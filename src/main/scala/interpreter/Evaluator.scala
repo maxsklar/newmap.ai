@@ -122,6 +122,15 @@ object Evaluator {
       case SubtypeType(parentType) => {
         SubtypeType(makeRelevantSubsitutions(parentType, env))
       }
+      case SubtypeFromMap(MapInstance(values, default)) => {
+        val newValues = for {
+          (k, v) <- values
+        } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
+
+        val newMapInstance = MapInstance(newValues, default)
+
+        SubtypeFromMap(newMapInstance)
+      }
     }
   }
 

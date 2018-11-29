@@ -42,16 +42,18 @@ object TypeChecker {
 
           functionTypeCheckerSuccess <- typeCheckFunctionType(functionType)
 
-          inputType = functionTypeCheckerSuccess match {
-            case StaticTypeFunctionChecked(inputType, outputType) => inputType
-          }
-
-          outputType = functionTypeCheckerSuccess match {
-            case StaticTypeFunctionChecked(inputType, outputType) => outputType
-          }
+          inputType = functionTypeCheckerSuccess.inputType
 
           successfullyTypeChecked <- typeCheck(input, inputType, env)
           inputValue = successfullyTypeChecked.objectFound
+
+          outputType <- functionTypeCheckerSuccess match {
+            case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
+            case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
+              val obj = params.find(x => x._1 == inputValue).map(_._2).getOrElse(paramsDefault)
+              Evaluator.convertObjectToType(obj, env)
+            }
+          }
         } yield {
           TypeChecked(outputType, ApplyFunction(functionValue, inputValue))
         }
@@ -160,6 +162,11 @@ object TypeChecker {
           case IndexT(j) => if (typeFoundExplicit) (j == i) else (j <= i)
           case _ => false
         }        
+      }
+      case SubtypeFromMapType(mi) => mi match {
+        case MapInstance(values, default) => {
+          false // TODO: fix this! Need Literals
+        }
       }
       case _ => (typeExpected == resolvedType)
     }
@@ -342,18 +349,18 @@ object TypeChecker {
     } yield nmt
   }
 
-  sealed abstract class FunctionTypeChecked
+  sealed abstract class FunctionTypeChecked(val inputType: NewMapType)
   case class StaticTypeFunctionChecked(
-    inputType: NewMapType,
+    override val inputType: NewMapType,
     outputType: NewMapType
-  ) extends FunctionTypeChecked
+  ) extends FunctionTypeChecked(inputType)
 
   // This is what happens in a struct, where different inputs produce different outputs
-  //case class DynamicTypeFunctionChecked(
-  //  inputType: NewMapType,
-  //  params: Vector[(NewMapObject, NewMapType)],
-  //  paramsDefault: NewMapType
-  //) extends FunctionTypeChecked
+  case class DynamicTypeFunctionChecked(
+    override val inputType: NewMapType,
+    params: Vector[(NewMapObject, NewMapObject)],
+    paramsDefault: NewMapObject
+  ) extends FunctionTypeChecked(inputType)
 
   // The type in question is purported to be a function (or anything applyable)
   // Therefore, it should have an input type, and an output type
@@ -362,7 +369,7 @@ object TypeChecker {
     functionType: NewMapType
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case IndexT(_) | TypeT | IdentifierT | ObjectT | SubstitutableT(_) => {
+      case IndexT(_) | TypeT | IdentifierT | ObjectT | SubstitutableT(_) | Subtype(_) | SubtypeFromMapType(_) => {
         Failure("Type " + functionType.toString + " not generally callable.")
       }
       case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
@@ -372,24 +379,20 @@ object TypeChecker {
         // TODO: This is a special case, because the function is a struct
         // - The input is a field of the struct
         // - The output is the value for that field, which varies in type
-        Failure("Cannot handle struct calls yet: " + functionType.toString)
+        //Failure("Cannot handle struct calls yet: " + functionType.toString)
 
         // This will work (uncomment DynamicTypeFunctionChecked) when index type can be quantified
-        //Success(DynamicTypeFunctionChecked(
-        //  inputType, // This requires the subtype of the params
-        //  params,
-        //  IndexT(1)
-        //))
+        Success(DynamicTypeFunctionChecked(
+          SubtypeFromMapType(paramsToObject(params)),
+          paramsToObject(params).values,
+          Index(1)
+        ))
       }
       case LambdaT(
         params: Vector[(String, NewMapType)],
         result: NewMapType
       ) => {
         Success(StaticTypeFunctionChecked(ParameterList(params), result))
-      }
-      case Subtype(t: NewMapType) => {
-        // This represents the function of whether something in the parent type is in the subtype
-        Success(StaticTypeFunctionChecked(t, IndexT(2)))
       }
     }
   }
@@ -442,7 +445,10 @@ object TypeChecker {
         }
       }
       case Subtype(t: NewMapType) => {
-        typeDepth(t, env) + 1
+        typeDepth(t, env) + 1 // TODO: this is also fishy, make a test
+      }
+      case SubtypeFromMapType(mapInstance: MapInstance) => {
+        1 // TODO: this is fishy, make a test
       }
     }
     result
@@ -461,6 +467,7 @@ object TypeChecker {
       case SubstitutableT(s: String) => ParameterObj(s)
       case TypeT => TypeType
       case Subtype(t: NewMapType) => SubtypeType(typeToObject(t))
+      case SubtypeFromMapType(m: MapInstance) => SubtypeFromMap(m)
     }
   }
 
@@ -475,7 +482,7 @@ object TypeChecker {
   }
 
 
-  def paramsToObject(params: Vector[(String, NewMapType)]): NewMapObject = {
+  def paramsToObject(params: Vector[(String, NewMapType)]): MapInstance = {
     val paramsAsObjects: Vector[(NewMapObject, NewMapObject)] = for {
       (name, nmt) <- params
     } yield {

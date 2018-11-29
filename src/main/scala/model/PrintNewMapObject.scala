@@ -1,6 +1,7 @@
 package ai.newmap.model
 
 import scala.collection.mutable.StringBuilder
+import ai.newmap.model._
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
@@ -60,8 +61,9 @@ object PrintNewMapObject {
       sb.append(")")
       sb.toString
     }
-    case SubtypeType(parentType) => {
-      "Subtype(" + this(parentType) + ")"
+    case SubtypeType(parent) => "Subtype(" + this(parent) + ")"
+    case SubtypeFromMap(mi) => mi match {
+      case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
     }
   }
 
@@ -102,6 +104,9 @@ object PrintNewMapObject {
       sb.toString
     }
     case SubstitutableT(s) => s
-    case Subtype(t) => "Subtype(" + applyType(t) + ")"
+    case Subtype(parent) => "Subtype(" + applyType(parent) + ")"
+    case SubtypeFromMapType(mi) => mi match {
+      case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
+    }
   }
 }

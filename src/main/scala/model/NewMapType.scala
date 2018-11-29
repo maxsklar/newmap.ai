@@ -19,8 +19,10 @@ case class SubstitutableT(s: String) extends NewMapType
 
 // Represents a type that contains a subset of the parent type
 case class Subtype(parent: NewMapType) extends NewMapType
+case class SubtypeFromMapType(values: MapInstance) extends NewMapType
 
-// TODO: subtypes
+// TODO: subtypes need to be fleshed out more
+
 // TODO: enumerated types
 // TODO: other kinds of maps
 // TODO: Callable Type?? (includes lambda and map)

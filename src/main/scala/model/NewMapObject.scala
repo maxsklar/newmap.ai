@@ -47,3 +47,4 @@ case class StructType(
 case class StructInstance(value: Vector[(String, NewMapObject)]) extends NewMapObject
 
 case class SubtypeType(parentType: NewMapObject) extends NewMapObject
+case class SubtypeFromMap(map: MapInstance) extends NewMapObject

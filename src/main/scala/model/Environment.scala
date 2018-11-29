@@ -108,6 +108,19 @@ object Environment {
       expression = StructType(
         ParameterObj("params")
       )
+    )),
+    EnvironmentCommand("Subtype", LambdaT(
+      params = Vector(
+        "parent" -> TypeT
+      ),
+      result = TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
+    ), LambdaInstance(
+      params = Vector(
+        "parent" -> TypeType
+      ),
+      expression = SubtypeType(
+        ParameterObj("parent")
+      )
     ))
   ))
 
