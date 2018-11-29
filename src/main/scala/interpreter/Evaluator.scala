@@ -44,6 +44,10 @@ object Evaluator {
           }
         }
       }
+      case (StructInstance(value: Vector[(String, NewMapObject)]), identifier) => {
+        val id = makeRelevantSubsitutions(identifier, env)
+        Success(value.find(x => IdentifierInstance(x._1) == id).map(_._2).getOrElse(Index(0)))
+      }
       case _ => {
         Failure("Not implemented: apply function when not lambdainstance and structinstance")
       }

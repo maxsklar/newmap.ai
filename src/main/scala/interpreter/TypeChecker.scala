@@ -107,7 +107,7 @@ object TypeChecker {
           env,
           typeFoundExplicit = false // TODO: set this to true if the type was explicitly set and it's just inferred
         ),
-        "In expression " + expression.toString + " expected type " + expectedType.toString + " found type " + typeFound + " and cannot convert\n\n" + env.toString
+        "In expression " + expression.toString + " expected type " + expectedType.toString + " found type " + typeFound + " and cannot convert\n"
       )
     } yield {
       TypeChecked(typeFound, valueFound)
@@ -376,14 +376,12 @@ object TypeChecker {
         Success(StaticTypeFunctionChecked(key, value))
       }
       case ParameterList(params: Vector[(String, NewMapType)]) => {
-        // TODO: This is a special case, because the function is a struct
-        // - The input is a field of the struct
-        // - The output is the value for that field, which varies in type
-        //Failure("Cannot handle struct calls yet: " + functionType.toString)
-
         // This will work (uncomment DynamicTypeFunctionChecked) when index type can be quantified
         Success(DynamicTypeFunctionChecked(
-          SubtypeFromMapType(paramsToObject(params)),
+          // TODO - this first param should really be SubtypeFromMapType(paramsToObject(params))
+          //  However, the identifier currently can't be recognized as that type, even if it's a param.
+          //  So once that's fixed, this can be changed over 
+          IdentifierT,
           paramsToObject(params).values,
           Index(1)
         ))
