@@ -189,7 +189,7 @@ object Evaluator {
           // This must be a identifier -> type map
           newParams <- convertMapInstanceStructToParams(values, env)
         } yield {
-          ParameterList(newParams)
+          StructT(newParams)
         }
       }
       case ParameterObj(name) => {
@@ -221,7 +221,7 @@ object Evaluator {
 
           newParams <- convertMapInstanceStructToParams(values, env)
         } yield {
-          ParameterList(newParams)
+          StructT(newParams)
         }
       }
       case _ => {

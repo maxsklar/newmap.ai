@@ -75,7 +75,7 @@ object PrintNewMapObject {
     case MapT(key, value, default) => {
       "Map (" + applyType(key) + ") => (" + applyType(value) + ") default " + apply(default)
     }
-    case ParameterList(params) => {
+    case StructT(params) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
       var bindings: Vector[String] = Vector.empty

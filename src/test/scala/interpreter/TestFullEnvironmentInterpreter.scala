@@ -108,7 +108,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     } yield {
       val correctCommand = EnvironmentCommand(
         "s",
-        ParameterList(Vector(("a",IndexT(2)), ("b",IndexT(3)))),
+        StructT(Vector(("a",IndexT(2)), ("b",IndexT(3)))),
         StructInstance(Vector(("a",Index(0)), ("b",Index(0)))))
       assert(r == correctCommand.toString)
     }

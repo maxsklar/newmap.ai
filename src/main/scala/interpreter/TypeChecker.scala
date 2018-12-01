@@ -71,7 +71,7 @@ object TypeChecker {
               TypeChecked(expectedType, MapInstance(mapValues, defaultValue))
             }
           }
-          case ParameterList(params: Vector[(String, NewMapType)]) => {
+          case StructT(params: Vector[(String, NewMapType)]) => {
             typeCheckStructStandalone(params, values, env)
           }
           case TypeT => {
@@ -332,7 +332,7 @@ object TypeChecker {
   ): Outcome[TypeChecked, String] = for {
     envCommands <- typeCheckStruct(parameterList, valueList, env)
   } yield {
-    val typeFound = ParameterList(envCommands.map(c => c.id -> c.nType))
+    val typeFound = StructT(envCommands.map(c => c.id -> c.nType))
     val objectFound = StructInstance(envCommands.map(c => c.id -> c.nObject))
     TypeChecked(typeFound, objectFound)
   }
@@ -375,7 +375,7 @@ object TypeChecker {
       case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
         Success(StaticTypeFunctionChecked(key, value))
       }
-      case ParameterList(params: Vector[(String, NewMapType)]) => {
+      case StructT(params: Vector[(String, NewMapType)]) => {
         // This will work (uncomment DynamicTypeFunctionChecked) when index type can be quantified
         Success(DynamicTypeFunctionChecked(
           // TODO - this first param should really be SubtypeFromMapType(paramsToObject(params))
@@ -390,7 +390,7 @@ object TypeChecker {
         params: Vector[(String, NewMapType)],
         result: NewMapType
       ) => {
-        Success(StaticTypeFunctionChecked(ParameterList(params), result))
+        Success(StaticTypeFunctionChecked(StructT(params), result))
       }
     }
   }
@@ -420,7 +420,7 @@ object TypeChecker {
     val result = nType match {
       case IndexT(i) => i
       case TypeT => 1
-      case IdentifierT | ObjectT | ParameterList(_) => 0
+      case IdentifierT | ObjectT | StructT(_) => 0
       case MapT(key, value, default) => {
         if (isSubtype(key, IdentifierT, env, false) && isSubtype(value, TypeT, env, false)) {
           default match {
@@ -458,7 +458,7 @@ object TypeChecker {
       case ObjectT => ObjectType
       case IdentifierT => IdentifierType
       case MapT(key, value, default) => MapType(typeToObject(key), typeToObject(value), default)
-      case ParameterList(params: Vector[(String, NewMapType)]) => paramsToObject(params)
+      case StructT(params: Vector[(String, NewMapType)]) => paramsToObject(params)
       case LambdaT(params, result) => {
         LambdaInstance(paramsToObjectParams(params), typeToObject(result))
       }
