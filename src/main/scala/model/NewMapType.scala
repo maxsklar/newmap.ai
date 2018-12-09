@@ -21,6 +21,42 @@ case class SubstitutableT(s: String) extends NewMapType
 case class Subtype(parent: NewMapType) extends NewMapType
 case class SubtypeFromMapType(values: MapInstance) extends NewMapType
 
+// TODO: Examine Well-foundedness
+// Concrete Types: IndexT, IdentifierT
+//   MapT when the inputs are well founded
+//   StructT when the inputs are well founded
+//   LambdaT when the inputs are well founded
+//   SubstitutableT when the inputs are well founded
+// Type Classes
+//   TypeT
+//   ObjectT
+//   Any of the type constructors when the inputs are not well founded.
+// Plus with IndexT (and eventually count) it's types all the way down!
+
+// IDEA: talk about types and sets (subtypes of the type)
+//  types can be narrowed down by their sets
+//  Type Classes will come in later!
+// RAW TYPES:
+//  -- Index/Count (increments) - each count is also an index
+//  -- IdentifierT (just unique phrases)
+//  -- maps (command = key + command for the value type)
+//  -- lambda expression
+// WHAT NEXT
+// -- Then, any subset or enum can be used as a type
+// IMPLICATIONS OF THIS
+// -- Each variable has a type, a subset, and a value
+// -- val x: TYPE = VALUE
+//  TYPE can either be an actual type or a subset (if it's a subset, the actual type is inferred)
+//  The VALUE cannot refer to an actual type, but can refer to a subset.
+//  Later on, we can create VALUEs that model the type system, and generate newmap code.
+
+// This also means that param maps are kind of a meta map - and they can be versioned as well - but in a separate domain
+
+
+// Idea: Concrete Types should be specifiable as objects
+//   Then type classes or abstract types??
+
+
 // TODO: subtypes need to be fleshed out more
 
 // TODO: enumerated types

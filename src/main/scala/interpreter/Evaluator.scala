@@ -10,14 +10,90 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case ApplyFunction(func, input) => applyFunctionAttempt(func, input, env)
-      case _ => {
-        // TODO - this is unimplemented. In reality you need to dive into the
-        // nObject structure and figure out how to apply
-        // Also - return something else if can't be evaluated fully
+      case Index(_) | ObjectType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) => {
         Success(nObject)
       }
+      case MapType(key, value, default) => {
+        for {
+          evalKey <- this(key, env)
+          evalValue <- this(value, env)
+          evalDefault <- this(default, env)
+        } yield {
+          MapType(evalKey, evalValue, evalDefault)
+        }
+      }
+      case MapInstance(values: Vector[(NewMapObject, NewMapObject)], default) => {
+        for {
+          evalDefault <- this(default, env)
+          evalValues <- evalMapInstanceVals(values, env)
+        } yield MapInstance(evalValues, evalDefault)
+      }
+      case LambdaInstance(params: Vector[(String, NewMapObject)], expression) => {
+        for {
+          evalExpression <- this(expression, env)
+          evalParams <- evalParameters(params, env)
+        } yield LambdaInstance(evalParams, evalExpression)
+      }
+      case ApplyFunction(func, input) => {
+        for {
+          evalFunc <- this(func, env)
+          evalInput <- this(input, env)
+          result <- applyFunctionAttempt(evalFunc, evalInput, env)
+        } yield result
+      }
+      case StructType(params) => {
+        for {
+          evalParams <- this(params, env)
+        } yield StructType(evalParams)
+      }
+      case StructInstance(value: Vector[(String, NewMapObject)]) => {
+        for {
+          evalValue <- evalParameters(value, env)
+        } yield StructInstance(evalValue)
+      }
+      case SubtypeType(parentType) => {
+        for {
+          evalParentType <- this(parentType, env)
+        } yield SubtypeType(evalParentType)
+      }
+      case SubtypeFromMap(map: MapInstance) => {
+        for {
+          evalMapValues <- evalMapInstanceVals(map.values, env)
+          evalMapDefault <- this(map.default, env)
+        } yield SubtypeFromMap(MapInstance(evalMapValues, evalMapDefault))
+      }
     }
+  }
+
+  def evalMapInstanceVals(
+    values: Vector[(NewMapObject, NewMapObject)],
+    env: Environment
+  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = values match {
+    case (k, v) +: restOfValues => {
+      for {
+        evalK <- this(k, env)
+        evalV <- this(v, env)
+        evalRest <- evalMapInstanceVals(restOfValues, env)
+      } yield {
+        (evalK -> evalV) +: evalRest
+      }
+    }
+    case _ => Success(Vector.empty)
+  }
+
+  def evalParameters(
+    params: Vector[(String, NewMapObject)],
+    env: Environment
+  ): Outcome[Vector[(String, NewMapObject)], String] = params match {
+    case (k, v) +: restOfValues => {
+      for {
+        evalV <- this(v, env)
+        evalRest <- evalParameters(restOfValues, env)
+      } yield {
+        (k -> evalV) +: evalRest
+      }
+    }
+    case _ => Success(Vector.empty)
   }
 
   def applyFunctionAttempt(

@@ -44,7 +44,7 @@ object NewMapParser extends Parsers {
   private def enclosure: Parser[Enclosure] = {
     val pattern = {
       Lexer.Enc(Paren, true) ~
-        repsep(expression ~ Lexer.Colon() ~ expression, Lexer.Comma()) ~
+        repsep(expression ~ Lexer.Colon() ~ expressionList, Lexer.Comma()) ~
         Lexer.Enc(Paren, false)
     }
     pattern ^^ {
@@ -58,7 +58,7 @@ object NewMapParser extends Parsers {
   }
 
   private def lambdaParse: Parser[LambdaParse] = {
-    enclosure ~ Lexer.Enc(CurlyBrace, true) ~ expression ~ Lexer.Enc(CurlyBrace, false) ^^ {
+    enclosure ~ Lexer.Enc(CurlyBrace, true) ~ expressionList ~ Lexer.Enc(CurlyBrace, false) ^^ {
       case Enclosure(Paren, pairs) ~ _ ~ exp ~ _ => {
         LambdaParse(pairs, exp)
       }

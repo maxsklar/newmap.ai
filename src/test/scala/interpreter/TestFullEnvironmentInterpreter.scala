@@ -139,4 +139,36 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       case Success(msg) => ()
     }
   }
+
+  it should " be considered a type in a type input" in {
+    val interp = new EnvironmentInterpreter()
+
+    val result = for {
+      r <- interp("val testType: Type = Map (key: Struct (params: (a: 3, b: 3)), value: 100, default: 0)")
+    } yield {
+      val correctCommand = EnvironmentCommand(
+        "testType",
+        TypeT,
+        MapType(
+          StructType(
+            MapInstance(
+              Vector(
+                IdentifierInstance("a") -> Index(3),
+                IdentifierInstance("b") -> Index(3)
+              ),
+              Index(1)
+            )
+          ),
+          Index(100),
+          Index(0)
+        )
+      )
+      assert(r == correctCommand.toString)
+    }
+    
+    result match {
+      case Failure(msg) => fail(msg)
+      case Success(msg) => ()
+    }
+  }
 }
