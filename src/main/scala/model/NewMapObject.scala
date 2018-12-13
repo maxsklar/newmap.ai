@@ -10,7 +10,6 @@ sealed abstract class NewMapObject {
 
 case class Index(i: Long) extends NewMapObject
 
-case object ObjectType extends NewMapObject
 case object TypeType extends NewMapObject
 
 case object IdentifierType extends NewMapObject

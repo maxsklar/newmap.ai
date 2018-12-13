@@ -7,8 +7,8 @@ import ai.newmap.util.{Outcome, Success, Failure}
 class TestTypeCheck extends FlatSpec {
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {
-  	  case Success(TypeChecked(typeFound, objectFound)) => {
-  	  	assert(typeFound == IndexT(5))
+  	  case Success(NewMapObjectWithType(objectFound, typeInfo)) => {
+  	  	assert(typeInfo == NewMapTypeInfo.init)
   	  	assert(objectFound == Index(4))
   	  }
   	  case Failure(reason) => fail(reason)
@@ -17,9 +17,9 @@ class TestTypeCheck extends FlatSpec {
 
   "A variable" should " be interpreted correctly" in {
   	TypeChecker(IdentifierParse("x")) match {
-  	  case Success(TypeChecked(typeFound, objectFound)) => {
-        assert(typeFound == IdentifierT)
-        assert(objectFound == IdentifierInstance("x"))
+  	  case Success(result) => {
+        assert(result.nObject == IdentifierInstance("x"))
+        assert(result.nTypeInfo == NewMapTypeInfo.init)
       }
   	  case Failure(reason) => fail(reason)
   	}
@@ -27,9 +27,9 @@ class TestTypeCheck extends FlatSpec {
 
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
-  	  case Success(TypeChecked(typeFound, objectFound)) => {
-  	  	assert(typeFound == TypeT)
-  	  	assert(objectFound == TypeType)
+  	  case Success(result) => {
+  	  	assert(result.nTypeInfo == ExplicitlyTyped(TypeT))
+  	  	assert(result.nObject == TypeType)
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -37,9 +37,9 @@ class TestTypeCheck extends FlatSpec {
 
   it should " be interpreted as an identifier if forced" in {
     TypeChecker(IdentifierParse("Type", true)) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-      	assert(typeFound == IdentifierT)
-      	assert(objectFound == IdentifierInstance("Type"))
+      case Success(result) => {
+        assert(result.nObject == IdentifierInstance("Type"))
+        assert(result.nTypeInfo == NewMapTypeInfo.init)
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -47,12 +47,12 @@ class TestTypeCheck extends FlatSpec {
 
   "A simple lambda expression " should " work" in {
     val expression = LambdaParse(
-      Vector(IdentifierParse("x") -> IdentifierParse("Object")),
+      Vector(IdentifierParse("x") -> NaturalNumberParse(12)),
       IdentifierParse("x")
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
+      case Success(result) => {
         ()
       }
       case Failure(reason) => fail(reason)
@@ -69,7 +69,12 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
+      case Success(result) => {
+        result.nTypeInfo match {
+          case ImplicitlyTyped(_) => fail(result + " should be explicit")
+          case _ => ()
+        }
+
         // TODO: check these are right
         //println(typeFound)
         //println(objectFound)
@@ -88,8 +93,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-        fail("It wrongfully succeeded, " + objectFound.toString + ": " + typeFound.toString)
+      case Success(result) => {
+        fail("It wrongfully succeeded with " + result.toString)
       }
       case Failure(reason) => {
         // TODO: turn reason into a case class, and check that the right error occurred
@@ -108,8 +113,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-        fail("It wrongfully succeeded, " + objectFound.toString + ": " + typeFound.toString)
+      case Success(result) => {
+        fail("It wrongfully succeeded with " + result)
       }
       case Failure(reason) => {
         //println(reason)
@@ -133,7 +138,12 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
+      case Success(result) => {
+        result.nTypeInfo match {
+          case ImplicitlyTyped(_) => fail(result + " should be explicit")
+          case _ => ()
+        }
+
         // TODO: Check these are right
         //println(typeFound)
         //println(objectFound)
@@ -157,8 +167,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-        fail("It wrongfully succeeded, " + objectFound.toString + ": " + typeFound.toString)
+      case Success(result) => {
+        fail("It wrongfully succeeded " + result.toString)
       }
       case Failure(reason) => {
         //println(reason)
@@ -177,8 +187,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-        fail("It wrongfully succeeded, " + objectFound.toString + ": " + typeFound.toString)
+      case Success(result) => {
+        fail("It wrongfully succeeded with " + result)
       }
       case Failure(reason) => {
         //println(reason)
@@ -198,8 +208,8 @@ class TestTypeCheck extends FlatSpec {
     )))
 
     TypeChecker(booleanMap) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
-      	assert(typeFound == TypeT)
+      case Success(result) => {
+      	assert(result.nTypeInfo == ExplicitlyTyped(TypeT))
         //println(objectFound)
 
       	// TODO: what should we do with this?
@@ -242,7 +252,7 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(TypeChecked(typeFound, objectFound)) => {
+      case Success(result) => {
         ()
       }
       case Failure(reason) => {

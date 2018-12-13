@@ -13,11 +13,6 @@ case class EnvironmentCommand(
   }
 }
 
-case class ObjectWithType(
-  nType: NewMapType,
-  nObject: NewMapObject
-)
-
 case class Environment(commands: Vector[EnvironmentCommand]) {
   def typeOf(
     identifier: String
@@ -31,10 +26,10 @@ case class Environment(commands: Vector[EnvironmentCommand]) {
     commands.reverse.find(_.id == identifier).map(_.nObject)
   }
 
-  def lookup(identifier: String): Option[ObjectWithType] = {
+  def lookup(identifier: String): Option[NewMapObjectWithType] = {
     val resultOpt = commands.reverse.find(_.id == identifier)
     resultOpt.map(result => {
-      ObjectWithType(result.nType, result.nObject)
+      NewMapObjectWithType(result.nObject, ExplicitlyTyped(result.nType))
     })
   }
 
@@ -74,7 +69,6 @@ case class Environment(commands: Vector[EnvironmentCommand]) {
 
 object Environment {
   val Base: Environment = Environment(Vector(
-    EnvironmentCommand("Object", TypeT, ObjectType),
     EnvironmentCommand("Type", TypeT, TypeType),
     EnvironmentCommand("Identifier", TypeT, IdentifierType),
     EnvironmentCommand("Map", LambdaT(

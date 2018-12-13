@@ -6,7 +6,6 @@ import ai.newmap.model._
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case Index(i) => i.toString
-    case ObjectType => "Object"
     case TypeType => "Type"
     case IdentifierType => "Identifier"
     case IdentifierInstance(s) => s
@@ -70,7 +69,6 @@ object PrintNewMapObject {
   def applyType(nType: NewMapType): String = nType match {
     case IndexT(i) => i.toString
     case TypeT => "Type"
-    case ObjectT => "Object"
     case IdentifierT => "Identifier"
     case MapT(key, value, default) => {
       "Map (" + applyType(key) + ") => (" + applyType(value) + ") default " + apply(default)
@@ -108,5 +106,12 @@ object PrintNewMapObject {
     case SubtypeFromMapType(mi) => mi match {
       case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
     }
+  }
+
+  def applyObjectWithType(nObjectWithType: NewMapObjectWithType): String = {
+    apply(nObjectWithType.nObject) + " : " + (nObjectWithType.nTypeInfo match {
+      case ExplicitlyTyped(nType) => applyType(nType)
+      case ImplicitlyTyped(convs) => "{" + convs.map(applyType).mkString(", ") + "}"
+    })
   }
 }

@@ -10,7 +10,6 @@ sealed abstract class NewMapType{
 
 case class IndexT(i: Long) extends NewMapType
 case object TypeT extends NewMapType
-case object ObjectT extends NewMapType
 case object IdentifierT extends NewMapType
 case class MapT(key: NewMapType, value: NewMapType, default: NewMapObject) extends NewMapType
 case class StructT(params: Vector[(String, NewMapType)]) extends NewMapType
@@ -52,6 +51,7 @@ case class SubtypeFromMapType(values: MapInstance) extends NewMapType
 
 // This also means that param maps are kind of a meta map - and they can be versioned as well - but in a separate domain
 
+// What about type classes?
 
 // Idea: Concrete Types should be specifiable as objects
 //   Then type classes or abstract types??

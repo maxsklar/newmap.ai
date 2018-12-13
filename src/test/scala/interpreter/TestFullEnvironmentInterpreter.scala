@@ -100,7 +100,26 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     }
   }
 
-  "a struct " should " be created" in {
+  it should " be creatable without explicit parameters" in {
+    val interp = new EnvironmentInterpreter()
+
+    // This is the first use of automatic
+    val code = "val m: Type = Map (3, 100, 0)"
+
+    interp(code) match {
+      case Failure(msg) => fail(msg)
+      case Success(msg) => {
+        val correctCommand = EnvironmentCommand(
+          "m",
+          TypeT,
+          MapType(Index(3), Index(100), Index(0))
+        )
+        assert(msg == correctCommand.toString)
+      }
+    }
+  }
+
+  "A struct " should " be created" in {
     val interp = new EnvironmentInterpreter()
 
     val result = for {

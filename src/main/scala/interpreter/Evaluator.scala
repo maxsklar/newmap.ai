@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case Index(_) | ObjectType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) => {
+      case Index(_) | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) => {
         Success(nObject)
       }
       case MapType(key, value, default) => {
@@ -165,7 +165,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | ObjectType | TypeType | IdentifierType | IdentifierInstance(_) => expression
+      case Index(_) | TypeType | IdentifierType | IdentifierInstance(_) => expression
       case MapType(key, value, default) => {
         MapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env), makeRelevantSubsitutions(default, env))
       }
@@ -239,7 +239,6 @@ object Evaluator {
   ): Outcome[NewMapType, String] = {
     objectFound match {
       case Index(i) => Success(IndexT(i))
-      case ObjectType => Success(ObjectT)
       case TypeType => Success(TypeT)
       case IdentifierType => Success(IdentifierT)
       case MapType(key, value, default) => {

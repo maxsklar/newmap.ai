@@ -19,8 +19,8 @@ object StatementInterpreter {
 
     for {
       typeAsType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
-      tc <- TypeChecker.typeCheck(objExpression, typeAsType, env)
-      evaluatedObject <- Evaluator(tc.objectFound, env)
+      tc <- TypeChecker.typeCheck(objExpression, ExplicitlyTyped(typeAsType), env)
+      evaluatedObject <- Evaluator(tc.nObject, env)
     } yield {
       Vector(EnvironmentCommand(id.s, typeAsType, evaluatedObject))
     }
