@@ -23,48 +23,23 @@ object TypeChecker {
           case None => Success(NewMapObjectWithType.untyped(IdentifierInstance(s)))
         }
       }
-      case ApplyParse(func: ParseTree, input: ParseTree) => {
-        val funcResult = typeCheck(
-          func,
-          NewMapTypeInfo.init, // TODO - can we do better here? gotta call typeCheckFunctionType later - maybe we can put a function kind here
-          env
-        )
-
+      case ApplyParse(startingFunction: ParseTree, applications: Vector[ParseTree]) => {
         for {
-          functionTypeChecked <- funcResult
-
-          functionValue = functionTypeChecked.nObject
-  
-          functionType <- functionTypeChecked.nTypeInfo match {
-            case ExplicitlyTyped(nType) => Success(nType)
-            case ImplicitlyTyped(_) => Failure(
-              "Functions must be explicitly typed for now. Implicit function types are not yet supported\n" ++
-              functionValue.toString
+          functionTypeChecked <- {
+            typeCheck(
+              startingFunction,
+               // TODO - can we do better here? gotta call typeCheckFunctionType later - maybe we can put a function kind here
+              NewMapTypeInfo.init,
+              env
             )
           }
-  
-          functionTypeCheckerSuccess <- typeCheckFunctionType(functionType)
 
-          inputType = functionTypeCheckerSuccess.inputType
-
-          // Ensures that the input can be converted to the right type
-          successfullyTypeChecked <- typeCheck(input, ExplicitlyTyped(inputType), env)
-          inputValue = successfullyTypeChecked.nObject
-
-          outputType <- functionTypeCheckerSuccess match {
-            case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
-            case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
-              val obj = params.find(x => x._1 == inputValue).map(_._2).getOrElse(paramsDefault)
-              Evaluator.convertObjectToType(obj, env)
-            }
-          }
-        } yield {
-          NewMapObjectWithType.withTypeE(ApplyFunction(functionValue, inputValue), outputType)
-        }
+          result <- processMultipleFunctionApplications(functionTypeChecked, applications, env)
+        } yield result  
       }
-      case Enclosure(encloseType, values: Vector[(ParseTree, ParseTree)]) => {
+      case CommandList(values: Vector[CommandItem]) => {
         expectedType match {
-          case ExplicitlyTyped(MapT(IdentifierT, TypeT, default)) if (encloseType == Paren) => {
+          case ExplicitlyTyped(MapT(IdentifierT, TypeT, default)) => {
             val mapT = MapT(IdentifierT, TypeT, default)
             // TODO - do we really want to consider this a parameter list, or just treat it like another map?
             typeCheckParamsStandalone(values, env, mapT)
@@ -81,16 +56,21 @@ object TypeChecker {
             typeCheckStructStandalone(params, values, env)
           }
           case ExplicitlyTyped(TypeT) => {
-            // Since this enclose is a type, we're going to assume that it's a struct description
+            // Since this commandList is a type, we're going to assume that it's a struct description
             // TODO: What if it's a case description??
             typeCheckParamsStandalone(values, env, TypeT)
           }
-          case _ => Failure("Enclosures must be explicit: " + values + " exp: " + expectedType)
+          case _ => Failure("CommandLists must be explicit: " + values + " exp: " + expectedType)
         }
       }
       case LambdaParse(params, expression) => {
         for {
-          newParams <- typeCheckParameterList(params, env)
+          paramValues <- params match {
+            case CommandList(values) => Success(values)
+            case _ => Failure("Lambda Values must be commands")
+          }
+
+          newParams <- typeCheckParameterList(paramValues, env)
           tc <- typeCheck(expression, NewMapTypeInfo.init, env.newParams(newParams))
 
           typeFound <- tc.nTypeInfo match {
@@ -121,12 +101,12 @@ object TypeChecker {
   }
 
   def typeCheckLiteralMap(
-    values: Vector[(ParseTree, ParseTree)],
+    values: Vector[CommandItem],
     expectedType: MapT,
     env: Environment
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     values match {
-      case (k, v) +: restOfValues => {
+      case BindingCommandItem(k, v) +: restOfValues => {
         for {
           tc <- typeCheck(k, ExplicitlyTyped(expectedType.key), env)
           objectFoundKey = tc.nObject
@@ -138,6 +118,9 @@ object TypeChecker {
         } yield {
           (objectFoundKey -> objectFoundValue) +: restOfMap
         }
+      }
+      case SingletonCommandItem(s) +: _ => {
+        Failure("No binding found in map for item " + s)
       }
       case _ => Success(Vector.empty)
     }
@@ -401,11 +384,11 @@ object TypeChecker {
 
   // TODO: This fails on a struct!!!
   def typeCheckParameterList(
-    parameterList: Vector[(ParseTree, ParseTree)],
+    parameterList: Vector[CommandItem],
     env: Environment
   ): Outcome[Vector[(String, NewMapType)], String] = {
     parameterList match {
-      case (identifier, typeOfIdentifier) +: otherIdentifiers => {
+      case BindingCommandItem(identifier, typeOfIdentifier) +: otherIdentifiers => {
         checkForIdentifier(identifier, env) match {
           case NotAnIdentifier => Failure("Expected Identifier: " + identifier.toString)
           case FoundIdentifier(name) => {
@@ -430,12 +413,15 @@ object TypeChecker {
           }
         }
       }
+      case SingletonCommandItem(_) +: _ => {
+        Failure("Must bind an identifier and a type in the parameter list.")
+      }
       case _ => Success(Vector.empty)
     }
   }
 
   def typeCheckParamsStandalone(
-    parameterList: Vector[(ParseTree, ParseTree)],
+    parameterList: Vector[CommandItem],
     env: Environment,
     expectedType: NewMapType
   ): Outcome[NewMapObjectWithType, String] = for {
@@ -449,11 +435,11 @@ object TypeChecker {
    */
   def typeCheckStruct(
     parameterList: Vector[(String, NewMapType)],
-    valueList: Vector[(ParseTree, ParseTree)],
+    valueList: Vector[CommandItem],
     env: Environment
   ): Outcome[Vector[EnvironmentCommand], String] = {
     (parameterList, valueList) match {
-      case (((paramId, typeOfIdentifier) +: restOfParamList), ((valueIdentifier, valueObject) +: restOfValueList)) => {
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         val valueIdOpt = checkForKnownIdentifier(valueIdentifier, env)
 
         valueIdOpt match {
@@ -475,6 +461,18 @@ object TypeChecker {
             Failure("Id note found for " + paramId)
           }
         }
+      }      
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (SingletonCommandItem(valueObject) +: restOfValueList)) => {
+        // TODO: this is pasted code from inside the case above.
+        for {
+          tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
+
+          envCommand = EnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
+          newEnv = env.newCommand(envCommand)
+          result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
+        } yield {
+          envCommand +: result
+        }
       }
       case _ => {
         if (parameterList.isEmpty && valueList.isEmpty) {
@@ -490,7 +488,7 @@ object TypeChecker {
 
   def typeCheckStructStandalone(
     parameterList: Vector[(String, NewMapType)],
-    valueList: Vector[(ParseTree, ParseTree)],
+    valueList: Vector[CommandItem],
     env: Environment
   ): Outcome[NewMapObjectWithType, String] = for {
     envCommands <- typeCheckStruct(parameterList, valueList, env)
@@ -651,6 +649,67 @@ object TypeChecker {
       IdentifierInstance(name) -> typeToObject(nmt)
     }
     MapInstance(paramsAsObjects, Index(1))
+  }
+
+  def processMultipleFunctionApplications(
+    startingFunction: NewMapObjectWithType,
+    applications: Vector[ParseTree],
+    env: Environment
+  ): Outcome[NewMapObjectWithType, String] = applications match {
+    case (firstApplication +: restOfApplications) => {
+      for {
+        functionType <- startingFunction.nTypeInfo match {
+          case ExplicitlyTyped(nType) => Success(nType)
+          case ImplicitlyTyped(_) => Failure(
+            "Functions must be explicitly typed for now. Implicit function types are not yet supported\n" ++
+            startingFunction.nObject.toString
+          )
+        }
+
+        functionTypeChecked <- typeCheckFunctionType(functionType)
+
+        resultOfFirstApplication <- processFunctionApplication(startingFunction, functionTypeChecked, firstApplication, env)
+
+        result <- processMultipleFunctionApplications(resultOfFirstApplication, restOfApplications, env)
+      } yield result
+    }
+    case _ => {
+      Success(startingFunction)
+    }
+  }
+
+  def processFunctionApplication(
+    startingFunction: NewMapObjectWithType,
+    functionTypeChecked: FunctionTypeChecked,
+    input: ParseTree,
+    env: Environment
+  ): Outcome[NewMapObjectWithType, String] = {
+    for {
+      // Ensures that the input can be converted to the right type
+      successfullyTypeChecked <- typeCheck(
+        input,
+        ExplicitlyTyped(functionTypeChecked.inputType),
+        env
+      )
+
+      inputValue = successfullyTypeChecked.nObject
+
+      outputType <- functionTypeChecked match {
+        case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
+        case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
+          val obj = params.find(x => x._1 == inputValue).map(_._2).getOrElse(paramsDefault)
+          Evaluator.convertObjectToType(obj, env)
+        }
+      }
+    } yield {
+      NewMapObjectWithType.withTypeE(
+        ApplyFunction(
+          startingFunction.nObject,
+          inputValue
+        ),
+        outputType
+      )
+    }
   }
 
   def apply(

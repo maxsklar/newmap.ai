@@ -47,7 +47,9 @@ class TestTypeCheck extends FlatSpec {
 
   "A simple lambda expression " should " work" in {
     val expression = LambdaParse(
-      Vector(IdentifierParse("x") -> NaturalNumberParse(12)),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("x"), NaturalNumberParse(12))
+      )),
       IdentifierParse("x")
     )
 
@@ -61,10 +63,10 @@ class TestTypeCheck extends FlatSpec {
 
   "If x is declared as a type, y " should " be able to be declared as type x" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("x") -> IdentifierParse("Type"),
-        IdentifierParse("y") -> IdentifierParse("x")
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type")),
+        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x"))
+      )),
       IdentifierParse("y"),
     )
 
@@ -85,10 +87,10 @@ class TestTypeCheck extends FlatSpec {
 
   it should " fail when the order is reversed" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("y") -> IdentifierParse("x"),
-        IdentifierParse("x") -> IdentifierParse("Type")
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x")),
+        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type"))
+      )),
       IdentifierParse("y"),
     )
 
@@ -104,11 +106,11 @@ class TestTypeCheck extends FlatSpec {
 
    it should " fail if another type is extraced" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("x") -> IdentifierParse("Type"),
-        IdentifierParse("y") -> IdentifierParse("x"),
-        IdentifierParse("z") -> IdentifierParse("y")
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type")),
+        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x")),
+        BindingCommandItem(IdentifierParse("z"), IdentifierParse("y"))
+      )),
       IdentifierParse("z"),
     )
 
@@ -125,15 +127,15 @@ class TestTypeCheck extends FlatSpec {
 
   "A numerical type " should " beget lots of subtypes" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("a") -> NaturalNumberParse(100),
-        IdentifierParse("b") -> IdentifierParse("a"),
-        IdentifierParse("c") -> IdentifierParse("b"),
-        IdentifierParse("d") -> IdentifierParse("c"),
-        IdentifierParse("e") -> IdentifierParse("d"),
-        IdentifierParse("f") -> IdentifierParse("e"),
-        IdentifierParse("g") -> IdentifierParse("f"),
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(100)),
+        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a")),
+        BindingCommandItem(IdentifierParse("c"), IdentifierParse("b")),
+        BindingCommandItem(IdentifierParse("d"), IdentifierParse("c")),
+        BindingCommandItem(IdentifierParse("e"), IdentifierParse("d")),
+        BindingCommandItem(IdentifierParse("f"), IdentifierParse("e")),
+        BindingCommandItem(IdentifierParse("g"), IdentifierParse("f")),
+      )),
       IdentifierParse("g"),
     )
 
@@ -154,15 +156,15 @@ class TestTypeCheck extends FlatSpec {
 
   "A numerical type " should " not get infinite subtyping" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("a") -> NaturalNumberParse(3),
-        IdentifierParse("b") -> IdentifierParse("a"),
-        IdentifierParse("c") -> IdentifierParse("b"),
-        IdentifierParse("d") -> IdentifierParse("c"),
-        IdentifierParse("e") -> IdentifierParse("d"),
-        IdentifierParse("f") -> IdentifierParse("e"),
-        IdentifierParse("g") -> IdentifierParse("f"),
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(3)),
+        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a")),
+        BindingCommandItem(IdentifierParse("c"), IdentifierParse("b")),
+        BindingCommandItem(IdentifierParse("d"), IdentifierParse("c")),
+        BindingCommandItem(IdentifierParse("e"), IdentifierParse("d")),
+        BindingCommandItem(IdentifierParse("f"), IdentifierParse("e")),
+        BindingCommandItem(IdentifierParse("g"), IdentifierParse("f")),
+      )),
       IdentifierParse("g"),
     )
 
@@ -179,10 +181,10 @@ class TestTypeCheck extends FlatSpec {
 
   "The zero type " should " be recognized as a type even though no object exists" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("a") -> NaturalNumberParse(0),
-        IdentifierParse("b") -> IdentifierParse("a")
-      ),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(0)),
+        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a"))
+      )),
       IdentifierParse("a"),
     )
 
@@ -201,11 +203,11 @@ class TestTypeCheck extends FlatSpec {
   "A boolean map " should " be interpreted correctly" in {
   	val booleanMap = ApplyParse(
       IdentifierParse("Map"),
-      Enclosure(Paren, Vector(
-        IdentifierParse("key") -> NaturalNumberParse(2),
-        IdentifierParse("value") -> NaturalNumberParse(2),
-        IdentifierParse("default") -> NaturalNumberParse(0)
-    )))
+      Vector(CommandList(Vector(
+        BindingCommandItem(IdentifierParse("key"), NaturalNumberParse(2)),
+        BindingCommandItem(IdentifierParse("value"), NaturalNumberParse(2)),
+        BindingCommandItem(IdentifierParse("default"), NaturalNumberParse(0))
+    ))))
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
@@ -233,21 +235,22 @@ class TestTypeCheck extends FlatSpec {
   // TODO - this fails because structs fail!
   "Applying a Function in a lambda " should " work if the types are right" in {
     val expression = LambdaParse(
-      Vector(
-        IdentifierParse("inputType") -> IdentifierParse("Type"),
-        IdentifierParse("outputType") -> IdentifierParse("Type"),
-        IdentifierParse("f") -> LambdaParse(
-          Vector(IdentifierParse("input") -> IdentifierParse("inputType")),
+      CommandList(Vector(
+        BindingCommandItem(IdentifierParse("inputType"), IdentifierParse("Type")),
+        BindingCommandItem(IdentifierParse("outputType"), IdentifierParse("Type")),
+        BindingCommandItem(IdentifierParse("f"), LambdaParse(
+          CommandList(Vector(
+            BindingCommandItem(IdentifierParse("input"), IdentifierParse("inputType"))
+          )),
           IdentifierParse("outputType")
-        ),
-        IdentifierParse("x") -> IdentifierParse("inputType")
-      ),
+        )),
+        BindingCommandItem(IdentifierParse("x"), IdentifierParse("inputType"))
+      )),
       ApplyParse(
         IdentifierParse("f"),
-        Enclosure(
-          Paren,
-          Vector(IdentifierParse("input") -> IdentifierParse("x"))
-        )
+        Vector(CommandList(Vector(
+          BindingCommandItem(IdentifierParse("input"), IdentifierParse("x"))
+        )))
       )
     )
 

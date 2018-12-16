@@ -11,19 +11,28 @@ case class IdentifierParse(
   force: Boolean = false // If this is true, the identifier is forced to be a raw identifier, and not a keyword or substitute
 ) extends ParseTree
 
-case class Enclosure(
-  symbol: EnclosureSymbol,
-  values: Vector[(ParseTree, ParseTree)]
+sealed abstract class CommandItem
+
+case class BindingCommandItem(
+  key: ParseTree,
+  value: ParseTree
+) extends CommandItem
+
+case class SingletonCommandItem(
+  value: ParseTree
+) extends CommandItem
+
+case class CommandList(
+  values: Vector[CommandItem]
 ) extends ParseTree
 
-// TODO: we should make this a list of expressions to apply in sequence
 case class ApplyParse(
-  func: ParseTree,
-  input: ParseTree
+  function: ParseTree,
+  applications: Vector[ParseTree]
 ) extends ParseTree
 
 case class LambdaParse(
-  params: Vector[(ParseTree, ParseTree)],
+  params: ParseTree,
   expression: ParseTree
 ) extends ParseTree
 

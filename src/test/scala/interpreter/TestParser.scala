@@ -39,18 +39,18 @@ class TestParser extends FlatSpec {
   "Apply function " should " work for f(x)" in {
     val tokens = Vector(Identifier("f"), Enc(Paren, true), Identifier("x"), Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      ApplyParse(IdentifierParse("f"), IdentifierParse("x"))
+      ApplyParse(IdentifierParse("f"), Vector(IdentifierParse("x")))
     ))
   }
 
   it should " work for f 5" in {
     val tokens = Vector(Identifier("f"), Number(5))
     assert(NewMapParser(tokens) == Success(
-      ApplyParse(IdentifierParse("f"), NaturalNumberParse(5))
+      ApplyParse(IdentifierParse("f"), Vector(NaturalNumberParse(5)))
     ))
   }
 
-  "An enclosure " should " be parsed with one element" in {
+  "A command list " should " be parsed with one element" in {
     val tokens = Vector(
       Enc(Paren, true),
       Identifier("digit"),
@@ -58,7 +58,7 @@ class TestParser extends FlatSpec {
       Number(10),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      Enclosure(Paren, Vector(IdentifierParse("digit") -> NaturalNumberParse(10)))
+      CommandList(Vector(BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10))))
     ))
   }
 
@@ -74,11 +74,10 @@ class TestParser extends FlatSpec {
       Identifier("Type"),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      Enclosure(
-        Paren,
+      CommandList(
         Vector(
-          IdentifierParse("digit") -> NaturalNumberParse(10),
-          IdentifierParse("T") -> IdentifierParse("Type")
+          BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10)),
+          BindingCommandItem(IdentifierParse("T"), IdentifierParse("Type"))
         )
       )
     ))
@@ -87,9 +86,24 @@ class TestParser extends FlatSpec {
   it should " be parsed with zero elements" in {
     val tokens = Vector(
       Enc(Paren, true),
+      Identifier("3"),
+      Enc(Paren, false))
+  }
+
+  it should " work with singleton elements" in {
+    val tokens = Vector(
+      Enc(Paren, true),
+      Number(10),
+      Comma(),
+      Number(5),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      Enclosure(Paren, Vector.empty)
+      CommandList(
+        Vector(
+          SingletonCommandItem(NaturalNumberParse(10)), 
+          SingletonCommandItem(NaturalNumberParse(5))
+        )
+      )
     ))
   }
 
@@ -105,7 +119,10 @@ class TestParser extends FlatSpec {
       Enc(CurlyBrace, false)
     )
     assert(NewMapParser(tokens) == Success(
-      LambdaParse(Vector(IdentifierParse("d") -> NaturalNumberParse(5)), IdentifierParse("d"))
+      LambdaParse(
+        CommandList(Vector(BindingCommandItem(IdentifierParse("d"), NaturalNumberParse(5)))),
+        IdentifierParse("d")
+      )
     ))
   }
 }

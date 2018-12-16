@@ -41,7 +41,7 @@ object NewMapParser extends Parsers {
     }
   }
 
-  private def enclosure: Parser[Enclosure] = {
+  private def commandList: Parser[CommandList] = {
     val pattern = {
       Lexer.Enc(Paren, true) ~
         repsep(expression ~ Lexer.Colon() ~ expressionList, Lexer.Comma()) ~
@@ -50,28 +50,32 @@ object NewMapParser extends Parsers {
     pattern ^^ {
       case _ ~ items ~ _ => {
         val pairs = items.map(item => {
-          (item._1._1-> item._2)
+          BindingCommandItem(item._1._1,  item._2)
         })
-        Enclosure(Paren, pairs.toVector)
+        CommandList(pairs.toVector)
       }
     }
   }
 
   private def lambdaParse: Parser[LambdaParse] = {
-    enclosure ~ Lexer.Enc(CurlyBrace, true) ~ expressionList ~ Lexer.Enc(CurlyBrace, false) ^^ {
-      case Enclosure(Paren, pairs) ~ _ ~ exp ~ _ => {
-        LambdaParse(pairs, exp)
+    commandList ~ Lexer.Enc(CurlyBrace, true) ~ expressionList ~ Lexer.Enc(CurlyBrace, false) ^^ {
+      case commandList ~ _ ~ exp ~ _ => {
+        LambdaParse(commandList, exp)
       }
     }
   }
 
   private def expression: Parser[ParseTree] = {
-    expressionInParens | naturalNumber | identifier | forcedId | lambdaParse | enclosure
+    expressionInParens | naturalNumber | identifier | forcedId | lambdaParse | commandList
   }
 
   private def expressionList: Parser[ParseTree] = {
     rep1(expression) ^^ {
-      case exps => exps reduceRight ApplyParse
+      case exps => {
+        // TODO - make this type safe
+        if (exps.length > 1) ApplyParse(exps(0), exps.drop(1).toVector)
+        else exps(0)
+      }
     }
   }
 
