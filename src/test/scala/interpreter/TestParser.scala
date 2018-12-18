@@ -100,8 +100,8 @@ class TestParser extends FlatSpec {
     assert(NewMapParser(tokens) == Success(
       CommandList(
         Vector(
-          SingletonCommandItem(NaturalNumberParse(10)), 
-          SingletonCommandItem(NaturalNumberParse(5))
+          NaturalNumberParse(10), 
+          NaturalNumberParse(5)
         )
       )
     ))
@@ -114,9 +114,8 @@ class TestParser extends FlatSpec {
       Colon(),
       Number(5),
       Enc(Paren, false),
-      Enc(CurlyBrace, true),
-      Identifier("d"),
-      Enc(CurlyBrace, false)
+      Arrow(),
+      Identifier("d")
     )
     assert(NewMapParser(tokens) == Success(
       LambdaParse(

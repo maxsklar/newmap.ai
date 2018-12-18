@@ -37,7 +37,7 @@ object TypeChecker {
           result <- processMultipleFunctionApplications(functionTypeChecked, applications, env)
         } yield result  
       }
-      case CommandList(values: Vector[CommandItem]) => {
+      case CommandList(values: Vector[ParseTree]) => {
         expectedType match {
           case ExplicitlyTyped(MapT(IdentifierT, TypeT, default)) => {
             val mapT = MapT(IdentifierT, TypeT, default)
@@ -63,11 +63,14 @@ object TypeChecker {
           case _ => Failure("CommandLists must be explicit: " + values + " exp: " + expectedType)
         }
       }
+      case BindingCommandItem(key, value) => {
+        typeCheck(CommandList(Vector(expression)), expectedType, env)
+      }
       case LambdaParse(params, expression) => {
         for {
           paramValues <- params match {
             case CommandList(values) => Success(values)
-            case _ => Failure("Lambda Values must be commands")
+            case _ => Failure("Lambda Values must be variable bindings")
           }
 
           newParams <- typeCheckParameterList(paramValues, env)
@@ -75,9 +78,15 @@ object TypeChecker {
 
           typeFound <- tc.nTypeInfo match {
             case ExplicitlyTyped(nType) => Success(nType)
-            case ImplicitlyTyped(_) => {
-              // TODO: this case must be filled out
-              Failure("Cannot do implicitly typed lambda statements yet")
+            case ImplicitlyTyped(convs) => {
+              expectedType match {
+                case ExplicitlyTyped(TypeT) => {
+                  // TODO: more cases
+                  Success(TypeT)
+                }
+                // TODO: this case must be further filled out
+                case _ => Failure("Cannot do implicitly typed lambda statements for expected " + expectedType)
+              }
             }
           }
         } yield {
@@ -101,7 +110,7 @@ object TypeChecker {
   }
 
   def typeCheckLiteralMap(
-    values: Vector[CommandItem],
+    values: Vector[ParseTree],
     expectedType: MapT,
     env: Environment
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
@@ -119,7 +128,7 @@ object TypeChecker {
           (objectFoundKey -> objectFoundValue) +: restOfMap
         }
       }
-      case SingletonCommandItem(s) +: _ => {
+      case s +: _ => {
         Failure("No binding found in map for item " + s)
       }
       case _ => Success(Vector.empty)
@@ -384,7 +393,7 @@ object TypeChecker {
 
   // TODO: This fails on a struct!!!
   def typeCheckParameterList(
-    parameterList: Vector[CommandItem],
+    parameterList: Vector[ParseTree],
     env: Environment
   ): Outcome[Vector[(String, NewMapType)], String] = {
     parameterList match {
@@ -413,7 +422,7 @@ object TypeChecker {
           }
         }
       }
-      case SingletonCommandItem(_) +: _ => {
+      case otherItem +: _ => {
         Failure("Must bind an identifier and a type in the parameter list.")
       }
       case _ => Success(Vector.empty)
@@ -421,7 +430,7 @@ object TypeChecker {
   }
 
   def typeCheckParamsStandalone(
-    parameterList: Vector[CommandItem],
+    parameterList: Vector[ParseTree],
     env: Environment,
     expectedType: NewMapType
   ): Outcome[NewMapObjectWithType, String] = for {
@@ -435,7 +444,7 @@ object TypeChecker {
    */
   def typeCheckStruct(
     parameterList: Vector[(String, NewMapType)],
-    valueList: Vector[CommandItem],
+    valueList: Vector[ParseTree],
     env: Environment
   ): Outcome[Vector[EnvironmentCommand], String] = {
     (parameterList, valueList) match {
@@ -462,7 +471,7 @@ object TypeChecker {
           }
         }
       }      
-      case (((paramId, typeOfIdentifier) +: restOfParamList), (SingletonCommandItem(valueObject) +: restOfValueList)) => {
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
         for {
           tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
@@ -488,7 +497,7 @@ object TypeChecker {
 
   def typeCheckStructStandalone(
     parameterList: Vector[(String, NewMapType)],
-    valueList: Vector[CommandItem],
+    valueList: Vector[ParseTree],
     env: Environment
   ): Outcome[NewMapObjectWithType, String] = for {
     envCommands <- typeCheckStruct(parameterList, valueList, env)

@@ -62,7 +62,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | comma | colon | equals | tilda | arrow | enclosure)) ^^ { rawTokens =>
+    phrase(rep1(identifier | number | comma | colon | arrow | equals | tilda | enclosure)) ^^ { rawTokens =>
       rawTokens
     }
   }

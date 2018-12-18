@@ -11,19 +11,13 @@ case class IdentifierParse(
   force: Boolean = false // If this is true, the identifier is forced to be a raw identifier, and not a keyword or substitute
 ) extends ParseTree
 
-sealed abstract class CommandItem
-
 case class BindingCommandItem(
   key: ParseTree,
   value: ParseTree
-) extends CommandItem
-
-case class SingletonCommandItem(
-  value: ParseTree
-) extends CommandItem
+) extends ParseTree
 
 case class CommandList(
-  values: Vector[CommandItem]
+  values: Vector[ParseTree]
 ) extends ParseTree
 
 case class ApplyParse(

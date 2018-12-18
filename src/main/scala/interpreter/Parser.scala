@@ -41,25 +41,31 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def kvBinding: Parser[BindingCommandItem] = {
+    val pattern = expressionList ~ Lexer.Colon() ~ expressionList
+    pattern ^^ {
+      case key ~ _ ~ value => {
+        BindingCommandItem(key, value)
+      }
+    }
+  }
+
   private def commandList: Parser[CommandList] = {
     val pattern = {
       Lexer.Enc(Paren, true) ~
-        repsep(expression ~ Lexer.Colon() ~ expressionList, Lexer.Comma()) ~
+        repsep(kvBinding | expressionList, Lexer.Comma()) ~
         Lexer.Enc(Paren, false)
     }
     pattern ^^ {
       case _ ~ items ~ _ => {
-        val pairs = items.map(item => {
-          BindingCommandItem(item._1._1,  item._2)
-        })
-        CommandList(pairs.toVector)
+        CommandList(items.toVector)
       }
     }
   }
 
   private def lambdaParse: Parser[LambdaParse] = {
-    commandList ~ Lexer.Enc(CurlyBrace, true) ~ expressionList ~ Lexer.Enc(CurlyBrace, false) ^^ {
-      case commandList ~ _ ~ exp ~ _ => {
+    commandList ~ Lexer.Arrow() ~ expressionList ^^ {
+      case commandList ~ _ ~ exp => {
         LambdaParse(commandList, exp)
       }
     }

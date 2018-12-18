@@ -190,4 +190,27 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       case Success(msg) => ()
     }
   }
+
+  "Lambda expressions" should " be creatable as a type" in {
+    val interp = new EnvironmentInterpreter()
+
+    val result = for {
+      r <- interp("val f: Type = ((a: 3) => 4)")
+    } yield {
+      val correctCommand = EnvironmentCommand(
+        "f",
+        TypeT,
+        LambdaInstance(
+          Vector("a" -> Index(3)),
+          Index(4)
+        )
+      )
+      assert(r == correctCommand.toString)
+    }
+
+    result match {
+      case Failure(msg) => fail(msg)
+      case Success(msg) => ()
+    }
+  }
 }
