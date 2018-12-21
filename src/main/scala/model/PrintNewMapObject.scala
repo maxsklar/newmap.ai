@@ -9,7 +9,7 @@ object PrintNewMapObject {
     case TypeType => "Type"
     case IdentifierType => "Identifier"
     case IdentifierInstance(s) => s
-    case MapType(key, value, default) => "Map (" + this(key) + ") => (" + this(value) + ") default " + this(default)
+    case MapType(key, value, default) => "(Map " + this(key) + " " + this(value) + " " + this(default) +")"
     case MapInstance(values, default) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
@@ -35,9 +35,8 @@ object PrintNewMapObject {
         bindings :+= k + ": " + this(v)
       }
       sb.append(bindings.mkString(", "))
-      sb.append(") {")
+      sb.append(") => ")
       sb.append(this(expression))
-      sb.append("}")
       sb.toString
     }
     case ApplyFunction(func, input) => {
@@ -71,7 +70,7 @@ object PrintNewMapObject {
     case TypeT => "Type"
     case IdentifierT => "Identifier"
     case MapT(key, value, default) => {
-      "Map (" + applyType(key) + ") => (" + applyType(value) + ") default " + apply(default)
+      "(Map " + applyType(key) + " " + applyType(value) + " " + apply(default) + ")"
     }
     case StructT(params) => {
       val sb: StringBuilder = new StringBuilder()
@@ -96,9 +95,8 @@ object PrintNewMapObject {
         bindings :+= (k + ": " + applyType(v))
       }
       sb.append(bindings.mkString(", "))
-      sb.append(") {")
+      sb.append(") => ")
       sb.append(applyType(result))
-      sb.append("}")
       sb.toString
     }
     case SubstitutableT(s) => s

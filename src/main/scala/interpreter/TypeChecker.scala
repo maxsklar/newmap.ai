@@ -35,7 +35,7 @@ object TypeChecker {
           }
 
           result <- processMultipleFunctionApplications(functionTypeChecked, applications, env)
-        } yield result  
+        } yield result
       }
       case CommandList(values: Vector[ParseTree]) => {
         expectedType match {
@@ -60,7 +60,18 @@ object TypeChecker {
             // TODO: What if it's a case description??
             typeCheckParamsStandalone(values, env, TypeT)
           }
-          case _ => Failure("CommandLists must be explicit: " + values + " exp: " + expectedType)
+          case ImplicitlyTyped(Vector()) => {
+            // Assume that it's a map?
+            // TODO - maybe there needs to be more logic here
+            for {
+              mapValues <- typeCheckLiteralMapNoType(values, env)
+            } yield {
+              // TODO: default value is given by index(0) - but in reality this is a ReqMap over its inputs
+              // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMapNoType
+              NewMapObjectWithType.untyped(MapInstance(mapValues, Index(0)))
+            }
+          }
+          case _ => Failure("CommandLists not working yet with this expected type: " + values + " exp: " + expectedType)
         }
       }
       case BindingCommandItem(key, value) => {
@@ -135,6 +146,34 @@ object TypeChecker {
     }
   }
 
+  // TODO: there are no implicit type checks here, and there should be
+  def typeCheckLiteralMapNoType(
+    values: Vector[ParseTree],
+    env: Environment
+  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
+    values match {
+      case BindingCommandItem(k, v) +: restOfValues => {
+        for {
+          // TODO: Replace init with type info
+          tc <- typeCheck(k, NewMapTypeInfo.init, env)
+          objectFoundKey = tc.nObject
+
+          // TODO: Replace init with type info
+          tc2 <- typeCheck(v, NewMapTypeInfo.init, env)
+          objectFoundValue = tc2.nObject
+
+          restOfMap <- typeCheckLiteralMapNoType(restOfValues, env)
+        } yield {
+          (objectFoundKey -> objectFoundValue) +: restOfMap
+        }
+      }
+      case s +: _ => {
+        Failure("No binding found in map for item " + s)
+      }
+      case _ => Success(Vector.empty)
+    }
+  }
+
   // TODO - I expect this function to get more complex
   // TODO - Include Index Type (with open question)
   //  Suppose I expect Index(4). If I have given "2", obviously that's alright
@@ -194,10 +233,10 @@ object TypeChecker {
       }
       case ImplicitlyTyped(typeConversions) => {
         if (typeConversions.isEmpty) {
-          if (isRawObjectConvertibleToType(objectWithType.nObject, typeExpected, env)) {
-            Success(NewMapObjectWithType(objectWithType.nObject, ImplicitlyTyped(Vector(typeExpected))))
-          } else {
-            Failure("Could not implicitly interpret object " + objectWithType.nObject.toString + " as type " + typeExpected.toString)
+          for {
+            unit <- isRawObjectConvertibleToType(objectWithType, typeExpected, env)
+          } yield {
+            NewMapObjectWithType(objectWithType.nObject, ImplicitlyTyped(Vector(typeExpected)))
           }
         } else if (typeConversions.length == 1) {
           // TODO, this head is fine, but clean up your scala MAX!
@@ -271,58 +310,83 @@ object TypeChecker {
   // Can this untyped object possibly be interpreted as type nType?
   // TODO: don't just return a boolean, return an outcome with a reason for failure.
   def isRawObjectConvertibleToType(
-    nObject: NewMapObject,
+    nObjectWithType: NewMapObjectWithType,
     nType: NewMapType,
     env: Environment
-  ): Boolean = {
+  ): Outcome[Unit, String] = {
+    def failMsg(extra: String) = {
+      Failure(extra + " Could not implicitly interpret object " + nObjectWithType + " as type " + nType)
+    }
+
+    val success = Success(())
+
+    val nObject = nObjectWithType.nObject
+
     resolveType(nType, env) match {
       case IndexT(i) => nObject match {
-        case Index(j) => j < i
-        case _ => false
+        case Index(j) => if (j < i) success else failMsg("A")
+        case _ => failMsg("B")
       }
-      case TypeT => Evaluator.convertObjectToType(nObject, env).isSuccess
+      case TypeT => if (Evaluator.convertObjectToType(nObject, env).isSuccess) success else failMsg("C")
       case IdentifierT => nObject match {
-        case IdentifierInstance(_) => true
-        case _ => false
+        case IdentifierInstance(_) => success
+        case _ => failMsg("D")
       }
       case MapT(key, value, defaultInType) => nObject match {
         case MapInstance(values, default) => {
-          (defaultInType == default) && (
-            values.forall(x => {
-              isRawObjectConvertibleToType(x._1, key, env) &&
-              isRawObjectConvertibleToType(x._2, value, env)
-            })
-          )
+          // TODO: we need a helper function here to get the right message
+          if (
+            (defaultInType == default) && (
+              values.forall(x => {
+                isRawObjectConvertibleToType(NewMapObjectWithType.untyped(x._1), key, env).isSuccess &&
+                isRawObjectConvertibleToType(NewMapObjectWithType.untyped(x._2), value, env).isSuccess
+              })
+            )
+          ) success else failMsg("E")
         }
-        case _ => false
+        case _ => failMsg("F")
       }
       case StructT(params) => nObject match {
         case StructInstance(value) => {
           //////////////////// TODO  not always
-          true
+          success
         }
-        case _ => false
+        case otherObject => {
+          // This could also be the first input to the struct
+
+          params match {
+            case firstParam +: otherParams => {
+              if (otherParams.length == 0) {
+                val firstParamType: NewMapType = firstParam._2
+                isRawObjectConvertibleToType(nObjectWithType, firstParamType, env)
+              } else {
+                failMsg("Can't convert non-struct to multiple-valued struct")
+              }
+            }
+            case _ => failMsg("G")
+          }
+        }
       }
       case LambdaT(params, result) => nObject match {
         case LambdaInstance(params, expression) => {
           //////////////////// TODO  not always
-          true
+          success
         }
-        case _ => false
+        case _ => failMsg("H")
       }
       case SubstitutableT(s) => {
         // TODO: I believe that if we don't actually know the type we can't figure this out
-        false
+        failMsg("I")
       }
       case Subtype(parent) => nObject match {
         case SubtypeFromMap(values) => {
           //////////////////// TODO  not always
-          true
+          success
         }
-        case _ => false
+        case _ => failMsg("J")
       }
       case SubtypeFromMapType(mi) => {
-        mi.values.exists(_._1 == nObject)
+        if (mi.values.exists(_._1 == nObject)) success else failMsg("K")
       }
     }
   }
@@ -664,26 +728,26 @@ object TypeChecker {
     startingFunction: NewMapObjectWithType,
     applications: Vector[ParseTree],
     env: Environment
-  ): Outcome[NewMapObjectWithType, String] = applications match {
-    case (firstApplication +: restOfApplications) => {
-      for {
-        functionType <- startingFunction.nTypeInfo match {
-          case ExplicitlyTyped(nType) => Success(nType)
-          case ImplicitlyTyped(_) => Failure(
-            "Functions must be explicitly typed for now. Implicit function types are not yet supported\n" ++
-            startingFunction.nObject.toString
-          )
-        }
+  ): Outcome[NewMapObjectWithType, String] = {
+    applications match {
+      case (firstApplication +: restOfApplications) => {
+        for {
+          functionType <- startingFunction.nTypeInfo match {
+            case ExplicitlyTyped(nType) => Success(nType)
+            case ImplicitlyTyped(_) => Failure(
+              "Functions must be explicitly typed for now. Implicit function types are not yet supported\n" ++
+              startingFunction.nObject.toString
+            )
+          }
 
-        functionTypeChecked <- typeCheckFunctionType(functionType)
-
-        resultOfFirstApplication <- processFunctionApplication(startingFunction, functionTypeChecked, firstApplication, env)
-
-        result <- processMultipleFunctionApplications(resultOfFirstApplication, restOfApplications, env)
-      } yield result
-    }
-    case _ => {
-      Success(startingFunction)
+          functionTypeChecked <- typeCheckFunctionType(functionType)
+          resultOfFirstApplication <- processFunctionApplication(startingFunction, functionTypeChecked, firstApplication, env)
+          result <- processMultipleFunctionApplications(resultOfFirstApplication, restOfApplications, env)
+        } yield result
+      }
+      case _ => {
+        Success(startingFunction)
+      }
     }
   }
 
@@ -695,29 +759,92 @@ object TypeChecker {
   ): Outcome[NewMapObjectWithType, String] = {
     for {
       // Ensures that the input can be converted to the right type
-      successfullyTypeChecked <- typeCheck(
+      typeCheckFunctionInputResult <- typeCheckFunctionInput(
         input,
-        ExplicitlyTyped(functionTypeChecked.inputType),
+        functionTypeChecked,
         env
       )
 
+      successfullyTypeChecked = typeCheckFunctionInputResult.newMapObjectWithType
+
       inputValue = successfullyTypeChecked.nObject
 
-      outputType <- functionTypeChecked match {
+      fullOutputType <- functionTypeChecked match {
         case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
         case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
           val obj = params.find(x => x._1 == inputValue).map(_._2).getOrElse(paramsDefault)
           Evaluator.convertObjectToType(obj, env)
         }
       }
+
+      // We're either peeling away one parameter, or we're going to the full output
+      outputType <- if (typeCheckFunctionInputResult.firstParamOnly) {
+        functionTypeChecked.inputType match {
+          case StructT(params) => {
+            if (params.length == 1) Success(fullOutputType) else {
+              val newParams = params.drop(1).map(param => {
+                // TODO: resolveType will only make the subsitution if the type is directly a SubstitutableT
+                // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
+                param._1 -> resolveType(
+                  param._2,
+                  env.newCommand(EnvironmentCommand(params(0)._1, TypeT, typeToObject(params(0)._2)))
+                )
+              })
+
+              Success(LambdaT(newParams, fullOutputType))
+            }
+          }
+          // TODO: refactor to avoid this case?
+          case _ => Failure("This shouldn't happen")
+        }
+      } else Success(fullOutputType)
     } yield {
       NewMapObjectWithType.withTypeE(
         ApplyFunction(
           startingFunction.nObject,
           inputValue
         ),
-        outputType
+         outputType
       )
+    }
+  }
+
+  case class TypeCheckFunctionInputResult(
+    newMapObjectWithType: NewMapObjectWithType,
+    firstParamOnly: Boolean
+  )
+
+  def typeCheckFunctionInput(
+    input: ParseTree,
+    functionTypeChecked: FunctionTypeChecked,
+    env: Environment
+  ): Outcome[TypeCheckFunctionInputResult, String] = {
+    typeCheck(
+      input,
+      ExplicitlyTyped(functionTypeChecked.inputType),
+      env
+    ) match {
+      case Success(nmo) => Success(TypeCheckFunctionInputResult(nmo, false))
+      case Failure(msg) => {
+        // Now we have a second try, because the input might be the first value of an input struct
+        functionTypeChecked.inputType match {
+          case StructT(params) => {
+            // TODO: type unsafe until we enforce at least one param in scala
+            val firstParam = params.head
+
+            typeCheck(input, ExplicitlyTyped(firstParam._2), env) match {
+              case Success(nmo) => Success(TypeCheckFunctionInputResult(nmo, true))
+              case Failure(msg2) => {
+                val introStr = "Could not interpret input " + input + " as valid for function."
+                val err1 = "Error for direct approach: " + msg
+                val err2 = "Error for trying to match it to the first parameter: " + msg2
+                Failure(introStr + "\n" + err1 + "\n" + err2)
+              }
+            }
+          }
+          case _ => Failure(msg)
+        }
+      }
     }
   }
 

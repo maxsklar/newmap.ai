@@ -24,6 +24,7 @@ case class MapInstance(
 ) extends NewMapObject
 
 // This could be a type if the expression is also a type
+// TODO: params must have at least one value. We can enforce this in scala
 case class LambdaInstance(
   params: Vector[(String, NewMapObject)],
   expression: NewMapObject

@@ -32,12 +32,14 @@ object Evaluator {
         for {
           evalExpression <- this(expression, env)
           evalParams <- evalParameters(params, env)
-        } yield LambdaInstance(evalParams, evalExpression)
+        } yield {
+          LambdaInstance(evalParams, evalExpression)
+        }
       }
       case ApplyFunction(func, input) => {
         for {
-          evalFunc <- this(func, env)
           evalInput <- this(input, env)
+          evalFunc <- this(func, env)
           result <- applyFunctionAttempt(evalFunc, evalInput, env)
         } yield result
       }
@@ -106,17 +108,50 @@ object Evaluator {
         for {
           newEnv <- updateEnvironmentWithParamValues(params, paramValues, env)
           substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
+          result <- this(substitutedExpression, env)
+        } yield result
+      }
+      case (LambdaInstance(params, expression), firstParamValue) => {
+        // Here we are passing in the first parameter to the function
+
+        // TODO - this isn't type safe until we enforce the at-least-one-param-rule
+        val firstParam = params.head
+
+        for {
+          newEnv <- updateEnvironmentWithParamValues(Vector(firstParam), Vector(firstParam._1 -> firstParamValue), env)
+          substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
+
+          result <- this(substitutedExpression, env)
         } yield {
-          substitutedExpression
+          if (params.length == 1) result else {
+            val newParams = params.drop(1).map(param => {
+              // TODO: resolveType will only make the subsitution if the type is directly a SubstitutableT
+              // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
+              param._1 -> makeRelevantSubsitutions(
+                param._2,
+                env.newCommand(EnvironmentCommand(params(0)._1, TypeT, params(0)._2))
+              )
+            })
+
+            LambdaInstance(newParams, result)
+          }
         }
       }
       case (MapInstance(values, default), key) => {
         for {
           evaluatedKey <- this(key, env)
         } yield {
-          values.find(_._1 == evaluatedKey).map(_._2) match {
-            case Some(result) => result
-            case None => default
+          evaluatedKey match {
+            case ParameterObj(s) => {
+              // The function can't be applied because we don't have the input yet
+              ApplyFunction(func, input)
+            }
+            case _ => {
+              values.find(_._1 == evaluatedKey).map(_._2) match {
+                case Some(result) => result
+                case None => default
+              }
+            }
           }
         }
       }
@@ -159,7 +194,6 @@ object Evaluator {
     }
   }
 
-  // TODO: this shouldn't be part of the type checker
   def makeRelevantSubsitutions(
     expression: NewMapObject,
     env: Environment
@@ -214,7 +248,6 @@ object Evaluator {
     }
   }
 
-  // TODO: this should also not be a part of the type checker
   def includeParams(
     params: Vector[(String, NewMapObject)],
     env: Environment
@@ -283,7 +316,7 @@ object Evaluator {
         for {
           functionApplied <- applyFunctionAttempt(func, input, env)
           result <- convertObjectToType(functionApplied, env)
-        } yield (result)
+        } yield result
       }
       case StructType(params) => {
         for {
