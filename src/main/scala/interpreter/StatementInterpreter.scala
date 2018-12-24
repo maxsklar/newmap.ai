@@ -10,19 +10,35 @@ object StatementInterpreter {
    * @param env This is a map of identifiers which at this point are supposed to be subsituted.
    */
   def apply(
-    sParse: StatementParse,
+    sParse: EnvStatementParse,
     env: Environment
   ): Outcome[Vector[EnvironmentCommand], String] = {
-    val id = sParse.identifier
-    val typeExpression = sParse.typeExpression
-    val objExpression = sParse.expression
-
-    for {
-      typeAsType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
-      tc <- TypeChecker.typeCheck(objExpression, ExplicitlyTyped(typeAsType), env)
-      evaluatedObject <- Evaluator(tc.nObject, env)
-    } yield {
-      Vector(EnvironmentCommand(id.s, typeAsType, evaluatedObject))
+    sParse match {
+      case FullStatementParse(_, id, typeExpression, objExpression) => {
+        for {
+          typeAsType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
+          tc <- TypeChecker.typeCheck(objExpression, ExplicitlyTyped(typeAsType), env)
+          evaluatedObject <- Evaluator(tc.nObject, env)
+        } yield {
+          Vector(FullEnvironmentCommand(id.s, typeAsType, evaluatedObject))
+        }
+      }
+      case InferredTypeStatementParse(_, id, objExpression) => {
+        for {
+          tc <- TypeChecker.typeCheck(objExpression, NewMapTypeInfo.init, env)
+          evaluatedObject <- Evaluator(tc.nObject, env)
+        } yield {
+          Vector(TypeInferredEnvironmentCommand(id.s, evaluatedObject))
+        }
+      }
+      case ExpressionOnlyStatementParse(exp) => {
+        for {
+          tc <- TypeChecker.typeCheck(exp, NewMapTypeInfo.init, env)
+          evaluatedObject <- Evaluator(tc.nObject, env)
+        } yield {
+          Vector(ExpOnlyEnvironmentCommand(evaluatedObject))
+        }
+      }
     }
   }
 }

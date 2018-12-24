@@ -223,10 +223,20 @@ class TestTypeCheck extends FlatSpec {
 
   // TODO - should be in a separate file
   "A statement " should " be readable" in {
-    val statement = StatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
+    val statement = FullStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(EnvironmentCommand("x",IndexT(1),Index(0))))
+        assert(envCommands == Vector(FullEnvironmentCommand("x",IndexT(1),Index(0))))
+      }
+      case Failure(reason) => fail(reason)
+    }
+  }
+
+  it should " be readable if there's an inferred type" in {
+    val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
+    StatementInterpreter(statement, Environment.Base) match {
+      case Success(envCommands) => {
+        assert(envCommands == Vector(TypeInferredEnvironmentCommand("x",Index(10))))
       }
       case Failure(reason) => fail(reason)
     }

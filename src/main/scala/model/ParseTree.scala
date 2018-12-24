@@ -30,12 +30,24 @@ case class LambdaParse(
   expression: ParseTree
 ) extends ParseTree
 
-case class StatementParse(
+abstract class EnvStatementParse
+
+case class FullStatementParse(
   prefix: StatementPrefix,
   identifier: IdentifierParse,
   typeExpression: ParseTree,
   expression: ParseTree
-)
+) extends EnvStatementParse
+
+case class InferredTypeStatementParse(
+  prefix: StatementPrefix,
+  identifier: IdentifierParse,
+  expression: ParseTree
+) extends EnvStatementParse
+
+case class ExpressionOnlyStatementParse(
+  expression: ParseTree
+) extends EnvStatementParse
 
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix

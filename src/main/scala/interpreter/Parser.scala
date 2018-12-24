@@ -85,10 +85,26 @@ object NewMapParser extends Parsers {
     }
   }
 
-  private def statement: Parser[StatementParse] = {
+  private def fullStatement: Parser[FullStatementParse] = {
     Lexer.Identifier("val") ~ identifier ~ Lexer.Colon() ~ expressionList ~ Lexer.Equals() ~ expressionList ^^ {
       case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
-        StatementParse(ValStatement, id, typeExp, exp)
+        FullStatementParse(ValStatement, id, typeExp, exp)
+      }
+    }
+  }
+
+  private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
+    Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionList ^^ {
+      case _ ~ id ~ _ ~ exp => {
+        InferredTypeStatementParse(ValStatement, id, exp)
+      }
+    }
+  }
+
+  private def expOnlyStatmentParse: Parser[ExpressionOnlyStatementParse] = {
+    expressionList ^^ {
+      case exp => {
+        ExpressionOnlyStatementParse(exp)
       }
     }
   }
@@ -108,9 +124,9 @@ object NewMapParser extends Parsers {
 
   def statementParse(
     tokens: Seq[Lexer.Token]
-  ): Outcome[StatementParse, String] = {
+  ): Outcome[EnvStatementParse, String] = {
     val reader = new TokenReader(tokens)
-    val program = phrase(statement)
+    val program = phrase(fullStatement | inferredTypeStatement | expOnlyStatmentParse)
 
     program(reader) match {
       case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

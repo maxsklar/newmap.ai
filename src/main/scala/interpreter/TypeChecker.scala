@@ -28,7 +28,6 @@ object TypeChecker {
           functionTypeChecked <- {
             typeCheck(
               startingFunction,
-               // TODO - can we do better here? gotta call typeCheckFunctionType later - maybe we can put a function kind here
               NewMapTypeInfo.init,
               env
             )
@@ -510,7 +509,7 @@ object TypeChecker {
     parameterList: Vector[(String, NewMapType)],
     valueList: Vector[ParseTree],
     env: Environment
-  ): Outcome[Vector[EnvironmentCommand], String] = {
+  ): Outcome[Vector[FullEnvironmentCommand], String] = {
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         val valueIdOpt = checkForKnownIdentifier(valueIdentifier, env)
@@ -520,7 +519,7 @@ object TypeChecker {
             for {
               tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
 
-              envCommand = EnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
+              envCommand = FullEnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
               newEnv = env.newCommand(envCommand)
               result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
             } yield {
@@ -540,7 +539,7 @@ object TypeChecker {
         for {
           tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
 
-          envCommand = EnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
+          envCommand = FullEnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
           newEnv = env.newCommand(envCommand)
           result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
         } yield {
@@ -672,10 +671,17 @@ object TypeChecker {
         typeDepth(result, env.newParams(params))
       }
       case SubstitutableT(s: String) => {
-        env.typeOf(s).map(t => typeDepth(t, env)) match {
-          case None => -2 // TODO: this should be an error
-          case Some(0) => -1 // TODO: this should also be an error.. this type shouldn't exist
-          case Some(i) => i - 1
+        env.typeOf(s) match {
+          case Failure(_) => -2 // TODO: this should be an error
+          case Success(ExplicitlyTyped(nType)) => {
+            val depth = typeDepth(nType, env)
+            if (depth == 0) -1 // TODO: this should also be an error.. this type shouldn't exist
+            else depth - 1
+            depth - 1
+          }
+          case Success(ImplicitlyTyped(types)) => {
+            -3 // TODO: Figure out what to do here 
+          }
         }
       }
       case Subtype(t: NewMapType) => {
@@ -787,7 +793,7 @@ object TypeChecker {
                 // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
                 param._1 -> resolveType(
                   param._2,
-                  env.newCommand(EnvironmentCommand(params(0)._1, TypeT, typeToObject(params(0)._2)))
+                  env.newCommand(FullEnvironmentCommand(params(0)._1, TypeT, typeToObject(params(0)._2)))
                 )
               })
 

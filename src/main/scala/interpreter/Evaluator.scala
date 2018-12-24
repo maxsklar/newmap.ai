@@ -129,7 +129,7 @@ object Evaluator {
               // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
               param._1 -> makeRelevantSubsitutions(
                 param._2,
-                env.newCommand(EnvironmentCommand(params(0)._1, TypeT, params(0)._2))
+                env.newCommand(FullEnvironmentCommand(params(0)._1, TypeT, params(0)._2))
               )
             })
 
@@ -160,7 +160,7 @@ object Evaluator {
         Success(value.find(x => IdentifierInstance(x._1) == id).map(_._2).getOrElse(Index(0)))
       }
       case _ => {
-        Failure("Not implemented: apply function when not lambdainstance and structinstance")
+        Failure("Not implemented: apply function when not lambdainstance and structinstance\nCallable: " + func + "\nInput:" + input)
       }
     }
   }
@@ -179,7 +179,7 @@ object Evaluator {
           )
           typeInformation <- convertObjectToType(firstParamType._2, env)
 
-          envCommand = EnvironmentCommand(
+          envCommand = FullEnvironmentCommand(
             firstParamType._1,
             typeInformation,
             firstParamValue._2
@@ -302,7 +302,14 @@ object Evaluator {
       }
       case ParameterObj(name) => {
         for {
-          typeOfObjectFound <- Outcome(env.typeOf(name), "Could not get type from object name " + name)
+          typeInfoOfObjectFound <- env.typeOf(name)
+
+          typeOfObjectFound <- typeInfoOfObjectFound match {
+            case ExplicitlyTyped(nType) => Success(nType)
+            case ImplicitlyTyped(types) => {
+              Failure("Param Obj not implemented for ImplicitlyTyped case")
+            }
+          }
 
           _ <- Outcome.failWhen(
             !TypeChecker.refersToAType(typeOfObjectFound, env),
@@ -314,7 +321,9 @@ object Evaluator {
       }
       case ApplyFunction(func, input) => {
         for {
-          functionApplied <- applyFunctionAttempt(func, input, env)
+          evalInput <- this(input, env)
+          evalFunc <- this(func, env)
+          functionApplied <- applyFunctionAttempt(evalFunc, evalInput, env)
           result <- convertObjectToType(functionApplied, env)
         } yield result
       }

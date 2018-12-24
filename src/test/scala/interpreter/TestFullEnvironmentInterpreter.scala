@@ -87,7 +87,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A static map " should " be creatable" in {
     val code = "val m: Map (key: 3, value: 100, default: 0) = (0: 20, 1: 43, 2: 67)"
 
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "m",
       MapT(IndexT(3), IndexT(100), Index(0)),
       MapInstance(Vector(
@@ -103,7 +103,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be creatable as a type" in {
     val code = "val m: Type = Map (key: 3, value: 100, default: 0)"
 
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "m",
       TypeT,
       MapType(Index(3), Index(100), Index(0))
@@ -113,7 +113,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key" in {
-    val correctCommand = EnvironmentCommand("result", IndexT(100), Index(43))
+    val correctCommand = FullEnvironmentCommand("result", IndexT(100), Index(43))
     testCodeScript(Vector(
       CodeExpectation("val m: Map (key: 3, value: 100, default: 0) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
@@ -121,7 +121,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key not specified and use the default" in {
-    val correctCommand = EnvironmentCommand("result", IndexT(100), Index(0))
+    val correctCommand = FullEnvironmentCommand("result", IndexT(100), Index(0))
 
     testCodeScript(Vector(
       CodeExpectation("val m: Map (key: 3, value: 100, default: 0) = (0: 20, 2: 67)", GeneralSuccessCheck),
@@ -134,7 +134,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val code = "val m: Type = Map (3, 100, 0)"
     val codeSimplified = "val m: Type = Map 3 100 0"
 
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "m",
       TypeT,
       MapType(Index(3), Index(100), Index(0))
@@ -144,10 +144,22 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(codeSimplified, SuccessCheck(correctCommand)))
   }
 
+  it should " be creatable as a type object pair" in {
+    val code = "val m: Map 3 100 0 = (0: 10, 2: 3)"
+
+    val correctCommand = FullEnvironmentCommand(
+      "m",
+      MapT(IndexT(3), IndexT(100), Index(0)),
+      MapInstance(Vector(Index(0) -> Index(10), Index(2) -> Index(3)), Index(0))
+    )
+
+    testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
+  }
+
   "A struct " should " be created" in {
     val code = "val s: Struct (params: (a: 2, b: 3)) = (a:0, b:0)"
     
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "s",
       StructT(Vector(("a",IndexT(2)), ("b",IndexT(3)))),
       StructInstance(Vector(("a",Index(0)), ("b",Index(0)))))
@@ -157,7 +169,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " be callable " in {
     val interp = new EnvironmentInterpreter()
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "q",
       IndexT(3),
       Index(1)
@@ -172,7 +184,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be considered a type in a type input" in {
     val code = "val testType: Type = Map (key: Struct (params: (a: 3, b: 3)), value: 100, default: 0)"
 
-    val correctCommand = EnvironmentCommand(
+    val correctCommand = FullEnvironmentCommand(
       "testType",
       TypeT,
       MapType(
@@ -194,7 +206,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "Lambda expressions" should " be creatable as a type, object and applied" in {
-    val correctCommandCreateFunc = EnvironmentCommand(
+    val correctCommandCreateFunc = FullEnvironmentCommand(
       "f",
       LambdaT(Vector("a" -> IndexT(3)), IndexT(4)),
       LambdaInstance(
@@ -206,26 +218,26 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       )
     )
 
-    val correctCommandUseFunc = EnvironmentCommand(
+    val correctCommandUseFunc = FullEnvironmentCommand(
       "result",
       IndexT(4),
       Index(3)
     )
 
-    val correctCommandUseSimpleFunc = EnvironmentCommand(
+    val correctCommandUseSimpleFunc = FullEnvironmentCommand(
       "resultSimple",
       IndexT(4),
       Index(1)
     )
 
-    val correctCommandUseParenFunc = EnvironmentCommand(
+    val correctCommandUseParenFunc = FullEnvironmentCommand(
       "resultParen",
       IndexT(4),
       Index(2)
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(EnvironmentCommand(
+      CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(FullEnvironmentCommand(
         "fSig",
         TypeT,
         LambdaInstance(
