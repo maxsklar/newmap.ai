@@ -41,7 +41,7 @@ object TypeChecker {
           case ExplicitlyTyped(MapT(IdentifierT, TypeT, default)) => {
             val mapT = MapT(IdentifierT, TypeT, default)
             // TODO - do we really want to consider this a parameter list, or just treat it like another map?
-            typeCheckParamsStandalone(values, env, mapT)
+            typeCheckParamsStandalone(values, env, mapT, default)
           }
           case ExplicitlyTyped(MapT(keyType, valueType, defaultValue)) => {
             val mapT = MapT(keyType, valueType, defaultValue)
@@ -54,10 +54,47 @@ object TypeChecker {
           case ExplicitlyTyped(StructT(params: Vector[(String, NewMapType)])) => {
             typeCheckStructStandalone(params, values, env)
           }
+          case ExplicitlyTyped(CaseT(params: Vector[(String, NewMapType)])) => {
+            if (values.length != 1) {
+              Failure("A case may only select 1 value")
+            } else {
+              val firstValue = values(0)
+              firstValue match {
+                case BindingCommandItem(valueIdentifier, valueObject) => {
+                  val valueIdOpt = checkForKnownIdentifier(valueIdentifier, env)
+
+                  valueIdOpt match {
+                    case Some(valueId) => {
+                      params.toMap.get(valueId) match {
+                        case Some(nType) => {
+                          for {
+                            nObjectWithType <- typeCheck(valueObject, ExplicitlyTyped(nType), env)
+                          } yield {
+                            val valueObject = nObjectWithType.nObject
+                            NewMapObjectWithType(CaseInstance(valueId, valueObject), expectedType)
+                          }
+                        }
+                        case _ => {
+                          Failure("Identifier " + valueId + " not a member of case class: " + params)
+                        }
+                      }
+                    }
+                    case None => {
+                      Failure("Expected idenfier: " + valueIdentifier)
+                    }
+                  }
+                }
+                case _ => {
+                  Failure("Value " + firstValue + " not a member of case class: " + params)
+                }
+              }
+            }
+          }
           case ExplicitlyTyped(TypeT) => {
-            // Since this commandList is a type, we're going to assume that it's a struct description
-            // TODO: What if it's a case description??
-            typeCheckParamsStandalone(values, env, TypeT)
+            // Since this commandList is a type, we're going to assume that it's a struct or case description
+            // TODO: This should be Index(0) if this is a "Case" - need to figure out that possibility
+            val default = Index(1) 
+            typeCheckParamsStandalone(values, env, TypeT, default)
           }
           case ImplicitlyTyped(Vector()) => {
             // Assume that it's a map?
@@ -326,7 +363,11 @@ object TypeChecker {
         case Index(j) => if (j < i) success else failMsg("A")
         case _ => failMsg("B")
       }
-      case TypeT => if (Evaluator.convertObjectToType(nObject, env).isSuccess) success else failMsg("C")
+      case TypeT => {
+        for {
+          _ <- Evaluator.convertObjectToType(nObject, env)
+        } yield ()
+      }
       case IdentifierT => nObject match {
         case IdentifierInstance(_) => success
         case _ => failMsg("D")
@@ -365,6 +406,22 @@ object TypeChecker {
             case _ => failMsg("G")
           }
         }
+      }
+      case CaseT(params) => nObject match {
+        case CaseInstance(constructor, input) => {
+          params.toMap.get(constructor) match {
+            case None => failMsg("No constructor for type: " + constructor)
+            case Some(t) => {
+              isRawObjectConvertibleToType(
+                NewMapObjectWithType.untyped(input),
+                t,
+                env
+              )
+            }
+          }
+        }
+        // TODO: there can be some conversions here; we don't neccesarily need to go to the fail case
+        case _ => failMsg("G Case")
       }
       case LambdaT(params, result) => nObject match {
         case LambdaInstance(params, expression) => {
@@ -495,11 +552,12 @@ object TypeChecker {
   def typeCheckParamsStandalone(
     parameterList: Vector[ParseTree],
     env: Environment,
-    expectedType: NewMapType
+    expectedType: NewMapType,
+    default: NewMapObject
   ): Outcome[NewMapObjectWithType, String] = for {
     newParams <- typeCheckParameterList(parameterList, env)
   } yield {
-    NewMapObjectWithType.withTypeE(paramsToObject(newParams), expectedType)
+    NewMapObjectWithType.withTypeE(paramsToObject(newParams, default), expectedType)
   }
 
   /*
@@ -605,7 +663,7 @@ object TypeChecker {
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
       case IndexT(_) | TypeT | IdentifierT | SubstitutableT(_) | Subtype(_) | SubtypeFromMapType(_) => {
-        Failure("Type " + functionType.toString + " not generally callable.")
+        Failure("Type " + functionType + " not generally callable.")
       }
       case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
         Success(StaticTypeFunctionChecked(key, value))
@@ -617,9 +675,12 @@ object TypeChecker {
           //  However, the identifier currently can't be recognized as that type, even if it's a param.
           //  So once that's fixed, this can be changed over 
           IdentifierT,
-          paramsToObject(params).values,
+          paramsToObject(params, Index(1)).values,
           Index(1)
         ))
+      }
+      case CaseT(params: Vector[(String, NewMapType)]) => {
+        Failure("Case types are not functions: " + functionType)      
       }
       case LambdaT(
         params: Vector[(String, NewMapType)],
@@ -655,7 +716,7 @@ object TypeChecker {
     val result = nType match {
       case IndexT(i) => i
       case TypeT => 1
-      case IdentifierT | StructT(_) => 0
+      case IdentifierT | StructT(_) | CaseT(_) => 0
       case MapT(key, value, default) => {
         if (isSubtype(key, IdentifierT, env, false) && isSubtype(value, TypeT, env, false)) {
           default match {
@@ -699,7 +760,8 @@ object TypeChecker {
       case IndexT(i: Long) => Index(i)
       case IdentifierT => IdentifierType
       case MapT(key, value, default) => MapType(typeToObject(key), typeToObject(value), default)
-      case StructT(params: Vector[(String, NewMapType)]) => paramsToObject(params)
+      case StructT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(1))
+      case CaseT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(0))
       case LambdaT(params, result) => {
         LambdaInstance(paramsToObjectParams(params), typeToObject(result))
       }
@@ -721,13 +783,17 @@ object TypeChecker {
   }
 
 
-  def paramsToObject(params: Vector[(String, NewMapType)]): MapInstance = {
+  def paramsToObject(
+    params: Vector[(String, NewMapType)],
+    default: NewMapObject
+  ): MapInstance = {
     val paramsAsObjects: Vector[(NewMapObject, NewMapObject)] = for {
       (name, nmt) <- params
     } yield {
       IdentifierInstance(name) -> typeToObject(nmt)
     }
-    MapInstance(paramsAsObjects, Index(1))
+    //// TODO
+    MapInstance(paramsAsObjects, default)
   }
 
   def processMultipleFunctionApplications(

@@ -149,6 +149,19 @@ object Environment {
         ParameterObj("params")
       )
     )),
+    FullEnvironmentCommand("Case", LambdaT(
+      params = Vector(
+        "params" -> MapT(IdentifierT, TypeT, Index(0))
+      ),
+      result = TypeT
+    ), LambdaInstance(
+      params = Vector(
+        "params" -> MapType(IdentifierType, TypeType, Index(0))
+      ),
+      expression = CaseType(
+        ParameterObj("params")
+      )
+    )),
     FullEnvironmentCommand("Subtype", LambdaT(
       params = Vector(
         "parent" -> TypeT

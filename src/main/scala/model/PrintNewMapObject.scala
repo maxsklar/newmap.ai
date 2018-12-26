@@ -43,9 +43,8 @@ object PrintNewMapObject {
       this(func) + " " + this(input)
     }
     case ParameterObj(name) => name
-    case StructType(params) => {
-      "Struct (" + this(params) + ")"
-    }
+    case StructType(params) => "Struct" + this(params)
+    case CaseType(params) => "Case" + this(params)
     case StructInstance(value) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
@@ -58,6 +57,9 @@ object PrintNewMapObject {
       sb.append(bindings.mkString(", "))
       sb.append(")")
       sb.toString
+    }
+    case CaseInstance(constructor, value) => {
+      constructor + " " + this(value)
     }
     case SubtypeType(parent) => "Subtype(" + this(parent) + ")"
     case SubtypeFromMap(mi) => mi match {
@@ -74,7 +76,21 @@ object PrintNewMapObject {
     }
     case StructT(params) => {
       val sb: StringBuilder = new StringBuilder()
-      sb.append("(")
+      sb.append("Struct (")
+      var bindings: Vector[String] = Vector.empty
+      for {
+        (k, v) <- params
+      } {
+        bindings :+= (k + ": " + applyType(v))
+      }
+      sb.append(bindings.mkString(", "))
+      sb.append(")")
+      sb.toString
+    }
+    case CaseT(params) => {
+      // TODO - Repeated Code
+      val sb: StringBuilder = new StringBuilder()
+      sb.append("Case (")
       var bindings: Vector[String] = Vector.empty
       for {
         (k, v) <- params

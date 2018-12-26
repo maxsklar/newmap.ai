@@ -48,10 +48,20 @@ object Evaluator {
           evalParams <- this(params, env)
         } yield StructType(evalParams)
       }
+      case CaseType(params) => {
+        for {
+          evalParams <- this(params, env)
+        } yield CaseType(evalParams)
+      }
       case StructInstance(value: Vector[(String, NewMapObject)]) => {
         for {
           evalValue <- evalParameters(value, env)
         } yield StructInstance(evalValue)
+      }
+      case CaseInstance(constructor: String, input: NewMapObject) => {
+        for {
+          evalInput <- this(input, env)
+        } yield CaseInstance(constructor, evalInput)
       }
       case SubtypeType(parentType) => {
         for {
@@ -230,8 +240,14 @@ object Evaluator {
       case StructType(values) => {
         StructType(makeRelevantSubsitutions(values, env))
       }
+      case CaseType(values) => {
+        CaseType(makeRelevantSubsitutions(values, env))
+      }
       case StructInstance(value) => {
         StructInstance(value.map(x => (x._1 -> makeRelevantSubsitutions(x._2, env))))
+      }
+      case CaseInstance(constructor, value) => {
+        CaseInstance(constructor, makeRelevantSubsitutions(value, env))      
       }
       case SubtypeType(parentType) => {
         SubtypeType(makeRelevantSubsitutions(parentType, env))
@@ -339,6 +355,22 @@ object Evaluator {
           newParams <- convertMapInstanceStructToParams(values, env)
         } yield {
           StructT(newParams)
+        }
+      }
+      case CaseType(params) => {
+        // TODO - this is repeated code from StructType
+        for {
+          mapInstance <- this(params, env)
+
+          values <- mapInstance match {
+            case MapInstance(v, Index(0)) => Success(v)
+            case MapInstance(v, default) => Failure("Map Instance " + mapInstance + " has the wrong default: " + default)
+            case _ => Failure("Map Instance could not be resolved for params " + params + "\nInstead recieved: " + mapInstance)
+          }
+
+          newParams <- convertMapInstanceStructToParams(values, env)
+        } yield {
+          CaseT(newParams)
         }
       }
       case _ => {

@@ -43,8 +43,14 @@ case class StructType(
   params: NewMapObject // This must be of type MapType(Identifier, Type, 1)
 ) extends NewMapObject
 
+case class CaseType(
+  params: NewMapObject // This must be of type MapType(Identifier, Type, 1)
+) extends NewMapObject
+
 // This one is a little different/complex because each object has a unique type as defined by the struct
 case class StructInstance(value: Vector[(String, NewMapObject)]) extends NewMapObject
+
+case class CaseInstance(constructor: String, input: NewMapObject) extends NewMapObject
 
 case class SubtypeType(parentType: NewMapObject) extends NewMapObject
 case class SubtypeFromMap(map: MapInstance) extends NewMapObject

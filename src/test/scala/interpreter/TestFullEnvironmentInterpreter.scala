@@ -205,6 +205,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
   }
 
+  "A case " should " be created and instantiated" in {
+    testCodeScript(Vector(
+      CodeExpectation("val Option: (t: Type) => Type = (t: Type) => Case (None: 1, Some: t)", GeneralSuccessCheck),
+      CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
+      CodeExpectation("val x: maybeSix = (None: 0)", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = (Some: 1)", GeneralSuccessCheck),
+      CodeExpectation("val z: maybeSix = (None: 3)", FailureCheck),
+    ))
+  }
+
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = FullEnvironmentCommand(
       "f",
@@ -250,6 +260,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val result: 4 = f (a: 1)", SuccessCheck(correctCommandUseFunc)),
       CodeExpectation("val resultSimple: 4 = f 2", SuccessCheck(correctCommandUseSimpleFunc)),
       CodeExpectation("val resultParen: 4 = f(0)", SuccessCheck(correctCommandUseParenFunc))
+    ))
+  }
+
+  it should "be able to take arbitrary types as inputs" in {
+    testCodeScript(Vector(
+      CodeExpectation("val fSig: Type = (3 => 4)", GeneralSuccessCheck),
+      CodeExpectation("val m: Map(3, 4, 0) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
+      CodeExpectation("val f: fSig = (a => m a)", GeneralSuccessCheck),
+      CodeExpectation("val resultSimple: 4 = f 2", GeneralSuccessCheck),
     ))
   }
 }

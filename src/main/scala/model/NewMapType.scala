@@ -13,6 +13,7 @@ case object TypeT extends NewMapType
 case object IdentifierT extends NewMapType
 case class MapT(key: NewMapType, value: NewMapType, default: NewMapObject) extends NewMapType
 case class StructT(params: Vector[(String, NewMapType)]) extends NewMapType
+case class CaseT(params: Vector[(String, NewMapType)]) extends NewMapType
 case class LambdaT(params: Vector[(String, NewMapType)], result: NewMapType) extends NewMapType
 case class SubstitutableT(s: String) extends NewMapType
 
