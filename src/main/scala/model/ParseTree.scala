@@ -49,5 +49,10 @@ case class ExpressionOnlyStatementParse(
   expression: ParseTree
 ) extends EnvStatementParse
 
+case class NewVersionedStatementParse(
+  identifier: IdentifierParse,
+  expression: ParseTree // Must represent the versioned type
+) extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix

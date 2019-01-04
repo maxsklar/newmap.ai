@@ -6,6 +6,7 @@ import ai.newmap.model._
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case Index(i) => i.toString
+    case CountType => "Count"
     case TypeType => "Type"
     case IdentifierType => "Identifier"
     case IdentifierInstance(s) => s
@@ -25,15 +26,34 @@ object PrintNewMapObject {
       sb.append(")")
       sb.toString
     }
-    case LambdaInstance(params, expression) => {
+    case LambdaType(inputType, outputType) => {
+      val sb: StringBuilder = new StringBuilder()
+      sb.append(this(inputType))
+      sb.append(" -> ")
+      sb.append(this(outputType))
+      sb.toString
+    }
+    case LambdaInstance(lambdaParams, expression) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
       var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- params
-      } {
-        bindings :+= k + ": " + this(v)
+
+      lambdaParams match {
+        case StructParams(params) => {
+          for {
+            (k, v) <- params
+          } {
+            bindings :+= k + ": " + this(v)
+          }
+        }
+        case IdentifierParam(name, typeAsObj) => {
+          bindings :+= name + ": " + this(typeAsObj)
+        }
+        case InputStackParam(typeAsObj) => {
+          bindings :+= "_ : " + this(typeAsObj)
+        }
       }
+
       sb.append(bindings.mkString(", "))
       sb.append(") => ")
       sb.append(this(expression))
@@ -43,8 +63,8 @@ object PrintNewMapObject {
       this(func) + " " + this(input)
     }
     case ParameterObj(name) => name
-    case StructType(params) => "Struct" + this(params)
-    case CaseType(params) => "Case" + this(params)
+    case StructType(params) => "Struct " + this(params)
+    case CaseType(params) => "Case " + this(params)
     case StructInstance(value) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
@@ -65,61 +85,22 @@ object PrintNewMapObject {
     case SubtypeFromMap(mi) => mi match {
       case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
     }
+    case Increment => "increment"
+    case AppendToSeq => "appendSeq"
+    case AppendToMap => "appendMap"
+    case MutableObject(commands, currentState) => {
+      "V" + commands.length + "." + currentState.toString
+    }
+    case MutableType(staticType, init, commandType, updateFunction) => {
+      "VersionedType (staticType: " + staticType + ", init: " + init + ", commandType: " + commandType + ", updateFunction " + updateFunction + ")"
+    }
+    case IncrementType(baseType) => {
+      "IncrementType (" + baseType + ")"
+    }
   }
 
-  def applyType(nType: NewMapType): String = nType match {
-    case IndexT(i) => i.toString
-    case TypeT => "Type"
-    case IdentifierT => "Identifier"
-    case MapT(key, value, default) => {
-      "(Map " + applyType(key) + " " + applyType(value) + " " + apply(default) + ")"
-    }
-    case StructT(params) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("Struct (")
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- params
-      } {
-        bindings :+= (k + ": " + applyType(v))
-      }
-      sb.append(bindings.mkString(", "))
-      sb.append(")")
-      sb.toString
-    }
-    case CaseT(params) => {
-      // TODO - Repeated Code
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("Case (")
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- params
-      } {
-        bindings :+= (k + ": " + applyType(v))
-      }
-      sb.append(bindings.mkString(", "))
-      sb.append(")")
-      sb.toString
-    }
-    case LambdaT(params, result) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("(")
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- params
-      } {
-        bindings :+= (k + ": " + applyType(v))
-      }
-      sb.append(bindings.mkString(", "))
-      sb.append(") => ")
-      sb.append(applyType(result))
-      sb.toString
-    }
-    case SubstitutableT(s) => s
-    case Subtype(parent) => "Subtype(" + applyType(parent) + ")"
-    case SubtypeFromMapType(mi) => mi match {
-      case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
-    }
+  def applyType(nType: NewMapType): String = {
+    this(ConvertNewMapTypeToObject(nType))
   }
 
   def applyObjectWithType(nObjectWithType: NewMapObjectWithType): String = {

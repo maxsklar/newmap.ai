@@ -32,6 +32,15 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
+case class NewVersionedEnvironmentCommand(
+  id: String,
+  nObject: NewMapType
+) extends EnvironmentCommand {
+  override def toString: String = {
+    "new " + nObject + " " + id
+  }
+}
+
 case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
   idToObjectWithType: ListMap[String, NewMapObjectWithType] = ListMap.empty
@@ -90,10 +99,27 @@ case class Environment(
           // TODO: save this in the result enum
           idToObjectWithType
         }
+        case NewVersionedEnvironmentCommand(id, nType) => {
+          createNewMutableObject(nType) match {
+            case Some(binding) => idToObjectWithType + (id -> binding)
+            case None => idToObjectWithType
+          } 
+        }
       }
     }
 
     Environment(newCommands, newObjectMap)
+  }
+
+  // TODO - handling errors when this returns None?
+  // at least add tests!
+  def createNewMutableObject(nType: NewMapType): Option[NewMapObjectWithType] = {
+    nType match {
+      case MutableT(staticT, init, commandT, updateFunction) => {
+        Some(NewMapObjectWithType.withTypeE(MutableObject(Vector.empty, init), nType))
+      }
+      case _ => None
+    }
   }
 
   def newCommands(newCommands: Vector[EnvironmentCommand]): Environment = {
@@ -116,20 +142,21 @@ case class Environment(
 object Environment {
   val Base: Environment = Environment().newCommands(Vector(
     FullEnvironmentCommand("Type", TypeT, TypeType),
+    FullEnvironmentCommand("Count", TypeT, CountType),
     FullEnvironmentCommand("Identifier", TypeT, IdentifierType),
     FullEnvironmentCommand("Map", LambdaT(
-      params = Vector(
+      input = StructT(Vector(
         "key" -> TypeT,
         "value" -> TypeT,
         "default" -> SubstitutableT("value")
-      ),
+      )),
       result = TypeT
     ), LambdaInstance(
-      params = Vector(
+      paramStrategy = StructParams(Vector(
         "key" -> TypeType,
         "value" -> TypeType,
         "default" -> ParameterObj("value")
-      ),
+      )),
       expression = MapType(
         ParameterObj("key"),
         ParameterObj("value"),
@@ -137,46 +164,115 @@ object Environment {
       )
     )),    
     FullEnvironmentCommand("Struct", LambdaT(
-      params = Vector(
-        "params" -> MapT(IdentifierT, TypeT, Index(1))
-      ),
+      input = MapT(IdentifierT, TypeT, Index(1)),
       result = TypeT
     ), LambdaInstance(
-      params = Vector(
-        "params" -> MapType(IdentifierType, TypeType, Index(1))
-      ),
+      paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(1))),
       expression = StructType(
-        ParameterObj("params")
+        ParameterObj("input")
       )
     )),
     FullEnvironmentCommand("Case", LambdaT(
-      params = Vector(
-        "params" -> MapT(IdentifierT, TypeT, Index(0))
-      ),
+      input = MapT(IdentifierT, TypeT, Index(0)),
       result = TypeT
     ), LambdaInstance(
-      params = Vector(
-        "params" -> MapType(IdentifierType, TypeType, Index(0))
-      ),
+      paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(0))),
       expression = CaseType(
-        ParameterObj("params")
+        ParameterObj("input")
       )
     )),
     FullEnvironmentCommand("Subtype", LambdaT(
-      params = Vector(
-        "parent" -> TypeT
-      ),
+      input = TypeT,
       result = TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
     ), LambdaInstance(
-      params = Vector(
-        "parent" -> TypeType
-      ),
+      paramStrategy = IdentifierParam("input", TypeType),
       expression = SubtypeType(
-        ParameterObj("parent")
+        ParameterObj("input")
       )
-    ))
-  ))
+    )),
+    FullEnvironmentCommand(
+      "increment",
+      LambdaT(
+        input = CountT,
+        result = CountT
+      ),
+      Increment
+    ),
+    FullEnvironmentCommand(
+      "appendSeq",
+      LambdaT(
+        input = StructT(Vector(
+          "currentSize" -> CountT,
+          "valueType" -> TypeT,
+          "defaultValue" -> SubstitutableT("valueType"),
+          "currentSeq" -> MapT(SubstitutableT("currentSize"), SubstitutableT("valueType"), ParameterObj("defaultValue")),
+          "nextValue" -> SubstitutableT("valueType")
+        )),
+        result = MapT(IncrementT(SubstitutableT("currentSize")), SubstitutableT("valueType"), ParameterObj("defaultValue"))
+      ),
+      AppendToSeq
+    ),
+    FullEnvironmentCommand(
+      "appendMap",
+      LambdaT(
+        input = StructT(Vector(
+          "keyType" -> TypeT,
+          "valueType" -> TypeT,
+          "default" -> SubstitutableT("valueType"),
+          "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default")),
+          "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
+        )),
+        result = MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
+      ),
+      AppendToMap
+    ),
+    FullEnvironmentCommand(
+      "VersionedType", 
+      LambdaT(
+        input = StructT(Vector(
+          "staticType" -> TypeT,
+          "init" -> SubstitutableT("staticType"),
+          "commandType" -> TypeT,
+          "apply" -> LambdaT(
+            input = StructT(Vector(
+              "from" -> SubstitutableT("staticType"),
+              "command" -> SubstitutableT("commandType"))),
+            result = SubstitutableT("staticType")
+          )
+        )),
+        result = TypeT
+      ), LambdaInstance(
+        paramStrategy = StructParams(Vector(
+          "staticType" -> TypeType,
+          "init" -> ParameterObj("staticType"),
+          "commandType" -> TypeType,
+          "apply" -> LambdaType(
+            inputType = StructType(MapInstance(Vector(
+              IdentifierInstance("from") -> ParameterObj("staticType"),
+              IdentifierInstance("command") -> ParameterObj("commandType")), Index(1))),
+            outputType = ParameterObj("staticType")
+          )
+        )),
+        expression = MutableType(
+          ParameterObj("staticType"),
+          ParameterObj("init"),
+          ParameterObj("commandType"),
+          ParameterObj("apply")
+        )
+      )
+    )/*,
+    FullEnvironmentCommand(
+      "new",
+      LambdaT(
+        input = SubstitutableT("versionedType")
+        result = MutableT(
 
+        )
+      ), LambdaInstance(
+
+      )
+    )*/
+  ))
   def paramToEnvCommand(x: (String, NewMapType)): FullEnvironmentCommand = {
     FullEnvironmentCommand(x._1, x._2, ParameterObj(x._1))
   }

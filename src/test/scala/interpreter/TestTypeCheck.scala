@@ -154,7 +154,7 @@ class TestTypeCheck extends FlatSpec {
     }
   }
 
-  "A numerical type " should " not get infinite subtyping" in {
+  "A numerical type " should " get infinite subtyping" in {
     val expression = LambdaParse(
       CommandList(Vector(
         BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(3)),
@@ -169,13 +169,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(result) => {
-        fail("It wrongfully succeeded " + result.toString)
-      }
-      case Failure(reason) => {
-        //println(reason)
-        // TODO: turn reason into a case class, and check that the right error occurred
-      }
+      case Success(result) => ()
+      case Failure(reason) => fail(reason)
     }
   }
 
@@ -189,13 +184,8 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(result) => {
-        fail("It wrongfully succeeded with " + result)
-      }
-      case Failure(reason) => {
-        //println(reason)
-        // TODO: turn reason into a case class, and check that the right error occurred
-      }
+      case Success(result) => ()
+      case Failure(reason) => fail(reason)
     }
   }
 

@@ -157,7 +157,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A struct " should " be created" in {
-    val code = "val s: Struct (params: (a: 2, b: 3)) = (a:0, b:0)"
+    val code = "val s: (Struct (a: 2, b: 3)) = (a:0, b:0)"
     
     val correctCommand = FullEnvironmentCommand(
       "s",
@@ -176,13 +176,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val s: Struct (params: (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val s: Struct (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val q: 3 = s b", SuccessCheck(correctCommand))
     ))
   }
 
   it should " be considered a type in a type input" in {
-    val code = "val testType: Type = Map (key: Struct (params: (a: 3, b: 3)), value: 100, default: 0)"
+    val code = "val testType: Type = Map (key: Struct (a: 3, b: 3), value: 100, default: 0)"
 
     val correctCommand = FullEnvironmentCommand(
       "testType",
@@ -205,9 +205,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
   }
 
+  "A parameter map for a struct " should " be creatable" in {
+    testLineWorks("val m: Map (Identifier, Type, 1) = (a: 6)")
+  }
+
   "A case " should " be created and instantiated" in {
     testCodeScript(Vector(
-      CodeExpectation("val Option: (t: Type) => Type = (t: Type) => Case (None: 1, Some: t)", GeneralSuccessCheck),
+      CodeExpectation("val Option: (Type => Type) = (t => Case (None: 1, Some: t)))", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
       CodeExpectation("val x: maybeSix = (None: 0)", GeneralSuccessCheck),
       CodeExpectation("val y: maybeSix = (Some: 1)", GeneralSuccessCheck),
@@ -218,9 +222,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = FullEnvironmentCommand(
       "f",
-      LambdaT(Vector("a" -> IndexT(3)), IndexT(4)),
+      LambdaT(StructT(Vector("a" -> IndexT(3))), IndexT(4)),
       LambdaInstance(
-        Vector("a" -> Index(3)),
+        StructParams(Vector("a" -> Index(3))),
         ApplyFunction(
           MapInstance(Vector(Index(0) -> Index(2), Index(1) -> Index(3), Index(2) -> Index(1)), Index(0)),
           ParameterObj("a")
@@ -250,8 +254,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(FullEnvironmentCommand(
         "fSig",
         TypeT,
-        LambdaInstance(
-          Vector("a" -> Index(3)),
+        LambdaType(
+          MapInstance(Vector(IdentifierInstance("a") -> Index(3)), Index(1)),
           Index(4)
         )
       ))),

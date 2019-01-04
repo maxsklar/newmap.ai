@@ -63,16 +63,27 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def lambdaParseInParens: Parser[LambdaParse] = {
+    val pattern = {
+      Lexer.Enc(Paren, true) ~
+        lambdaParse ~
+        Lexer.Enc(Paren, false)
+    }
+    pattern ^^ {
+      case _ ~ lp ~ _ => lp
+    }
+  }
+
   private def lambdaParse: Parser[LambdaParse] = {
-    commandList ~ Lexer.Arrow() ~ expressionList ^^ {
-      case commandList ~ _ ~ exp => {
-        LambdaParse(commandList, exp)
+    expressionList ~ Lexer.Arrow() ~ expressionList ^^ {
+      case input ~ _ ~ output => {
+        LambdaParse(input, output)
       }
     }
   }
 
   private def expression: Parser[ParseTree] = {
-    expressionInParens | naturalNumber | identifier | forcedId | lambdaParse | commandList
+    expressionInParens | naturalNumber | identifier | forcedId | lambdaParseInParens | commandList
   }
 
   private def expressionList: Parser[ParseTree] = {
@@ -113,7 +124,6 @@ object NewMapParser extends Parsers {
     tokens: Seq[Lexer.Token]
   ): Outcome[ParseTree, String] = {
     val reader = new TokenReader(tokens)
-
     val program = phrase(expressionList)
 
     program(reader) match {
