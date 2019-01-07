@@ -46,7 +46,7 @@ object TypeChecker {
           case ExplicitlyTyped(MapT(keyType, valueType, defaultValue)) => {
             val mapT = MapT(keyType, valueType, defaultValue)
             for {
-              mapValues <- typeCheckLiteralMap(values, mapT, env)
+              mapValues <- typeCheckLiteralMap(values, Some(mapT), env)
             } yield {
               NewMapObjectWithType.withTypeE(MapInstance(mapValues, defaultValue), mapT)
             }
@@ -100,10 +100,10 @@ object TypeChecker {
             // Assume that it's a map?
             // TODO - maybe there needs to be more logic here
             for {
-              mapValues <- typeCheckLiteralMapNoType(values, env)
+              mapValues <- typeCheckLiteralMap(values, None, env)
             } yield {
               // TODO: default value is given by index(0) - but in reality this is a ReqMap over its inputs
-              // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMapNoType
+              // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMap
               NewMapObjectWithType.untyped(MapInstance(mapValues, Index(0)))
             }
           }
@@ -191,47 +191,22 @@ object TypeChecker {
 
   def typeCheckLiteralMap(
     values: Vector[ParseTree],
-    expectedType: MapT,
+    expectedTypeOpt: Option[MapT],
     env: Environment
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
+        val kType = expectedTypeOpt.map(e => ExplicitlyTyped(e.key)).getOrElse(NewMapTypeInfo.init)
+        val vType = expectedTypeOpt.map(e => ExplicitlyTyped(e.value)).getOrElse(NewMapTypeInfo.init)
+
         for {
-          tc <- typeCheck(k, ExplicitlyTyped(expectedType.key), env)
+          tc <- typeCheck(k, kType, env)
           objectFoundKey = tc.nObject
 
-          tc2 <- typeCheck(v, ExplicitlyTyped(expectedType.value), env)
+          tc2 <- typeCheck(v, vType, env)
           objectFoundValue = tc2.nObject
 
-          restOfMap <- typeCheckLiteralMap(restOfValues, expectedType, env)
-        } yield {
-          (objectFoundKey -> objectFoundValue) +: restOfMap
-        }
-      }
-      case s +: _ => {
-        Failure("No binding found in map for item " + s)
-      }
-      case _ => Success(Vector.empty)
-    }
-  }
-
-  // TODO: there are no implicit type checks here, and there should be
-  def typeCheckLiteralMapNoType(
-    values: Vector[ParseTree],
-    env: Environment
-  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
-    values match {
-      case BindingCommandItem(k, v) +: restOfValues => {
-        for {
-          // TODO: Replace init with type info
-          tc <- typeCheck(k, NewMapTypeInfo.init, env)
-          objectFoundKey = tc.nObject
-
-          // TODO: Replace init with type info
-          tc2 <- typeCheck(v, NewMapTypeInfo.init, env)
-          objectFoundValue = tc2.nObject
-
-          restOfMap <- typeCheckLiteralMapNoType(restOfValues, env)
+          restOfMap <- typeCheckLiteralMap(restOfValues, expectedTypeOpt, env)
         } yield {
           (objectFoundKey -> objectFoundValue) +: restOfMap
         }

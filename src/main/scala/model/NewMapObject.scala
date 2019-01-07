@@ -73,6 +73,15 @@ case class StructInstance(value: Vector[(String, NewMapObject)]) extends NewMapO
 
 case class CaseInstance(constructor: String, input: NewMapObject) extends NewMapObject
 
+// The type inputs a case class and outputs a type - so for each case it creates a function to that type
+// Generally of type Case(params) => T
+//case class MatchInstance(
+//  patterns: NewMapObject // This must be of type MapType(C, T, default)
+  // Where C: the case type that this refers to
+  // T: the output type
+  // default: the "else" clause
+//)
+
 case class SubtypeType(parentType: NewMapObject) extends NewMapObject
 case class SubtypeFromMap(map: MapInstance) extends NewMapObject
 
