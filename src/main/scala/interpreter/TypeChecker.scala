@@ -178,6 +178,9 @@ object TypeChecker {
     for {
       objectWithType <- result
 
+      //_ = println ("--- " + objectWithType)
+      //_ = println ("-!- " + expectedType + "\n")
+
       // TODO: figure out what to really do here
       withAdditionalType <- expectedType match {
         case ExplicitlyTyped(nType) => additionalExpectedType(objectWithType, nType, env)
@@ -451,7 +454,7 @@ object TypeChecker {
         if (mi.values.exists(_._1 == nObject)) success else failMsg("K")
       }
       case IncrementT(_) => failMsg("L")
-      case MutableT(_, _, _, _) => failMsg("Not implemented: MutableT\n")
+      //case MutableT(_, _, _, _) => failMsg("Not implemented: MutableT\n")
     }
   }
 
@@ -693,7 +696,7 @@ object TypeChecker {
       case LambdaT(inputType: NewMapType, outputType: NewMapType) => {
         Success(StaticTypeFunctionChecked(inputType, outputType))
       }
-      case MutableT(staticType, _, _, _) => typeCheckFunctionType(staticType)
+      //case MutableT(staticType, _, _, _) => typeCheckFunctionType(staticType)
     }
   }
 
@@ -765,7 +768,7 @@ object TypeChecker {
     }
     case CountT => Long.MaxValue // TODO: should be infinite
     case IncrementT(base) => Long.MaxValue
-    case MutableT(staticType, _, _, _) => typeDepth(staticType, env)
+    //case MutableT(staticType, _, _, _) => typeDepth(staticType, env)
   }
 
   def processMultipleFunctionApplications(

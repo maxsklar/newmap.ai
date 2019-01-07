@@ -33,15 +33,6 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
-case class NewVersionedEnvironmentCommand(
-  id: String,
-  nObject: NewMapType
-) extends EnvironmentCommand {
-  override def toString: String = {
-    "new " + nObject + " " + id
-  }
-}
-
 case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
   idToObjectWithType: ListMap[String, NewMapObjectWithType] = ListMap.empty
@@ -91,27 +82,10 @@ case class Environment(
           // TODO: save this in the result enum
           idToObjectWithType
         }
-        case NewVersionedEnvironmentCommand(id, nType) => {
-          createNewMutableObject(nType) match {
-            case Some(binding) => idToObjectWithType + (id -> binding)
-            case None => idToObjectWithType
-          } 
-        }
       }
     }
 
     Environment(newCommands, newObjectMap)
-  }
-
-  // TODO - handling errors when this returns None?
-  // at least add tests!
-  def createNewMutableObject(nType: NewMapType): Option[NewMapObjectWithType] = {
-    nType match {
-      case MutableT(staticT, init, commandT, updateFunction) => {
-        Some(NewMapObjectWithType.withTypeE(MutableObject(Vector.empty, init), nType))
-      }
-      case _ => None
-    }
   }
 
   def newCommands(newCommands: Vector[EnvironmentCommand]): Environment = {

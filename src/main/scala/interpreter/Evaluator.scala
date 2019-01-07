@@ -87,7 +87,7 @@ object Evaluator {
           evalMapDefault <- this(NewMapObjectWithType.untyped(map.default), env)
         } yield SubtypeFromMap(MapInstance(evalMapValues, evalMapDefault))
       }
-      case MutableObject(commands, currentState) => {
+      /*case MutableObject(commands, currentState) => {
         for {
           evalCommands <- evalSequence(commands, env)
           evalCurrentState <- this(NewMapObjectWithType.untyped(currentState), env)
@@ -100,7 +100,7 @@ object Evaluator {
           evalCommandType <- this(NewMapObjectWithType.withTypeE(commandType, TypeT), env)
           evalUpdateFunction <- this(NewMapObjectWithType.untyped(updateFunction), env)
         } yield MutableType(evalStaticType, evalInit, evalCommandType, evalUpdateFunction)
-      }
+      }*/
       case IncrementType(baseType) => {
         for {
           evalBaseType <- this(NewMapObjectWithType.withTypeE(baseType, CountT), env)
@@ -229,18 +229,7 @@ object Evaluator {
         )
       }
       case (Increment, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
-      case (Increment, ParameterObj(name)) => {
-        for {
-          typeOfInput <- env.typeOf(name)
-
-          nType <- typeOfInput match {
-            case ExplicitlyTyped(t) => Success(t)
-            case _ => Failure("ImplicitlyTyped input to increment not implemented yet")
-          }
-
-          _ <- Outcome.failWhen(nType != CountT, "Input to increment must be of type CountT")
-        } yield UnableToApplyDueToUnknownInput
-      }
+      case (Increment, _) => Success(UnableToApplyDueToUnknownInput)
       case (AppendToSeq, StructInstance(paramValues)) => {
         /**
         params = Vector(
@@ -367,7 +356,7 @@ object Evaluator {
 
         SubtypeFromMap(newMapInstance)
       }
-      case MutableObject(commands, currentState) => {
+      /*case MutableObject(commands, currentState) => {
         MutableObject(
           commands.map(command => makeRelevantSubsitutions(command, env)),
           makeRelevantSubsitutions(currentState, env)
@@ -380,7 +369,7 @@ object Evaluator {
           makeRelevantSubsitutions(commandType, env),
           makeRelevantSubsitutions(updateFunction, env)
         )
-      }
+      }*/
       case IncrementType(baseType) => IncrementType(makeRelevantSubsitutions(baseType, env))
     }
   }
@@ -541,14 +530,14 @@ object Evaluator {
           CaseT(newParams)
         }
       }
-      case MutableType(staticType, init, commandType, updateFunction) => {
+      /*case MutableType(staticType, init, commandType, updateFunction) => {
         for {
           staticT <- convertObjectToType(staticType, env)
           commandT <- convertObjectToType(commandType, env)
         } yield {
           MutableT(staticT, init, commandT, updateFunction)
         }
-      }
+      }*/
       case IdentifierInstance(name) => {
         Failure("Identifier " + name + " is not connected to a type.")
       }

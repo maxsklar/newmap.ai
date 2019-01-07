@@ -88,12 +88,12 @@ object PrintNewMapObject {
     case Increment => "increment"
     case AppendToSeq => "appendSeq"
     case AppendToMap => "appendMap"
-    case MutableObject(commands, currentState) => {
+    /*case MutableObject(commands, currentState) => {
       "V" + commands.length + "." + currentState.toString
     }
     case MutableType(staticType, init, commandType, updateFunction) => {
       "VersionedType (staticType: " + staticType + ", init: " + init + ", commandType: " + commandType + ", updateFunction " + updateFunction + ")"
-    }
+    }*/
     case IncrementType(baseType) => {
       "IncrementType (" + baseType + ")"
     }

@@ -95,7 +95,7 @@ case object AppendToMap extends NewMapObject
 // Mutables Section
 
 // Encapsulates all possible mutable objects (stacks, sequences, types, and counts)
-case class MutableObject(
+/*case class MutableObject(
   commands: Vector[NewMapObject],
   currentState: NewMapObject
 ) extends NewMapObject
@@ -105,6 +105,4 @@ case class MutableType(
   init: NewMapObject,
   commandType: NewMapObject,
   updateFunction: NewMapObject
-) extends NewMapObject
-
-case object MutableTypeType extends NewMapObject
+) extends NewMapObject*/

@@ -33,6 +33,14 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def emptyParens: Parser[ParseTree] = {
+    Lexer.Enc(Paren, true) ~ Lexer.Enc(Paren, false) ^^ {
+      case _ ~ _ => {
+        CommandList(Vector.empty)
+      }
+    }
+  }
+
   private def expressionInParens: Parser[ParseTree] = {
     Lexer.Enc(Paren, true) ~ expressionListWithOperations ~ Lexer.Enc(Paren, false) ^^ {
       case _ ~ exps ~ _ => {
@@ -153,7 +161,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpression: Parser[ParseTree] = {
-    expressionInParens | naturalNumber | identifier | forcedId
+    expressionInParens | emptyParens | naturalNumber | identifier | forcedId
   }
 
   private def expressionList: Parser[ParseTree] = {

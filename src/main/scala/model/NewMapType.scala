@@ -33,17 +33,6 @@ case class SubstitutableT(s: String) extends NewMapType
 case class Subtype(parent: NewMapType) extends NewMapType
 case class SubtypeFromMapType(values: MapInstance) extends NewMapType
 
-// Remove in favor of a struct???
-case class MutableT(
-  initType: NewMapType, // Problem: ITS NOT A STATIC TYPE
-  init: NewMapObject,
-  commandType: NewMapType,
-  updateFunction: NewMapObject
-) extends NewMapType
-
-// This is a subtype of type that includes all the mutable types
-case object MutableTypeT extends NewMapType
-
 // TODO: Type functions
 
 

@@ -15,9 +15,9 @@ object ConvertNewMapTypeToObject {
     case TypeT => TypeType
     case Subtype(t: NewMapType) => SubtypeType(this(t))
     case SubtypeFromMapType(m: MapInstance) => SubtypeFromMap(m)
-    case MutableT(staticType, init, commandType, updateFunction) => {
+    /*case MutableT(staticType, init, commandType, updateFunction) => {
       MutableType(this(staticType), init, this(commandType), updateFunction)
-    }
+    }*/
     case IncrementT(baseType) => IncrementType(this(baseType))
   }
 

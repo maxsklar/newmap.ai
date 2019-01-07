@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 
 object MutableHandler {
-  def addCommand(
+  /*def addCommand(
     mutable: MutableObject,
     mutableType: MutableT,
     command: NewMapObjectWithType,
@@ -60,5 +60,5 @@ object MutableHandler {
     val newState = calculateStaticObject(newCommandList, mutableType, env)
 
     MutableObject(newCommandList, newState)
-  }
+  }*/
 }
