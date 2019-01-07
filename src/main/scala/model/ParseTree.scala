@@ -56,3 +56,9 @@ case class NewVersionedStatementParse(
 
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
+
+sealed abstract class BinaryOpParse
+
+case class CommaBinaryOpParse() extends BinaryOpParse
+case class ColonBinaryOpParse() extends BinaryOpParse
+case class ArrowBinaryOpParse() extends BinaryOpParse

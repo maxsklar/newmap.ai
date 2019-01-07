@@ -106,3 +106,5 @@ case class MutableType(
   commandType: NewMapObject,
   updateFunction: NewMapObject
 ) extends NewMapObject
+
+case object MutableTypeType extends NewMapObject

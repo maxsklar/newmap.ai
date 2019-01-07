@@ -216,7 +216,9 @@ class TestTypeCheck extends FlatSpec {
     val statement = FullStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(FullEnvironmentCommand("x",IndexT(1),Index(0))))
+        assert(envCommands.length == 1)
+        val com = envCommands(0)
+        assert(com == Environment.eCommand("x",IndexT(1),Index(0)))
       }
       case Failure(reason) => fail(reason)
     }
@@ -226,7 +228,7 @@ class TestTypeCheck extends FlatSpec {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(TypeInferredEnvironmentCommand("x",Index(10))))
+        assert(envCommands == Vector(FullEnvironmentCommand("x",NewMapObjectWithType.untyped(Index(10)))))
       }
       case Failure(reason) => fail(reason)
     }

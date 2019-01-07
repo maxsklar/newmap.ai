@@ -168,7 +168,7 @@ object Evaluator {
       case (LambdaInstance(IdentifierParam(id, typeOfParam), expression), param) => {
         for {
           nType <- convertObjectToType(typeOfParam, env)
-          newEnv = env.newCommand(FullEnvironmentCommand(id, nType, param))
+          newEnv = env.newCommand(Environment.eCommand(id, nType, param))
           substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
           result <- this(NewMapObjectWithType.untyped(substitutedExpression), env)
         } yield AbleToApplyFunction(result)
@@ -196,12 +196,7 @@ object Evaluator {
             substitutedExpression
           } else {
             val newParams = params.drop(1).map(param => {
-              // TODO: resolveType will only make the subsitution if the type is directly a SubstitutableT
-              // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
-              param._1 -> makeRelevantSubsitutions(
-                param._2,
-                env.newCommand(FullEnvironmentCommand(params(0)._1, TypeT, params(0)._2))
-              )
+              param._1 -> makeRelevantSubsitutions(param._2, newEnv)
             })
 
             LambdaInstance(StructParams(newParams), substitutedExpression)
@@ -270,6 +265,10 @@ object Evaluator {
         */
         Failure("Not implemented: Apply function AppendToMap")
       }
+      case (ParameterObj(id), input) => {
+        // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
+        Success(UnableToApplyDueToUnknownInput)
+      }
       case _ => {
         Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
       }
@@ -290,7 +289,7 @@ object Evaluator {
           )
           typeInformation <- convertObjectToType(firstParamType._2, env)
 
-          envCommand = FullEnvironmentCommand(
+          envCommand = Environment.eCommand(
             firstParamType._1,
             typeInformation,
             firstParamValue._2

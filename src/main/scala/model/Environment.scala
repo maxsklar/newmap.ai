@@ -9,20 +9,21 @@ sealed abstract class EnvironmentCommand
 
 case class FullEnvironmentCommand(
   id: String,
-  nType: NewMapType,
-  nObject: NewMapObject
+  nObjectWithType: NewMapObjectWithType
 ) extends EnvironmentCommand {
-  override def toString: String = {
-    "val " + id + ": " + nType + " = " + nObject
-  }
-}
-
-case class TypeInferredEnvironmentCommand(
-  id: String,
-  nObject: NewMapObject
-) extends EnvironmentCommand {
-  override def toString: String = {
-    "val " + id + " = " + nObject
+  override def toString: String = nObjectWithType.nTypeInfo match {
+    case ExplicitlyTyped(nType) => {
+      "val " + id + ": " + nType + " = " + nObjectWithType.nObject
+    }
+    case ImplicitlyTyped(nTypes) => {
+      if (nTypes.length == 0) {
+        "val " + id + " = " + nObjectWithType.nObject
+      } else {
+        // TODO - type intersections still need work
+        "val " + id + ": " + "Convertible(" + nTypes.mkString(", ") + ")" + " = " + nObjectWithType.nObject
+      }
+    }
+    
   }
 }
 
@@ -67,13 +68,7 @@ case class Environment(
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
     for ((id, objWithTypeInfo) <- idToObjectWithType) {
-      val command = objWithTypeInfo.nTypeInfo match {
-        // TODO - don't rely on EnvironmentCommand to print
-        case ExplicitlyTyped(nType) => FullEnvironmentCommand(id, nType, objWithTypeInfo.nObject)
-        // TODO - the inferred types must be brought in here somehow
-        case ImplicitlyTyped(types) => TypeInferredEnvironmentCommand(id, objWithTypeInfo.nObject)
-      }
-
+      val command = FullEnvironmentCommand(id, objWithTypeInfo)
       builder.append(command.toString)
       builder.append("\n")
     }
@@ -89,11 +84,8 @@ case class Environment(
 
     val newObjectMap: ListMap[String, NewMapObjectWithType] = {
       command match {
-        case FullEnvironmentCommand(id, nType, nObject) => {
-          idToObjectWithType + (id -> NewMapObjectWithType(nObject, ExplicitlyTyped(nType)))
-        }
-        case TypeInferredEnvironmentCommand(id, nObject) => {
-          idToObjectWithType + (id -> NewMapObjectWithType(nObject, NewMapTypeInfo.init))          
+        case FullEnvironmentCommand(id, nObjectWithType) => {
+          idToObjectWithType + (id -> nObjectWithType)
         }
         case ExpOnlyEnvironmentCommand(nObject) => {
           // TODO: save this in the result enum
@@ -140,11 +132,16 @@ case class Environment(
 }
 
 object Environment {
+  def eCommand(id: String, nType: NewMapType, nObject: NewMapObject): EnvironmentCommand = {
+    FullEnvironmentCommand(id, NewMapObjectWithType.withTypeE(nObject, nType))
+  }
+
+
   val Base: Environment = Environment().newCommands(Vector(
-    FullEnvironmentCommand("Type", TypeT, TypeType),
-    FullEnvironmentCommand("Count", TypeT, CountType),
-    FullEnvironmentCommand("Identifier", TypeT, IdentifierType),
-    FullEnvironmentCommand("Map", LambdaT(
+    eCommand("Type", TypeT, TypeType),
+    eCommand("Count", TypeT, CountType),
+    eCommand("Identifier", TypeT, IdentifierType),
+    eCommand("Map", LambdaT(
       input = StructT(Vector(
         "key" -> TypeT,
         "value" -> TypeT,
@@ -163,7 +160,7 @@ object Environment {
         ParameterObj("default")
       )
     )),    
-    FullEnvironmentCommand("Struct", LambdaT(
+    eCommand("Struct", LambdaT(
       input = MapT(IdentifierT, TypeT, Index(1)),
       result = TypeT
     ), LambdaInstance(
@@ -172,7 +169,7 @@ object Environment {
         ParameterObj("input")
       )
     )),
-    FullEnvironmentCommand("Case", LambdaT(
+    eCommand("Case", LambdaT(
       input = MapT(IdentifierT, TypeT, Index(0)),
       result = TypeT
     ), LambdaInstance(
@@ -181,7 +178,7 @@ object Environment {
         ParameterObj("input")
       )
     )),
-    FullEnvironmentCommand("Subtype", LambdaT(
+    eCommand("Subtype", LambdaT(
       input = TypeT,
       result = TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
     ), LambdaInstance(
@@ -190,7 +187,7 @@ object Environment {
         ParameterObj("input")
       )
     )),
-    FullEnvironmentCommand(
+    eCommand(
       "increment",
       LambdaT(
         input = CountT,
@@ -198,7 +195,7 @@ object Environment {
       ),
       Increment
     ),
-    FullEnvironmentCommand(
+    eCommand(
       "appendSeq",
       LambdaT(
         input = StructT(Vector(
@@ -212,7 +209,7 @@ object Environment {
       ),
       AppendToSeq
     ),
-    FullEnvironmentCommand(
+    eCommand(
       "appendMap",
       LambdaT(
         input = StructT(Vector(
@@ -225,8 +222,9 @@ object Environment {
         result = MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
       ),
       AppendToMap
-    ),
-    FullEnvironmentCommand(
+    )/*,
+    eCommand("VType", Subtype(TypeT), MutableTypeT),
+    eCommand(
       "VersionedType", 
       LambdaT(
         input = StructT(Vector(
@@ -240,7 +238,7 @@ object Environment {
             result = SubstitutableT("staticType")
           )
         )),
-        result = TypeT
+        result = MutableTypeT
       ), LambdaInstance(
         paramStrategy = StructParams(Vector(
           "staticType" -> TypeType,
@@ -260,21 +258,19 @@ object Environment {
           ParameterObj("apply")
         )
       )
-    )/*,
-    FullEnvironmentCommand(
+    ),*/
+    /*eCommand(
       "new",
       LambdaT(
-        input = SubstitutableT("versionedType")
-        result = MutableT(
-
-        )
+        input = MutableTypeT
+        result = MutableType(???) // An actual object of type mutable type (will be based on input)
       ), LambdaInstance(
 
       )
     )*/
   ))
-  def paramToEnvCommand(x: (String, NewMapType)): FullEnvironmentCommand = {
-    FullEnvironmentCommand(x._1, x._2, ParameterObj(x._1))
+  def paramToEnvCommand(x: (String, NewMapType)): EnvironmentCommand = {
+    eCommand(x._1, x._2, ParameterObj(x._1))
   }
 }
 

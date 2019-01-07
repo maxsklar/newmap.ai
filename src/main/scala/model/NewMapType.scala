@@ -22,19 +22,27 @@ case object IdentifierT extends NewMapType
 case class MapT(key: NewMapType, value: NewMapType, default: NewMapObject) extends NewMapType
 case class StructT(params: Vector[(String, NewMapType)]) extends NewMapType
 case class CaseT(params: Vector[(String, NewMapType)]) extends NewMapType
+
+
+// Actually the result type can depend on the input type
 case class LambdaT(input: NewMapType, result: NewMapType) extends NewMapType
+
 case class SubstitutableT(s: String) extends NewMapType
 
 // Represents a type that contains a subset of the parent type
 case class Subtype(parent: NewMapType) extends NewMapType
 case class SubtypeFromMapType(values: MapInstance) extends NewMapType
 
+// Remove in favor of a struct???
 case class MutableT(
-  staticType: NewMapType,
+  initType: NewMapType, // Problem: ITS NOT A STATIC TYPE
   init: NewMapObject,
   commandType: NewMapType,
   updateFunction: NewMapObject
 ) extends NewMapType
+
+// This is a subtype of type that includes all the mutable types
+case object MutableTypeT extends NewMapType
 
 // TODO: Type functions
 

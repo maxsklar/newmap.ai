@@ -116,7 +116,12 @@ object TypeChecker {
       case LambdaParse(params, expression) if (expectedType == ExplicitlyTyped(TypeT)) => {
         for {
           inputType <- typeSpecificTypeChecker(params, env)
-          outputType <- typeSpecificTypeChecker(expression, env)
+          newEnv = inputType match {
+            case StructT(inputParams) => env.newParams(inputParams)
+            case _ => env
+          }
+
+          outputType <- typeSpecificTypeChecker(expression, newEnv)
         } yield {
           NewMapObjectWithType.withTypeE(
             LambdaType(ConvertNewMapTypeToObject(inputType), ConvertNewMapTypeToObject(outputType)),
@@ -128,6 +133,7 @@ object TypeChecker {
         for {
           newParams <- params match {
             case CommandList(values) => typeCheckParameterList(values, env)
+            case BindingCommandItem(key, value) => typeCheckParameterList(Vector(params), env)
             case IdentifierParse(id, _) => {
               expectedType match {
                 case ExplicitlyTyped(LambdaT(input, output)) => {
@@ -139,7 +145,7 @@ object TypeChecker {
               }
 
             }
-            case _ => Failure("Lambda Values must be variable bindings")
+            case _ => Failure("Lambda Values must be variable bindings " + params + " -- " + expression)
           }
 
           tc <- typeCheck(expression, NewMapTypeInfo.init, env.newParams(newParams))
@@ -231,41 +237,6 @@ object TypeChecker {
         Failure("No binding found in map for item " + s)
       }
       case _ => Success(Vector.empty)
-    }
-  }
-
-  // TODO - I expect this function to get more complex
-  // TODO - Include Index Type (with open question)
-  //  Suppose I expect Index(4). If I have given "2", obviously that's alright
-  //  But if I'm given x, which is a param memmber Index(3) - should I automatically convert?
-  //  I would say not automatically, because it probably indicates a code error
-  //  Solution: use expected value above when calculating the type of a number
-  // TODO: might have to remove this!!!
-  /**
-   * @param typeFoundExplicit was the type explicitly set, or was it found implicitly in the code? If it was found implicitly, the requirements are lax
-   */
-  def isSubtype(
-    typeFound: NewMapType,
-    typeExpected: NewMapType,
-    env: Environment,
-    typeFoundExplicit: Boolean
-  ): Boolean = {
-    val resolvedType = resolveType(typeFound, env)
-
-    resolveType(typeExpected, env) match {
-      case TypeT => refersToAType(resolvedType, env)
-      case IndexT(i) => {
-        typeFound match {
-          case IndexT(j) => if (typeFoundExplicit) (j == i) else (j <= i)
-          case _ => false
-        }        
-      }
-      case SubtypeFromMapType(mi) => mi match {
-        case MapInstance(values, default) => {
-          false // TODO: fix this! Need Literals
-        }
-      }
-      case _ => (typeExpected == resolvedType)
     }
   }
 
@@ -604,7 +575,7 @@ object TypeChecker {
     parameterList: Vector[(String, NewMapType)],
     valueList: Vector[ParseTree],
     env: Environment
-  ): Outcome[Vector[FullEnvironmentCommand], String] = {
+  ): Outcome[Vector[(String, NewMapType, NewMapObject)], String] = {
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         val valueIdOpt = checkForKnownIdentifier(valueIdentifier, env)
@@ -614,11 +585,11 @@ object TypeChecker {
             for {
               tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
 
-              envCommand = FullEnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
+              envCommand = Environment.eCommand(paramId, typeOfIdentifier, tc.nObject)
               newEnv = env.newCommand(envCommand)
               result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
             } yield {
-              envCommand +: result
+              (paramId, typeOfIdentifier, tc.nObject) +: result
             }
           }
           case Some(valueId) => {
@@ -634,11 +605,11 @@ object TypeChecker {
         for {
           tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
 
-          envCommand = FullEnvironmentCommand(paramId, typeOfIdentifier, tc.nObject)
+          envCommand = Environment.eCommand(paramId, typeOfIdentifier, tc.nObject)
           newEnv = env.newCommand(envCommand)
           result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
         } yield {
-          envCommand +: result
+          (paramId, typeOfIdentifier, tc.nObject) +: result
         }
       }
       case _ => {
@@ -660,8 +631,8 @@ object TypeChecker {
   ): Outcome[NewMapObjectWithType, String] = for {
     envCommands <- typeCheckStruct(parameterList, valueList, env)
   } yield {
-    val typeFound = StructT(envCommands.map(c => c.id -> c.nType))
-    val objectFound = StructInstance(envCommands.map(c => c.id -> c.nObject))
+    val typeFound = StructT(envCommands.map(c => c._1 -> c._2))
+    val objectFound = StructInstance(envCommands.map(c => c._1 -> c._3))
     NewMapObjectWithType.withTypeE(objectFound, typeFound)
   }
 
@@ -761,7 +732,7 @@ object TypeChecker {
       if (params.isEmpty) Long.MaxValue else params.map(_._2).map(t => typeDepth(t, env)).min
     }
     case MapT(key, value, default) => {
-      if (isSubtype(key, IdentifierT, env, false) && isSubtype(value, TypeT, env, false)) {
+      if (isTypeConvertible(key, IdentifierT, env) && isTypeConvertible(value, TypeT, env)) {
         default match {
           // TODO: Index(0) and Index(1) are both in Index(2)... can we do some kind of check here?
           case Index(0) | Index(1) => 1 // This refers to the case and struct type respectively
@@ -807,10 +778,19 @@ object TypeChecker {
         for {
           functionType <- startingFunction.nTypeInfo match {
             case ExplicitlyTyped(nType) => Success(nType)
-            case ImplicitlyTyped(_) => Failure(
-              "Functions must be explicitly typed for now. Implicit function types are not yet supported\n" ++
-              startingFunction.nObject.toString
-            )
+            case ImplicitlyTyped(convertibles) => {
+              if (convertibles.length > 1) {
+                Failure(
+                  "Implicit function types are not yet supported for multiple convertibles\n" ++
+                  startingFunction.nObject.toString
+                )
+              }
+
+              convertibles.headOption match {
+                case None => Failure("Function not assigned any type")
+                case Some(nType) => Success(nType)
+              }
+            }
           }
 
           functionTypeChecked <- typeCheckFunctionType(functionType)
@@ -845,8 +825,7 @@ object TypeChecker {
       fullOutputType <- functionTypeChecked match {
         case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
         case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
-          val obj = params.find(x => x._1 == inputValue).map(_._2).getOrElse(paramsDefault)
-          Evaluator.convertObjectToType(obj, env)
+          dynamicTyping(inputValue, params, paramsDefault, env)
         }
       }
 
@@ -856,12 +835,9 @@ object TypeChecker {
           case StructT(params) => {
             if (params.length == 1) Success(fullOutputType) else {
               val newParams = params.drop(1).map(param => {
-                // TODO: resolveType will only make the subsitution if the type is directly a SubstitutableT
-                // We need to figure out a "Let" statement (where to put extra env commands) for the more complex results
-                param._1 -> resolveType(
-                  param._2,
-                  env.newCommand(FullEnvironmentCommand(params(0)._1, TypeT, ConvertNewMapTypeToObject(params(0)._2)))
-                )
+                val newEnv = env.newCommand(FullEnvironmentCommand(params(0)._1, successfullyTypeChecked))
+                val resolvedType = resolveType(param._2, newEnv)
+                param._1 -> resolvedType
               })
 
               Success(LambdaT(StructT(newParams), fullOutputType))
@@ -879,6 +855,37 @@ object TypeChecker {
         ),
         outputType
       )
+    }
+  }
+
+  def dynamicTyping(
+    inputValue: NewMapObject,
+    params: Vector[(NewMapObject, NewMapObject)],
+    paramsDefault: NewMapObject,
+    env: Environment
+  ): Outcome[NewMapType, String] = params match {
+    case firstParam +: restOfParams => {
+      if (firstParam._1 == inputValue) {
+        Evaluator.convertObjectToType(firstParam._2, env)
+      } else {
+        for {
+          firstParamType <- Evaluator.convertObjectToType(firstParam._2, env)
+
+          newEnv = firstParam._1 match {
+            case IdentifierInstance(id) => env.newParam(id, firstParamType)
+            case _ => {
+              // TODO: I think this is unusable right now, check if we can get rid of this.
+              env
+            }
+          }
+
+          result <- dynamicTyping(inputValue, restOfParams, paramsDefault, newEnv)
+        } yield result
+        
+      }
+    }
+    case _ => {
+      Evaluator.convertObjectToType(paramsDefault, env)
     }
   }
 
@@ -908,7 +915,7 @@ object TypeChecker {
             typeCheck(input, ExplicitlyTyped(firstParam._2), env) match {
               case Success(nmo) => Success(TypeCheckFunctionInputResult(nmo, true))
               case Failure(msg2) => {
-                val introStr = "Could not interpret input " + input + " as valid for function explicitly typed as" + firstParam._2 + "."
+                val introStr = "Could not interpret input " + input + " as valid for function explicitly typed as " + firstParam._2 + "."
                 val err1 = "Error for direct approach: " + msg
                 val err2 = "Error for trying to match it to the first parameter: " + msg2
                 Failure(introStr + "\n" + err1 + "\n" + err2)

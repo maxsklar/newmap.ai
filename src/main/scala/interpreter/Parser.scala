@@ -34,60 +34,130 @@ object NewMapParser extends Parsers {
   }
 
   private def expressionInParens: Parser[ParseTree] = {
-    Lexer.Enc(Paren, true) ~ expressionList ~ Lexer.Enc(Paren, false) ^^ {
+    Lexer.Enc(Paren, true) ~ expressionListWithOperations ~ Lexer.Enc(Paren, false) ^^ {
       case _ ~ exps ~ _ => {
         exps
       }
     }
   }
 
-  private def kvBinding: Parser[BindingCommandItem] = {
-    val pattern = expressionList ~ Lexer.Colon() ~ expressionList
+  private def comma: Parser[BinaryOpParse] = {
+    accept("comma", { case Lexer.Comma() => {
+      CommaBinaryOpParse()
+    }})
+  }
+
+  private def colon: Parser[BinaryOpParse] = {
+    accept("colon", { case Lexer.Colon() => {
+      ColonBinaryOpParse()
+    }})
+  }
+
+  private def arrow: Parser[BinaryOpParse] = {
+    accept("arrow", { case Lexer.Arrow() => {
+      ArrowBinaryOpParse()
+    }})
+  }
+
+  private def binaryOpParse: Parser[BinaryOpParse] = {
+    comma | colon | arrow
+  }
+
+  private def expressionListWithOperations: Parser[ParseTree] = {
+    val pattern = expressionList ~ rep(binaryOpParse ~ expressionList)
+
     pattern ^^ {
-      case key ~ _ ~ value => {
-        BindingCommandItem(key, value)
+      case startingExp ~ otherExps => {
+
+        val o0: Vector[(BinaryOpParse, ParseTree)] = otherExps.map(_ match {
+          case (symbol ~ exp) => (symbol, exp)
+        }).toVector
+
+        // Precedence of operations is, highest to lowest: Colon, Comma, Arrow
+        // Arrow associates to the right, while the others associate to the left
+
+        // TODO - this binding code is confusing. It's just order of operations, should be
+        //  possible to rewrite
+
+        val (s1, o1) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b) => {
+          BindingCommandItem(a, b)
+        })
+
+        val (s2, o2) = bindBinaryOpParse(s1, o1, CommaBinaryOpParse(), (a, b) => {
+          a match {
+            case CommandList(commands) => CommandList(commands :+ b)
+            case _ => CommandList(Vector(a, b))
+          }
+        })
+
+        def bindArrow(in: ParseTree, out: ParseTree): ParseTree = {
+          in match {
+            case LambdaParse(inIn, inOut) => LambdaParse(inIn, bindArrow(inOut, out))
+            case _ => LambdaParse(in, out)
+          }
+        }
+
+        val (s3, o3) = bindBinaryOpParse(s2, o2, ArrowBinaryOpParse(), (a, b) => {
+          bindArrow(a, b)
+        })
+
+        if (o3.nonEmpty) {
+          println("Warning: the parse is dropping stuff: " + o3)
+        }
+
+        s3
       }
     }
   }
 
-  private def commandList: Parser[CommandList] = {
-    val pattern = {
-      Lexer.Enc(Paren, true) ~
-        repsep(kvBinding | expressionList, Lexer.Comma()) ~
-        Lexer.Enc(Paren, false)
+  def bindBinaryOpParse(
+    startingExp: ParseTree,
+    otherExpressions: Vector[(BinaryOpParse, ParseTree)],
+    binaryOpToBind: BinaryOpParse,
+    bindingInstructions: (ParseTree, ParseTree) => ParseTree
+  ): (ParseTree, Vector[(BinaryOpParse, ParseTree)]) = {
+    var newStarting = startingExp
+
+    val initial = otherExpressions.takeWhile(x => {
+      x._1 == binaryOpToBind
+    })
+
+    for {
+      init <- initial
+    } {
+      newStarting = bindingInstructions(newStarting, init._2)
     }
-    pattern ^^ {
-      case _ ~ items ~ _ => {
-        CommandList(items.toVector)
+
+    val nextOtherExpressions = otherExpressions.drop(initial.length)
+
+    val newOthers = nextOtherExpressions match {
+      case exp +: tailExp => {
+        var completedExps: Vector[(BinaryOpParse, ParseTree)] = Vector.empty
+        var currentExp = exp
+
+        for {e <- tailExp} {
+          if (e._1 == binaryOpToBind) {
+            currentExp = currentExp._1 -> bindingInstructions(currentExp._2, e._2)
+          } else {
+            completedExps :+= currentExp
+            currentExp = e
+          }
+        }
+
+        completedExps :+ currentExp
       }
+      case _ => Vector.empty
     }
+
+    (newStarting, newOthers)
   }
 
-  private def lambdaParseInParens: Parser[LambdaParse] = {
-    val pattern = {
-      Lexer.Enc(Paren, true) ~
-        lambdaParse ~
-        Lexer.Enc(Paren, false)
-    }
-    pattern ^^ {
-      case _ ~ lp ~ _ => lp
-    }
-  }
-
-  private def lambdaParse: Parser[LambdaParse] = {
-    expressionList ~ Lexer.Arrow() ~ expressionList ^^ {
-      case input ~ _ ~ output => {
-        LambdaParse(input, output)
-      }
-    }
-  }
-
-  private def expression: Parser[ParseTree] = {
-    expressionInParens | naturalNumber | identifier | forcedId | lambdaParseInParens | commandList
+  private def baseExpression: Parser[ParseTree] = {
+    expressionInParens | naturalNumber | identifier | forcedId
   }
 
   private def expressionList: Parser[ParseTree] = {
-    rep1(expression) ^^ {
+    rep1(baseExpression) ^^ {
       case exps => {
         // TODO - make this type safe
         if (exps.length > 1) ApplyParse(exps(0), exps.drop(1).toVector)
@@ -97,7 +167,7 @@ object NewMapParser extends Parsers {
   }
 
   private def fullStatement: Parser[FullStatementParse] = {
-    Lexer.Identifier("val") ~ identifier ~ Lexer.Colon() ~ expressionList ~ Lexer.Equals() ~ expressionList ^^ {
+    Lexer.Identifier("val") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
         FullStatementParse(ValStatement, id, typeExp, exp)
       }
@@ -105,7 +175,7 @@ object NewMapParser extends Parsers {
   }
 
   private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
-    Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionList ^^ {
+    Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
         InferredTypeStatementParse(ValStatement, id, exp)
       }
@@ -113,7 +183,7 @@ object NewMapParser extends Parsers {
   }
 
   private def expOnlyStatmentParse: Parser[ExpressionOnlyStatementParse] = {
-    expressionList ^^ {
+    expressionListWithOperations ^^ {
       case exp => {
         ExpressionOnlyStatementParse(exp)
       }
@@ -124,7 +194,7 @@ object NewMapParser extends Parsers {
     tokens: Seq[Lexer.Token]
   ): Outcome[ParseTree, String] = {
     val reader = new TokenReader(tokens)
-    val program = phrase(expressionList)
+    val program = phrase(expressionListWithOperations)
 
     program(reader) match {
       case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

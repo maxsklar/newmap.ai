@@ -20,7 +20,7 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheck(objExpression, ExplicitlyTyped(typeAsType), env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, typeAsType, evaluatedObject))
+          Vector(FullEnvironmentCommand(id.s, NewMapObjectWithType(evaluatedObject, ExplicitlyTyped(typeAsType))))
         }
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
@@ -28,7 +28,7 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheck(objExpression, NewMapTypeInfo.init, env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
-          Vector(TypeInferredEnvironmentCommand(id.s, evaluatedObject))
+          Vector(FullEnvironmentCommand(id.s, NewMapObjectWithType(evaluatedObject, tc.nTypeInfo)))
         }
       }
       case ExpressionOnlyStatementParse(exp) => {

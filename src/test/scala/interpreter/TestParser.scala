@@ -58,7 +58,7 @@ class TestParser extends FlatSpec {
       Number(10),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      CommandList(Vector(BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10))))
+      BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10))
     ))
   }
 
@@ -119,7 +119,7 @@ class TestParser extends FlatSpec {
     )
     assert(NewMapParser(tokens) == Success(
       LambdaParse(
-        CommandList(Vector(BindingCommandItem(IdentifierParse("d"), NaturalNumberParse(5)))),
+        BindingCommandItem(IdentifierParse("d"), NaturalNumberParse(5)),
         IdentifierParse("d")
       )
     ))
