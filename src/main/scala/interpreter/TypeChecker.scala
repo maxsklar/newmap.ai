@@ -178,9 +178,6 @@ object TypeChecker {
     for {
       objectWithType <- result
 
-      //_ = println ("--- " + objectWithType)
-      //_ = println ("-!- " + expectedType + "\n")
-
       // TODO: figure out what to really do here
       withAdditionalType <- expectedType match {
         case ExplicitlyTyped(nType) => additionalExpectedType(objectWithType, nType, env)

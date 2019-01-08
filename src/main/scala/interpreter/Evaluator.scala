@@ -409,8 +409,7 @@ object Evaluator {
     }
   }
 
-    // Already assume the object is a type
-  // TODO - once objects and type are unified, this should become unneccesary
+  // Converts a New Map Object (that is convertible to type Type) into the corresponding NewMapType object
   def convertObjectToType(
     objectFound: NewMapObject,
     env: Environment
@@ -568,37 +567,6 @@ object Evaluator {
       case _ => {
         Success(Vector.empty)
       }
-    }
-  }
-
-  def objectParamsToParams(
-    params: Vector[(String, NewMapObject)],
-    env: Environment
-  ): Outcome[Vector[(String, NewMapType)], String] = {
-    //println("Calling objectParamsToParams: " + params)
-
-    params match {
-      case (paramId, paramTypeObj) +: restOfParams => {
-        for {
-          resultOfTypeConvert <- convertObjectToType(paramTypeObj, env)
-          newEnv = env.newParam(paramId, resultOfTypeConvert)
-          restOfParamsConverted <- objectParamsToParams(restOfParams, newEnv)
-        } yield {
-          (paramId -> resultOfTypeConvert) +: restOfParamsConverted
-        }
-      }
-      case _ => Success(Vector.empty)
-    }
-  }
-
-  def lambdaParamsToParams(
-    lParams: LambdaParamStrategy,
-    env: Environment
-  ): Outcome[Vector[(String, NewMapType)], String] = lParams match {
-    case StructParams(params) => objectParamsToParams(params, env)
-    case IdentifierParam(name, typeAsObj) => objectParamsToParams(Vector(name -> typeAsObj), env)
-    case InputStackParam(typeAsObj) => {
-      Failure("Can't handle input stack yet (unimplemented)")
     }
   }
 }
