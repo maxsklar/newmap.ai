@@ -41,8 +41,15 @@ object Evaluator {
       case LambdaType(inputType, outputType) => {
         for {
           evalInputType <- this(NewMapObjectWithType.untyped(inputType), env)
-          // TODO: The environement in outputType can be altered by inputtype
-          evalOutputType <- this(NewMapObjectWithType.untyped(outputType), env)
+
+          // TODO - there are either more cases than this, or this subroutine should be put in its own
+          // function
+          newEnv = convertObjectToType(evalInputType, env) match {
+            case Success(StructT(params)) => env.newParams(params)
+            case _ => env
+          }
+
+          evalOutputType <- this(NewMapObjectWithType.untyped(outputType), newEnv)
         } yield LambdaType(evalInputType, evalOutputType)
       }
       case ApplyFunction(func, input) => {
@@ -132,12 +139,27 @@ object Evaluator {
       for {
         evalK <- this(NewMapObjectWithType.untyped(k), env)
         evalV <- this(NewMapObjectWithType.untyped(v), env)
-        evalRest <- evalMapInstanceVals(restOfValues, env)
+
+        // TODO: I'm not sure if this is the best place to be altering the Environment
+        // Could the env be altered here when it shouldn't be??
+        newEnv = (extractIdentifier(evalK), convertObjectToType(evalV, env)) match {
+          case (Some(s), Success(t)) => env.newParam(s, t)
+          case _ => env
+        }
+
+        evalRest <- evalMapInstanceVals(restOfValues, newEnv)
       } yield {
         (evalK -> evalV) +: evalRest
       }
     }
     case _ => Success(Vector.empty)
+  }
+
+  def extractIdentifier(nObject: NewMapObject): Option[String] = {
+    nObject match {
+      case IdentifierInstance(s) => Some(s)
+      case _ => None 
+    }
   }
 
   def evalParameters(
@@ -465,7 +487,6 @@ object Evaluator {
       case ParameterObj(name) => {
         for {
           typeInfoOfObjectFound <- env.typeOf(name)
-
           typeOfObjectFound <- typeInfoOfObjectFound match {
             case ExplicitlyTyped(nType) => Success(nType)
             case ImplicitlyTyped(types) => {

@@ -65,7 +65,7 @@ case class StructType(
 ) extends NewMapObject
 
 case class CaseType(
-  params: NewMapObject // This must be of type MapType(Identifier, Type, 1)
+  params: NewMapObject // This must be of type MapType(Identifier, Type, 0)
 ) extends NewMapObject
 
 // This one is a little different/complex because each object has a unique type as defined by the struct

@@ -124,4 +124,18 @@ class TestParser extends FlatSpec {
       )
     ))
   }
+
+  it should " work correctly for multiple types" in {
+    val tokens = Vector(Number(1), Arrow(), Number(2), Arrow(), Number(3))
+    assert(NewMapParser(tokens) == Success(
+      LambdaParse(NaturalNumberParse(1), LambdaParse(NaturalNumberParse(2), NaturalNumberParse(3)))
+    ))
+  }
+
+  it should " work correctly when the types are grouped" in {
+    val tokens = Vector(Enc(Paren, true), Number(1), Arrow(), Number(2), Enc(Paren, false), Arrow(), Number(3))
+    assert(NewMapParser(tokens) == Success(
+      LambdaParse(LambdaParse(NaturalNumberParse(1), NaturalNumberParse(2)), NaturalNumberParse(3))
+    ))
+  }
 }

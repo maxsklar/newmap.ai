@@ -87,26 +87,26 @@ object NewMapParser extends Parsers {
         // TODO - this binding code is confusing. It's just order of operations, should be
         //  possible to rewrite
 
-        val (s1, o1) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b) => {
+        val (s1, o1) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, first) => {
           BindingCommandItem(a, b)
         })
 
-        val (s2, o2) = bindBinaryOpParse(s1, o1, CommaBinaryOpParse(), (a, b) => {
+        val (s2, o2) = bindBinaryOpParse(s1, o1, CommaBinaryOpParse(), (a, b, first) => {
           a match {
             case CommandList(commands) => CommandList(commands :+ b)
             case _ => CommandList(Vector(a, b))
           }
         })
 
-        def bindArrow(in: ParseTree, out: ParseTree): ParseTree = {
+        def bindArrow(in: ParseTree, out: ParseTree, first: Boolean): ParseTree = {
           in match {
-            case LambdaParse(inIn, inOut) => LambdaParse(inIn, bindArrow(inOut, out))
+            case LambdaParse(inIn, inOut) if (!first) => LambdaParse(inIn, bindArrow(inOut, out, false))
             case _ => LambdaParse(in, out)
           }
         }
 
-        val (s3, o3) = bindBinaryOpParse(s2, o2, ArrowBinaryOpParse(), (a, b) => {
-          bindArrow(a, b)
+        val (s3, o3) = bindBinaryOpParse(s2, o2, ArrowBinaryOpParse(), (a, b, first) => {
+          bindArrow(a, b, first)
         })
 
         if (o3.nonEmpty) {
@@ -122,7 +122,7 @@ object NewMapParser extends Parsers {
     startingExp: ParseTree,
     otherExpressions: Vector[(BinaryOpParse, ParseTree)],
     binaryOpToBind: BinaryOpParse,
-    bindingInstructions: (ParseTree, ParseTree) => ParseTree
+    bindingInstructions: (ParseTree, ParseTree, Boolean) => ParseTree
   ): (ParseTree, Vector[(BinaryOpParse, ParseTree)]) = {
     var newStarting = startingExp
 
@@ -130,10 +130,13 @@ object NewMapParser extends Parsers {
       x._1 == binaryOpToBind
     })
 
+    var firstTime = true
+
     for {
       init <- initial
     } {
-      newStarting = bindingInstructions(newStarting, init._2)
+      newStarting = bindingInstructions(newStarting, init._2, firstTime)
+      firstTime = false
     }
 
     val nextOtherExpressions = otherExpressions.drop(initial.length)
@@ -142,13 +145,16 @@ object NewMapParser extends Parsers {
       case exp +: tailExp => {
         var completedExps: Vector[(BinaryOpParse, ParseTree)] = Vector.empty
         var currentExp = exp
+        var firstTime = true
 
         for {e <- tailExp} {
           if (e._1 == binaryOpToBind) {
-            currentExp = currentExp._1 -> bindingInstructions(currentExp._2, e._2)
+            currentExp = currentExp._1 -> bindingInstructions(currentExp._2, e._2, firstTime)
+            firstTime = false
           } else {
             completedExps :+= currentExp
             currentExp = e
+            firstTime = true
           }
         }
 
