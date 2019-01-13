@@ -94,11 +94,17 @@ case class IncrementType(baseType: NewMapObject) extends NewMapObject
 
 //Type:
 // (t: Type, currentSeq: Map n T default, t: T) => Map (increment n) T default
-case object AppendToSeq extends NewMapObject
+case class AppendToSeq(
+  currentSeq: NewMapObject,
+  newValue: NewMapObject
+) extends NewMapObject
 
 // Type:
 // (keyType: Type, valueType: Type, currentMap: Map keyType valueType default, appendedMap: Map keyType valueType default) => Map keyType valueType default
-case object AppendToMap extends NewMapObject
+case class AppendToMap(
+  currentSeq: NewMapObject,
+  newValues: NewMapObject
+) extends NewMapObject
 
 
 // Mutables Section

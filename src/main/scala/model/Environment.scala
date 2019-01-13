@@ -40,6 +40,10 @@ case class Environment(
   def typeOf(
     identifier: String
   ): Outcome[NewMapTypeInfo, String] = {
+    //if (lookup(identifier).isEmpty) {
+    //  Thread.dumpStack()
+    //}
+
     Outcome(
       lookup(identifier).map(_.nTypeInfo),
       "Could not get type from object name " + identifier
@@ -181,7 +185,16 @@ object Environment {
         )),
         result = MapT(IncrementT(SubstitutableT("currentSize")), SubstitutableT("valueType"), ParameterObj("defaultValue"))
       ),
-      AppendToSeq
+      LambdaInstance(
+        paramStrategy = StructParams(Vector(
+          "currentSize" -> CountType,
+          "valueType" -> TypeType,
+          "defaultValue" -> ParameterObj("valueType"),
+          "currentSeq" -> MapType(ParameterObj("currentSize"), ParameterObj("valueType"), ParameterObj("defaultValue")),
+          "nextValue" -> ParameterObj("valueType")
+        )),
+        expression = AppendToSeq(ParameterObj("currentSeq"), ParameterObj("nextValue"))
+      ),
     ),
     eCommand(
       "appendMap",
@@ -195,7 +208,16 @@ object Environment {
         )),
         result = MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
       ),
-      AppendToMap
+      LambdaInstance(
+        paramStrategy = StructParams(Vector(
+          "keyType" -> TypeType,
+          "valueType" -> TypeType,
+          "default" -> ParameterObj("valueType"),
+          "currentMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default")),
+          "appendedMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default"))
+        )),
+        expression = AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
+      ),
     )/*,
     eCommand("VType", Subtype(TypeT), MutableTypeT),
     eCommand(

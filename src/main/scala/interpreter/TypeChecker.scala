@@ -435,6 +435,7 @@ object TypeChecker {
     env: Environment
   ): NewMapType = {
     typeFound match {
+      case IndexT(_) | TypeT | CountT | IdentifierT | SubtypeFromMapType(_) => typeFound
       case SubstitutableT(name) => {
         env.objectOf(name) match {
           case Some(resObj) => {
@@ -448,7 +449,17 @@ object TypeChecker {
           case None => typeFound
         }
       }
-      case _ => typeFound
+      case IncrementT(t) => {
+        resolveType(t, env) match {
+          case IndexT(i) => IndexT(i + 1)
+          case other => IncrementT(other)
+        }
+      }
+      case MapT(key, value, default) => MapT(resolveType(key, env), resolveType(value, env), default)
+      case StructT(params) => StructT(params.map(p => (p._1 -> resolveType(p._2, env))))
+      case CaseT(params) => StructT(params.map(p => (p._1 -> resolveType(p._2, env))))
+      case LambdaT(input, result) => LambdaT(resolveType(input, env), resolveType(result, env))
+      case Subtype(parent) => Subtype(resolveType(parent, env))
     }
   }
 
@@ -809,13 +820,16 @@ object TypeChecker {
         functionTypeChecked.inputType match {
           case StructT(params) => {
             if (params.length == 1) Success(fullOutputType) else {
+              val newEnv = env.newCommand(FullEnvironmentCommand(params(0)._1, successfullyTypeChecked))
+
               val newParams = params.drop(1).map(param => {
-                val newEnv = env.newCommand(FullEnvironmentCommand(params(0)._1, successfullyTypeChecked))
-                val resolvedType = resolveType(param._2, newEnv)
-                param._1 -> resolvedType
+                param._1 -> resolveType(param._2, newEnv)
               })
 
-              Success(LambdaT(StructT(newParams), fullOutputType))
+              for {
+                newStruct <- subsituteType(StructT(newParams), newEnv)
+                newOutputType <- subsituteType(fullOutputType, newEnv.newParams(newParams))
+              } yield LambdaT(newStruct, newOutputType)
             }
           }
           // TODO: refactor to avoid this case?
@@ -831,6 +845,16 @@ object TypeChecker {
         outputType
       )
     }
+  }
+
+  def subsituteType(
+    newMapType: NewMapType,
+    env: Environment
+  ): Outcome[NewMapType, String] = {
+    Evaluator.convertObjectToType(
+      Evaluator.makeRelevantSubsitutions(ConvertNewMapTypeToObject(newMapType), env),
+      env
+    )
   }
 
   def dynamicTyping(

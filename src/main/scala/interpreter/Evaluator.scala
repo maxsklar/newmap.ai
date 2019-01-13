@@ -11,7 +11,7 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) | Increment | AppendToSeq | AppendToMap => {
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) | Increment => {
         Success(nObject)
       }
       case MapType(key, value, default) => {
@@ -113,6 +113,36 @@ object Evaluator {
           evalBaseType <- this(NewMapObjectWithType.withTypeE(baseType, CountT), env)
         } yield IncrementType(evalBaseType)
       }
+      case AppendToSeq(currentSeq, newValue) => {
+        for {
+          evalCurrentSeq <- this(NewMapObjectWithType.untyped(currentSeq), env)
+          evalNewValue <- this(NewMapObjectWithType.untyped(newValue), env)
+        } yield {
+          evalCurrentSeq match {
+            case MapInstance(values, default) => {
+              val keyNums: Vector[Long] = values.map(_._1).flatMap(extractNumber(_))
+
+              val newIndex = if (keyNums.isEmpty) 0 else (keyNums.max + 1)
+
+              MapInstance(values ++ Vector(Index(newIndex) -> evalNewValue), default)
+            }
+            case _ => AppendToSeq(evalCurrentSeq, evalNewValue)
+          }
+        }
+      }
+      case AppendToMap(currentMap, newValues) => {
+        for {
+          evalCurrentMap <- this(NewMapObjectWithType.untyped(currentMap), env)
+          evalNewValues <- this(NewMapObjectWithType.untyped(newValues), env)
+        } yield {
+          (evalCurrentMap, evalNewValues) match {
+            case (MapInstance(values, default), MapInstance(newValues, _)) => {
+              MapInstance(values ++ newValues, default)
+            }
+            case _ => AppendToMap(evalCurrentMap, evalNewValues)
+          }
+        }
+      }
     }
   }
 
@@ -159,6 +189,13 @@ object Evaluator {
     nObject match {
       case IdentifierInstance(s) => Some(s)
       case _ => None 
+    }
+  }
+
+  def extractNumber(nObject: NewMapObject): Option[Long] = {
+    nObject match {
+      case Index(i) => Some(i)
+      case _ => None
     }
   }
 
@@ -252,30 +289,6 @@ object Evaluator {
       }
       case (Increment, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
       case (Increment, _) => Success(UnableToApplyDueToUnknownInput)
-      case (AppendToSeq, StructInstance(paramValues)) => {
-        /**
-        params = Vector(
-          "currentSize" -> CountT,
-          "valueType" -> TypeT,
-          "defaultValue" -> SubstitutableT("valueType"),
-          "currentSeq" -> MapT(SubstitutableT("currentSize"), SubstitutableT("valueType"), ParameterObj("defaultValue")),
-          "nextValue" -> SubstitutableT("valueType")
-        ),
-        */
-        Failure("Not implemented: Apply function AppendToSeq")
-      }
-      case (AppendToMap, StructInstance(paramsValues)) => {
-        /**
-          params = Vector(
-            "keyType" -> TypeT,
-            "valueType" -> TypeT,
-            "default" -> SubstitutableT("valueType"),
-            "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default")),
-            "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
-          ),
-        */
-        Failure("Not implemented: Apply function AppendToMap")
-      }
       case (ParameterObj(id), input) => {
         // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
         Success(UnableToApplyDueToUnknownInput)
@@ -320,7 +333,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | Increment | AppendToSeq | AppendToMap=> expression
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | Increment => expression
       case MapType(key, value, default) => {
         MapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env), makeRelevantSubsitutions(default, env))
       }
@@ -393,6 +406,12 @@ object Evaluator {
         )
       }*/
       case IncrementType(baseType) => IncrementType(makeRelevantSubsitutions(baseType, env))
+      case AppendToSeq(currentSeq, newValue) => {
+        AppendToSeq(makeRelevantSubsitutions(currentSeq, env), makeRelevantSubsitutions(newValue, env))
+      }
+      case AppendToMap(currentMap, newValues) => {
+        AppendToMap(makeRelevantSubsitutions(currentMap, env), makeRelevantSubsitutions(newValues, env))
+      }
     }
   }
 
@@ -560,6 +579,11 @@ object Evaluator {
       }*/
       case IdentifierInstance(name) => {
         Failure("Identifier " + name + " is not connected to a type.")
+      }
+      case IncrementType(baseType) => {
+        for {
+          baseT <- convertObjectToType(baseType, env)
+        } yield IncrementT(baseT)      
       }
       case _ => {
         // TODO: Need to explicitly handle every case

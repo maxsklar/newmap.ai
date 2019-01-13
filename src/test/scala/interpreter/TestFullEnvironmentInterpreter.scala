@@ -294,4 +294,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("id 8 3", GeneralSuccessCheck),
     ))
   }
+
+  "Type replacement " should " happen when a function is called" in {
+    val correctCommand = Environment.eCommand(
+      "ff",
+      LambdaT(StructT(Vector("inputTwo" -> IndexT(3))), IndexT(3)),
+      LambdaInstance(StructParams(Vector("inputTwo" -> Index(3))), ParameterObj("inputTwo"))
+    )
+
+    testCodeScript(Vector(
+      CodeExpectation("val f: (inputOne: 5, inputTwo: inputOne) => inputOne = (inputOne: 5, inputTwo: inputOne) => inputTwo", GeneralSuccessCheck),
+      CodeExpectation("val ff = f 3", SuccessCheck(correctCommand)),
+    ))
+    
+    
+  }
 }

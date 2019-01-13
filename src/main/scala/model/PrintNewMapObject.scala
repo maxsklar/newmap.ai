@@ -86,8 +86,8 @@ object PrintNewMapObject {
       case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
     }
     case Increment => "increment"
-    case AppendToSeq => "appendSeq"
-    case AppendToMap => "appendMap"
+    case AppendToSeq(currentSeq, newValue) => "appendSeq " + currentSeq + " " + newValue
+    case AppendToMap(currentMap, newValues) => "appendMap " + currentMap + " " + newValues
     /*case MutableObject(commands, currentState) => {
       "V" + commands.length + "." + currentState.toString
     }

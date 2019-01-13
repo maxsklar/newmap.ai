@@ -234,7 +234,6 @@ class TestTypeCheck extends FlatSpec {
     }
   }
 
-  // TODO - this fails because structs fail!
   "Applying a Function in a lambda " should " work if the types are right" in {
     val expression = LambdaParse(
       CommandList(Vector(
