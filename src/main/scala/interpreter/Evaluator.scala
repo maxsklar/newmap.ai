@@ -137,7 +137,10 @@ object Evaluator {
         } yield {
           (evalCurrentMap, evalNewValues) match {
             case (MapInstance(values, default), MapInstance(newValues, _)) => {
-              MapInstance(values ++ newValues, default)
+              val updatedKeys = newValues.map(_._1).toSet
+              val removedValues = values.filter(v => !updatedKeys.contains(v._1))
+
+              MapInstance(removedValues ++ newValues, default)
             }
             case _ => AppendToMap(evalCurrentMap, evalNewValues)
           }
