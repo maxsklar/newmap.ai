@@ -19,6 +19,7 @@ object ConvertNewMapTypeToObject {
       MutableType(this(staticType), init, this(commandType), updateFunction)
     }*/
     case IncrementT(baseType) => IncrementType(this(baseType))
+    case AppliedFunctionT(func, input) => ApplyFunction(func, input)
   }
 
   // TODO(max): These 2 methods should not be needed

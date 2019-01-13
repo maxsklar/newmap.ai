@@ -94,20 +94,6 @@ object Evaluator {
           evalMapDefault <- this(NewMapObjectWithType.untyped(map.default), env)
         } yield SubtypeFromMap(MapInstance(evalMapValues, evalMapDefault))
       }
-      /*case MutableObject(commands, currentState) => {
-        for {
-          evalCommands <- evalSequence(commands, env)
-          evalCurrentState <- this(NewMapObjectWithType.untyped(currentState), env)
-        } yield MutableObject(evalCommands, evalCurrentState)
-      }
-      case MutableType(staticType, init, commandType, updateFunction) => {
-        for {
-          evalStaticType <- this(NewMapObjectWithType.withTypeE(staticType, TypeT), env)
-          evalInit <- this(NewMapObjectWithType.untyped(init), env)
-          evalCommandType <- this(NewMapObjectWithType.withTypeE(commandType, TypeT), env)
-          evalUpdateFunction <- this(NewMapObjectWithType.untyped(updateFunction), env)
-        } yield MutableType(evalStaticType, evalInit, evalCommandType, evalUpdateFunction)
-      }*/
       case IncrementType(baseType) => {
         for {
           evalBaseType <- this(NewMapObjectWithType.withTypeE(baseType, CountT), env)
@@ -209,7 +195,11 @@ object Evaluator {
     case (k, v) +: restOfValues => {
       for {
         evalV <- this(NewMapObjectWithType.untyped(v), env)
-        evalRest <- evalParameters(restOfValues, env)
+
+        // TODO: we should bring in the type here
+        newEnv = env.newCommand(FullEnvironmentCommand(k, NewMapObjectWithType.untyped(evalV)))
+
+        evalRest <- evalParameters(restOfValues, newEnv)
       } yield {
         (k -> evalV) +: evalRest
       }
@@ -394,21 +384,14 @@ object Evaluator {
 
         SubtypeFromMap(newMapInstance)
       }
-      /*case MutableObject(commands, currentState) => {
-        MutableObject(
-          commands.map(command => makeRelevantSubsitutions(command, env)),
-          makeRelevantSubsitutions(currentState, env)
-        )
+      case IncrementType(baseType) => {
+        val substBaseType = makeRelevantSubsitutions(baseType, env)
+
+        makeRelevantSubsitutions(baseType, env) match {
+          case Index(i) => Index(i + 1)
+          case other => IncrementType(substBaseType)
+        }
       }
-      case MutableType(staticType, init, commandType, updateFunction) => {
-        MutableType(
-          makeRelevantSubsitutions(staticType, env),
-          makeRelevantSubsitutions(init, env),
-          makeRelevantSubsitutions(commandType, env),
-          makeRelevantSubsitutions(updateFunction, env)
-        )
-      }*/
-      case IncrementType(baseType) => IncrementType(makeRelevantSubsitutions(baseType, env))
       case AppendToSeq(currentSeq, newValue) => {
         AppendToSeq(makeRelevantSubsitutions(currentSeq, env), makeRelevantSubsitutions(newValue, env))
       }
@@ -507,7 +490,13 @@ object Evaluator {
         }
       }
       case ParameterObj(name) => {
-        for {
+        //if (env.typeOf(name).isFailure) {
+        //  Thread.dumpStack()
+        //  env.print()
+        //}
+
+        // TODO: put this stuff back in, but we need to make sure the name is in the environment at this point
+        /*for {
           typeInfoOfObjectFound <- env.typeOf(name)
           typeOfObjectFound <- typeInfoOfObjectFound match {
             case ExplicitlyTyped(nType) => Success(nType)
@@ -520,9 +509,9 @@ object Evaluator {
             !TypeChecker.refersToAType(typeOfObjectFound, env),
             "Could not confirm " + name + " as a type. The elements of type " + typeOfObjectFound.toString + " are not generally types themselves."
           )
-        } yield {
-          SubstitutableT(name)
-        }
+        } yield {*/
+          Success(SubstitutableT(name))
+        //}
       }
       case ApplyFunction(Increment, input) => {
         for {
@@ -538,7 +527,7 @@ object Evaluator {
 
           result <- functionApplied match {
             case AbleToApplyFunction(nTypeAsObject) => convertObjectToType(nTypeAsObject, env)
-            case UnableToApplyDueToUnknownInput => Failure("Cannot convert applied function to type " + objectFound)
+            case UnableToApplyDueToUnknownInput => Success(AppliedFunctionT(func, input))
           }
         } yield result
       }
@@ -572,14 +561,6 @@ object Evaluator {
           CaseT(newParams)
         }
       }
-      /*case MutableType(staticType, init, commandType, updateFunction) => {
-        for {
-          staticT <- convertObjectToType(staticType, env)
-          commandT <- convertObjectToType(commandType, env)
-        } yield {
-          MutableT(staticT, init, commandT, updateFunction)
-        }
-      }*/
       case IdentifierInstance(name) => {
         Failure("Identifier " + name + " is not connected to a type.")
       }

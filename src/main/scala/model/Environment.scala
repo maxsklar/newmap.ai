@@ -40,9 +40,9 @@ case class Environment(
   def typeOf(
     identifier: String
   ): Outcome[NewMapTypeInfo, String] = {
-    //if (lookup(identifier).isEmpty) {
-    //  Thread.dumpStack()
-    //}
+    if (lookup(identifier).isEmpty) {
+      Thread.dumpStack()
+    }
 
     Outcome(
       lookup(identifier).map(_.nTypeInfo),
@@ -218,52 +218,7 @@ object Environment {
         )),
         expression = AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
       ),
-    )/*,
-    eCommand("VType", Subtype(TypeT), MutableTypeT),
-    eCommand(
-      "VersionedType", 
-      LambdaT(
-        input = StructT(Vector(
-          "staticType" -> TypeT,
-          "init" -> SubstitutableT("staticType"),
-          "commandType" -> TypeT,
-          "apply" -> LambdaT(
-            input = StructT(Vector(
-              "from" -> SubstitutableT("staticType"),
-              "command" -> SubstitutableT("commandType"))),
-            result = SubstitutableT("staticType")
-          )
-        )),
-        result = MutableTypeT
-      ), LambdaInstance(
-        paramStrategy = StructParams(Vector(
-          "staticType" -> TypeType,
-          "init" -> ParameterObj("staticType"),
-          "commandType" -> TypeType,
-          "apply" -> LambdaType(
-            inputType = StructType(MapInstance(Vector(
-              IdentifierInstance("from") -> ParameterObj("staticType"),
-              IdentifierInstance("command") -> ParameterObj("commandType")), Index(1))),
-            outputType = ParameterObj("staticType")
-          )
-        )),
-        expression = MutableType(
-          ParameterObj("staticType"),
-          ParameterObj("init"),
-          ParameterObj("commandType"),
-          ParameterObj("apply")
-        )
-      )
-    ),*/
-    /*eCommand(
-      "new",
-      LambdaT(
-        input = MutableTypeT
-        result = MutableType(???) // An actual object of type mutable type (will be based on input)
-      ), LambdaInstance(
-
-      )
-    )*/
+    )
   ))
   def paramToEnvCommand(x: (String, NewMapType)): EnvironmentCommand = {
     eCommand(x._1, x._2, ParameterObj(x._1))

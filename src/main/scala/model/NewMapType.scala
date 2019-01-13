@@ -29,6 +29,8 @@ case class LambdaT(input: NewMapType, result: NewMapType) extends NewMapType
 
 case class SubstitutableT(s: String) extends NewMapType
 
+case class AppliedFunctionT(func: NewMapObject, input: NewMapObject) extends NewMapType
+
 // Represents a type that contains a subset of the parent type
 case class Subtype(parent: NewMapType) extends NewMapType
 case class SubtypeFromMapType(values: MapInstance) extends NewMapType
