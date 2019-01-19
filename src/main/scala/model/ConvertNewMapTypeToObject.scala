@@ -8,9 +8,7 @@ object ConvertNewMapTypeToObject {
     case MapT(key, value, default) => MapType(this(key), this(value), default)
     case StructT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(1))
     case CaseT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(0))
-    case LambdaT(inputType, outputType) => {
-      LambdaType(this(inputType), this(outputType))
-    }
+    case LambdaT(transformer) => LambdaType(transformer)
     case SubstitutableT(s: String) => ParameterObj(s)
     case TypeT => TypeType
     case Subtype(t: NewMapType) => SubtypeType(this(t))

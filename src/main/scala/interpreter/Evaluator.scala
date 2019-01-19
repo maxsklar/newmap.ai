@@ -38,19 +38,13 @@ object Evaluator {
           LambdaInstance(lambdaParams, evalExpression)
         }
       }
-      case LambdaType(inputType, outputType) => {
+      case LambdaType(typeTransformer) => {
+        val transformerWithType = {
+          NewMapObjectWithType.withTypeE(typeTransformer, LambdaT(MapInstance(Vector((TypeType, TypeType)), Index(0))))
+        }
         for {
-          evalInputType <- this(NewMapObjectWithType.untyped(inputType), env)
-
-          // TODO - there are either more cases than this, or this subroutine should be put in its own
-          // function
-          newEnv = convertObjectToType(evalInputType, env) match {
-            case Success(StructT(params)) => env.newParams(params)
-            case _ => env
-          }
-
-          evalOutputType <- this(NewMapObjectWithType.untyped(outputType), newEnv)
-        } yield LambdaType(evalInputType, evalOutputType)
+          evalTransformer <- this(transformerWithType, env)
+        } yield LambdaType(evalTransformer)
       }
       case ApplyFunction(func, input) => {
         for {
@@ -337,10 +331,9 @@ object Evaluator {
 
         MapInstance(newValues, default)
       }
-      case LambdaType(inputType, outputType) => {
+      case LambdaType(typeTransformer) => {
         LambdaType(
-          makeRelevantSubsitutions(inputType, env),
-          makeRelevantSubsitutions(outputType, env)
+          makeRelevantSubsitutions(typeTransformer, env)
         )
       }
       case LambdaInstance(params, expression) => {
@@ -454,22 +447,8 @@ object Evaluator {
           MapT(keyType, valueType, default)
         }
       }
-      case LambdaType(inputType, outputType) => {
-        for {
-          evalInputType <- convertObjectToType(inputType, env)
-
-          newEnv = evalInputType match {
-            case StructT(params) => env.newParams(params)
-
-            // TODO: there might be other options here
-            case _ => env
-          }
-
-          // TODO - the end in the output type is affected by the input type
-          evalOutputType <- convertObjectToType(outputType, newEnv)
-        } yield {
-          LambdaT(evalInputType, evalOutputType)
-        }
+      case LambdaType(typeTransformer) => {
+        Success(LambdaT(typeTransformer))
       }
       case MapInstance(values, Index(1)) => {
         // TODO - require an explicit conversion here? Maybe this should be left to struct type

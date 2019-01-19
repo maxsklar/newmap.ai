@@ -114,18 +114,26 @@ object Environment {
     FullEnvironmentCommand(id, NewMapObjectWithType.withTypeE(nObject, nType))
   }
 
+  def simpleFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
+    val transformV = Vector(
+      ConvertNewMapTypeToObject(inputType) -> ConvertNewMapTypeToObject(outputType)
+    )
+    val transformer = MapInstance(transformV, Index(0))
+    LambdaT(transformer)
+  }
+
 
   val Base: Environment = Environment().newCommands(Vector(
     eCommand("Type", TypeT, TypeType),
     eCommand("Count", TypeT, CountType),
     eCommand("Identifier", TypeT, IdentifierType),
-    eCommand("Map", LambdaT(
-      input = StructT(Vector(
+    eCommand("Map", simpleFuncT(
+      StructT(Vector(
         "key" -> TypeT,
         "value" -> TypeT,
         "default" -> SubstitutableT("value")
       )),
-      result = TypeT
+      TypeT
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
         "key" -> TypeType,
@@ -138,27 +146,27 @@ object Environment {
         ParameterObj("default")
       )
     )),    
-    eCommand("Struct", LambdaT(
-      input = MapT(IdentifierT, TypeT, Index(1)),
-      result = TypeT
+    eCommand("Struct", simpleFuncT(
+      MapT(IdentifierT, TypeT, Index(1)),
+      TypeT
     ), LambdaInstance(
       paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(1))),
       expression = StructType(
         ParameterObj("input")
       )
     )),
-    eCommand("Case", LambdaT(
-      input = MapT(IdentifierT, TypeT, Index(0)),
-      result = TypeT
+    eCommand("Case", simpleFuncT(
+      MapT(IdentifierT, TypeT, Index(0)),
+      TypeT
     ), LambdaInstance(
       paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(0))),
       expression = CaseType(
         ParameterObj("input")
       )
     )),
-    eCommand("Subtype", LambdaT(
-      input = TypeT,
-      result = TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
+    eCommand("Subtype", simpleFuncT(
+      TypeT,
+      TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
     ), LambdaInstance(
       paramStrategy = IdentifierParam("input", TypeType),
       expression = SubtypeType(
@@ -167,23 +175,20 @@ object Environment {
     )),
     eCommand(
       "increment",
-      LambdaT(
-        input = CountT,
-        result = CountT
-      ),
+      Environment.simpleFuncT(CountT, CountT),
       Increment
     ),
     eCommand(
       "appendSeq",
-      LambdaT(
-        input = StructT(Vector(
+      simpleFuncT(
+        StructT(Vector(
           "currentSize" -> CountT,
           "valueType" -> TypeT,
           "defaultValue" -> SubstitutableT("valueType"),
           "currentSeq" -> MapT(SubstitutableT("currentSize"), SubstitutableT("valueType"), ParameterObj("defaultValue")),
           "nextValue" -> SubstitutableT("valueType")
         )),
-        result = MapT(IncrementT(SubstitutableT("currentSize")), SubstitutableT("valueType"), ParameterObj("defaultValue"))
+        MapT(IncrementT(SubstitutableT("currentSize")), SubstitutableT("valueType"), ParameterObj("defaultValue"))
       ),
       LambdaInstance(
         paramStrategy = StructParams(Vector(
@@ -198,25 +203,25 @@ object Environment {
     ),
     eCommand(
       "appendMap",
-      LambdaT(
-        input = StructT(Vector(
+      simpleFuncT(
+        StructT(Vector(
           "keyType" -> TypeT,
           "valueType" -> TypeT,
           "default" -> SubstitutableT("valueType"),
           "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default")),
           "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
         )),
-        result = MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
+        MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
       ),
       LambdaInstance(
-        paramStrategy = StructParams(Vector(
+        StructParams(Vector(
           "keyType" -> TypeType,
           "valueType" -> TypeType,
           "default" -> ParameterObj("valueType"),
           "currentMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default")),
           "appendedMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default"))
         )),
-        expression = AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
+        AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
       ),
     )
   ))

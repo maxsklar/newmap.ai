@@ -24,8 +24,12 @@ case class StructT(params: Vector[(String, NewMapType)]) extends NewMapType
 case class CaseT(params: Vector[(String, NewMapType)]) extends NewMapType
 
 
-// Actually the result type can depend on the input type
-case class LambdaT(input: NewMapType, result: NewMapType) extends NewMapType
+// the type transformer takes the input type and returns the output type. It's a function from Type => Type
+// How can it be a function when the LambdaT type is needed to MAKE a function?
+// - The answer is, it can also be a map (MapT Type Type 0) which is also convertable to a function (it can be applied)
+// In the traditional case, a function take a single type as input, and outputs a single type.
+// - In this case (T1 => T2), the typeTransformer is just the map (T1: T2)
+case class LambdaT(typeTransformer: NewMapObject) extends NewMapType
 
 case class SubstitutableT(s: String) extends NewMapType
 

@@ -26,8 +26,7 @@ case class MapInstance(
 ) extends NewMapObject
 
 case class LambdaType(
-  inputType: NewMapObject,
-  outputType: NewMapObject
+  typeTransformer: NewMapObject
 ) extends NewMapObject
 
 // If Param == None, then 2 things happen:

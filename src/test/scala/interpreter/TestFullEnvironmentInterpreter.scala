@@ -222,7 +222,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
-      LambdaT(StructT(Vector("a" -> IndexT(3))), IndexT(4)),
+      Environment.simpleFuncT(StructT(Vector("a" -> IndexT(3))), IndexT(4)),
       LambdaInstance(
         StructParams(Vector("a" -> Index(3))),
         ApplyFunction(
@@ -254,10 +254,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
         TypeT,
-        LambdaType(
-          MapInstance(Vector(IdentifierInstance("a") -> Index(3)), Index(1)),
-          Index(4)
-        )
+        ConvertNewMapTypeToObject(Environment.simpleFuncT(
+          StructT(Vector("a" -> IndexT(3))),
+          IndexT(4)
+        ))
       ))),
       CodeExpectation("val m: Map(3, 4, 0) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = ((a: 3) => m a)", SuccessCheck(correctCommandCreateFunc)),
@@ -298,7 +298,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Type replacement " should " happen when a function is called" in {
     val correctCommand = Environment.eCommand(
       "ff",
-      LambdaT(StructT(Vector("inputTwo" -> IndexT(3))), IndexT(3)),
+      Environment.simpleFuncT(StructT(Vector("inputTwo" -> IndexT(3))), IndexT(3)),
       LambdaInstance(StructParams(Vector("inputTwo" -> Index(3))), ParameterObj("inputTwo"))
     )
 

@@ -26,11 +26,10 @@ object PrintNewMapObject {
       sb.append(")")
       sb.toString
     }
-    case LambdaType(inputType, outputType) => {
+    case LambdaType(typeTransformer) => {
       val sb: StringBuilder = new StringBuilder()
-      sb.append(this(inputType))
-      sb.append(" -> ")
-      sb.append(this(outputType))
+      sb.append("/\\")
+      sb.append(this(typeTransformer))
       sb.toString
     }
     case LambdaInstance(lambdaParams, expression) => {
