@@ -349,50 +349,37 @@ object TypeChecker {
     val resolvedStartingType = resolveType(startingType, env)
     val resolvedEndingType = resolveType(endingType, env)
 
-    resolvedEndingType match {
-      case TypeT => refersToAType(resolvedStartingType, env)
-      case IndexT(i) => {
+    (resolvedStartingType, resolvedEndingType) match {
+      case (_, TypeT) => refersToAType(resolvedStartingType, env)
+      case (IndexT(j), IndexT(i)) => {
         // The indecies must match, even though you can theoretically convert a smaller index to a bigger index.
         // This conversion is not made explicit to prevent people from accessing an array or map with the wrong index value
-        resolvedStartingType match {
-          case IndexT(j) => (j == i)
-          case _ => false
-        }
+        (j == i)
       }
-      case SubtypeFromMapType(endingMi) => {
-        resolvedStartingType match {
-          case SubtypeFromMapType(startingMi) => {
-            (endingMi.default == startingMi.default) && (
-              startingMi.values.forall(v => endingMi.values.exists(_._1 == v._1))
-            )
-          }
-          case _ => false
-        }
+      case (SubtypeFromMapType(startingMi), SubtypeFromMapType(endingMi)) => {
+        (endingMi.default == startingMi.default) && (
+          startingMi.values.forall(v => endingMi.values.exists(_._1 == v._1))
+        )
       }
-      case LambdaT(endingTypeTransformer) => {
-        resolvedStartingType match {
-          case LambdaT(startingTypeTransformer) => {
-            val resultOutcome = for {
-              startingResult <- convertTypeTransformerToInputOutput(startingTypeTransformer, env)
-              endingResult <- convertTypeTransformerToInputOutput(endingTypeTransformer, env)
-            } yield {
-              val (startingInputType, startingOutputType) = startingResult
-              val (endingInputType, endingOutputType) = endingResult
-              val isInputTypeConvertible = isTypeConvertible(startingInputType, endingInputType, env)
+      case (LambdaT(startingTypeTransformer), LambdaT(endingTypeTransformer)) => {
+        val resultOutcome = for {
+          startingResult <- convertTypeTransformerToInputOutput(startingTypeTransformer, env)
+          endingResult <- convertTypeTransformerToInputOutput(endingTypeTransformer, env)
+        } yield {
+          val (startingInputType, startingOutputType) = startingResult
+          val (endingInputType, endingOutputType) = endingResult
+          val isInputTypeConvertible = isTypeConvertible(startingInputType, endingInputType, env)
 
-              // TODO: there could be more cases, and I'm pretty sure this is done elsewhere
-              val newEnv = startingInputType match {
-                case StructT(params) => env.newParams(params)
-                case _ => env
-              }
-
-              isInputTypeConvertible && isTypeConvertible(startingOutputType, endingOutputType, newEnv)
-            }
-
-            resultOutcome.toOption.getOrElse(false)
+          // TODO: there could be more cases, and I'm pretty sure this is done elsewhere
+          val newEnv = startingInputType match {
+            case StructT(params) => env.newParams(params)
+            case _ => env
           }
-          case _ => false
+
+          isInputTypeConvertible && isTypeConvertible(startingOutputType, endingOutputType, newEnv)
         }
+
+        resultOutcome.toOption.getOrElse(false)
       }
       case _ => {
         (resolvedEndingType == resolvedStartingType) || {
