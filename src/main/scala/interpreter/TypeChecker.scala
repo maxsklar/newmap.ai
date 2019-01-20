@@ -41,7 +41,6 @@ object TypeChecker {
             )
           }
 
-          //_ = env.print()
           result <- processMultipleFunctionApplications(functionTypeChecked, applications, env, depth)
         } yield result
       }
@@ -300,7 +299,7 @@ object TypeChecker {
       case ImplicitlyTyped(typeConversions) => {
         if (typeConversions.isEmpty) {
           for {
-            unit <- isRawObjectConvertibleToType(objectWithType, typeExpected, env)
+            unit <- isRawObjectConvertibleToType(objectWithType.nObject, typeExpected, env)
           } yield {
             NewMapObjectWithType(objectWithType.nObject, ImplicitlyTyped(Vector(typeExpected)))
           }
@@ -396,17 +395,15 @@ object TypeChecker {
 
   // Can this untyped object be interpreted as type nType?
   def isRawObjectConvertibleToType(
-    nObjectWithType: NewMapObjectWithType,
+    nObject: NewMapObject,
     nType: NewMapType,
     env: Environment
   ): Outcome[Unit, String] = {
     def failMsg(extra: String) = {
-      Failure(extra + " Could not implicitly interpret object " + nObjectWithType + " as type " + nType)
+      Failure(extra + " Could not implicitly interpret object " + nObject + " as type " + nType)
     }
 
     val success = Success(())
-
-    val nObject = nObjectWithType.nObject
 
     resolveType(nType, env) match {
       case IndexT(i) => nObject match {
@@ -432,8 +429,8 @@ object TypeChecker {
           if (
             (defaultInType == default) && (
               values.forall(x => {
-                isRawObjectConvertibleToType(NewMapObjectWithType.untyped(x._1), key, env).isSuccess &&
-                isRawObjectConvertibleToType(NewMapObjectWithType.untyped(x._2), value, env).isSuccess
+                isRawObjectConvertibleToType(x._1, key, env).isSuccess &&
+                isRawObjectConvertibleToType(x._2, value, env).isSuccess
               })
             )
           ) success else failMsg("E")
@@ -452,7 +449,7 @@ object TypeChecker {
             case firstParam +: otherParams => {
               if (otherParams.length == 0) {
                 val firstParamType: NewMapType = firstParam._2
-                isRawObjectConvertibleToType(nObjectWithType, firstParamType, env)
+                isRawObjectConvertibleToType(nObject, firstParamType, env)
               } else {
                 failMsg("Can't convert non-struct to multiple-valued struct")
               }
@@ -465,13 +462,7 @@ object TypeChecker {
         case CaseInstance(constructor, input) => {
           params.toMap.get(constructor) match {
             case None => failMsg("No constructor for type: " + constructor)
-            case Some(t) => {
-              isRawObjectConvertibleToType(
-                NewMapObjectWithType.untyped(input),
-                t,
-                env
-              )
-            }
+            case Some(t) => isRawObjectConvertibleToType(input, t, env)
           }
         }
         // TODO: there can be some conversions here; we don't neccesarily need to go to the fail case
@@ -519,11 +510,8 @@ object TypeChecker {
     typeFound: NewMapType,
     env: Environment
   ): NewMapType = {
-    val objectVersion = ConvertNewMapTypeToObject(typeFound)
-    val resolved = Evaluator.makeRelevantSubsitutions(objectVersion, env)
-
     // TODO: not type safe
-    Evaluator.convertObjectToType(resolved, env) match {
+    subsituteType(typeFound, env) match {
       case Success(nType) => nType
       case Failure(reason) => {
         println(reason)
@@ -840,11 +828,8 @@ object TypeChecker {
     }
     case MapT(key, value, default) => {
       if (isTypeConvertible(key, IdentifierT, env) && isTypeConvertible(value, TypeT, env)) {
-        default match {
-          // TODO: Index(0) and Index(1) are both in Index(2)... can we do some kind of check here?
-          case Index(0) | Index(1) => 1 // This refers to the case and struct type respectively
-          case _ => 0 
-        }
+        // Index(0) indicates a case, and Index(1) indicates a struct. Both are in IndexT(2)
+        if (isRawObjectConvertibleToType(default, IndexT(2), env).isSuccess) 1 else 0
       } else {
         0
       }
