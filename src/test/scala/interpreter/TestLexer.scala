@@ -71,4 +71,16 @@ class TestLexer extends FlatSpec {
       Number(6)
     )))
   }
+
+  "A Lambda transformer expressioned " should " be lexed correctly" in {
+    val code = "\\ (T => T)"
+    assert(Lexer(code) == Success(List(
+      LambdaTransformer(),
+      Enc(Paren, isOpen = true),
+      Identifier("T"),
+      Arrow(),
+      Identifier("T"),
+      Enc(Paren, isOpen = false)
+    )))
+  }
 }

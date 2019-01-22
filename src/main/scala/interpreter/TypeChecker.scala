@@ -21,7 +21,7 @@ object TypeChecker {
     val additionalKeys = env.idToObjectWithType.keys.toSet -- expectedKeys.toSet
     //println(depthToSpacing + " " + expression + " -- " + expectedType + " -- " + additionalKeys.mkString(", "))
 
-    val result = expression match {
+    val result: Outcome[NewMapObjectWithType, String] = expression match {
       case NaturalNumberParse(i: Long) => Success(NewMapObjectWithType.untyped(Index(i)))
       case IdentifierParse(s: String, true) => Success(NewMapObjectWithType.untyped(IdentifierInstance(s)))
       case IdentifierParse(s: String, false) => {
@@ -138,10 +138,7 @@ object TypeChecker {
           val typeTransformer = MapInstance(Vector(
             ConvertNewMapTypeToObject(inputType) -> ConvertNewMapTypeToObject(outputType)
           ), Index(0))
-          NewMapObjectWithType.withTypeE(
-            LambdaType(typeTransformer),
-            TypeT
-          )
+          NewMapObjectWithType.withTypeE(LambdaType(typeTransformer), TypeT)
         }
       }
       case LambdaParse(params, expression) => {
@@ -153,7 +150,7 @@ object TypeChecker {
               expectedType match {
                 case ExplicitlyTyped(LambdaT(typeTransformer)) => {
                   for {
-                    result <- convertTypeTransformerToInputOutput(typeTransformer, env)
+                    result <- convertTypeTransformerToInputOutput("D -- " + params + " -- " + expression, typeTransformer, env)
                   } yield {
                     Vector(id -> result._1)
                   }
@@ -170,7 +167,7 @@ object TypeChecker {
           expectedExpressionType <- expectedType match {
             case ExplicitlyTyped(LambdaT(typeTransformer)) => {
               for {
-                result <- convertTypeTransformerToInputOutput(typeTransformer, env)
+                result <- convertTypeTransformerToInputOutput("E ", typeTransformer, env)
               } yield {
                 ExplicitlyTyped(result._2)
               }
@@ -210,6 +207,14 @@ object TypeChecker {
           )
         }
       }
+      case LambdaTransformerParse(expression) => {
+        val expectedType = LambdaT(MapInstance(Vector(TypeType -> TypeType), Index(0)))
+        for {
+          baseExp <- typeCheck(expression, ExplicitlyTyped(expectedType), env, depth + 1)
+        } yield {
+          NewMapObjectWithType.withTypeE(LambdaType(baseExp.nObject), TypeT)
+        }
+      }
     }
 
     for {
@@ -224,6 +229,7 @@ object TypeChecker {
   }
 
   def convertTypeTransformerToInputOutput(
+    msg: String,
     typeTransformer: NewMapObject,
     env: Environment
   ): Outcome[(NewMapType, NewMapType), String] = {
@@ -235,11 +241,31 @@ object TypeChecker {
             outputType <- Evaluator.convertObjectToType(values(0)._2, env)
           } yield (inputType -> outputType)
         } else {
-          Failure("Type Transformer is mapped with multiple types, and this is not implemented yet.")
+          Failure(msg + " Type Transformer is mapped with multiple types, and this is not implemented yet.")
+        }
+      }
+      case LambdaInstance(paramStrategy, expression) => {
+        paramStrategy match {
+          case IdentifierParam(id, TypeType) => {
+            val inputType = SubstitutableT(id)
+            for {
+              outputType <- Evaluator.convertObjectToType(expression, env.newParam(id, TypeT))
+            } yield (inputType -> outputType)
+          }
+          case IdentifierParam(id, _) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
+          case StructParams(params) => {
+            // TODO - not type safe!!
+            val objParams = params.map(p => p._1 -> Evaluator.convertObjectToType(p._2, env).toOption.get)
+            val inputType = StructT(objParams)
+            for {
+              outputType <- Evaluator.convertObjectToType(expression, env.newParams(objParams))
+            } yield (inputType -> outputType)
+          }
+          case InputStackParam(typeAsObj) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
         }
       }
       case _ => {
-        Failure("Complex Type Transformers are not implemented yet.")
+        Failure(msg + " Type Transformers must be a Map Instance or Lambda Instance.")
       }
     }
   }
@@ -362,8 +388,8 @@ object TypeChecker {
       }
       case (LambdaT(startingTypeTransformer), LambdaT(endingTypeTransformer)) => {
         val resultOutcome = for {
-          startingResult <- convertTypeTransformerToInputOutput(startingTypeTransformer, env)
-          endingResult <- convertTypeTransformerToInputOutput(endingTypeTransformer, env)
+          startingResult <- convertTypeTransformerToInputOutput("A ", startingTypeTransformer, env)
+          endingResult <- convertTypeTransformerToInputOutput("B ", endingTypeTransformer, env)
         } yield {
           val (startingInputType, startingOutputType) = startingResult
           val (endingInputType, endingOutputType) = endingResult
@@ -780,7 +806,7 @@ object TypeChecker {
       }
       case LambdaT(typeTransformer: NewMapObject) => {
         for {
-          result <- convertTypeTransformerToInputOutput(typeTransformer, env)
+          result <- convertTypeTransformerToInputOutput("C ", typeTransformer, env)
         } yield {
           // TODO: obviously this should go dynamic with the type transformer
           StaticTypeFunctionChecked(result._1, result._2)

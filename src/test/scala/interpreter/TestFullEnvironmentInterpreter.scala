@@ -24,11 +24,7 @@ case object GeneralSuccessCheck extends ResultExpectation
 case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 
 
-
 class TestFullEnvironmentInterpreter extends FlatSpec {
-
-
-
   /**
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 
@@ -306,7 +302,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val f: (inputOne: 5, inputTwo: inputOne) => inputOne = (inputOne: 5, inputTwo: inputOne) => inputTwo", GeneralSuccessCheck),
       CodeExpectation("val ff = f 3", SuccessCheck(correctCommand)),
     ))
-    
-    
+  }
+
+  "Lambda Transformer Expressions " should " work" in {
+    testLineWorks("val id: \\ (T => T) = t => t")
+  }
+
+  it should " fail when the input makes no sense" in {
+    testLineFails("val weird: Type = \\ 3")
   }
 }
