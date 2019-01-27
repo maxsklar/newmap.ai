@@ -324,4 +324,29 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("x 3", FailureCheck)
     ))
   }
+
+  it should " require all the values" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: ReqMap 5 10 = (0: 1, 1: 3, 4: 5)", FailureCheck),
+      CodeExpectation("val x: ReqMap 5 10 = (0: 1, 1: 3, 2: 3, 3: 9, 4: 5)", GeneralSuccessCheck),
+      CodeExpectation("x 0", GeneralSuccessCheck),
+      CodeExpectation("x 3", GeneralSuccessCheck)
+    ))
+  }
+
+  "A Subset Type " should "work" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Subtype 8 = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
+      CodeExpectation("val y: x = 1", GeneralSuccessCheck),
+      CodeExpectation("val y: x = 6", FailureCheck)
+    ))
+  }
+
+  it should " have functions made from them" in {
+    testCodeScript(Vector(
+      CodeExpectation("val Bool: Subtype Identifier = (True: 1, False: 1)", GeneralSuccessCheck),
+      CodeExpectation("val f: Bool => 100 = x => (True: 10, False: 20) x", GeneralSuccessCheck),
+      CodeExpectation("val x: 100 = f True", GeneralSuccessCheck)
+    ))
+  }
 }

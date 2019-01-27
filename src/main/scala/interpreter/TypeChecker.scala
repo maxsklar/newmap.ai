@@ -111,6 +111,16 @@ object TypeChecker {
             val default = Index(1) 
             typeCheckParamsStandalone(values, env, TypeT, default)
           }
+          case ExplicitlyTyped(Subtype(parentType)) => {
+            for {
+              mapValues <- typeCheckLiteralMap(values, Some(parentType), Some(IndexT(2)), env)
+            } yield {
+              NewMapObjectWithType.withTypeE(
+                SubtypeFromMap(ReqMapInstance(mapValues)),
+                Subtype(parentType)
+              )
+            }
+          }
           case ImplicitlyTyped(Vector()) => {
             // Assume that it's a reqmap?
             // TODO - maybe there needs to be more logic here
@@ -430,6 +440,11 @@ object TypeChecker {
         }
 
         resultOutcome.toOption.getOrElse(false)
+      }
+      case (SubtypeFromMapType(v), _) => {
+        v.values.forall(value => {
+          (value._2 == Index(0)) || isRawObjectConvertibleToType(value._1, resolvedEndingType, env).isSuccess
+        })
       }
       case _ => {
         (resolvedEndingType == resolvedStartingType) || {
@@ -914,7 +929,11 @@ object TypeChecker {
       }
     }
     case Subtype(t: NewMapType) => {
-      typeDepth(t, env) + 1 // TODO: this is also fishy, make a test
+      val baseTypeDef = typeDepth(t, env)
+      // TODO: this logic might be faulty
+      // This weird MaxValue test is due to the fact that we need a true infinite here. Working on it!
+      if (baseTypeDef == Long.MaxValue) Long.MaxValue
+      else typeDepth(t, env) + 1
     }
     case SubtypeFromMapType(baseMap: ReqMapInstance) => {
       1 // TODO: this is fishy, make a test
