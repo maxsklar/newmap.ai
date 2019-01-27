@@ -272,6 +272,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should "be creatable without a type given" in {
+    val line = "val f = t => t"
+    testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
+  }
+
   "Universal identity function " should " have a valid type signature" in {
     val line = "val u: Type = (T: Type, t: T) => T"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
@@ -310,5 +315,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " fail when the input makes no sense" in {
     testLineFails("val weird: Type = \\ 3")
+  }
+
+  "ReqMaps " should " be usable" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x = (0: 1, 1: 3, 4: 5)", GeneralSuccessCheck),
+      CodeExpectation("x 0", GeneralSuccessCheck),
+      CodeExpectation("x 3", FailureCheck)
+    ))
   }
 }

@@ -10,25 +10,13 @@ object PrintNewMapObject {
     case TypeType => "Type"
     case IdentifierType => "Identifier"
     case IdentifierInstance(s) => s
-    case MapType(key, value, default) => "(Map " + this(key) + " " + this(value) + " " + this(default) +")"
-    case MapInstance(values, default) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("(")
-
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- values
-      } {
-        bindings :+= this(k) + ": " + this(v)
-      }
-      sb.append(bindings.mkString(", "))
-
-      sb.append(")")
-      sb.toString
-    }
+    case MapType(key, value, default) => "(Map " + this(key) + " " + this(value) + " " + this(default) + ")"
+    case MapInstance(values, default) => mapToString(values)
+    case ReqMapType(key, value) => "(ReqMap " + this(key) + " " + this(value) + ")"
+    case ReqMapInstance(values) => mapToString(values)
     case LambdaType(typeTransformer) => {
       val sb: StringBuilder = new StringBuilder()
-      sb.append("/\\")
+      sb.append("\\")
       sb.append(this(typeTransformer))
       sb.toString
     }
@@ -82,7 +70,7 @@ object PrintNewMapObject {
     }
     case SubtypeType(parent) => "Subtype(" + this(parent) + ")"
     case SubtypeFromMap(mi) => mi match {
-      case MapInstance(vals, default) => "Set" + vals.map(_._1).toString
+      case ReqMapInstance(vals) => "Set(" + vals.map(x => this(x._1)).mkString(", ") + ")"
     }
     case Increment => "increment"
     case AppendToSeq(currentSeq, newValue) => "appendSeq " + currentSeq + " " + newValue
@@ -107,5 +95,21 @@ object PrintNewMapObject {
       case ExplicitlyTyped(nType) => applyType(nType)
       case ImplicitlyTyped(convs) => "{" + convs.map(applyType).mkString(", ") + "}"
     })
+  }
+
+  def mapToString(values: Vector[(NewMapObject, NewMapObject)]): String = {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("(")
+
+    var bindings: Vector[String] = Vector.empty
+    for {
+      (k, v) <- values
+    } {
+      bindings :+= this(k) + ": " + this(v)
+    }
+    sb.append(bindings.mkString(", "))
+
+    sb.append(")")
+    sb.toString
   }
 }

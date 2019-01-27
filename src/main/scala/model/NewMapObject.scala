@@ -25,6 +25,9 @@ case class MapInstance(
   default: NewMapObject
 ) extends NewMapObject
 
+case class ReqMapType(key: NewMapObject, value: NewMapObject) extends NewMapObject
+case class ReqMapInstance(values: Vector[(NewMapObject, NewMapObject)]) extends NewMapObject
+
 case class LambdaType(
   typeTransformer: NewMapObject
 ) extends NewMapObject
@@ -82,7 +85,7 @@ case class CaseInstance(constructor: String, input: NewMapObject) extends NewMap
 //)
 
 case class SubtypeType(parentType: NewMapObject) extends NewMapObject
-case class SubtypeFromMap(map: MapInstance) extends NewMapObject
+case class SubtypeFromMap(map: ReqMapInstance) extends NewMapObject
 
 // Basic Function Section
 // These are pre-defined functions, their types are in comment

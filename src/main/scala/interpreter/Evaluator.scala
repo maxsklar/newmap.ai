@@ -30,6 +30,19 @@ object Evaluator {
           evalValues <- evalMapInstanceVals(values, env)
         } yield MapInstance(evalValues, evalDefault)
       }
+      case ReqMapType(key, value) => {
+        for {
+          evalKey <- this(NewMapObjectWithType.withTypeE(key, TypeT), env)
+          evalValue <- this(NewMapObjectWithType.withTypeE(value, TypeT), env)
+        } yield {
+          ReqMapType(evalKey, evalValue)
+        }
+      }
+      case ReqMapInstance(values: Vector[(NewMapObject, NewMapObject)]) => {
+        for {
+          evalValues <- evalMapInstanceVals(values, env)
+        } yield ReqMapInstance(evalValues)
+      }
       case LambdaInstance(lambdaParams, expression) => {
         val newEnv = includeLambdaParams(lambdaParams, env)
         for {
@@ -82,11 +95,10 @@ object Evaluator {
           evalParentType <- this(NewMapObjectWithType.withTypeE(parentType, TypeT), env)
         } yield SubtypeType(evalParentType)
       }
-      case SubtypeFromMap(map: MapInstance) => {
+      case SubtypeFromMap(map: ReqMapInstance) => {
         for {
           evalMapValues <- evalMapInstanceVals(map.values, env)
-          evalMapDefault <- this(NewMapObjectWithType.untyped(map.default), env)
-        } yield SubtypeFromMap(MapInstance(evalMapValues, evalMapDefault))
+        } yield SubtypeFromMap(ReqMapInstance(evalMapValues))
       }
       case IncrementType(baseType) => {
         for {
@@ -266,6 +278,20 @@ object Evaluator {
           }
         }
       }
+      case (ReqMapInstance(values), key) => {
+        for {
+          evaluatedKey <- this(NewMapObjectWithType.untyped(key), env)
+          ans <- evaluatedKey match {
+            case ParameterObj(s) => Success(UnableToApplyDueToUnknownInput)
+            case _ => {
+              values.find(_._1 == evaluatedKey).map(_._2) match {
+                case Some(result) => Success(AbleToApplyFunction(result))
+                case None => Failure("Key " + key + " don't fit in reqmap. There is a bug in the type checker")
+              }
+            }
+          }
+        } yield ans
+      }
       case (StructInstance(value: Vector[(String, NewMapObject)]), identifier) => {
         val id = makeRelevantSubsitutions(identifier, env)
         Success(
@@ -331,6 +357,16 @@ object Evaluator {
 
         MapInstance(newValues, default)
       }
+      case ReqMapType(key, value) => {
+        ReqMapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env))
+      }
+      case ReqMapInstance(values) => {
+        val newValues = for {
+          (k, v) <- values
+        } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
+
+        ReqMapInstance(newValues)
+      }
       case LambdaType(typeTransformer) => {
         LambdaType(
           makeRelevantSubsitutions(typeTransformer, env)
@@ -368,14 +404,12 @@ object Evaluator {
       case SubtypeType(parentType) => {
         SubtypeType(makeRelevantSubsitutions(parentType, env))
       }
-      case SubtypeFromMap(MapInstance(values, default)) => {
+      case SubtypeFromMap(ReqMapInstance(values)) => {
         val newValues = for {
           (k, v) <- values
         } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
 
-        val newMapInstance = MapInstance(newValues, default)
-
-        SubtypeFromMap(newMapInstance)
+        SubtypeFromMap(ReqMapInstance(newValues))
       }
       case IncrementType(baseType) => {
         val substBaseType = makeRelevantSubsitutions(baseType, env)
@@ -468,6 +502,14 @@ object Evaluator {
           CaseT(newParams)
         }
       }
+      case ReqMapType(key, value) => {
+        for {
+          keyType <- convertObjectToType(key, env) 
+          valueType <- convertObjectToType(value, env)
+        } yield {
+          ReqMapT(keyType, valueType)
+        }
+      }
       case ParameterObj(name) => {
         //if (env.typeOf(name).isFailure) {
         //  Thread.dumpStack()
@@ -548,6 +590,12 @@ object Evaluator {
           baseT <- convertObjectToType(baseType, env)
         } yield IncrementT(baseT)      
       }
+      case SubtypeType(parentType) => {
+        for {
+          parentT <- convertObjectToType(parentType, env)
+        } yield Subtype(parentT)
+      }
+      case SubtypeFromMap(map) => Success(SubtypeFromMapType(map))
       case _ => {
         // TODO: Need to explicitly handle every case
         Failure("Couldn't convert into type: " + objectFound + " -- could be unimplemented")

@@ -6,16 +6,14 @@ object ConvertNewMapTypeToObject {
     case CountT => CountType
     case IdentifierT => IdentifierType
     case MapT(key, value, default) => MapType(this(key), this(value), default)
-    case StructT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(1))
-    case CaseT(params: Vector[(String, NewMapType)]) => paramsToObject(params, Index(0))
+    case ReqMapT(key, value) => ReqMapType(this(key), this(value))
+    case StructT(params: Vector[(String, NewMapType)]) => StructType(paramsToObject(params, Index(1)))
+    case CaseT(params: Vector[(String, NewMapType)]) => CaseType(paramsToObject(params, Index(0)))
     case LambdaT(transformer) => LambdaType(transformer)
     case SubstitutableT(s: String) => ParameterObj(s)
     case TypeT => TypeType
     case Subtype(t: NewMapType) => SubtypeType(this(t))
-    case SubtypeFromMapType(m: MapInstance) => SubtypeFromMap(m)
-    /*case MutableT(staticType, init, commandType, updateFunction) => {
-      MutableType(this(staticType), init, this(commandType), updateFunction)
-    }*/
+    case SubtypeFromMapType(m) => SubtypeFromMap(m)
     case IncrementT(baseType) => IncrementType(this(baseType))
     case AppliedFunctionT(func, input) => ApplyFunction(func, input)
   }

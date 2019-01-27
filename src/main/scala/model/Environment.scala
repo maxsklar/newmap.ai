@@ -145,7 +145,23 @@ object Environment {
         ParameterObj("value"),
         ParameterObj("default")
       )
-    )),    
+    )),
+    eCommand("ReqMap", simpleFuncT(
+      StructT(Vector(
+        "key" -> TypeT,
+        "value" -> TypeT
+      )),
+      TypeT
+    ), LambdaInstance(
+      paramStrategy = StructParams(Vector(
+        "key" -> TypeType,
+        "value" -> TypeType
+      )),
+      expression = ReqMapType(
+        ParameterObj("key"),
+        ParameterObj("value")
+      )
+    )),  
     eCommand("Struct", simpleFuncT(
       MapT(IdentifierT, TypeT, Index(1)),
       TypeT

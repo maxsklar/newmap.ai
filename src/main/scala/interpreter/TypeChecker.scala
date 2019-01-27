@@ -51,9 +51,19 @@ object TypeChecker {
           case ExplicitlyTyped(MapT(keyType, valueType, defaultValue)) => {
             val mapT = MapT(keyType, valueType, defaultValue)
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(mapT), env)
+              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env)
             } yield {
               NewMapObjectWithType.withTypeE(MapInstance(mapValues, defaultValue), mapT)
+            }
+          }
+          case ExplicitlyTyped(ReqMapT(keyType, valueType)) => {
+            val reqMapT = ReqMapT(keyType, valueType)
+            for {
+              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env)
+              isCovered <- doMapValuesCoverType(mapValues, keyType)
+              _ <- Outcome.failWhen(!isCovered, "Incomplete mapping of " + keyType)
+            } yield {
+              NewMapObjectWithType.withTypeE(ReqMapInstance(mapValues), reqMapT)
             }
           }
           case ExplicitlyTyped(StructT(params: Vector[(String, NewMapType)])) => {
@@ -102,14 +112,19 @@ object TypeChecker {
             typeCheckParamsStandalone(values, env, TypeT, default)
           }
           case ImplicitlyTyped(Vector()) => {
-            // Assume that it's a map?
+            // Assume that it's a reqmap?
             // TODO - maybe there needs to be more logic here
             for {
-              mapValues <- typeCheckLiteralMap(values, None, env)
+              mapValues <- typeCheckLiteralMap(values, None, None, env)
             } yield {
-              // TODO: default value is given by index(0) - but in reality this is a ReqMap over its inputs
               // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMap
-              NewMapObjectWithType.untyped(MapInstance(mapValues, Index(0)))
+              val reqMap = ReqMapInstance(mapValues)
+              NewMapObjectWithType(ReqMapInstance(mapValues), ExplicitlyTyped(
+                ReqMapT(
+                  SubtypeFromMapType(reqMap),
+                  SubtypeFromMapType(ReqMapInstance(mapValues.map(x => (x._2 -> Index(1)))))
+                )
+              ))
             }
           }
           case _ => {
@@ -192,10 +207,6 @@ object TypeChecker {
             ConvertNewMapTypeToObject.paramsToObjectParams(newParams)
           }
 
-          val typeTransformer = MapInstance(Vector(
-            ConvertNewMapTypeToObject(StructT(newParams)) -> ConvertNewMapTypeToObject(typeFound)
-          ), Index(0))
-
           NewMapObjectWithType.withTypeE(
             LambdaInstance(StructParams(lambdaParams), tc.nObject),
             Environment.simpleFuncT(StructT(newParams), typeFound)
@@ -221,6 +232,27 @@ object TypeChecker {
         case ImplicitlyTyped(convs) => additionalExpectedTypes(objectWithType, convs, env)
       }
     } yield withAdditionalType
+  }
+
+  // For ReqMaps, we need to ensure that all of the values are accounted for.
+  def doMapValuesCoverType(
+    values: Vector[(NewMapObject, NewMapObject)],
+    nType: NewMapType
+  ): Outcome[Boolean, String] = {
+    val keys = values.map(_._1).toSet
+    nType match {
+      case IndexT(i) => {
+        val keysToMatch: Set[NewMapObject] = (0 until i.toInt).map(j => Index(j.toLong)).toSet
+        Success((keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty)
+      }
+      case SubtypeFromMapType(valuesInType) => {
+        val keysToMatch = valuesInType.values.map(_._2).toSet
+        Success((keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty)
+      }
+      case _ => {
+        Failure("Can't create a ReqMap with keyType " + nType + ". Either this is an infinite type, or the functionality is unimplemented")
+      }
+    }
   }
 
   def convertTypeTransformerToInputOutput(
@@ -267,13 +299,14 @@ object TypeChecker {
 
   def typeCheckLiteralMap(
     values: Vector[ParseTree],
-    expectedTypeOpt: Option[MapT],
+    expectedKeyType: Option[NewMapType],
+    expectedValueType: Option[NewMapType],
     env: Environment
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
-        val kType = expectedTypeOpt.map(e => ExplicitlyTyped(e.key)).getOrElse(NewMapTypeInfo.init)
-        val vType = expectedTypeOpt.map(e => ExplicitlyTyped(e.value)).getOrElse(NewMapTypeInfo.init)
+        val kType = expectedKeyType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
+        val vType = expectedValueType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
 
         for {
           tc <- typeCheck(k, kType, env)
@@ -282,7 +315,7 @@ object TypeChecker {
           tc2 <- typeCheck(v, vType, env)
           objectFoundValue = tc2.nObject
 
-          restOfMap <- typeCheckLiteralMap(restOfValues, expectedTypeOpt, env)
+          restOfMap <- typeCheckLiteralMap(restOfValues, expectedKeyType, expectedValueType, env)
         } yield {
           (objectFoundKey -> objectFoundValue) +: restOfMap
         }
@@ -376,9 +409,7 @@ object TypeChecker {
         (j == i)
       }
       case (SubtypeFromMapType(startingMi), SubtypeFromMapType(endingMi)) => {
-        (endingMi.default == startingMi.default) && (
-          startingMi.values.forall(v => endingMi.values.exists(_._1 == v._1))
-        )
+        (startingMi.values.forall(v => endingMi.values.exists(_._1 == v._1)))
       }
       case (LambdaT(startingTypeTransformer), LambdaT(endingTypeTransformer)) => {
         val resultOutcome = for {
@@ -456,6 +487,20 @@ object TypeChecker {
           ) success else failMsg("E")
         }
         case _ => failMsg("F")
+      }
+      case ReqMapT(key, value) => nObject match {
+        case ReqMapInstance(values) => {
+          // TODO: we need a helper function here to get the right message
+          if (
+            (
+              values.forall(x => {
+                isRawObjectConvertibleToType(x._1, key, env).isSuccess &&
+                isRawObjectConvertibleToType(x._2, value, env).isSuccess
+              })
+            )
+          ) success else failMsg("Req E")
+        }
+        case _ => failMsg("Req F")
       }
       case StructT(params) => nObject match {
         case StructInstance(value) => {
@@ -753,6 +798,9 @@ object TypeChecker {
       case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
         Success(StaticTypeFunctionChecked(key, value))
       }
+      case ReqMapT(key: NewMapType, value: NewMapType) => {
+        Success(StaticTypeFunctionChecked(key, value))
+      }
       case StructT(params: Vector[(String, NewMapType)]) => {
         // TODO: this is really complex.. hopefully we can simplify this whole process
         val dynamicParams: Vector[(NewMapObject, NewMapObject)] = functionObject match {
@@ -849,6 +897,7 @@ object TypeChecker {
         0
       }
     }
+    case ReqMapT(key, value) => 0
     case LambdaT(_) => 0
     case SubstitutableT(s: String) => {
       env.typeOf(s) match {
@@ -867,7 +916,7 @@ object TypeChecker {
     case Subtype(t: NewMapType) => {
       typeDepth(t, env) + 1 // TODO: this is also fishy, make a test
     }
-    case SubtypeFromMapType(mapInstance: MapInstance) => {
+    case SubtypeFromMapType(baseMap: ReqMapInstance) => {
       1 // TODO: this is fishy, make a test
     }
     case CountT => Long.MaxValue // TODO: should be infinite

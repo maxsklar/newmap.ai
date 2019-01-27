@@ -20,6 +20,7 @@ case object TypeT extends NewMapType
 case object CountT extends NewMapType
 case object IdentifierT extends NewMapType
 case class MapT(key: NewMapType, value: NewMapType, default: NewMapObject) extends NewMapType
+case class ReqMapT(key: NewMapType, value: NewMapType) extends NewMapType
 case class StructT(params: Vector[(String, NewMapType)]) extends NewMapType
 case class CaseT(params: Vector[(String, NewMapType)]) extends NewMapType
 
@@ -37,7 +38,7 @@ case class AppliedFunctionT(func: NewMapObject, input: NewMapObject) extends New
 
 // Represents a type that contains a subset of the parent type
 case class Subtype(parent: NewMapType) extends NewMapType
-case class SubtypeFromMapType(values: MapInstance) extends NewMapType
+case class SubtypeFromMapType(values: ReqMapInstance) extends NewMapType
 
 // TODO: Type functions
 
