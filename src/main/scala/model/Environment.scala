@@ -239,6 +239,11 @@ object Environment {
         )),
         AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
       ),
+    ),
+    eCommand(
+      "key",
+      LambdaT(KeysOfTypeTransformer),
+      KeysOf
     )
   ))
   def paramToEnvCommand(x: (String, NewMapType)): EnvironmentCommand = {

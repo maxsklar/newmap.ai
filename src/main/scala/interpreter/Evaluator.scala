@@ -11,7 +11,7 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) | Increment => {
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) | Increment | KeysOf | KeysOfTypeTransformer => {
         Success(nObject)
       }
       case MapType(key, value, default) => {
@@ -306,6 +306,20 @@ object Evaluator {
         // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
         Success(UnableToApplyDueToUnknownInput)
       }
+      case (KeysOf, MapInstance(values, default)) => {
+        val reqValues = values.flatMap(v => {
+          if (v._2 != default) Some(v._1 -> Index(1)) else None
+        })
+
+        Success(AbleToApplyFunction(SubtypeFromMap(ReqMapInstance(reqValues))))
+      }
+      case (KeysOf, ReqMapInstance(values)) => {
+        val reqValues = values.flatMap(v => {
+          Some(v._1 -> Index(1))
+        })
+
+        Success(AbleToApplyFunction(SubtypeFromMap(ReqMapInstance(reqValues))))      
+      }
       case _ => {
         Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
       }
@@ -346,7 +360,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | Increment => expression
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | Increment | KeysOf | KeysOfTypeTransformer => expression
       case MapType(key, value, default) => {
         MapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env), makeRelevantSubsitutions(default, env))
       }

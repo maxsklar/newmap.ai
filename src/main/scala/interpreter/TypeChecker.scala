@@ -301,7 +301,14 @@ object TypeChecker {
           case InputStackParam(typeAsObj) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
         }
       }
-      case _ => {
+      case KeysOfTypeTransformer => {
+        // TODO: Obviously this is arbitrary due to lack of pattern matching
+        // We need to remove the idea that a single type transform exists altogether 
+        Success(
+          MapT(IdentifierT, CountT, Index(0)) -> Subtype(IdentifierT)
+        )
+      }
+        case _ => {
         Failure(msg + " Type Transformers must be a Map Instance or Lambda Instance.")
       }
     }
