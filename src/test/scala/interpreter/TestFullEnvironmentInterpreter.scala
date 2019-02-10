@@ -349,29 +349,4 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val x: 100 = f True", GeneralSuccessCheck)
     ))
   }
-
-  "key function " should " return the appropriate type from a map" in {
-    testCodeScript(Vector(
-      CodeExpectation("val m: Map Identifier Count 0 = (a: 3, b: 4, c: 5)", GeneralSuccessCheck),
-      CodeExpectation("val keyM: Subtype Identifier = key m", GeneralSuccessCheck),
-      CodeExpectation("val x: keyM = a", GeneralSuccessCheck),
-      CodeExpectation("val y: keyM = d", FailureCheck),
-    ))
-  }
-
-  it should " return the appropriate type from a reqmap" in {
-    testCodeScript(Vector(
-      CodeExpectation("val keyM: Subtype Identifier = key (a: 3, b: 4, c: 5)", GeneralSuccessCheck),
-      CodeExpectation("val x: keyM = a", GeneralSuccessCheck),
-      CodeExpectation("val y: keyM = d", FailureCheck),
-    ))
-  }
-
-  it should " work when the key isn't identifier" in {
-    testCodeScript(Vector(
-      CodeExpectation("val keyM: Subtype 4 = key (0: 3, 1: 4, 3: 5)", GeneralSuccessCheck),
-      CodeExpectation("val x: keyM = 0", GeneralSuccessCheck),
-      CodeExpectation("val y: keyM = 2", FailureCheck),
-    ))
-  }
 }

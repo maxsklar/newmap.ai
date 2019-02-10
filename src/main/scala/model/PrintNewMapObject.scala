@@ -84,8 +84,6 @@ object PrintNewMapObject {
     case IncrementType(baseType) => {
       "IncrementType (" + baseType + ")"
     }
-    case KeysOf => "keys"
-    case KeysOfTypeTransformer => "KeysOfTypeTransformer"
   }
 
   def applyType(nType: NewMapType): String = {

@@ -108,10 +108,18 @@ case class AppendToMap(
   newValues: NewMapObject
 ) extends NewMapObject
 
-// converts a map into a type of it's keys
-case object KeysOf extends NewMapObject
 
-// This ultimately can be created when we have pattern matching and won't have to be here
-// But for now it's defined by the pattern:
-// Map K V v => Subtype K
-case object KeysOfTypeTransformer extends NewMapObject
+// Mutables Section
+
+// Encapsulates all possible mutable objects (stacks, sequences, types, and counts)
+/*case class MutableObject(
+  commands: Vector[NewMapObject],
+  currentState: NewMapObject
+) extends NewMapObject
+
+case class MutableType(
+  staticType: NewMapObject,
+  init: NewMapObject,
+  commandType: NewMapObject,
+  updateFunction: NewMapObject
+) extends NewMapObject*/
