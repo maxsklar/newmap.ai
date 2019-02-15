@@ -43,14 +43,14 @@ class general_test extends FunSuite {
 	// TODO: couldn't parse correctly
     test("A List of tokens should be parsed correctly"){
 	 val tokens = List(Identifier("val"), Identifier("a"), Colon(), Identifier("Map"), Enc(Paren,true), Number(3), Comma(), Number(100), Comma(), Number(0), Enc(Paren,false), Equals(), Enc(Paren,true), Number(0), Colon(), Number(20), Comma(), Number(1), Colon(), Number(43), Comma(), Number(2), Colon(), Number(67), Enc(Paren,false))
-        assert(NewMapParser(tokens) == Success(
+        assert(NewMapParser.statementParse(tokens) == Success(
             FullStatementParse(ValStatement,IdentifierParse("a",false),ApplyParse(IdentifierParse("Map",false),Vector(CommandList(Vector(NaturalNumberParse(3), NaturalNumberParse(100), NaturalNumberParse(0))))),CommandList(Vector(BindingCommandItem(NaturalNumberParse(0),NaturalNumberParse(20)), BindingCommandItem(NaturalNumberParse(1),NaturalNumberParse(43)), BindingCommandItem(NaturalNumberParse(2),NaturalNumberParse(67)))))
 	))
     }
     // parser test 2 
     test("parser test 2"){
     	val tokens = List(Identifier("val"), Identifier("a"), Colon(), Identifier("Count"), Equals(), Number(5))
-	assert(NewMapParser(tokens) == Success(
+	assert(NewMapParser.statementParse(tokens) == Success(
 		FullStatementParse(ValStatement,IdentifierParse("a",false),IdentifierParse("Count",false),NaturalNumberParse(5))
 	)
     )}
