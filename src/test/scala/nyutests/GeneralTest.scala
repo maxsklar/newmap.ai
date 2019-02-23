@@ -7,7 +7,7 @@ import ai.newmap.interpreter.Lexer._
 
 import ai.newmap.model._
 
-class general_test extends FunSuite {
+class GeneralTest extends FunSuite {
     // lexer test
     test("A map statement should be lexed correctly"){
 		val code = "val a : Map(3, 100, 0) = (0:20, 1:43, 2:67)"
