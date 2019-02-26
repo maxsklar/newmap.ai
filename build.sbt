@@ -20,6 +20,20 @@ version := "0.0"
 // mostly only necessary if you intend to publish your library's binaries on a
 // place like Sonatype or Bintray.
 
+lazy val root = (project in file(".")).enablePlugins(PlayScala)
+
+scalaVersion := "2.11.7"
+
+libraryDependencies ++= Seq(
+  jdbc,
+  cache,
+  ws
+)
+
+// heroku delpoy
+herokuIncludePaths in Compile := Seq(
+  "app", "conf/routes", "public/javascripts"
+)
 
 // Want to use a published library in your project?
 // You can define other libraries as dependencies in your build like this:
