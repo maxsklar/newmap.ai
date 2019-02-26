@@ -27,7 +27,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(views.html.index())
   }
 	
-  def greet(code : String) = Action {
+  def newmap(code : String) = Action {
     var envInterp = new EnvironmentInterpreter()
     var response = envInterp(code)
       response match {
