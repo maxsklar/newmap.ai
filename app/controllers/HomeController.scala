@@ -23,9 +23,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
    * will be called when the application receives a `GET` request with
    * a path of `/`.
    */
-  def index() = Action { implicit request: Request[AnyContent] =>
-    Ok("Welcome to NewMap.AI!")
-    // Ok(views.html.index())
+  def index = Action {
+    Ok(views.html.index("Welcome to NewMap.AI!"))
   }
 
   def processcommand() = Action {
@@ -43,6 +42,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
           }
           case Failure(s) => println("Error:\n" + s)
         }
-        Ok(s"Processed: $response")
+        Ok(s"Received: $msg \n Processed: $response")
   }
 }
