@@ -27,7 +27,23 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(views.html.index())
   }
 	
-  def newmap(code : String) = Action {
+  def newmap = Action { request: Request[AnyContent] =>
+  	val body: AnyContent = request.body
+  	val msg = body.asFormUrlEncoded.get.get("text").get.head
+    var envInterp = new EnvironmentInterpreter()
+    var response = envInterp(msg)
+      response match {
+        case Success(s) => {
+          
+          println(s)
+          
+        }
+        case Failure(s) => println("Error:\n" + s)
+      }
+    Ok(""+response)
+  }
+
+  def newmap_get(code : String) = Action {
     var envInterp = new EnvironmentInterpreter()
     var response = envInterp(code)
       response match {
