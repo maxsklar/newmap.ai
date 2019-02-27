@@ -40,7 +40,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         }
         case Failure(s) => println("Error:\n" + s)
       }
-    Ok(""+response)
+    Ok("input: "+msg+" \n"+response)
   }
 
   def newmap_get(code : String) = Action {
