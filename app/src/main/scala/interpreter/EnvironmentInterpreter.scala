@@ -3,6 +3,8 @@ package ai.newmap.interpreter
 import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.environment.envCreater.envCreate
+import ai.newmap.environment.envReader.envLogIn
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -28,8 +30,29 @@ class EnvironmentInterpreter() {
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
 
+  def createEnv(chanName: String, envName: String, envAccessCode: String): CommandInterpResponse = {
+    val ret: Boolean = envCreate(chanName, envName, envAccessCode)
+    if(ret)CommandPrintSomething("created environment")
+    else{
+      CommandPrintSomething("env already exits")
+    }    
+  }
+
+  def logInEnv(chanName: String, envName: String, envAccessCode: String): CommandInterpResponse = {
+    val ret: Boolean = envLogIn(chanName, envName, envAccessCode)
+    if(ret)CommandPrintSomething("finish import")
+    else{
+      CommandPrintSomething("Could not log in")
+    }
+  }  
+
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
+      case ":create" => this.createEnv("newmap_test", "Workspace", "aaa")
+      case code if code.startsWith(":log in ") => {
+                        val cont:Array[String] = code.stripPrefix(":log in ").split("\\s+")
+                        this.logInEnv(cont(0), cont(1), cont(2))
+                      }
       case ":env" => CommandPrintSomething(env.toString)
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
