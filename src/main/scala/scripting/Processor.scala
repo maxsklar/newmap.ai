@@ -19,9 +19,13 @@ class Processor {
         val it = file.getLines
         while (it.hasNext) {
           var line = it.next()
-          while (line.length == 0 && it.hasNext) {
+          while (line.length == 0) {
             linenum += 1
-            line = it.next()
+            if (it.hasNext) line = it.next()
+            else {
+              println(output)
+              break
+            } // EOF
           }
           // further improvement for comments
           // while(line.startsWith("#/*"))
