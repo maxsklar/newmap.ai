@@ -4,6 +4,8 @@ import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 
+import ai.newmap.scripting.Processor
+
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
 
@@ -20,6 +22,11 @@ class EnvironmentInterpreter() {
       case CommandPrintSomething(response) => Success(response)
       case CommandExit => Success(":exit")
       case CommandPassThrough => applyEnvCommand(code)
+      case CommandFileProcessor(filepath) => {
+        val fileProc = new Processor
+        var response = fileProc.FileProcessor(filepath)
+        Success(response)
+      }
     }
   }
 
@@ -27,6 +34,7 @@ class EnvironmentInterpreter() {
   case class CommandPrintSomething(s: String) extends CommandInterpResponse
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
+  case class CommandFileProcessor(s: String) extends CommandInterpResponse
 
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
@@ -36,8 +44,10 @@ class EnvironmentInterpreter() {
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
         ":exit | :quit\tExit this repl\n" ++
-        ":help\tPrint this help message\n"
+        ":help\tPrint this help message\n" ++
+        ":script\tRead from a file"
       )
+      case s if (s.startsWith(":script")) => CommandFileProcessor(s.drop(8))
       case _ => CommandPassThrough
     }
   }
