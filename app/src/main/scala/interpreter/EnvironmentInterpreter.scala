@@ -5,6 +5,7 @@ import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 import ai.newmap.environment.envCreater.envCreate
 import ai.newmap.environment.envReader.envLogIn
+import ai.newmap.environment.envPrinter.envPrint
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -63,14 +64,15 @@ class EnvironmentInterpreter() {
                         val cont:Array[String] = code.stripPrefix(":log in ").split("\\s+")
                         this.logInEnv(cont(0), cont(1), cont(2))
                       }
-      case ":env" => CommandPrintSomething(env.toString)
+      //case ":env" => CommandPrintSomething(env.toString)
+      case ":env" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
-        ":exit | :quit\tExit this repl\n" ++
-        ":create <env name> <env password>\n" ++
-        ":log in <env name> <env password>\n" ++
+        //":exit | :quit\tExit this repl\n" ++
+        ":create <env name> <env password>\tCreate a new environment\n" ++
+        ":log in <env name> <env password>\tLog in to an exist environment\n" ++
         ":help\tPrint this help message\n"
       )
       case _ => CommandPassThrough
