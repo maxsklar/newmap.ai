@@ -38,9 +38,15 @@ class EnvironmentInterpreter() {
     }    
   }
 
+<<<<<<< HEAD
   def logInEnv(chanName: String, envName: String, envAccessCode: String): CommandInterpResponse = {
     val ret: Boolean = envLogIn(chanName, envName, envAccessCode)
     if(ret)CommandPrintSomething("finish import")
+=======
+  def logInEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
+    val ret: Boolean = envLogIn(this.chanName, this.userName, envName, envAccessCode)
+    if(ret)CommandPrintSomething("loged into "+envName)
+>>>>>>> e183478... add :help about create and log in
     else{
       CommandPrintSomething("Could not log in")
     }
@@ -59,6 +65,8 @@ class EnvironmentInterpreter() {
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
         ":exit | :quit\tExit this repl\n" ++
+        ":create <env name> <env password>\n" ++
+        ":log in <env name> <env password>\n" ++
         ":help\tPrint this help message\n"
       )
       case _ => CommandPassThrough
