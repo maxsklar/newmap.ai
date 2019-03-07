@@ -69,6 +69,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
   }
 
   def newmap_get(code : String) = Action {
+<<<<<<< HEAD
     var envInterp = new EnvironmentInterpreter()
     var response = envInterp(code)
       response match {
@@ -78,6 +79,29 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
           
         }
         case Failure(s) => println("Error:\n" + s)
+=======
+    // channel name:
+    val chanName = "testChanName"
+    // user name:
+    val userName = "admin"
+    //var envInterp = new EnvironmentInterpreter()
+    var response:String = ""
+    code match{
+      case code if code.startsWith(":create ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(code)
+      }
+    case code if code.startsWith(":log in ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(code)
+    }
+    case _ =>{
+        response = ""+envRead(chanName, userName, code)
+>>>>>>> 67cf7ea... change generated log name
       }
     Ok(""+response)
   }
