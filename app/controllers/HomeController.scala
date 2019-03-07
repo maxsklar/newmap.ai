@@ -30,6 +30,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
   def newmap = Action { request: Request[AnyContent] =>
   	val body: AnyContent = request.body
   	val msg = body.asFormUrlEncoded.get.get("text").get.head
+<<<<<<< HEAD
     var envInterp = new EnvironmentInterpreter()
     var response = envInterp(msg)
       response match {
@@ -39,6 +40,30 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
           
         }
         case Failure(s) => println("Error:\n" + s)
+=======
+
+    // channel name:
+    val chanName = body.asFormUrlEncoded.get.get("channel_name").get.head
+    // user name:
+    val userName = body.asFormUrlEncoded.get.get("user_name").get.head
+    //Ok(chanName+" "+userName)
+    var response:String = ""
+    msg match{
+      case msg if msg.startsWith(":create ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(msg)
+      }
+    case msg if msg.startsWith(":log in ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(msg)
+    }
+    case _ =>{
+        response = ""+envRead(chanName, userName, msg)
+>>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
       }
     Ok("Input: "+msg+" \n"+response)
   }
