@@ -15,7 +15,11 @@ object envReader {
 
 
 	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Boolean = {
+<<<<<<< HEAD
 
+=======
+		
+>>>>>>> 3a04edc... remove redundent comment
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 >>>>>>> 1a42f2f... solve AWS security issue
@@ -63,7 +67,11 @@ object envReader {
 <<<<<<< HEAD
 =======
 	def envRead(chanName:String, userName: String, msg: String):String = {
+<<<<<<< HEAD
 
+=======
+		
+>>>>>>> 3a04edc... remove redundent comment
 		var envInterp = new EnvironmentInterpreter()
 		envInterp.setChanName(chanName)
 		envInterp.setUserName(userName)

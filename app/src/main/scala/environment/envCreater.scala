@@ -13,6 +13,13 @@ object envCreater {
 	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
 >>>>>>> 1a42f2f... solve AWS security issue
 
+<<<<<<< HEAD
+=======
+	def envCreate(chanName: String, userName: String, envName: String, envAccessCode: String): Boolean = {
+		
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+>>>>>>> 3a04edc... remove redundent comment
 
 <<<<<<< HEAD
 	def envCreate(chanName: String, envName: String, envAccessCode: String): Boolean = {
