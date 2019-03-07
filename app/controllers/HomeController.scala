@@ -61,6 +61,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = ""+envInterp(msg)
     }
+    case ":env" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(msg)
+    }
     case _ =>{
         response = ""+envRead(chanName, userName, msg)
 >>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
@@ -94,6 +100,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         response = ""+envInterp(code)
       }
     case code if code.startsWith(":log in ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(code)
+    }
+    case ":env" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
