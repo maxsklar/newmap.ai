@@ -6,6 +6,12 @@ import java.io.PrintWriter
 import java.nio.file.{Paths, Files}
 
 object envCreater {
+<<<<<<< HEAD
+=======
+	val BUCKET_NAME = envConstant.BUCKET_NAME
+	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
+	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
+>>>>>>> 1a42f2f... solve AWS security issue
 
 
 <<<<<<< HEAD

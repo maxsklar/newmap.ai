@@ -45,8 +45,12 @@ class EnvironmentInterpreter() {
 =======
   def logInEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
     val ret: Boolean = envLogIn(this.chanName, this.userName, envName, envAccessCode)
+<<<<<<< HEAD
     if(ret)CommandPrintSomething("loged into "+envName)
 >>>>>>> e183478... add :help about create and log in
+=======
+    if(ret)CommandPrintSomething("loged into Environment "+envName)
+>>>>>>> 1a42f2f... solve AWS security issue
     else{
       CommandPrintSomething("Could not log in")
     }

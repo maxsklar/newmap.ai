@@ -7,6 +7,18 @@ import java.io.PrintWriter
 import java.nio.file.{Paths, Files}
 
 object envReader {
+<<<<<<< HEAD
+=======
+	val BUCKET_NAME = envConstant.BUCKET_NAME
+	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
+	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
+
+
+	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Boolean = {
+
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+>>>>>>> 1a42f2f... solve AWS security issue
 
 
 <<<<<<< HEAD
