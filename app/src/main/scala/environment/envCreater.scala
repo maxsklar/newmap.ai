@@ -27,8 +27,19 @@ object envCreater {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
+  		// local env file name
 		val fileName: String = chanName+"_"+envName+"_Env.txt"
+		// check if that's exits in AWS S3
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, fileName)) {return false}
+
+		// write envName into a chanName_envs.txt file
+		val envsFileName:String = chanName+"_Envs.txt"
+		val envsFile:File = new File(envsFileName)
+		val fileWriter:FileWriter = new FileWriter(envsFile, true)
+		val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter);
+		bufferedWriter.write(envName+"\n")
+		bufferedWriter.close();
+		amazonS3Client.putObject(BUCKET_NAME, envsFileName, envsFile)
 
 		// write chanName, envName, envAccessCode into CACHE
 		// the cache will be named in channel name and user name

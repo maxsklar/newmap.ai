@@ -44,4 +44,21 @@ object envPrinter {
 		str
 	}
 
+	def envsPrint(chanName: String):String = {
+		val envsFileName:String = chanName+"_Envs.txt"
+
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val envsObj = amazonS3Client.getObject(BUCKET_NAME, envsFileName)
+  		val envsReader = new BufferedReader(new InputStreamReader(envsObj.getObjectContent()))
+  		var line = envsReader.readLine
+  		var str = "\n"
+  		while(line!=null){
+  			str += line+"\n"
+  			line = envsReader.readLine
+  		}
+  		str
+	}
+
 }
