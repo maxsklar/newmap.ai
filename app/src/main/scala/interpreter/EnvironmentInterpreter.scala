@@ -82,7 +82,7 @@ class EnvironmentInterpreter() {
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
-        ":envs\tPrint the environments under current channel" ++
+        ":envs\tPrint the environments under current channel\n" ++
         //":exit | :quit\tExit this repl\n" ++
         ":create <env name> <env password>\tCreate a new environment\n" ++
         ":log in <env name> <env password>\tLog in to an exist environment\n" ++
