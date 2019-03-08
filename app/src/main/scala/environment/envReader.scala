@@ -14,10 +14,17 @@ object envReader {
 	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
 
 
+<<<<<<< HEAD
 	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Boolean = {
 <<<<<<< HEAD
 
 =======
+=======
+	// return 1: environment not exsit
+	// return 2: wrong password
+	// return 0: loged in
+	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Int = {
+>>>>>>> 276487e... change return type of envLogIn func
 		
 >>>>>>> 3a04edc... remove redundent comment
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -33,15 +40,19 @@ object envReader {
 =======
 		val fileName: String = chanName+"_"+envName+"_Env.txt"
 		//println(fileName)
-		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, fileName)) {return false}
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, fileName)) {return 1}
 		val obj = amazonS3Client.getObject(BUCKET_NAME, fileName)
   		val reader = new BufferedReader(new InputStreamReader(obj.getObjectContent()))
   		var line = reader.readLine
 		println(line.stripPrefix("AC: "))
 
 		// check accesscode is correct or not
+<<<<<<< HEAD
 		if(!envAccessCode.equals(line.stripPrefix("AC: "))){return false}
 >>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
+=======
+		if(!envAccessCode.equals(line.stripPrefix("AC: "))){return 2}
+>>>>>>> 276487e... change return type of envLogIn func
 
 		// write chanName, envName, envAccessCode into CACHE
 		// TODO: the cache will be named in channel name and user name
@@ -56,12 +67,16 @@ object envReader {
 		cacheFile.write(chanName+","+envName+","+envAccessCode)
 		cacheFile.close()
 
+<<<<<<< HEAD
 		val linesArray = Source.fromFile(fileName).getLines.toArray
 		println(linesArray(0).stripPrefix("AC: "))
 		for(i <- 0 until linesArray.size){
 			println(linesArray(i))
 		}
 		true
+=======
+		0
+>>>>>>> 276487e... change return type of envLogIn func
 	}
 
 <<<<<<< HEAD

@@ -45,6 +45,7 @@ class EnvironmentInterpreter() {
     if(ret)CommandPrintSomething("finish import")
 =======
   def logInEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
+<<<<<<< HEAD
     val ret: Boolean = envLogIn(this.chanName, this.userName, envName, envAccessCode)
 <<<<<<< HEAD
     if(ret)CommandPrintSomething("loged into "+envName)
@@ -54,6 +55,17 @@ class EnvironmentInterpreter() {
 >>>>>>> 1a42f2f... solve AWS security issue
     else{
       CommandPrintSomething("Could not log in")
+=======
+    // return 1: environment not exsit
+    // return 2: wrong password
+    // return 0: loged in
+    val ret: Int = envLogIn(this.chanName, this.userName, envName, envAccessCode)
+    if(ret == 0)CommandPrintSomething("loged into Environment "+envName)
+    else if(ret == 1) {
+      CommandPrintSomething("Could not log in, environment not exist")
+    }else{
+      CommandPrintSomething("Could not log in, wrong password")
+>>>>>>> 276487e... change return type of envLogIn func
     }
   }  
 
