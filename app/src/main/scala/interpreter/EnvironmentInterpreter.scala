@@ -6,6 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 import ai.newmap.environment.envCreater.envCreate
 import ai.newmap.environment.envReader.envLogIn
 import ai.newmap.environment.envPrinter.envPrint
+import ai.newmap.environment.envPrinter.envsPrint
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -20,7 +21,7 @@ class EnvironmentInterpreter() {
     this.userName = userName
   }
 
-  
+
   for (code <- EnvironmentInterpreter.initialCommands) {
     apply(code)
   }
@@ -76,10 +77,12 @@ class EnvironmentInterpreter() {
                       }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":env" => CommandPrintSomething(envPrint(this.chanName, this.userName))
+      case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
+        ":envs\tPrint the environments under current channel"
         //":exit | :quit\tExit this repl\n" ++
         ":create <env name> <env password>\tCreate a new environment\n" ++
         ":log in <env name> <env password>\tLog in to an exist environment\n" ++
