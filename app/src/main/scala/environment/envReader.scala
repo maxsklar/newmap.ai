@@ -55,6 +55,8 @@ object envReader {
 		val cacheFile = new PrintWriter(c_file)
 		cacheFile.write(chanName+","+envName+","+envAccessCode)
 		cacheFile.close()
+
+		amazonS3Client.putObject(BUCKET_NAME, cacheFileName, c_file)
 		0
 	}
 
