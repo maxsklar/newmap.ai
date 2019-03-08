@@ -9,7 +9,18 @@ import ai.newmap.environment.envPrinter.envPrint
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
+  var chanName = ""
+  var userName = ""
 
+  def setChanName(chanName: String) {
+    this.chanName = chanName
+  }
+
+  def setUserName(userName: String) {
+    this.userName = userName
+  }
+
+  
   for (code <- EnvironmentInterpreter.initialCommands) {
     apply(code)
   }
@@ -31,31 +42,15 @@ class EnvironmentInterpreter() {
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
 
-  def createEnv(chanName: String, envName: String, envAccessCode: String): CommandInterpResponse = {
-    val ret: Boolean = envCreate(chanName, envName, envAccessCode)
+  def createEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
+    val ret: Boolean = envCreate(this.chanName, this.userName, envName, envAccessCode)
     if(ret)CommandPrintSomething("created environment")
     else{
       CommandPrintSomething("env already exits")
     }    
   }
 
-<<<<<<< HEAD
-  def logInEnv(chanName: String, envName: String, envAccessCode: String): CommandInterpResponse = {
-    val ret: Boolean = envLogIn(chanName, envName, envAccessCode)
-    if(ret)CommandPrintSomething("finish import")
-=======
   def logInEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
-<<<<<<< HEAD
-    val ret: Boolean = envLogIn(this.chanName, this.userName, envName, envAccessCode)
-<<<<<<< HEAD
-    if(ret)CommandPrintSomething("loged into "+envName)
->>>>>>> e183478... add :help about create and log in
-=======
-    if(ret)CommandPrintSomething("loged into Environment "+envName)
->>>>>>> 1a42f2f... solve AWS security issue
-    else{
-      CommandPrintSomething("Could not log in")
-=======
     // return 1: environment not exsit
     // return 2: wrong password
     // return 0: loged in
@@ -65,16 +60,19 @@ class EnvironmentInterpreter() {
       CommandPrintSomething("Could not log in, environment not exist")
     }else{
       CommandPrintSomething("Could not log in, wrong password")
->>>>>>> 276487e... change return type of envLogIn func
+
     }
   }  
 
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
-      case ":create" => this.createEnv("newmap_test", "Workspace", "aaa")
+      case code if code.startsWith(":create")  => {
+                        val cont:Array[String] = code.stripPrefix(":create ").split("\\s+")
+                        this.createEnv(cont(0), cont(1))
+                      }
       case code if code.startsWith(":log in ") => {
                         val cont:Array[String] = code.stripPrefix(":log in ").split("\\s+")
-                        this.logInEnv(cont(0), cont(1), cont(2))
+                        this.logInEnv(cont(0), cont(1))
                       }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":env" => CommandPrintSomething(envPrint(this.chanName, this.userName))

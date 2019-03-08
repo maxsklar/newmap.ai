@@ -8,6 +8,9 @@ import ai.newmap.model._
 import ai.newmap.interpreter._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.environment.envReader.envRead
+import ai.newmap.environment.envReader.envLogIn
+import ai.newmap.environment.envCreater.envCreate
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -30,17 +33,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
   def newmap = Action { request: Request[AnyContent] =>
   	val body: AnyContent = request.body
   	val msg = body.asFormUrlEncoded.get.get("text").get.head
-<<<<<<< HEAD
-    var envInterp = new EnvironmentInterpreter()
-    var response = envInterp(msg)
-      response match {
-        case Success(s) => {
-          
-          println(s)
-          
-        }
-        case Failure(s) => println("Error:\n" + s)
-=======
 
     // channel name:
     val chanName = body.asFormUrlEncoded.get.get("channel_name").get.head
@@ -55,37 +47,26 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = ""+envInterp(msg)
       }
-    case msg if msg.startsWith(":log in ")=>{
+      case msg if msg.startsWith(":log in ")=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
         response = ""+envInterp(msg)
-    }
-    case ":env" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
-    }
-    case _ =>{
-        response = ""+envRead(chanName, userName, msg)
->>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
       }
+      case ":env" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(msg)
+      }
+      case _ =>{
+        response = ""+envRead(chanName, userName, msg)
+      }
+    }
     Ok("Input: "+msg+" \n"+response)
   }
 
   def newmap_get(code : String) = Action {
-<<<<<<< HEAD
-    var envInterp = new EnvironmentInterpreter()
-    var response = envInterp(code)
-      response match {
-        case Success(s) => {
-          
-          println(s)
-          
-        }
-        case Failure(s) => println("Error:\n" + s)
-=======
     // channel name:
     val chanName = "testChanName"
     // user name:
@@ -113,8 +94,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     }
     case _ =>{
         response = ""+envRead(chanName, userName, code)
->>>>>>> 67cf7ea... change generated log name
       }
+    }
     Ok(""+response)
   }
 

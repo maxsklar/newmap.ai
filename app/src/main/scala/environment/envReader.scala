@@ -2,42 +2,40 @@ package ai.newmap.environment
 
 
 import java.io.File
+import java.io.FileWriter
+import java.io.BufferedWriter
 import scala.io.Source
 import java.io.PrintWriter
 import java.nio.file.{Paths, Files}
 
+import ai.newmap.interpreter._
+import ai.newmap.model._
+import ai.newmap.interpreter.TypeChecker._
+import ai.newmap.util.{Outcome, Success, Failure}
+
+import com.amazonaws.auth.BasicAWSCredentials
+import com.amazonaws.services.s3.AmazonS3Client
+import com.amazonaws.AmazonClientException
+import com.amazonaws.AmazonServiceException
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.FileOutputStream
+import org.apache.commons.io.IOUtils
+
 object envReader {
-<<<<<<< HEAD
-=======
+
 	val BUCKET_NAME = envConstant.BUCKET_NAME
 	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
 	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
 
-
-<<<<<<< HEAD
-	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Boolean = {
-<<<<<<< HEAD
-
-=======
-=======
 	// return 1: environment not exsit
 	// return 2: wrong password
 	// return 0: loged in
 	def envLogIn(chanName: String, userName: String, envName: String, envAccessCode: String): Int = {
->>>>>>> 276487e... change return type of envLogIn func
-		
->>>>>>> 3a04edc... remove redundent comment
+
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
->>>>>>> 1a42f2f... solve AWS security issue
 
-
-<<<<<<< HEAD
-	def envLogIn(chanName: String, envName: String, envAccessCode: String): Boolean = {
-		val fileName: String = "EnvScript/"+chanName+"_"+envName+"_Env.txt"
-		println(fileName)
-		if(!Files.exists(Paths.get(fileName))){return false}
-=======
 		val fileName: String = chanName+"_"+envName+"_Env.txt"
 		//println(fileName)
 		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, fileName)) {return 1}
@@ -47,46 +45,20 @@ object envReader {
 		println(line.stripPrefix("AC: "))
 
 		// check accesscode is correct or not
-<<<<<<< HEAD
-		if(!envAccessCode.equals(line.stripPrefix("AC: "))){return false}
->>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
-=======
 		if(!envAccessCode.equals(line.stripPrefix("AC: "))){return 2}
->>>>>>> 276487e... change return type of envLogIn func
 
 		// write chanName, envName, envAccessCode into CACHE
 		// TODO: the cache will be named in channel name and user name
 		// overwrite each time
-<<<<<<< HEAD
-		val cacheFile = new PrintWriter(new File("EnvScript/Sys/CACHE.txt"))
-=======
 		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
 		val c_file = new File(cacheFileName)
 		val cacheFile = new PrintWriter(c_file)
->>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
 		cacheFile.write(chanName+","+envName+","+envAccessCode)
 		cacheFile.close()
-
-<<<<<<< HEAD
-		val linesArray = Source.fromFile(fileName).getLines.toArray
-		println(linesArray(0).stripPrefix("AC: "))
-		for(i <- 0 until linesArray.size){
-			println(linesArray(i))
-		}
-		true
-=======
 		0
->>>>>>> 276487e... change return type of envLogIn func
 	}
 
-<<<<<<< HEAD
-=======
 	def envRead(chanName:String, userName: String, msg: String):String = {
-<<<<<<< HEAD
-
-=======
-		
->>>>>>> 3a04edc... remove redundent comment
 		var envInterp = new EnvironmentInterpreter()
 		envInterp.setChanName(chanName)
 		envInterp.setUserName(userName)
@@ -125,7 +97,9 @@ object envReader {
 				amazonS3Client.putObject(BUCKET_NAME, fileName, file)
         	}
         	case Failure(s) =>{
->>>>>>> 9c5eba0... correct env switching logic and deploy it to heroku
-
+        	}
+        }
+        ""+response
+    }
 
 }

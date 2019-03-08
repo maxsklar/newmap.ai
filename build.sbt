@@ -57,6 +57,7 @@ resolvers += "Artima Maven Repository" at "http://repo.artima.com/releases"
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
 
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.1"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.11.49"
 
 // ============================================================================
 
