@@ -53,6 +53,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = ""+envInterp(msg)
       }
+      case code if code.startsWith(":copy ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(msg)
+    }
       case ":env" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
@@ -92,7 +98,19 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = ""+envInterp(code)
     }
+    case code if code.startsWith(":copy ")=>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(code)
+    }
     case ":env" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = ""+envInterp(code)
+    }
+    case ":envs" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
