@@ -103,9 +103,9 @@ class EnvironmentInterpreter() {
         ":env\tPrint the current environment\n" ++
         ":envs\tPrint the environments under current channel\n" ++
         //":exit | :quit\tExit this repl\n" ++
-        ":copy <From chan name> <env name> <env password> <new env name> <new env password>\n"++
         ":create <env name> <env password>\tCreate a new environment\n" ++
         ":log in <env name> <env password>\tLog in to an exist environment\n" ++
+        ":copy <From chan name> <env name> <env password> <new env name> <new env password>\tCopy an exist environment to a new environment\n"++
         ":help\tPrint this help message\n"
       )
       case _ => CommandPassThrough
