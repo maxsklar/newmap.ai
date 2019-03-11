@@ -4,6 +4,7 @@ import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 import ai.newmap.environment.envCreater.envCreate
+import ai.newmap.environment.envCreater.envCopy
 import ai.newmap.environment.envReader.envLogIn
 import ai.newmap.environment.envPrinter.envPrint
 import ai.newmap.environment.envPrinter.envsPrint
@@ -45,9 +46,9 @@ class EnvironmentInterpreter() {
 
   def createEnv(envName: String, envAccessCode: String): CommandInterpResponse = {
     val ret: Boolean = envCreate(this.chanName, this.userName, envName, envAccessCode)
-    if(ret)CommandPrintSomething("created environment")
+    if(ret)CommandPrintSomething("Environment create success")
     else{
-      CommandPrintSomething("env already exits")
+      CommandPrintSomething(envName+" already exits")
     }    
   }
 
@@ -56,7 +57,7 @@ class EnvironmentInterpreter() {
     // return 2: wrong password
     // return 0: loged in
     val ret: Int = envLogIn(this.chanName, this.userName, envName, envAccessCode)
-    if(ret == 0)CommandPrintSomething("loged into Environment "+envName)
+    if(ret == 0)CommandPrintSomething("Logged into Environment "+envName)
     else if(ret == 1) {
       CommandPrintSomething("Could not log in, environment not exist")
     }else{
@@ -64,6 +65,20 @@ class EnvironmentInterpreter() {
 
     }
   }  
+
+  def copyEnv(fromChanName:String, envName: String, envAccessCode: String, newEnvName: String, newAccessCode:String): CommandInterpResponse = {
+    // ret 1: coppied environment not exist
+    // ret 2: wrong access code 
+    // ret 3: new environment name already exist
+    // ret 0: coppied success
+    val ret: Int = envCopy(this.chanName, fromChanName, this.userName, envName, envAccessCode, newEnvName, newAccessCode)
+    if(ret == 1){CommandPrintSomething("Could not copy, "+envName+" not exist")}
+    else if(ret == 2){CommandPrintSomething("Could not copy, wrong password")}
+    else if(ret == 3){CommandPrintSomething("Could not copy, "+newEnvName+" already exist")}
+    else{
+      CommandPrintSomething("Envionment coppied success")
+    }
+  }
 
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
@@ -75,6 +90,10 @@ class EnvironmentInterpreter() {
                         val cont:Array[String] = code.stripPrefix(":log in ").split("\\s+")
                         this.logInEnv(cont(0), cont(1))
                       }
+      case code if code.startsWith(":copy ") => {
+                        val cont:Array[String] = code.stripPrefix(":copy ").split("\\s+")
+                        this.copyEnv(cont(0), cont(1), cont(2), cont(3), cont(4))
+      }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":env" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
@@ -84,6 +103,7 @@ class EnvironmentInterpreter() {
         ":env\tPrint the current environment\n" ++
         ":envs\tPrint the environments under current channel\n" ++
         //":exit | :quit\tExit this repl\n" ++
+        ":copy <From chan name> <env name> <env password> <new env name> <new env password>\n"++
         ":create <env name> <env password>\tCreate a new environment\n" ++
         ":log in <env name> <env password>\tLog in to an exist environment\n" ++
         ":help\tPrint this help message\n"
