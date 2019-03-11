@@ -28,6 +28,9 @@ object envReader {
 	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
 	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
 
+	val S3_EnvFileName_Prefix = "EnvScript/"
+	val S3_CacheFileName_Prefix = "CACHE/"
+
 	// return 1: environment not exsit
 	// return 2: wrong password
 	// return 0: loged in
@@ -38,8 +41,8 @@ object envReader {
 
 		val fileName: String = chanName+"_"+envName+"_Env.txt"
 		//println(fileName)
-		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, fileName)) {return 1}
-		val obj = amazonS3Client.getObject(BUCKET_NAME, fileName)
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)) {return 1}
+		val obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)
   		val reader = new BufferedReader(new InputStreamReader(obj.getObjectContent()))
   		var line = reader.readLine
 		println(line.stripPrefix("AC: "))
@@ -56,7 +59,7 @@ object envReader {
 		cacheFile.write(chanName+","+envName+","+envAccessCode)
 		cacheFile.close()
 
-		amazonS3Client.putObject(BUCKET_NAME, cacheFileName, c_file)
+		amazonS3Client.putObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName, c_file)
 		0
 	}
 
@@ -70,7 +73,7 @@ object envReader {
 		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
 		//val cacheLinesArray = Source.fromFile(cacheFileName).getLines.toArray
 		println("******"+cacheFileName+"******")
-		val obj1 = amazonS3Client.getObject(BUCKET_NAME, cacheFileName)
+		val obj1 = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
   		val reader1 = new BufferedReader(new InputStreamReader(obj1.getObjectContent()))
   		var cache_line = reader1.readLine
 		// there should be only one line in cache
@@ -79,28 +82,32 @@ object envReader {
 		val envAccessCode = cont(2)
 
 		val fileName: String = chanName+"_"+envName+"_Env.txt"
-		val obj2 = amazonS3Client.getObject(BUCKET_NAME, fileName)
+
+		val file:File = new File(fileName)
+		val fileWriter:FileWriter = new FileWriter(file, false)
+		val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter);
+
+		val obj2 = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)
   		val reader2 = new BufferedReader(new InputStreamReader(obj2.getObjectContent()))
   		var line = reader2.readLine
+  		bufferedWriter.write(line+"\n")
   		line = reader2.readLine
 		while (line!=null){
 			println("***"+line+"***")
 			envInterp(line)
+			bufferedWriter.write(line+"\n")
 			line = reader2.readLine
 		}
 		val response = envInterp(msg)
 		response match {
         	case Success(s) => {
-          		val file:File = new File(fileName)
-				val fileWriter:FileWriter = new FileWriter(file, true)
-				val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter);
 				bufferedWriter.write(msg+"\n")
-				bufferedWriter.close();
-				amazonS3Client.putObject(BUCKET_NAME, fileName, file)
         	}
         	case Failure(s) =>{
         	}
         }
+        bufferedWriter.close();
+		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName, file)
         ""+response
     }
 

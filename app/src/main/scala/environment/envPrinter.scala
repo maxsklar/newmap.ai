@@ -15,13 +15,20 @@ object envPrinter {
 	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
 	val AWS_SECRET_KEY = envConstant.AWS_SECRET_KEY
 
+	val S3_EnvFileName_Prefix = "EnvScript/"
+	val S3_CacheFileName_Prefix = "CACHE/"
+
 	def envPrint(chanName: String, userName: String):String = {
 		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
 
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
-  		val cache_obj = amazonS3Client.getObject(BUCKET_NAME, cacheFileName)
+  		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)) {
+  			return "Please log in first"
+  		}
+
+  		val cache_obj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
   		val cache_reader = new BufferedReader(new InputStreamReader(cache_obj.getObjectContent()))
   		val cache_line = cache_reader.readLine
   		val cont: Array[String] = cache_line.split(",")
@@ -29,7 +36,7 @@ object envPrinter {
 
   		val fileName: String = chanName+"_"+envName+"_Env.txt"
 
-  		val obj = amazonS3Client.getObject(BUCKET_NAME, fileName)
+  		val obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)
   		val reader = new BufferedReader(new InputStreamReader(obj.getObjectContent()))
   		var str = "\nEnvironment "+envName+": \n"
   		var line = reader.readLine
@@ -50,7 +57,11 @@ object envPrinter {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
-  		val envsObj = amazonS3Client.getObject(BUCKET_NAME, envsFileName)
+  		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)) {
+  			return "No environment exist in this channel"
+  		}
+
+  		val envsObj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)
   		val envsReader = new BufferedReader(new InputStreamReader(envsObj.getObjectContent()))
   		var line = envsReader.readLine
   		var str = "\n"
