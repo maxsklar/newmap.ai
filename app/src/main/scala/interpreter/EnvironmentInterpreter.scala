@@ -8,6 +8,7 @@ import ai.newmap.environment.envCreater.envCopy
 import ai.newmap.environment.envReader.envLogIn
 import ai.newmap.environment.envPrinter.envPrint
 import ai.newmap.environment.envPrinter.envsPrint
+import ai.newmap.environment.envCommenter.envComment
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -80,6 +81,20 @@ class EnvironmentInterpreter() {
     }
   }
 
+  def commentEnv(input: String): CommandInterpResponse = {
+
+    val comment: String = input.split("\"")(1).stripSuffix("\"")
+    val envName: String = input.split("\"")(0).split("\\s+")(0)
+    val envAccessCode: String = input.split("\"")(0).split("\\s+")(1)
+
+    val ret: Int = envComment(this.chanName, this.userName, envName, envAccessCode, comment)
+    if(ret == 1){CommandPrintSomething("Could not comment, "+envName+" not exist")}
+    else if(ret == 2){CommandPrintSomething("Could not comment, wrong password")}
+    else{
+      CommandPrintSomething("Comment success")
+    }
+  }
+
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
       case code if code.startsWith(":create")  => {
@@ -93,7 +108,11 @@ class EnvironmentInterpreter() {
       case code if code.startsWith(":copy ") => {
                         val cont:Array[String] = code.stripPrefix(":copy ").split("\\s+")
                         this.copyEnv(cont(0), cont(1), cont(2), cont(3), cont(4))
-      }
+                      }
+      case code if code.startsWith(":comment on ") => {
+                        val cont = code.stripPrefix(":comment on ")
+                        this.commentEnv(cont)
+                      }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":env" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
@@ -106,6 +125,7 @@ class EnvironmentInterpreter() {
         ":create <env name> <env password>\tCreate a new environment\n" ++
         ":log in <env name> <env password>\tLog in to an exist environment\n" ++
         ":copy <From chan name> <env name> <env password> <new env name> <new env password>\tCopy an exist environment to a new environment\n"++
+        ":comment on <env name> <env password> \"<comment>\"\tComment on an exist environment\n"++
         ":help\tPrint this help message\n"
       )
       case _ => CommandPassThrough
