@@ -10,6 +10,13 @@ import java.io.InputStreamReader
 import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils 
 
+import ai.newmap.interpreter._
+import ai.newmap.model._
+import ai.newmap.interpreter.TypeChecker._
+import ai.newmap.util.{Outcome, Success, Failure}
+
+import scala.collection.mutable.HashSet
+
 object envPrinter {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
 	val AWS_ACCESS_KEY = envConstant.AWS_ACCESS_KEY
@@ -19,6 +26,9 @@ object envPrinter {
 	val S3_CacheFileName_Prefix = "CACHE/"
 
 	def envPrint(chanName: String, userName: String):String = {
+		var envInterp = new EnvironmentInterpreter()
+		envInterp.setChanName(chanName)
+		envInterp.setUserName(userName)
 		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
 
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -38,15 +48,24 @@ object envPrinter {
 
   		val obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)
   		val reader = new BufferedReader(new InputStreamReader(obj.getObjectContent()))
+  		
+		val envSet: HashSet[String] = HashSet()
   		var str = "\nEnvironment "+envName+": \n"
   		var line = reader.readLine
   		line = reader.readLine
   		while (line!=null){
-			println("***"+line+"***")
+			//println("***"+line+"***")
+			envInterp(line)
 			if(line.startsWith("val")){
-				str += line+"\n"
+				//str += line+"\n"
+				envSet += parseVal(line)
 			}
 			line = reader.readLine
+		}
+		for(element:String <- envSet){
+			println("******"+element+"******")
+			val response = envInterp(element)
+			str += element+" = "+parseResponse(""+response) + "\n"
 		}
 		str
 	}
@@ -70,6 +89,15 @@ object envPrinter {
   			line = envsReader.readLine
   		}
   		str
+	}
+
+	// private
+	def parseVal(str: String): String = {
+		return str.stripPrefix("val ").split("=")(0).split(":")(0).replaceAll("\\s+","")
+	}
+
+	def parseResponse(str: String): String = {
+		return str.stripPrefix("Success(").stripPrefix("Failure(").stripSuffix(")")
 	}
 
 }
