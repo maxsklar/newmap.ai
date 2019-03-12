@@ -98,7 +98,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = ""+envInterp(code)
     }
-    case code if code.startsWith(":copy ")=>{
+    case code if (code.startsWith(":copy ") ||
+                  code.startsWith(":comment on"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
