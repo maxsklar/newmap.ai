@@ -11,6 +11,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 import ai.newmap.environment.envReader.envRead
 import ai.newmap.environment.envReader.envLogIn
 import ai.newmap.environment.envCreater.envCreate
+import ai.newmap.environment.envPrinter.prettyPrinter
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -41,41 +42,44 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     //Ok(chanName+" "+userName)
     var response:String = ""
     msg match{
-      case msg if msg.startsWith(":create ")=>{
+      case msg if (msg.startsWith(":create ") ||
+                    msg.startsWith(":log in ") ||
+                    msg.startsWith(":copy ") ||
+                    msg.startsWith(":comment on"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
         response = ""+envInterp(msg)
       }
-      case msg if msg.startsWith(":log in ")=>{
+      case ":printEnv" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
-      }
-      case code if code.startsWith(":copy ")=>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
-    }
-      case ":env" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
+        response = prettyPrinter(""+envInterp(msg))
       }
       case ":envs" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
+        response = prettyPrinter(""+envInterp(msg))
+      }
+      case ":log off" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(msg))
+      }
+      case ":help" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(msg))
       }
       case _ =>{
         response = ""+envRead(chanName, userName, msg)
       }
     }
-    Ok("Input: "+msg+" \n"+response)
+    Ok(">> "+msg+" \n"+response)
   }
 
   def newmap_get(code : String) = Action {
@@ -86,42 +90,44 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     //var envInterp = new EnvironmentInterpreter()
     var response:String = ""
     code match{
-      case code if code.startsWith(":create ")=>{
+      case code if (code.startsWith(":create ") ||
+                    code.startsWith(":log in ") ||
+                    code.startsWith(":copy ") ||
+                    code.startsWith(":comment on"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
         response = ""+envInterp(code)
       }
-    case code if code.startsWith(":log in ")=>{
+    case ":printEnv" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(code)
-    }
-    case code if (code.startsWith(":copy ") ||
-                  code.startsWith(":comment on"))=>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = ""+envInterp(code)
-    }
-    case ":env" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = ""+envInterp(code)
+        response = prettyPrinter(""+envInterp(code))
     }
     case ":envs" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(code)
+        response = prettyPrinter(""+envInterp(code))
+    }
+    case ":log off" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(code))
+    }
+    case ":help" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(code))
     }
     case _ =>{
         response = ""+envRead(chanName, userName, code)
       }
     }
-    Ok(""+response)
+    Ok(">> "+code+" \n"+response)
   }
 
   def newmap_script = Action { request: Request[AnyContent] =>
