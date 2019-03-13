@@ -73,6 +73,9 @@ object envReader {
 		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
 		//val cacheLinesArray = Source.fromFile(cacheFileName).getLines.toArray
 		println("******"+cacheFileName+"******")
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){
+			return "*Please log in first*"
+		}
 		val obj1 = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
   		val reader1 = new BufferedReader(new InputStreamReader(obj1.getObjectContent()))
   		var cache_line = reader1.readLine
@@ -109,6 +112,19 @@ object envReader {
         bufferedWriter.close();
 		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName, file)
         ""+response
+    }
+
+    def envLogOff(chanName: String, userName: String): Boolean = {
+    	// get the cache file
+    	val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
+
+		// delete the cache file
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){return false}
+		amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
+		true
     }
 
 }
