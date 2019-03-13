@@ -24,8 +24,13 @@ class EnvironmentInterpreter() {
       case CommandPassThrough => applyEnvCommand(code)
       case CommandFileProcessor(filepath) => {
         val fileProc = new Processor
-        fileProc.FileProcessor(filepath)
-        Success("")
+        val response = fileProc.FileProcessor(filepath)
+        Success(response)
+      }
+      case CommandTextBlockProcessor(textString) => {
+        val textBlockProc = new Processor
+        val response = textBlockProc.textBlockProcessor(textString)
+        Success(response)
       }
     }
   }
@@ -35,6 +40,7 @@ class EnvironmentInterpreter() {
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
   case class CommandFileProcessor(s: String) extends CommandInterpResponse
+  case class CommandTextBlockProcessor(s: String) extends CommandInterpResponse
 
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
@@ -42,12 +48,17 @@ class EnvironmentInterpreter() {
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
-        ":env\tPrint the current environment\n" ++
-        ":exit | :quit\tExit this repl\n" ++
-        ":help\tPrint this help message\n" ++
-        ":script\tRead from a file"
+          ":env\tPrint the current environment\n" ++
+          ":exit | :quit\tExit this repl\n" ++
+          ":help\tPrint this help message\n" ++
+          ":script [-file]\tRead from a file or a text block"
       )
-      case s if (s.startsWith(":script")) => CommandFileProcessor(s.drop(8))
+      case s if (s.startsWith(":script")) => {
+        if (s.substring(8, 13) == "-file")
+          CommandFileProcessor(s.drop(14))
+        else
+          CommandTextBlockProcessor(s.drop(8))
+      }
       case _ => CommandPassThrough
     }
   }
