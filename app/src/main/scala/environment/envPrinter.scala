@@ -35,7 +35,7 @@ object envPrinter {
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)) {
-  			return "Please log in first"
+  			return "*Please log in first*"
   		}
 
   		val cache_obj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
@@ -50,9 +50,10 @@ object envPrinter {
   		val reader = new BufferedReader(new InputStreamReader(obj.getObjectContent()))
   		
 		val envSet: HashSet[String] = HashSet()
-  		var str = "\nEnvironment "+envName+": \n"
+  		var str = "*Environment "+envName+":* \n"
   		var line = reader.readLine
   		line = reader.readLine
+  		if(line == null){str = "*There is no content in environment "+envName+"* \n"}
   		while (line!=null){
 			//println("***"+line+"***")
 			envInterp(line)
@@ -65,7 +66,7 @@ object envPrinter {
 		for(element:String <- envSet){
 			println("******"+element+"******")
 			val response = envInterp(element)
-			str += element+" = "+parseResponse(""+response) + "\n"
+			str += "\t"+element+" = "+prettyPrinter(""+response) + "\n"
 		}
 		str
 	}
@@ -77,15 +78,15 @@ object envPrinter {
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)) {
-  			return "No environment exist in this channel"
+  			return "*No environment exist in this channel*"
   		}
 
   		val envsObj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)
   		val envsReader = new BufferedReader(new InputStreamReader(envsObj.getObjectContent()))
   		var line = envsReader.readLine
-  		var str = "\n"
+  		var str = "*In channel \""+chanName+"\", the environments are list below: *\n"
   		while(line!=null){
-  			str += line+"\n"
+  			str += "\t"+line+"\n"
   			line = envsReader.readLine
   		}
   		str
@@ -96,7 +97,7 @@ object envPrinter {
 		return str.stripPrefix("val ").split("=")(0).split(":")(0).replaceAll("\\s+","")
 	}
 
-	def parseResponse(str: String): String = {
+	def prettyPrinter(str: String): String = {
 		return str.stripPrefix("Success(").stripPrefix("Failure(").stripSuffix(")")
 	}
 
