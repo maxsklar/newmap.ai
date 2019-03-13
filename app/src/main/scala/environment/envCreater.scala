@@ -76,7 +76,7 @@ object envCreater {
 		true
 	}
 
-	// ret 1: coppied environment not exist
+	// ret 1: copied environment not exist
 	// ret 2: wrong access code 
 	// ret 3: new environment name already exist
 	// ret 0: coppied success
@@ -122,12 +122,14 @@ object envCreater {
 		val fileWriter:FileWriter = new FileWriter(envsFile, false)
 		val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter);
 
-		val env_obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)
-  		val env_reader = new BufferedReader(new InputStreamReader(env_obj.getObjectContent()))
-  		var env_line = env_reader.readLine
-  		while (env_line!=null) {
-   			bufferedWriter.write(env_line+"\n")
-    		env_line = env_reader.readLine
+		if (amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)){
+			val env_obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)
+  			val env_reader = new BufferedReader(new InputStreamReader(env_obj.getObjectContent()))
+  			var env_line = env_reader.readLine
+  			while (env_line!=null) {
+   				bufferedWriter.write(env_line+"\n")
+    			env_line = env_reader.readLine
+  			}
   		}
 
 		bufferedWriter.write(newEnvName+"\n")
