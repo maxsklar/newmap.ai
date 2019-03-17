@@ -1,7 +1,5 @@
 // The simplest possible sbt build file is just one line:
 
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
-
 scalaVersion := "2.12.7"
 // That is, to create a valid sbt build, all you've got to do is define the
 // version of Scala you'd like your project to use.
@@ -21,22 +19,6 @@ version := "0.0"
 // Note, it's not required for you to define these three settings. These are
 // mostly only necessary if you intend to publish your library's binaries on a
 // place like Sonatype or Bintray.
-
-lazy val root = (project in file(".")).enablePlugins(PlayScala)
-
-scalaVersion := "2.11.7"
-
-libraryDependencies ++= Seq(
-  jdbc,
-  cache,
-  ws
-)
-
-// heroku delpoy
-herokuIncludePaths in Compile := Seq(
-  "app", "conf/routes", "public/javascripts"
-)
-
 
 // Want to use a published library in your project?
 // You can define other libraries as dependencies in your build like this:
@@ -70,9 +52,6 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
 resolvers += "Artima Maven Repository" at "http://repo.artima.com/releases"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
-
-libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.1"
-
 // ============================================================================
 
 // Most moderately interesting Scala projects don't make use of the very simple
@@ -97,4 +76,3 @@ libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.1
 
 // To learn more about multi-project builds, head over to the official sbt
 // documentation at http://www.scala-sbt.org/documentation.html
-enablePlugins(JavaAppPackaging)

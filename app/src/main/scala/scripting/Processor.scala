@@ -20,6 +20,7 @@ class Processor {
           case Failure(s) => {
             breakflag = true
             println(s"Error in line $linenum: $s")
+            println(s"The command that has the Error is : $line: $s")
             }
           case Success(s) => {
             linenum += 1
