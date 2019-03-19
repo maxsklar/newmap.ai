@@ -136,7 +136,7 @@ class EnvironmentInterpreter() {
 
   def commitEnv(input: String): CommandInterpResponse = {
     val ret: Int = envCommit(this.chanName, this.userName, input)
-    if(ret == 1){CommandPrintSomething("*Env didn't log in*")}
+    if(ret == 1){CommandPrintSomething("*Couldn't commit, Please log in first*")}
     else if(ret == 2){CommandPrintSomething("*Env up to date, no need to commit*")}
     else{
       CommandPrintSomething("*Env commit success*")
