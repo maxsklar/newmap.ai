@@ -39,7 +39,7 @@ object envCreater {
 		val envsFileName:String = chanName+"_Envs.txt"
 		val envsFile:File = new File(envsFileName)
 		val fileWriter:FileWriter = new FileWriter(envsFile, false)
-		val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter);
+		val bufferedWriter:BufferedWriter = new BufferedWriter(fileWriter)
 
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)) {
 			val env_obj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envsFileName)
