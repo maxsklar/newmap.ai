@@ -134,8 +134,8 @@ class EnvironmentInterpreter() {
     }
   }
 
-  def commitEnv(): CommandInterpResponse = {
-    val ret: Int = envCommit(this.chanName, this.userName)
+  def commitEnv(input: String): CommandInterpResponse = {
+    val ret: Int = envCommit(this.chanName, this.userName, input)
     if(ret == 1){CommandPrintSomething("*env didn't log in*")}
     else if(ret == 2){CommandPrintSomething("*env didn't making any progress*")}
     else{
@@ -162,11 +162,13 @@ class EnvironmentInterpreter() {
                         val cont = code.stripPrefix(":comment on ")
                         this.commentEnv(cont)
                       }
+      case code if code.startsWith(":commit") => {
+                        this.commitEnv(code.stripPrefix(":commit"))
+                      }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":log off" => logOffEnv
       case ":printEnv" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
-      case ":commit" => this.commitEnv()
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "*List of environment commands*\n" ++
