@@ -118,15 +118,12 @@ object envCommiter {
 			val envReader = new BufferedReader(new InputStreamReader(envObj.getObjectContent()))
 			var envLine = envReader.readLine
 			envLine = envReader.readLine
-			while(envLine != null || comLine != null){
-				//println(envLine+"***"+comLine)
-				if(envLine != null && !envLine.equals(comLine)){
+			while((envLine != null || comLine != null) && same){
+				println(envLine+"***"+comLine)
+				if(envLine != null && comLine == null){
 					same = false
-					break
-				}
-				if(comLine != null && !comLine.equals(envLine)){
+				}else if(comLine != null && envLine == null){
 					same = false
-					break
 				}
 				envLine = envReader.readLine
 				comLine = comReader.readLine
