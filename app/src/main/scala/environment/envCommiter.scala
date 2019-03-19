@@ -79,7 +79,7 @@ object envCommiter {
 
 	// ret 1: env didn't log in
 	// ret 2: env didn't making any progress
-	def envCommit(chanName: String, userName: String): Int = {
+	def envCommit(chanName: String, userName: String, commitMessage: String): Int = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
@@ -120,7 +120,11 @@ object envCommiter {
 			envLine = envReader.readLine
 			while(envLine != null || comLine != null){
 				//println(envLine+"***"+comLine)
-				if(!envLine.equals(comLine)){
+				if(envLine != null && !envLine.equals(comLine)){
+					same = false
+					break
+				}
+				if(comLine != null && !comLine.equals(envLine)){
 					same = false
 					break
 				}
@@ -168,7 +172,7 @@ object envCommiter {
 			}
 		}
 
-		versionBufferedWriter.write(uuid+"\n")
+		versionBufferedWriter.write(uuid+"\t//"+commitMessage+" // @author "+userName+"\n")
 		versionBufferedWriter.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName, versionFile)
 		0
