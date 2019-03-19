@@ -11,6 +11,7 @@ import ai.newmap.environment.envPrinter.envPrint
 import ai.newmap.environment.envPrinter.envsPrint
 import ai.newmap.environment.envPrinter.prettyPrinter
 import ai.newmap.environment.envCommenter.envComment
+import ai.newmap.environment.envCommiter.envCommit
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -133,6 +134,16 @@ class EnvironmentInterpreter() {
     }
   }
 
+  def commitEnv(): CommandInterpResponse = {
+    val ret: Int = envCommit(this.chanName, this.userName)
+    if(ret == 1){CommandPrintSomething("*env didn't log in*")}
+    else if(ret == 2){CommandPrintSomething("*env didn't making any progress*")}
+    else{
+      CommandPrintSomething("*env commit success*")
+    }
+  }
+
+
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
       case code if code.startsWith(":create")  => {
@@ -155,6 +166,7 @@ class EnvironmentInterpreter() {
       case ":log off" => logOffEnv
       case ":printEnv" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
+      case ":commit" => this.commitEnv()
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "*List of environment commands*\n" ++
