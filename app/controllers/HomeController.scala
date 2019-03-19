@@ -45,7 +45,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       case msg if (msg.startsWith(":create ") ||
                     msg.startsWith(":log in ") ||
                     msg.startsWith(":copy ") ||
-                    msg.startsWith(":comment on"))=>{
+                    msg.startsWith(":comment on")||
+                    msg.startsWith(":commit"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
