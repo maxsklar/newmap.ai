@@ -93,7 +93,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       case code if (code.startsWith(":create ") ||
                     code.startsWith(":log in ") ||
                     code.startsWith(":copy ") ||
-                    code.startsWith(":comment on"))=>{
+                    code.startsWith(":comment on")||
+                    code.startsWith(":commit"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
@@ -112,12 +113,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         response = prettyPrinter(""+envInterp(code))
     }
     case ":log off" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(code))
-    }
-    case ":commit" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
