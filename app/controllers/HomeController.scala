@@ -46,11 +46,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
                     msg.startsWith(":log in ") ||
                     msg.startsWith(":copy ") ||
                     msg.startsWith(":comment on")||
-                    msg.startsWith(":commit"))=>{
+                    msg.startsWith(":commit") ||
+                    msg.startsWith(":checkout "))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(msg)
+        response = prettyPrinter(""+envInterp(msg))
       }
       case ":printEnv" =>{
         var envInterp = new EnvironmentInterpreter()
@@ -65,6 +66,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         response = prettyPrinter(""+envInterp(msg))
       }
       case ":log off" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(msg))
+      }
+      case ":printLog" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
@@ -94,12 +101,13 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       case code if (code.startsWith(":create ") ||
                     code.startsWith(":log in ") ||
                     code.startsWith(":copy ") ||
-                    code.startsWith(":comment on")||
-                    code.startsWith(":commit"))=>{
+                    code.startsWith(":comment on") ||
+                    code.startsWith(":commit") ||
+                    code.startsWith(":checkout "))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
-        response = ""+envInterp(code)
+        response = prettyPrinter(""+envInterp(code))
       }
     case ":printEnv" =>{
         var envInterp = new EnvironmentInterpreter()
