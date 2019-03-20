@@ -278,6 +278,193 @@ object envCommiter {
 		str.toString
 	}
 
+	// reset functionality, which won't delete commit file, will add a new commit file
+	def reset(chanName: String, userName: String, uuid: String, envAccessCode: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// check if logged in or not
+		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){
+			return "*Please log in first*"
+		}
+
+		// get env name
+		val cacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
+		val cacheReader = new BufferedReader(new InputStreamReader(cacheObj.getObjectContent()))
+		var cacheLine = cacheReader.readLine
+		val cont: Array[String] = cacheLine.split(",")
+		val envName = cont(1)
+
+		// get uuid.txt file
+			// check env name exist or not
+		val commitFileName = uuid+".txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)){
+			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"
+		}
+			// check if belongs to this env name or not
+		val comObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)
+		val comReader = new BufferedReader(new InputStreamReader(comObj.getObjectContent()))
+		var comLine = comReader.readLine
+		val thisEnvName = comLine.split(":")(0)
+		if(!thisEnvName.equals(envName)){
+			return "*Could not reset, Wrong environment, please use :PrintLog to check valid uuid*"
+		}
+
+			// check access code 
+		val thisAcessCode = comLine.split(":")(1)
+		if(!thisAcessCode.equals(envAccessCode)){
+			return "*Could not reset, Wrong password for environment "+envName+"*"
+		}
+
+		// write uuid.txt content to _Env file and new uuid .txt
+			// get new uuid
+		val new_uuid = generateUUID()
+		val newComFileName = new_uuid+".txt"
+		val newComFile = new File(newComFileName)
+		val newComFileWriter = new FileWriter(newComFile, false)
+		val newComBufferedWriter = new BufferedWriter(newComFileWriter)
+
+		val envFileName = chanName+"_"+envName+"_Env.txt"
+		val envFile = new File(envFileName)
+		val envFileWriter:FileWriter = new FileWriter(envFile, false)
+		val envBufferedWriter:BufferedWriter = new BufferedWriter(envFileWriter)
+		envBufferedWriter.write("AC: "+envAccessCode+"\n")
+		newComBufferedWriter.write(envName+":"+envAccessCode+"\n")
+		comLine = comReader.readLine
+		while(comLine != null){
+			envBufferedWriter.write(comLine+"\n")
+			newComBufferedWriter.write(comLine+"\n")
+			comLine = comReader.readLine
+		}
+
+		// update version file
+		val versionFileName = chanName+"_"+envName+"_Ver.txt"
+		val versionObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
+		val versionReader = new BufferedReader(new InputStreamReader(versionObj.getObjectContent()))
+		var versionLine = versionReader.readLine
+
+		val versionFile = new File(versionFileName)
+		val versionFileWriter = new FileWriter(versionFile, false)
+		val versionBufferedWriter = new BufferedWriter(versionFileWriter)
+			// change HEAD 
+		versionBufferedWriter.write("HEAD:"+new_uuid+"\n")
+		versionLine = versionReader.readLine
+			// remove aftwards commit file
+		var found = false
+		while(versionLine != null){
+			versionBufferedWriter.write(versionLine+"\n")
+			if(versionLine.startsWith(uuid)){
+				found = true
+			}
+			versionLine = versionReader.readLine
+		}
+		versionBufferedWriter.write(new_uuid+"\t// reset to "+uuid+" // @author "+userName+"\n")
+		if(!found){
+			return "*System Logic fault*" //which shouldn't exist	
+		}
+
+		versionBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName, versionFile)
+
+		envBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+envFileName, envFile)
+		newComBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_versionFileName_prefix+newComFileName, newComFile)
+		return "*Reset success*"
+	}
+
+	// reset HARD functionality
+	def resetHard(chanName: String, userName: String, uuid: String, envAccessCode: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// check if logged in or not
+		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){
+			return "*Please log in first*"
+		}
+
+		// get env name
+		val cacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
+		val cacheReader = new BufferedReader(new InputStreamReader(cacheObj.getObjectContent()))
+		var cacheLine = cacheReader.readLine
+		val cont: Array[String] = cacheLine.split(",")
+		val envName = cont(1)
+
+		// get uuid.txt file
+			// check env name exist or not
+		val commitFileName = uuid+".txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)){
+			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"
+		}
+			// check if belongs to this env name or not
+		val comObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)
+		val comReader = new BufferedReader(new InputStreamReader(comObj.getObjectContent()))
+		var comLine = comReader.readLine
+		val thisEnvName = comLine.split(":")(0)
+		if(!thisEnvName.equals(envName)){
+			return "*Could not reset, Wrong environment, please use :PrintLog to check valid uuid*"
+		}
+
+			// check access code 
+		val thisAcessCode = comLine.split(":")(1)
+		if(!thisAcessCode.equals(envAccessCode)){
+			return "*Could not reset, Wrong password for environment "+envName+"*"
+		}
+
+		// write uuid.txt content to _Env file
+		val envFileName = chanName+"_"+envName+"_Env.txt"
+		val envFile = new File(envFileName)
+		val envFileWriter:FileWriter = new FileWriter(envFile, false)
+		val envBufferedWriter:BufferedWriter = new BufferedWriter(envFileWriter)
+		envBufferedWriter.write("AC: "+envAccessCode+"\n")
+		comLine = comReader.readLine
+		while(comLine != null){
+			envBufferedWriter.write(comLine+"\n")
+			comLine = comReader.readLine
+		}
+
+		// update version file
+		val versionFileName = chanName+"_"+envName+"_Ver.txt"
+		val versionObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
+		val versionReader = new BufferedReader(new InputStreamReader(versionObj.getObjectContent()))
+		var versionLine = versionReader.readLine
+
+		val versionFile = new File(versionFileName)
+		val versionFileWriter = new FileWriter(versionFile, false)
+		val versionBufferedWriter = new BufferedWriter(versionFileWriter)
+			// change HEAD 
+		versionBufferedWriter.write("HEAD:"+uuid+"\n")
+		versionLine = versionReader.readLine
+			// remove aftwards commit file
+		var found = false
+		while(versionLine != null && !found){
+			versionBufferedWriter.write(versionLine+"\n")
+			if(versionLine.startsWith(uuid)){
+				found = true
+			}
+			versionLine = versionReader.readLine
+		}
+		while(versionLine != null){
+			// TODO: remove useless uuid from Pool
+			val dep_uuid = versionLine.split("\\s+")(0)
+			val depComFileName = dep_uuid+".txt"
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_versionFileName_prefix+depComFileName)
+			versionLine = versionReader.readLine
+		}
+		if(!found){
+			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"	
+		}
+
+		versionBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName, versionFile)
+
+		envBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+envFileName, envFile)
+		return "*Hard reset success*"
+	}
+
 	// private
 	def getNextNameableChar(r: scala.util.Random): Char = {
 		var c = r.nextPrintableChar
