@@ -175,6 +175,42 @@ object envCommiter {
 		0
 	}
 
+	// function to print commit log
+	def printLog(chanName: String, userName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// check if logged in or not
+		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){
+			return "*Please log in first*"
+		}
+
+		// get the envName
+		val cacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
+		val cacheReader = new BufferedReader(new InputStreamReader(cacheObj.getObjectContent()))
+		var cacheLine = cacheReader.readLine
+		val cont: Array[String] = cacheLine.split(",")
+		val envName = cont(1)
+
+		// read Version/chanN_envN_ver.txt
+		val versionFileName = chanName+"_"+envName+"_Ver.txt"
+			// if not exist 
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)){
+			return "*No log for this envrionment, please commit first*"
+		}
+
+		val res = new StringBuilder
+		val verObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
+		val verReader = new BufferedReader(new InputStreamReader(verObj.getObjectContent()))
+		var verLine = verReader.readLine
+		while(verLine != null){
+			res ++= verLine+"\n"
+			verLine = verReader.readLine
+		}
+		res.toString
+	}
+
 	// private
 	def getNextNameableChar(r: scala.util.Random): Char = {
 		var c = r.nextPrintableChar
