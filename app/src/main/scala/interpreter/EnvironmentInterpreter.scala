@@ -12,6 +12,7 @@ import ai.newmap.environment.envPrinter.envsPrint
 import ai.newmap.environment.envPrinter.prettyPrinter
 import ai.newmap.environment.envCommenter.envComment
 import ai.newmap.environment.envCommiter.envCommit
+import ai.newmap.environment.envCommiter.printLog
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -169,16 +170,20 @@ class EnvironmentInterpreter() {
       case ":log off" => logOffEnv
       case ":printEnv" => CommandPrintSomething(envPrint(this.chanName, this.userName))
       case ":envs" => CommandPrintSomething(envsPrint(this.chanName))
+      case ":printLog" => CommandPrintSomething(printLog(this.chanName, this.userName))
       case ":exit" | ":quit" => CommandExit
       case ":help" => CommandPrintSomething(
         "*List of environment commands*\n" ++
-        "*:printEnv*\tPrint the current environment\n" ++
         "*:envs*\tPrint the environments under current channel\n" ++
         //":exit | :quit\tExit this repl\n" ++
         "*:create <env name> <env password>*\tCreate a new environment\n" ++
         "*:log in <env name> <env password>*\tLog in to an exist environment\n" ++
+        "*:log off*\tLog off from current environment\n" ++
+        "*:printEnv*\tPrint the current environment\n" ++
         "*:copy <From chan name> <env name> <env password> <new env name> <new env password>*\tCopy an exist environment to a new environment\n"++
         "*:comment on <env name> <env password> (<comment>)*\tComment on an exist environment\n"++
+        "*:commit <comment>* or *:commit*\tcommit current environment\n"++
+        "*:printLog*\tprint the committed versions of current environment\n"++
         "*:help*\tPrint this help message\n"
       )
       case _ => CommandPassThrough
