@@ -7,6 +7,11 @@ import scala.io.Source
 import java.io.PrintWriter
 import java.nio.file.{Paths, Files}
 
+import ai.newmap.interpreter._
+import ai.newmap.model._
+import ai.newmap.interpreter.TypeChecker._
+import ai.newmap.util.{Outcome, Success, Failure}
+
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.AmazonClientException
@@ -213,6 +218,64 @@ object envCommiter {
 			verLine = verReader.readLine
 		}
 		res.toString
+	}
+
+	// checkout and print the env of given uuid
+	def checkout(chanName: String, userName: String, uuid: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		// check if logged in or not
+  		val cacheFileName = chanName+"_"+userName+"_CACHE.txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)){
+			return "*Please log in first*"
+		}
+
+		// get the envName
+		val cacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName)
+		val cacheReader = new BufferedReader(new InputStreamReader(cacheObj.getObjectContent()))
+		var cacheLine = cacheReader.readLine
+		val cont: Array[String] = cacheLine.split(",")
+		val envName = cont(1)
+
+		// check uuid is valid or not
+		val versionFileName = uuid+".txt"
+		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)){
+			return "*Invalid uuid, please use :printLog to check valid uuid*"
+		}
+
+		// check is this version file belongs to this envrionment
+		val verObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
+		val verReader = new BufferedReader(new InputStreamReader(verObj.getObjectContent()))
+		val thisEnvName = verReader.readLine.split(":")(0)
+		if(!thisEnvName.equals(envName)){
+			return "*Wrong environment, please use :PrintLog to check valid uuid*"
+		}
+
+		// read version file
+		var envInterp = new EnvironmentInterpreter()
+		envInterp.setChanName(chanName)
+		envInterp.setUserName(userName)
+		val envSet: HashSet[String] = HashSet()
+		val str = new StringBuilder
+  		str ++= "*Environment "+envName+", commit id "+uuid+":* \n"
+  		var verLine = verReader.readLine
+  		if(verLine == null){return "*There is no content in this commit of "+envName+"* \n"}
+  		while (verLine!=null){
+			//println("***"+verLine+"***")
+			envInterp(verLine)
+			if(verLine.startsWith("val")){
+				//str ++= verLine+"\n"
+				envSet += envPrinter.parseVal(verLine)
+			}
+			verLine = verReader.readLine
+		}
+		for(element:String <- envSet){
+			//println("******"+element+"******")
+			val response = envInterp(element)
+			str ++= "\t"+element+" = "+envPrinter.prettyPrinter(""+response) + "\n"
+		}
+		str.toString
 	}
 
 	// private
