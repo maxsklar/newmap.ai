@@ -119,6 +119,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         envInterp.setUserName(userName)
         response = prettyPrinter(""+envInterp(code))
     }
+    case ":printLog" =>{
+        var envInterp = new EnvironmentInterpreter()
+        envInterp.setChanName(chanName)
+        envInterp.setUserName(userName)
+        response = prettyPrinter(""+envInterp(code))
+    }
     case ":help" =>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
