@@ -13,6 +13,7 @@ import ai.newmap.environment.envPrinter.prettyPrinter
 import ai.newmap.environment.envCommenter.envComment
 import ai.newmap.environment.envCommiter.envCommit
 import ai.newmap.environment.envCommiter.printLog
+import ai.newmap.environment.envCommiter.checkout
 
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
@@ -144,6 +145,11 @@ class EnvironmentInterpreter() {
     }
   }
 
+  def checkoutVer(input: String): CommandInterpResponse = {
+    val ret: String = checkout(this.chanName, this.userName, input)
+    CommandPrintSomething(ret)
+  }
+
 
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
@@ -166,6 +172,9 @@ class EnvironmentInterpreter() {
       case code if code.startsWith(":commit") => {
                         this.commitEnv(code.stripPrefix(":commit"))
                       }
+      case code if code.startsWith(":checkout ")=> {
+                        this.checkoutVer(code.stripPrefix(":checkout "))
+                      }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":log off" => logOffEnv
       case ":printEnv" => CommandPrintSomething(envPrint(this.chanName, this.userName))
@@ -184,6 +193,7 @@ class EnvironmentInterpreter() {
         "*:comment on <env name> <env password> (<comment>)*\tComment on an exist environment\n"++
         "*:commit <comment>* or *:commit*\tcommit current environment\n"++
         "*:printLog*\tprint the committed versions of current environment\n"++
+        "*:checkout <uuid>*\tCheck out privious committed version environment\n"++
         "*:help*\tPrint this help message\n"
       )
       case _ => CommandPassThrough
