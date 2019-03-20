@@ -118,11 +118,14 @@ object envCommiter {
 			val envReader = new BufferedReader(new InputStreamReader(envObj.getObjectContent()))
 			var envLine = envReader.readLine
 			envLine = envReader.readLine
+			comLine = comReader.readLine
 			while((envLine != null || comLine != null) && same){
 				println(envLine+"***"+comLine)
 				if(envLine != null && comLine == null){
 					same = false
 				}else if(comLine != null && envLine == null){
+					same = false
+				}else if(!comLine.equals(envLine)){
 					same = false
 				}
 				envLine = envReader.readLine
@@ -144,6 +147,7 @@ object envCommiter {
 		val envObj = amazonS3Client.getObject(BUCKET_NAME, S3_EnvFileName_Prefix+envFileName)
 		val envReader = new BufferedReader(new InputStreamReader(envObj.getObjectContent()))
 		var envLine = envReader.readLine
+		commitBufferedWriter.write(envName+":"+envLine.stripPrefix("AC: ")+"\n")
 		envLine = envReader.readLine
 		while(envLine != null){
 			commitBufferedWriter.write(envLine+"\n")
