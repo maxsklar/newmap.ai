@@ -47,7 +47,9 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
                     msg.startsWith(":copy ") ||
                     msg.startsWith(":comment on")||
                     msg.startsWith(":commit") ||
-                    msg.startsWith(":checkout "))=>{
+                    msg.startsWith(":checkout ") ||
+                    msg.startsWith(":reset ") ||
+                    msg.startsWith(":hard reset "))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
@@ -103,7 +105,9 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
                     code.startsWith(":copy ") ||
                     code.startsWith(":comment on") ||
                     code.startsWith(":commit") ||
-                    code.startsWith(":checkout "))=>{
+                    code.startsWith(":checkout ") ||
+                    code.startsWith(":reset ") ||
+                    code.startsWith(":hard set "))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
