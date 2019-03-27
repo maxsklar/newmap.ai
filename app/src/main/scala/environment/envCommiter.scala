@@ -241,7 +241,7 @@ object envCommiter {
 		// check uuid is valid or not
 		val versionFileName = uuid+".txt"
 		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)){
-			return "*Invalid uuid, please use :printLog to check valid uuid*"
+			return "*Invalid commit id, please use :printLog to check valid commit id*"
 		}
 
 		// check is this version file belongs to this envrionment
@@ -249,7 +249,7 @@ object envCommiter {
 		val verReader = new BufferedReader(new InputStreamReader(verObj.getObjectContent()))
 		val thisEnvName = verReader.readLine.split(":")(0)
 		if(!thisEnvName.equals(envName)){
-			return "*Wrong environment, please use :PrintLog to check valid uuid*"
+			return "*Wrong environment, please use :PrintLog to check valid commit id*"
 		}
 
 		// read version file
@@ -300,7 +300,7 @@ object envCommiter {
 			// check env name exist or not
 		val commitFileName = uuid+".txt"
 		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)){
-			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"
+			return "*Could not reset, Invalid commit id, please use :printLog to check valid commit id*"
 		}
 			// check if belongs to this env name or not
 		val comObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)
@@ -308,7 +308,7 @@ object envCommiter {
 		var comLine = comReader.readLine
 		val thisEnvName = comLine.split(":")(0)
 		if(!thisEnvName.equals(envName)){
-			return "*Could not reset, Wrong environment, please use :printLog to check valid uuid*"
+			return "*Could not reset, Wrong environment, please use :printLog to check valid commit id*"
 		}
 
 			// check access code 
@@ -396,7 +396,7 @@ object envCommiter {
 			// check env name exist or not
 		val commitFileName = uuid+".txt"
 		if(!amazonS3Client.doesObjectExist(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)){
-			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"
+			return "*Could not reset, Invalid commit id, please use :printLog to check valid commit id*"
 		}
 			// check if belongs to this env name or not
 		val comObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+commitFileName)
@@ -404,7 +404,7 @@ object envCommiter {
 		var comLine = comReader.readLine
 		val thisEnvName = comLine.split(":")(0)
 		if(!thisEnvName.equals(envName)){
-			return "*Could not reset, Wrong environment, please use :PrintLog to check valid uuid*"
+			return "*Could not reset, Wrong environment, please use :PrintLog to check valid commit id*"
 		}
 
 			// check access code 
@@ -454,7 +454,7 @@ object envCommiter {
 			versionLine = versionReader.readLine
 		}
 		if(!found){
-			return "*Could not reset, Invalid uuid, please use :printLog to check valid uuid*"	
+			return "*Could not reset, Invalid commit id, please use :printLog to check valid commit id*"	
 		}
 
 		versionBufferedWriter.close()
