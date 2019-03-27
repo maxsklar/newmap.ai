@@ -210,6 +210,7 @@ object envCommiter {
 		}
 
 		val res = new StringBuilder
+		res ++= "*Log of environment "+envName+"*\n"
 		val verObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
 		val verReader = new BufferedReader(new InputStreamReader(verObj.getObjectContent()))
 		var verLine = verReader.readLine
