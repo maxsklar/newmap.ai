@@ -308,7 +308,7 @@ object envCommiter {
 		var comLine = comReader.readLine
 		val thisEnvName = comLine.split(":")(0)
 		if(!thisEnvName.equals(envName)){
-			return "*Could not reset, Wrong environment, please use :PrintLog to check valid uuid*"
+			return "*Could not reset, Wrong environment, please use :printLog to check valid uuid*"
 		}
 
 			// check access code 
