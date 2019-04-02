@@ -13,6 +13,9 @@ import ai.newmap.environment.envReader.envLogIn
 import ai.newmap.environment.envCreater.envCreate
 import ai.newmap.environment.envPrinter.prettyPrinter
 
+import ai.newmap.nluLayer.trainer.train
+import ai.newmap.nluLayer.nluInterpreter.loadModel
+
 /**
  * This controller creates an `Action` to handle HTTP requests to the
  * application's home page.
@@ -150,6 +153,25 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(">> "+code+" \n"+response)
   }
 
+  def test_get(code : String) = Action {
+    if(code.equals("train")){
+      train
+      Ok("train finished")
+    }else if(code.equals("load")){
+      loadModel
+      Ok("model loaded")
+    }else{
+      Ok("failed")
+    }
+  }
+
+
+
+
+
+
+
+  // deprecated
   def newmap_script = Action { request: Request[AnyContent] =>
     val body: AnyContent = request.body
     val script = body.asFormUrlEncoded.get.get("text").get.head
