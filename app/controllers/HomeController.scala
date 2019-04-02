@@ -14,7 +14,6 @@ import ai.newmap.environment.envCreater.envCreate
 import ai.newmap.environment.envPrinter.prettyPrinter
 
 import ai.newmap.nluLayer.trainer.train
-import ai.newmap.nluLayer.nluInterpreter.loadModel
 import ai.newmap.nluLayer.nluInterpreter.nluInterp
 
 /**
@@ -162,9 +161,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     if(code.equals("train")){
       train
       Ok("train finished")
-    }else if(code.equals("load")){
-      loadModel
-      Ok("model loaded")
     }else{
       val ret = nluInterp(chanName, userName, code)
       Ok(ret)
