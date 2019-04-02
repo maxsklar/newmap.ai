@@ -33,7 +33,7 @@ object nluInterpreter {
 	val CreateEnvIndMap:HashMap[String, String] = HashMap.empty[String,String]
 	val CreateDsIndMap:HashMap[String, String] = HashMap.empty[String,String]
 
-	def loadModel() = {
+	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
@@ -54,6 +54,14 @@ object nluInterpreter {
   			actionModLine = actionModReader.readLine
   		}
 
+  		println("*** action map ***")
+  		ActionMap.forEach{case (key, value) => println (key + "-->" + value)}
+  	}
+
+  	def loadCreateIndModel() = {
+  		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
   		val createIndFileName = "create_model.txt"
   		val createIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+createIndFileName)
   		val createIndReader = new BufferedReader(new InputStreamReader(createIndObj.getObjectContent()))
@@ -63,6 +71,14 @@ object nluInterpreter {
   			CreateIndMap += (cont(0) -> cont(1))
   			createIndLine = createIndReader.readLine
   		}
+
+  		println("*** create map ***")
+  		CreateIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+  	}
+
+  	def loadCreateEnvIndModel() = {
+  		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		val CreateEnvIndFileName = "create_env_model.txt"
   		val CreateEnvIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+CreateEnvIndFileName)
@@ -74,6 +90,15 @@ object nluInterpreter {
   			CreateEnvIndLine = CreateEnvIndReader.readLine
   		}
 
+  		println("*** create env map ***")
+  		CreateEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+
+  	}
+
+  	def loadCreateDsIndModel() = {
+  		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
   		val CreateDsIndFileName = "create_ds_model.txt"
   		val CreateDsIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+CreateDsIndFileName)
   		val CreateDsIndReader = new BufferedReader(new InputStreamReader(CreateDsIndObj.getObjectContent()))
@@ -84,31 +109,29 @@ object nluInterpreter {
   			CreateDsIndLine = CreateDsIndReader.readLine
   		}
 
-  		println("*** action map ***")
-  		ActionMap.forEach{case (key, value) => println (key + "-->" + value)}
-  		println("*** create map ***")
-  		CreateIndMap.forEach{case (key, value) => println (key + "-->" + value)}
-  		println("*** create env map ***")
-  		CreateEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
   		println("*** create ds map ***")
   		CreateDsIndMap.forEach{case (key, value) => println (key + "-->" + value)}
- 
-	}
+  	}
 
 	def nluInterp(chanName:String, userName: String, code: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
+  		loadActionModel
+
 		// read from nlu cache
 		var msg = ""
+		var cache_cont = ""
 		val nluCacheFileName = chanName+"_"+userName+"_nlu_cache.txt"
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)){
 			val nluCacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val nluCacheReader = new BufferedReader(new InputStreamReader(nluCacheObj.getObjectContent()))
 			val nluCacheLine = nluCacheReader.readLine
 			msg += nluCacheLine+" "
+			cache_cont += nluCacheLine+" "
 		}
 		msg += code
+		cache_cont += code
 		// append msg
 
 		// interpete
@@ -130,7 +153,7 @@ object nluInterpreter {
 			//println("*** no action type in message ***")
 			return "*Didn't recognize action in this message, please tell me exactly what you want to do*"
 		}else{
-			msg = actionType+" "
+			cache_cont = actionType+" "
 		}
 
 		// check action object
@@ -138,6 +161,7 @@ object nluInterpreter {
 		var gotActObjectType: Boolean = false
 		actionType match {
 			case "create" => {
+				loadCreateIndModel
 				for(tok <- cont if !gotActObjectType){
 					if(CreateIndMap.contains(tok)){
 						actObjectType = CreateIndMap(tok)
@@ -146,22 +170,73 @@ object nluInterpreter {
 					}
 				}
 				if(!gotActObjectType){
-					writeToCache(msg, nluCacheFileName)
+					writeToCache(cache_cont, nluCacheFileName)
 					//println("*** no action object type in message, please tell me what do u want to create env or data structure ***")
 					return "*Didn't recognize action object in message, please tell me what do u want to create, env or data structure*"
 				}else{
-					msg += actObjectType+" "
-					println("*** interpreted msg: "+msg+" ***")
+					cache_cont += actObjectType+" "
+					println("*** interpreted msg: "+cache_cont+" ***")
+					if(actObjectType.equals("env")){
+						val ret = parseCreateEnvArg(msg, nluCacheFileName)
+						//amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*\n"+ret
+					}else{
+						//amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*"
+					}
 				}
 			}
 			case _ => {
-				println("*** fail because logic error, "+actionType+" ***")
+				return "*** Fail because of logic error. "+actionType+" does not exist ***"
 			}
 		}
-		println("*** finish interpret one message ***")
+
+	}
+
+	def parseCreateEnvArg(msg: String, nluCacheFileName: String): String = {	// needs two args
+
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadCreateEnvIndModel
+
+		val cont = msg.toLowerCase.split("\\s+")
+		var arg1 = ""	// env name
+		var gotArg1 = false
+		var arg2 = ""	// password
+		var gotArg2 = false
+		for(i <- 0 to cont.size-1 if (!gotArg1 || !gotArg2)){
+			val tok = cont(i)
+			if(CreateEnvIndMap.contains(tok)){
+				val tmp = CreateEnvIndMap(tok)
+				if(!gotArg1 && tmp.equals("1") && i < cont.size-1){
+					arg1 = cont(i+1)
+					gotArg1 = true
+				}
+				if(!gotArg2 && tmp.equals("2") && i < cont.size-1){
+					arg2 = cont(i+1)
+					gotArg2 = true
+				}
+			}
+		}
+		var ret = ""
+		if(!gotArg1){
+			writeToCache(msg + " called ", nluCacheFileName)
+			ret += "*missing env name. *"
+			return ret
+		}else{
+			ret += "*got env name: "+arg1+". "
+		}
+		if(!gotArg2){
+			writeToCache(msg + " password ", nluCacheFileName)
+			ret += "missing password. *"
+			return ret
+		}else{
+			ret += "got password: "+arg2+". *"
+		}
+		println("*** Finish interpret a create env message! ***")
 		amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-		return "*I understand what you want to do, you want to "+actionType+" a/an "+actObjectType+"*"
-		// check argument
+		ret
 	}
 
 	// private
