@@ -38,10 +38,13 @@ object trainer {
 
 	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
+	val CommentEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def train() = {
 		act_create_train()
 		act_access_env_train()
 		act_print_train()
+		act_comment_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
@@ -63,6 +66,9 @@ object trainer {
 
 		val printIndFileName = "print_model.txt"
 		write_into_AWS(printIndFileName, PrintIndMap)
+
+		val commentEnvIndFileName = "comment_env_model.txt"
+		write_into_AWS(commentEnvIndFileName, CommentEnvIndMap)
 
 	}
 
@@ -219,6 +225,37 @@ object trainer {
 				}
 			}
 			printActLine = printActReader.readLine
+		}
+	}
+
+	// for comment action
+
+	def act_comment_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled print
+		val commentActTrainFileName = "comment_act_train.txt"
+
+		// interpret train file for each specific action
+		val commentActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+commentActTrainFileName)
+		val commentActReader = new BufferedReader(new InputStreamReader(commentActObj.getObjectContent()))
+		var commentActLine = commentActReader.readLine
+
+		while(commentActLine != null){
+			for(word <- commentActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "comment")
+				}else if(!i.equals("F")){
+					CommentEnvIndMap += (tok -> i)
+				}
+			}
+			commentActLine = commentActReader.readLine
 		}
 	}
 
