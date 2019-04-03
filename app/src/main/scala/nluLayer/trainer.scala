@@ -32,50 +32,37 @@ object trainer {
 	val CreateEnvIndMap:HashMap[String, String] = HashMap.empty[String,String]
 	val CreateDsIndMap:HashMap[String, String] = HashMap.empty[String,String]
 
+	val AccessEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	val LogInIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	// val LogOffIndMap:HashMap[String, String] = HashMap.empty[String, String] // no use because log off dont take argument
+
+	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def train() = {
-		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
-  		val amazonS3Client = new AmazonS3Client(awsCredentials)
 		act_create_train()
+		act_access_env_train()
+		act_print_train()
 
 		val actionModFileName = "action_model.txt"
-		val actionModFile = new File(actionModFileName)
-		val actionModFileWriter = new FileWriter(actionModFile, false)
-		val actionModBufferedWriter = new BufferedWriter(actionModFileWriter)
-		for ((k,v) <- ActionMap){
-			actionModBufferedWriter.write(k+","+v+"\n")
-		}
-		actionModBufferedWriter.close()
-		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+actionModFileName, actionModFile)
+		write_into_AWS(actionModFileName, ActionMap)
 
 		val createIndFileName = "create_model.txt"
-		val createIndFile = new File(createIndFileName)
-		val createIndFileWriter = new FileWriter(createIndFile, false)
-		val createIndBufferedWriter = new BufferedWriter(createIndFileWriter)
-		for ((k,v) <- CreateIndMap){
-			createIndBufferedWriter.write(k+","+v+"\n")
-		}
-		createIndBufferedWriter.close()
-		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+createIndFileName, createIndFile)
+		write_into_AWS(createIndFileName, CreateIndMap)
 
 		val createEnvIndFileName = "create_env_model.txt"
-		val createEnvIndFile = new File(createEnvIndFileName)
-		val createEnvIndFileWriter = new FileWriter(createEnvIndFile, false)
-		val createEnvIndBufferedWriter = new BufferedWriter(createEnvIndFileWriter)
-		for ((k,v) <- CreateEnvIndMap){
-			createEnvIndBufferedWriter.write(k+","+v+"\n")
-		}
-		createEnvIndBufferedWriter.close()
-		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+createEnvIndFileName, createEnvIndFile)
+		write_into_AWS(createEnvIndFileName, CreateEnvIndMap)
 
 		val createDsIndFileName = "create_ds_model.txt"
-		val createDsIndFile = new File(createDsIndFileName)
-		val createDsIndFileWriter = new FileWriter(createDsIndFile, false)
-		val createDsIndBufferedWriter = new BufferedWriter(createDsIndFileWriter)
-		for ((k,v) <- CreateDsIndMap){
-			createDsIndBufferedWriter.write(k+","+v+"\n")
-		}
-		createDsIndBufferedWriter.close()
-		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+createDsIndFileName, createDsIndFile)
+		write_into_AWS(createDsIndFileName, CreateDsIndMap)
+
+		val accessEnvIndFileName = "access_env_model.txt"
+		write_into_AWS(accessEnvIndFileName, AccessEnvIndMap)
+
+		val logInIndFileName = "log_in_model.txt"
+		write_into_AWS(logInIndFileName, LogInIndMap)
+
+		val printIndFileName = "print_model.txt"
+		write_into_AWS(printIndFileName, PrintIndMap)
 
 	}
 
@@ -132,6 +119,122 @@ object trainer {
 		}
 	}
 
+	// for access env action
+	def act_access_env_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled access env
+		val accessEnvActTrainFileName = "access_env_act_train.txt"
+
+		// interpret train file for each specific action
+		val accessEnvActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+accessEnvActTrainFileName)
+		val accessEnvActReader = new BufferedReader(new InputStreamReader(accessEnvActObj.getObjectContent()))
+		var accessEnvActLine = accessEnvActReader.readLine
+		accessEnvActLine = accessEnvActReader.readLine
+
+			// log in env
+		while(!accessEnvActLine.equals("## log off")){
+			for(word <- accessEnvActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "accessEnv")
+				}else if(i.equals("0")){
+					AccessEnvIndMap += (tok -> "in")
+				}else if(!i.equals("F")){
+					LogInIndMap += (tok -> i)
+				}
+
+			}
+			accessEnvActLine = accessEnvActReader.readLine
+		}
+
+			// log off env 	// log off dont have argument
+		while(accessEnvActLine != null){
+			for(word <- accessEnvActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "accessEnv")
+				}else if(i.equals("0")){
+					AccessEnvIndMap += (tok -> "off")
+				}
+
+			}
+			accessEnvActLine = accessEnvActReader.readLine
+		}
+
+	}
+
+	// for print action
+	def act_print_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled print
+		val printActTrainFileName = "print_act_train.txt"
+
+		// interpret train file for each specific action
+		val printActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+printActTrainFileName)
+		val printActReader = new BufferedReader(new InputStreamReader(printActObj.getObjectContent()))
+		var printActLine = printActReader.readLine
+		printActLine = printActReader.readLine
+
+			// print envs 
+		while(!printActLine.equals("## print env")){
+			for(word <- printActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "print")
+				}else if(i.equals("0")){
+					PrintIndMap += (tok -> "envs")
+				}
+			}
+			printActLine = printActReader.readLine
+		}
+
+			// print env
+		while(printActLine != null){
+			for(word <- printActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "print")
+				}else if(i.equals("0")){
+					PrintIndMap += (tok -> "env")
+				}
+			}
+			printActLine = printActReader.readLine
+		}
+	}
+
+	def write_into_AWS(modelFileName: String, modelMap: HashMap[String, String]) = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+		val modelFile = new File(modelFileName)
+		val modelFileWriter = new FileWriter(modelFile, false)
+		val modelBufferedWriter = new BufferedWriter(modelFileWriter)
+		for ((k,v) <- modelMap){
+			modelBufferedWriter.write(k+","+v+"\n")
+		}
+		modelBufferedWriter.close()
+		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+modelFileName, modelFile)
+	}
+
 	// ret -1	: _$_
 	// ret 0	: _0_
 	// ret 1    : _1_
@@ -139,20 +242,24 @@ object trainer {
 	def act_interp(word: String): String = {
 		word match {
 			case word if word.startsWith("_$_") => {
-				val tok = word.stripPrefix("_$_").stripSuffix("_$_").replace("_", " ")
+				val tok = word.stripPrefix("_$_").stripSuffix("_$_")
 				return "$_"+tok
 			}
 			case word if word.startsWith("_0_") => {
-				val tok = word.stripPrefix("_0_").stripSuffix("_0_").replace("_", " ")
+				val tok = word.stripPrefix("_0_").stripSuffix("_0_")
 				return "0_"+tok
 			}
 			case word if word.startsWith("_1_") => {
-				val tok = word.stripPrefix("_1_").stripSuffix("_1_").replace("_", " ")
+				val tok = word.stripPrefix("_1_").stripSuffix("_1_")
 				return "1_"+tok
 			}
 			case word if word.startsWith("_2_") => {
-				val tok = word.stripPrefix("_2_").stripSuffix("_2_").replace("_", " ")
+				val tok = word.stripPrefix("_2_").stripSuffix("_2_")
 				return "2_"+tok
+			}
+			case word if word.startsWith("_3_") => {
+				val tok = word.stripPrefix("_3_").stripSuffix("_3_")
+				return "3_"+tok
 			}
 			case _ =>{
 				return "F_"+word
