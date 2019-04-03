@@ -151,6 +151,8 @@ object nluInterpreter {
 
 		if(!gotActionType){
 			//println("*** no action type in message ***")
+			cache_cont = actionType+" "
+			writeToCache(cache_cont, nluCacheFileName)
 			return "*Didn't recognize action in this message, please tell me exactly what you want to do*"
 		}else{
 			cache_cont = actionType+" "
@@ -182,7 +184,7 @@ object nluInterpreter {
 						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*\n"+ret
 					}else{
 						//amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*"
+						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*"+"\nInterprete finished. *"
 					}
 				}
 			}
@@ -222,21 +224,21 @@ object nluInterpreter {
 		var ret = ""
 		if(!gotArg1){
 			writeToCache(msg + " called ", nluCacheFileName)
-			ret += "*missing env name. *"
+			ret += "*missing env name. Please tell me a env name*"
 			return ret
 		}else{
 			ret += "*got env name: "+arg1+". "
 		}
 		if(!gotArg2){
 			writeToCache(msg + " password ", nluCacheFileName)
-			ret += "missing password. *"
+			ret += "missing password. Please tell me a password*"
 			return ret
 		}else{
-			ret += "got password: "+arg2+". *"
+			ret += "got password: "+arg2+". "
 		}
 		println("*** Finish interpret a create env message! ***")
 		amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-		ret
+		ret+"\nInterprete finished. *"
 	}
 
 	// private
