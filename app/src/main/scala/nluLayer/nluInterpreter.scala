@@ -321,10 +321,10 @@ object nluInterpreter {
 
 		if(!gotArg1){
 			writeToCache("comment on ", nluCacheFileName)
-			return "*I understand u want to commen, but missing env name, Please tell me a env name*"
+			return "*I understand u want to comment, but missing env name, Please tell me a env name*"
 		}else if(!gotArg3){
 			writeToCache("comment on "+arg1+" with ", nluCacheFileName)
-			return "I understand u want to commen, but missing comment string, Please tell me what u want to comment*"
+			return "I understand u want to comment, but missing comment string, Please tell me what u want to comment*"
 		}else if(!gotArg2){
 			writeToCache("comment on "+arg1+" with "+arg3+" # password ", nluCacheFileName)
 			return "*Please tell me the password for this env*"
@@ -396,23 +396,35 @@ object nluInterpreter {
 		loadLogInIndModel
 
 		val cont = msg.toLowerCase.split("\\s+")
-		var arg = ""	// env name
-		var gotArg = false
+		var arg1 = ""	// env name
+		var gotArg1 = false
+		var arg2 = "" 	// password
+		var gotArg2 = false
 
-		for(i <- 0 to cont.size-1 if !gotArg) {
+		for(i <- 0 to cont.size-1 if (!gotArg1 || !gotArg2)) {
 			val tok = cont(i)
 			if(LogInIndMap.contains(tok) && i < cont.size-1){
-				arg = cont(i+1)
-				gotArg = true
+				val tmp = LogInIndMap(tok)
+				if(!gotArg1 && tmp.equals("1") && i < cont.size-1){
+					arg1 = cont(i+1)
+					gotArg1 = true
+				}
+				if(!gotArg2 && tmp.equals("2") && i < cont.size-1){
+					arg2 = cont(i+1)
+					gotArg2 = true
+				}
 			}
 		}
 
-		if(!gotArg){
+		if(!gotArg1){
 			writeToCache("access ", nluCacheFileName)
 			return "*missing env name, Please tell me a env name*"
+		}else if(!gotArg2){
+			writeToCache("access "+arg1+" with password ", nluCacheFileName)
+			return "*missing password, Please tell me the password for this env.*"
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*got env name: "+arg+". * \nInterpret finished."
+			return "*got env name: "+arg1+". got password "+arg2+". * \nInterpret finished."
 		}	
 	}
 
