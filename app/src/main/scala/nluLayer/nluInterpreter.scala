@@ -38,6 +38,8 @@ object nluInterpreter {
 
 	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
+	val CommentEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -173,6 +175,24 @@ object nluInterpreter {
   		PrintIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
+ 	def loadCommentEnvModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val commentEnvIndFileName = "comment_env_model.txt"
+  		val commentEnvIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+commentEnvIndFileName)
+  		val commentEnvIndReader = new BufferedReader(new InputStreamReader(commentEnvIndObj.getObjectContent()))
+  		var commentEnvIndLine = commentEnvIndReader.readLine
+  		while(commentEnvIndLine != null){
+  			val cont = commentEnvIndLine.split(",")
+  			CommentEnvIndMap += (cont(0) -> cont(1))
+  			commentEnvIndLine = commentEnvIndReader.readLine
+  		}
+
+  		println("*** commentEnv map ***")
+  		CommentEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
 	def nluInterp(chanName:String, userName: String, code: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -253,9 +273,64 @@ object nluInterpreter {
 			case "print" => {
 				return processPrintAct(msg, nluCacheFileName)
 			}
+			case "comment" => {
+				return parseCommentEnvArg(msg, nluCacheFileName)
+			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
 			}
+		}
+
+	}
+
+	def parseCommentEnvArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		loadCommentEnvModel
+
+		val cont = msg.toLowerCase.split("\\s+")
+		var arg1 = ""	// env name
+		var gotArg1 = false
+		var arg2 = ""	// password
+		var gotArg2 = false
+		var arg3 = ""   // comment String
+		var gotArg3 = false
+		for(i <- 0 to cont.size-1 if (!gotArg1 || !gotArg2 || !gotArg3)){
+			val tok = cont(i)
+			if(CommentEnvIndMap.contains(tok)){
+				val tmp = CommentEnvIndMap(tok)
+				if(!gotArg1 && tmp.equals("1") && i < cont.size-1){
+					arg1 = cont(i+1)
+					gotArg1 = true
+				}
+				if(!gotArg2 && tmp.equals("2") && i < cont.size-1){
+					arg2 = cont(i+1)
+					gotArg2 = true
+				}
+				if(!gotArg3 && tmp.equals("3") && i < cont.size-1){
+					var index: Int = i+1
+					while(index < cont.size && !cont(index).equals("#")){
+						arg3 += cont(index)+" "
+						index += 1
+					}
+					gotArg3 = true
+				}
+			}
+		}
+
+		if(!gotArg1){
+			writeToCache("comment on ", nluCacheFileName)
+			return "*I understand u want to commen, but missing env name, Please tell me a env name*"
+		}else if(!gotArg3){
+			writeToCache("comment on "+arg1+" with ", nluCacheFileName)
+			return "I understand u want to commen, but missing comment string, Please tell me what u want to comment*"
+		}else if(!gotArg2){
+			writeToCache("comment on "+arg1+" with "+arg3+" # password ", nluCacheFileName)
+			return "*Please tell me the password for this env*"
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand u want to comment on "+arg1+" with comment: "+arg3+". \nInterpret finished."
 		}
 
 	}
