@@ -33,6 +33,11 @@ object nluInterpreter {
 	val CreateEnvIndMap:HashMap[String, String] = HashMap.empty[String,String]
 	val CreateDsIndMap:HashMap[String, String] = HashMap.empty[String,String]
 
+	val AccessEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	val LogInIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
+	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -113,6 +118,61 @@ object nluInterpreter {
   		CreateDsIndMap.forEach{case (key, value) => println (key + "-->" + value)}
   	}
 
+  	 def loadAccessEnvIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val accessEnvIndFileName = "access_env_model.txt"
+  		val accessEnvIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+accessEnvIndFileName)
+  		val accessEnvIndReader = new BufferedReader(new InputStreamReader(accessEnvIndObj.getObjectContent()))
+  		var accessEnvIndLine = accessEnvIndReader.readLine
+  		while(accessEnvIndLine != null){
+  			val cont = accessEnvIndLine.split(",")
+  			AccessEnvIndMap += (cont(0) -> cont(1))
+  			accessEnvIndLine = accessEnvIndReader.readLine
+  		}
+
+  		println("*** access env map ***")
+  		AccessEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+
+ 	}
+
+ 	def loadLogInIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val logInIndFileName = "log_in_model.txt"
+  		val logInIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+logInIndFileName)
+  		val logInIndReader = new BufferedReader(new InputStreamReader(logInIndObj.getObjectContent()))
+  		var logInIndLine = logInIndReader.readLine
+  		while(logInIndLine != null){
+  			val cont = logInIndLine.split(",")
+  			LogInIndMap += (cont(0) -> cont(1))
+  			logInIndLine = logInIndReader.readLine
+  		}
+
+  		println("*** log in map ***")
+  		LogInIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
+ 	def loadPrintIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val printIndFileName = "print_model.txt"
+  		val printIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+printIndFileName)
+  		val printIndReader = new BufferedReader(new InputStreamReader(printIndObj.getObjectContent()))
+  		var printIndLine = printIndReader.readLine
+  		while(printIndLine != null){
+  			val cont = printIndLine.split(",")
+  			PrintIndMap += (cont(0) -> cont(1))
+  			printIndLine = printIndReader.readLine
+  		}
+
+  		println("*** print map ***")
+  		PrintIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
 	def nluInterp(chanName:String, userName: String, code: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -144,16 +204,16 @@ object nluInterpreter {
 			//println(tok)
 			if(ActionMap.contains(tok)){
 				actionType = ActionMap(tok)
-				println("*** action type: "+actionType+" ***")
+				println("*** tok: "+tok+", action type: "+actionType+" ***")
 				gotActionType = true
 			}
 		}
 
 		if(!gotActionType){
 			//println("*** no action type in message ***")
-			cache_cont = actionType+" "
-			writeToCache(cache_cont, nluCacheFileName)
+			//writeToCache(cache_cont, nluCacheFileName)
 			return "*Didn't recognize action in this message, please tell me exactly what you want to do*"
+					// TODO: add recommend actions as response
 		}else{
 			cache_cont = actionType+" "
 		}
@@ -180,13 +240,18 @@ object nluInterpreter {
 					println("*** interpreted msg: "+cache_cont+" ***")
 					if(actObjectType.equals("env")){
 						val ret = parseCreateEnvArg(msg, nluCacheFileName)
-						//amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*\n"+ret
 					}else{
-						//amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+						// TODO: parse create data structure arguments
 						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*"+"\nInterprete finished. *"
 					}
 				}
+			}
+			case "accessEnv" => {
+				return processAccessEnvAct(msg, nluCacheFileName)
+			}
+			case "print" => {
+				return processPrintAct(msg, nluCacheFileName)
 			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
@@ -194,6 +259,88 @@ object nluInterpreter {
 		}
 
 	}
+
+	def processPrintAct(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		loadPrintIndModel
+		val cont = msg.toLowerCase.split("\\s+")
+		var printType = ""
+		var gotPrintType = false
+		for(tok <- cont if !gotPrintType){
+			if(PrintIndMap.contains(tok)){
+				printType = PrintIndMap(tok)
+				gotPrintType = true
+			}
+		}
+
+		if(!gotPrintType){
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*couldn't identify what u want to print"
+		}else if(printType.equals("envs")) {
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand you want to print the envs in this channel* \nInterpret finished."
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand you want to print the content in this env* \nInterpret finished."
+		}
+	}
+
+	def processAccessEnvAct(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		loadAccessEnvIndModel
+		val cont = msg.toLowerCase.split("\\s+")
+		var accessEnvType = ""
+		var gotAccessEnvType = false
+		for(tok <- cont if !gotAccessEnvType){
+			if(AccessEnvIndMap.contains(tok)){
+				accessEnvType = AccessEnvIndMap(tok)
+				gotAccessEnvType = true
+			}
+		}
+
+		if(!gotAccessEnvType){
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "* couldn't identify log in env or log off *"
+		}else if(accessEnvType.equals("in")){
+			val ret = parseLogInArg(msg, nluCacheFileName)
+			return "*I understand you want to log in an environment*\n"+ret
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand you want to log off an environment* \nInterpret finished"
+		}
+	}
+
+	def parseLogInArg(msg:String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		loadLogInIndModel
+
+		val cont = msg.toLowerCase.split("\\s+")
+		var arg = ""	// env name
+		var gotArg = false
+
+		for(i <- 0 to cont.size-1 if !gotArg) {
+			val tok = cont(i)
+			if(LogInIndMap.contains(tok) && i < cont.size-1){
+				arg = cont(i+1)
+				gotArg = true
+			}
+		}
+
+		if(!gotArg){
+			writeToCache("access ", nluCacheFileName)
+			return "*missing env name, Please tell me a env name*"
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*got env name: "+arg+". * \nInterpret finished."
+		}	
+	}
+
 
 	def parseCreateEnvArg(msg: String, nluCacheFileName: String): String = {	// needs two args
 
@@ -238,7 +385,7 @@ object nluInterpreter {
 		}
 		println("*** Finish interpret a create env message! ***")
 		amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-		ret+"\nInterprete finished. *"
+		ret+"\nInterpret finished. *"
 	}
 
 	// private
