@@ -16,7 +16,7 @@ import java.io.InputStreamReader
 import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils
 import scala.collection.JavaConversions._
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.ListMap
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.argParser._
@@ -29,9 +29,9 @@ object actionProcessor {
 	val S3_ModelFileName_Prefix = "Model/"
 	val S3_CacheFileName_Prefix = "CACHE/"
 
-	val CreateIndMap:HashMap[String, String] = HashMap.empty[String, String]
-	val AccessEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
-	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	val CreateIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	val AccessEnvIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	val PrintIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
 	def processCreateAct(msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -92,8 +92,8 @@ object actionProcessor {
 			return "*I understand you want to print the log history in this env* \nInterpret finished."
 		}else if(printType.equals("commit")){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			// TODO: parse commit arg
-			return "*I understand you want to check the content of a previous commmit in this env* \nInterpret finished."
+			val ret = parseCheckOutArg(msg, nluCacheFileName)
+			return "*I understand you want to check the content of a previous commmit in this env* \n"+ret
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			return "*system logic error*"
