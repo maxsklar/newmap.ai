@@ -33,7 +33,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
   def index() = Action { implicit request: Request[AnyContent] =>
     Ok(views.html.index())
   }
-	
+
   def newmap = Action { request: Request[AnyContent] =>
   	val body: AnyContent = request.body
   	val msg = body.asFormUrlEncoded.get.get("text").get.head
@@ -52,7 +52,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
                     msg.startsWith(":commit") ||
                     msg.startsWith(":checkout ") ||
                     msg.startsWith(":reset ") ||
-                    msg.startsWith(":hard reset "))=>{
+                    msg.startsWith(":hard reset ") ||
+                    msg.startsWith(":script"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
@@ -110,7 +111,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
                     code.startsWith(":commit") ||
                     code.startsWith(":checkout ") ||
                     code.startsWith(":reset ") ||
-                    code.startsWith(":hard set "))=>{
+                    code.startsWith(":hard set ") ||
+                    code.startsWith(":script"))=>{
         var envInterp = new EnvironmentInterpreter()
         envInterp.setChanName(chanName)
         envInterp.setUserName(userName)
@@ -166,34 +168,4 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       Ok(ret)
     }
   }
-
-
-
-
-
-
-
-  // deprecated
-  def newmap_script = Action { request: Request[AnyContent] =>
-    val body: AnyContent = request.body
-    val script = body.asFormUrlEncoded.get.get("text").get.head
-    var envInterp = new EnvironmentInterpreter()
-    var c : String = ""
-    var res :String = ""
-    for( c <-script.split(";") ){
-      res += "Input: "+c.replaceAll("^\\s+", "")+"; Output: "+envInterp(c)+" \n"
-    }
-    Ok(""+res)
-  }
-
-  def newmap_script_get(code : String) = Action {
-    var envInterp = new EnvironmentInterpreter()
-    var c : String = ""
-    var res :String = ""
-    for( c <-code.split(";") ){
-      res += "Input: "+c.replaceAll("^\\s+", "")+"; Output: "+envInterp(c)+" \n"
-    }
-    Ok(""+res)
-  }
-
 }

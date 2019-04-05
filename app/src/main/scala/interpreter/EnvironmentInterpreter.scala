@@ -2,6 +2,7 @@ package ai.newmap.interpreter
 
 import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
+import ai.newmap.interpreter.Processor
 import ai.newmap.util.{Outcome, Success, Failure}
 import ai.newmap.environment.envCreater.envCreate
 import ai.newmap.environment.envCreater.envCopy
@@ -44,6 +45,16 @@ class EnvironmentInterpreter() {
       case CommandPrintSomething(response) => Success(response)
       case CommandExit => Success(":exit")
       case CommandPassThrough => applyEnvCommand(code)
+      case CommandFileProcessor(filepath) => {
+        val fileProc = new Processor
+        val response = fileProc.FileProcessor(filepath)
+        Success(response)
+      }
+      case CommandTextBlockProcessor(textString) => {
+        val textBlockProc = new Processor
+        val response = textBlockProc.textBlockProcessor(textString)
+        Success(response)
+      }
     }
   }
 
@@ -51,6 +62,8 @@ class EnvironmentInterpreter() {
   case class CommandPrintSomething(s: String) extends CommandInterpResponse
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
+  case class CommandFileProcessor(s: String) extends CommandInterpResponse
+  case class CommandTextBlockProcessor(s: String) extends CommandInterpResponse
 
   def createEnv(input: String): CommandInterpResponse = {
     val cont = input.split("\\s+")
@@ -63,7 +76,7 @@ class EnvironmentInterpreter() {
     if(ret)CommandPrintSomething("*Environment create success*")
     else{
       CommandPrintSomething("*"+envName+" already exist*")
-    }    
+    }
   }
 
   def logInEnv(input: String): CommandInterpResponse = {
@@ -83,7 +96,7 @@ class EnvironmentInterpreter() {
     }else{
       CommandPrintSomething("*Could not log in, wrong password*")
     }
-  }  
+  }
 
   def logOffEnv(): CommandInterpResponse = {
     val ret: Boolean = envLogOff(this.chanName, this.userName)
@@ -105,7 +118,7 @@ class EnvironmentInterpreter() {
     val newEnvName = cont(3)
     val newAccessCode = cont(4)
     // ret 1: coppied environment not exist
-    // ret 2: wrong access code 
+    // ret 2: wrong access code
     // ret 3: new environment name already exist
     // ret 0: coppied success
     val ret: Int = envCopy(this.chanName, fromChanName, this.userName, envName, envAccessCode, newEnvName, newAccessCode)
@@ -205,6 +218,12 @@ class EnvironmentInterpreter() {
       case code if code.startsWith(":reset ")=> {
                         this.resetCommit(code.stripPrefix(":reset "))
                       }
+      case code if code.startsWith(":script")=> {
+        if (code.substring(8, 13) == "-file")
+          CommandFileProcessor(code.drop(14))
+        else
+          CommandTextBlockProcessor(code.drop(8))
+      }
       //case ":env" => CommandPrintSomething(env.toString)
       case ":log off" => logOffEnv
       case ":printEnv" => CommandPrintSomething(envPrint(this.chanName, this.userName))
@@ -225,7 +244,8 @@ class EnvironmentInterpreter() {
         "*:printLog*\tPrint the committed versions of current environment\n"++
         "*:checkout <uuid>*\tCheck out privious committed version environment\n"++
         "*:reset <commit id> <env password>*\tReset to the commit version with that commit id\n"++
-        "*:hard reset <commit id> <env password>*\t Reset to commit version with that commit id and delete afterwards versions\n"++
+        "*:hard reset <commit id> <env password>*\tReset to commit version with that commit id and delete afterwards versions\n"++
+        "*:script [-file]*\tRead from a file or a text block\n"++
         "*:help*\tPrint this help message\n"
       )
       case _ => CommandPassThrough

@@ -10,7 +10,5 @@ GET     /                           controllers.HomeController.index
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
 
 POST     /newmap                      controllers.HomeController.newmap
-POST	 /newmap_script		    controllers.HomeController.newmap_script
 GET 	 /newmap		      controllers.HomeController.newmap_get(code)
-GET	 /newmap_script		    controllers.HomeController.newmap_script_get(code)
 GET  /test					controllers.HomeController.test_get(code)
