@@ -208,10 +208,8 @@ object nluInterpreter {
 			val nluCacheReader = new BufferedReader(new InputStreamReader(nluCacheObj.getObjectContent()))
 			val nluCacheLine = nluCacheReader.readLine
 			msg += nluCacheLine+" "
-			cache_cont += nluCacheLine+" "
 		}
 		msg += code
-		cache_cont += code
 		// append msg
 
 		// interpete
@@ -234,38 +232,12 @@ object nluInterpreter {
 			//writeToCache(cache_cont, nluCacheFileName)
 			return "*Didn't recognize action in this message, please tell me exactly what you want to do*"
 					// TODO: add recommend actions as response
-		}else{
-			cache_cont = actionType+" "
 		}
 
-		// check action object
-		var actObjectType: String = ""
-		var gotActObjectType: Boolean = false
+		// process action
 		actionType match {
 			case "create" => {
-				loadCreateIndModel
-				for(tok <- cont if !gotActObjectType){
-					if(CreateIndMap.contains(tok)){
-						actObjectType = CreateIndMap(tok)
-						println("*** action object type: "+actObjectType+" ***")
-						gotActObjectType = true
-					}
-				}
-				if(!gotActObjectType){
-					writeToCache(cache_cont, nluCacheFileName)
-					//println("*** no action object type in message, please tell me what do u want to create env or data structure ***")
-					return "*Didn't recognize action object in message, please tell me what do u want to create, env or data structure*"
-				}else{
-					cache_cont += actObjectType+" "
-					println("*** interpreted msg: "+cache_cont+" ***")
-					if(actObjectType.equals("env")){
-						val ret = parseCreateEnvArg(msg, nluCacheFileName)
-						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*\n"+ret
-					}else{
-						// TODO: parse create data structure arguments
-						return "*I understand you want to "+actionType+" a/an "+actObjectType+"*"+"\nInterprete finished. *"
-					}
-				}
+				return processCreateAct(msg, nluCacheFileName)
 			}
 			case "accessEnv" => {
 				return processAccessEnvAct(msg, nluCacheFileName)
@@ -281,6 +253,36 @@ object nluInterpreter {
 			}
 		}
 
+	}
+
+	def processCreateAct(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		loadCreateIndModel
+		val cont = msg.toLowerCase.split("\\s+")
+		var actObjectType = ""
+		var gotActObjectType = false
+		for(tok <- cont if !gotActObjectType){
+			if(CreateIndMap.contains(tok)){
+				actObjectType = CreateIndMap(tok)
+				//println("*** action object type: "+actObjectType+" ***")
+				gotActObjectType = true
+			}
+		}
+		if(!gotActObjectType){
+			writeToCache("create ", nluCacheFileName)
+			//println("*** no action object type in message, please tell me what do u want to create env or data structure ***")
+			return "*Didn't recognize action object in message, please tell me what do u want to create, env or data structure*"
+		}else{
+			if(actObjectType.equals("env")){
+				val ret = parseCreateEnvArg(msg, nluCacheFileName)
+				return "*I understand you want to create a/an "+actObjectType+"*\n"+ret
+			}else{
+				// TODO: parse create data structure arguments
+				return "*I understand you want to create a/an "+actObjectType+"*"+"\nInterprete finished. *"
+			}
+		}
 	}
 
 	def parseCommentEnvArg(msg: String, nluCacheFileName: String): String = {
@@ -356,9 +358,19 @@ object nluInterpreter {
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			return "*I understand you want to print the envs in this channel* \nInterpret finished."
-		}else{
+		}else if(printType.equals("env")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			return "*I understand you want to print the content in this env* \nInterpret finished."
+		}else if(printType.equals("log")) {
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand you want to print the log history in this env* \nInterpret finished."
+		}else if(printType.equals("commit")){
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			// TODO: parse commit arg
+			return "*I understand you want to check the content of a previous commmit in this env* \nInterpret finished."
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*system logic error*"
 		}
 	}
 
