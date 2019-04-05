@@ -27,6 +27,9 @@ object trainer {
 	val S3_TrainFileName_Prefix = "Train/"
 	val S3_ModelFileName_Prefix = "Model/"
 
+	// private
+	val Max_Priority = 2
+
 	val ActionMap:HashMap[String, String] = HashMap.empty[String,String]
 	val CreateIndMap:HashMap[String, String] = HashMap.empty[String, String]
 	val CreateEnvIndMap:HashMap[String, String] = HashMap.empty[String,String]
@@ -37,6 +40,7 @@ object trainer {
 	// val LogOffIndMap:HashMap[String, String] = HashMap.empty[String, String] // no use because log off dont take argument
 
 	val PrintIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	val CheckOutIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
 	val CommentEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
@@ -67,6 +71,9 @@ object trainer {
 		val printIndFileName = "print_model.txt"
 		write_into_AWS(printIndFileName, PrintIndMap)
 
+		val checkOutIndFileName = "check_out_model.txt"
+		write_into_AWS(checkOutIndFileName, CheckOutIndMap)
+
 		val commentEnvIndFileName = "comment_env_model.txt"
 		write_into_AWS(commentEnvIndFileName, CommentEnvIndMap)
 
@@ -92,7 +99,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 				//println("***"+word+"***")
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 				//println("***"+i+","+tok+"***")
 				if(i.equals("$")){
 					ActionMap += (tok -> "create")
@@ -111,7 +118,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 				//println("***"+word+"***")
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 				//println("***"+i+","+tok+"***")
 				if(i.equals("$")){
 					ActionMap += (tok -> "create")
@@ -145,7 +152,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "accessEnv")
@@ -165,7 +172,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "accessEnv")
@@ -199,7 +206,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "print")
@@ -216,7 +223,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "print")
@@ -232,7 +239,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "print")
@@ -249,12 +256,14 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "print")
 				}else if(i.equals("0")){
 					PrintIndMap += (tok -> "commit")
+				}else if(!i.equals("F")){
+					CheckOutIndMap += (tok -> i)
 				}
 			}
 			printActLine = printActReader.readLine
@@ -280,7 +289,7 @@ object trainer {
 				val cont = act_interp(word).split("_")
 
 				val i  = cont(0)
-				val tok = cont(1)
+				val tok = cont(2)+"_"+cont(1)
 
 				if(i.equals("$")){
 					ActionMap += (tok -> "comment")
@@ -298,8 +307,12 @@ object trainer {
 		val modelFile = new File(modelFileName)
 		val modelFileWriter = new FileWriter(modelFile, false)
 		val modelBufferedWriter = new BufferedWriter(modelFileWriter)
-		for ((k,v) <- modelMap){
-			modelBufferedWriter.write(k+","+v+"\n")
+		for(i <- 0 to Max_Priority){
+			val priority = i.toString
+			for ((k,v) <- modelMap if k.startsWith(priority)){
+				//println(k+" "+v)
+				modelBufferedWriter.write(k.stripPrefix(priority+"_")+","+v+"\n")
+			}
 		}
 		modelBufferedWriter.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_ModelFileName_Prefix+modelFileName, modelFile)
@@ -312,27 +325,37 @@ object trainer {
 	def act_interp(word: String): String = {
 		word match {
 			case word if word.startsWith("_$_") => {
-				val tok = word.stripPrefix("_$_").stripSuffix("_$_")
-				return "$_"+tok
+				val cont = word.stripPrefix("_$_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "$_"+tok+"_"+priority
 			}
 			case word if word.startsWith("_0_") => {
-				val tok = word.stripPrefix("_0_").stripSuffix("_0_")
-				return "0_"+tok
+				val cont = word.stripPrefix("_0_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "0_"+tok+"_"+priority
 			}
 			case word if word.startsWith("_1_") => {
-				val tok = word.stripPrefix("_1_").stripSuffix("_1_")
-				return "1_"+tok
+				val cont = word.stripPrefix("_1_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "1_"+tok+"_"+priority
 			}
 			case word if word.startsWith("_2_") => {
-				val tok = word.stripPrefix("_2_").stripSuffix("_2_")
-				return "2_"+tok
+				val cont = word.stripPrefix("_2_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "2_"+tok+"_"+priority
 			}
 			case word if word.startsWith("_3_") => {
-				val tok = word.stripPrefix("_3_").stripSuffix("_3_")
-				return "3_"+tok
+				val cont = word.stripPrefix("_3_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "3_"+tok+"_"+priority
 			}
 			case _ =>{
-				return "F_"+word
+				return "F_"+word+"_0"
 			}
 		}
 	}
