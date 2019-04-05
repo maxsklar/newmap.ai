@@ -211,7 +211,7 @@ object trainer {
 		}
 
 			// print env
-		while(printActLine != null){
+		while(!printActLine.equals("## print log")){
 			for(word <- printActLine.split("\\s+")){
 				val cont = act_interp(word).split("_")
 
@@ -222,6 +222,39 @@ object trainer {
 					ActionMap += (tok -> "print")
 				}else if(i.equals("0")){
 					PrintIndMap += (tok -> "env")
+				}
+			}
+			printActLine = printActReader.readLine
+		}
+			// print log
+		while(!printActLine.equals("## check out")){
+			for(word <- printActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "print")
+				}else if(i.equals("0")){
+					PrintIndMap += (tok -> "log")
+				}
+			}
+			printActLine = printActReader.readLine
+		}
+
+			// check out
+		while(printActLine != null){
+			for(word <- printActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i  = cont(0)
+				val tok = cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "print")
+				}else if(i.equals("0")){
+					PrintIndMap += (tok -> "commit")
 				}
 			}
 			printActLine = printActReader.readLine
