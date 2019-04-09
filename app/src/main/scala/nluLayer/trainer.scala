@@ -44,11 +44,18 @@ object trainer {
 
 	val CommentEnvIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
+	val CommitIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
+	val HardResetIndMap:HashMap[String, String] = HashMap.empty[String, String]
+	val ResetIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def train() = {
 		act_create_train()
 		act_access_env_train()
 		act_print_train()
 		act_comment_train()
+		act_commit_train()
+		act_reset_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
@@ -76,6 +83,15 @@ object trainer {
 
 		val commentEnvIndFileName = "comment_env_model.txt"
 		write_into_AWS(commentEnvIndFileName, CommentEnvIndMap)
+
+		val commitIndFileName = "commit_model.txt"
+		write_into_AWS(commitIndFileName, CommitIndMap)
+
+		val resetIndFileName = "reset_model.txt"
+		write_into_AWS(resetIndFileName, ResetIndMap)
+
+		val hardResetIndFileName = "hard_reset_model.txt"
+		write_into_AWS(hardResetIndFileName, HardResetIndMap)
 
 	}
 
@@ -271,12 +287,11 @@ object trainer {
 	}
 
 	// for comment action
-
 	def act_comment_train() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
-		// read from training doc labeled print
+		// read from training doc labeled comment
 		val commentActTrainFileName = "comment_act_train.txt"
 
 		// interpret train file for each specific action
@@ -301,6 +316,83 @@ object trainer {
 		}
 	}
 
+	// for commit action
+	def act_commit_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled commit
+		val commitActTrainFileName = "commit_act_train.txt"
+
+		// interpret train file for each specific action
+		val commitActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+commitActTrainFileName)
+		val commitActReader = new BufferedReader(new InputStreamReader(commitActObj.getObjectContent()))
+		var commitActLine = commitActReader.readLine
+
+		while(commitActLine != null){
+			for(word <- commitActLine.split("\\s+")) {
+				val cont = act_interp(word).split("_")
+
+				val i = cont(0)
+				val tok = cont(2)+"_"+cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "commit")
+				}else if(!i.equals("F")){
+					CommitIndMap += (tok -> i)
+				}
+			}
+			commitActLine = commitActReader.readLine
+		}
+	}
+
+	// for reset action 
+	def act_reset_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled reset
+		val resetActTrainFileName = "reset_act_train.txt"
+
+		// interpret train file for each specific action
+		val resetActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+resetActTrainFileName)
+		val resetActReader = new BufferedReader(new InputStreamReader(resetActObj.getObjectContent()))
+		var resetActLine = resetActReader.readLine
+
+		while(!resetActLine.equals("## hard reset")){
+			for(word <- resetActLine.split("\\s+")) {
+				val cont = act_interp(word).split("_")
+
+				val i = cont(0)
+				val tok = cont(2)+"_"+cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "reset")
+				}else if(!i.equals("F")){
+					ResetIndMap += (tok -> i)
+				}
+			}
+			resetActLine = resetActReader.readLine
+		}
+		while(resetActLine != null) {
+			for(word <- resetActLine.split("\\s+")) {
+				val cont = act_interp(word).split("_")
+
+				val i = cont(0)
+				val tok = cont(2)+"_"+cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "reset")
+				}else if(i.equals("0")){
+					HardResetIndMap += (tok -> "hard")
+				}else if(!i.equals("F")){
+					ResetIndMap += (tok -> i)
+				}
+			}
+			resetActLine = resetActReader.readLine
+		}
+	}
+
 	def write_into_AWS(modelFileName: String, modelMap: HashMap[String, String]) = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -308,7 +400,7 @@ object trainer {
 		val modelFileWriter = new FileWriter(modelFile, false)
 		val modelBufferedWriter = new BufferedWriter(modelFileWriter)
 		for(i <- 0 to Max_Priority){
-			val priority = i.toString
+			val priority = (Max_Priority - i).toString
 			for ((k,v) <- modelMap if k.startsWith(priority)){
 				//println(k+" "+v)
 				modelBufferedWriter.write(k.stripPrefix(priority+"_")+","+v+"\n")
