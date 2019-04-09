@@ -333,6 +333,64 @@ object argParser {
 
 	}
 
+	def parseCreateDSArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadCreateDsIndModel
+
+  		val cont = msg.toLowerCase.split("\\s+").toList
+  		var arg1 = ""
+  		var gotArg1 = false
+  		var arg2 = ""
+  		var gotArg2 = false
+  		var arg3 = ""
+  		var gotArg3 = false
+  		var varMap:ListMap[String, String] = ListMap.empty[String,String]
+
+  		for((k,v) <- CreateDsIndMap if !gotArg1){
+  			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
+  				if(v.equals("1") && !gotArg1) {
+					arg1 = cont(cont.indexOf(k)+1)
+					gotArg1 = true
+				}
+  			}
+  		}
+
+  		for(i <- 0 to cont.size-1 ){
+			val tok = cont(i)
+			if(CreateDsIndMap.contains(tok)){
+				val tmp = CreateDsIndMap(tok)
+				if(!gotArg2 && tmp.equals("2") && i < cont.size-1){
+					arg2 = cont(i+1)
+					gotArg2 = true
+				}
+				if(gotArg2 && tmp.equals("3") && i < cont.size-1){
+					arg3 = cont(i+1)
+					gotArg3 = true
+				}
+				if(gotArg2 && gotArg3){
+					varMap += (arg2 -> arg3)
+					gotArg2 = false
+					gotArg3 = false
+				}
+			}
+		}
+		//println(varMap)
+
+  		if(!gotArg1) {
+  			nluInterpreter.writeToCache("create data structure called ", nluCacheFileName)
+  			return "missing data structure name, Please tell me the name of the data structure you want to create."
+  		}else if(varMap.isEmpty) {
+  			nluInterpreter.writeToCache("create data structure called "+arg1+" ", nluCacheFileName)
+  			return "missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
+  		}else{
+  			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+  			return "var map: "+varMap.toString+"\nInterpret finished."
+  		}
+
+	}
+
 	def loadCreateEnvIndModel() = {
   		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
