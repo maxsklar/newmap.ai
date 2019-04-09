@@ -58,8 +58,8 @@ object actionProcessor {
 				val ret = parseCreateEnvArg(msg, nluCacheFileName)
 				return "*I understand you want to create a/an "+actObjectType+"*\n"+ret
 			}else{
-				// TODO: parse create data structure arguments
-				return "*I understand you want to create a/an "+actObjectType+"*"+"\nInterprete finished. *"
+				val ret = parseCreateDSArg(msg, nluCacheFileName)
+				return "*I understand you want to create a/an "+actObjectType+"*\n"+ret
 			}
 		}
 	}
