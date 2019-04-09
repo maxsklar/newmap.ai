@@ -16,7 +16,7 @@ import java.io.InputStreamReader
 import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils
 import scala.collection.JavaConversions._
-import scala.collection.mutable.ListMap
+import scala.collection.immutable.ListMap
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.argParser._
@@ -29,9 +29,10 @@ object actionProcessor {
 	val S3_ModelFileName_Prefix = "Model/"
 	val S3_CacheFileName_Prefix = "CACHE/"
 
-	val CreateIndMap:ListMap[String, String] = ListMap.empty[String, String]
-	val AccessEnvIndMap:ListMap[String, String] = ListMap.empty[String, String]
-	val PrintIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var CreateIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var AccessEnvIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var PrintIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var HardResetIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
 	def processCreateAct(msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -127,6 +128,27 @@ object actionProcessor {
 		}
 	}
 
+	def processResetAct(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadHardResetIndMode
+  		val cont = msg.toLowerCase.split("\\s+")
+		var gotHardResetType = false
+		for(tok <- cont if !gotHardResetType){
+			if(HardResetIndMap.contains(tok)){
+				gotHardResetType = true
+			}
+		}
+
+		val ret = parseResetArg(msg, nluCacheFileName)
+		if(!gotHardResetType) {
+			return "*I understand u want to reset to previous commit, "+ret
+		}else{
+			return "*I understand u want to hard reset to previous commit, "+ret
+		}
+	}
+
 	def loadCreateIndModel() = {
   		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -180,6 +202,24 @@ object actionProcessor {
 
   		println("*** print map ***")
   		PrintIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
+ 	def loadHardResetIndMode() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val hardResetIndFileName = "hard_reset_model.txt"
+  		val hardResetIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+hardResetIndFileName)
+  		val hardResetIndReader = new BufferedReader(new InputStreamReader(hardResetIndObj.getObjectContent()))
+  		var hardResetIndLine = hardResetIndReader.readLine
+  		while(hardResetIndLine != null) {
+  			val cont = hardResetIndLine.split(",")
+  			HardResetIndMap += (cont(0) -> cont(1))
+  			hardResetIndLine = hardResetIndReader.readLine
+  		}
+
+  		println("*** reset map ***")
+  		HardResetIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
 }
