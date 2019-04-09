@@ -16,7 +16,7 @@ import java.io.InputStreamReader
 import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils
 import scala.collection.JavaConversions._
-import scala.collection.mutable.ListMap
+import scala.collection.immutable.ListMap
 
 import ai.newmap.environment.envConstant
 
@@ -28,14 +28,18 @@ object argParser {
 	val S3_ModelFileName_Prefix = "Model/"
 	val S3_CacheFileName_Prefix = "CACHE/"
 
-	val CreateEnvIndMap:ListMap[String, String] = ListMap.empty[String,String]
-	val CreateDsIndMap:ListMap[String, String] = ListMap.empty[String,String]
+	var CreateEnvIndMap:ListMap[String, String] = ListMap.empty[String,String]
+	var CreateDsIndMap:ListMap[String, String] = ListMap.empty[String,String]
 
-	val LogInIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var LogInIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
-	val CheckOutIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var CheckOutIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
-	val CommentEnvIndMap:ListMap[String, String] = ListMap.empty[String, String]
+	var CommentEnvIndMap:ListMap[String, String] = ListMap.empty[String, String]
+
+	var CommitIndMap:ListMap[String, String] = ListMap.empty[String, String]
+
+	var ResetIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
 	def parseCommentEnvArg(msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -261,6 +265,74 @@ object argParser {
 
 	}
 
+	def parseCommitArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadCommitIndModel
+
+  		val cont = msg.toLowerCase.split("\\s+").toList
+		var arg = ""
+		var gotArg = false
+
+		for((k,v) <- CommitIndMap if !gotArg){
+			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
+				var i = cont.indexOf(k)+1
+				while(i < cont.size) {
+					arg += cont(i)+" "
+					i += 1
+				}
+				gotArg = true
+			}
+		}
+
+		if(!gotArg){
+			nluInterpreter.writeToCache("commit ", nluCacheFileName)
+			return "*I understand u want to commit, but missing the commit message, Please tell me the commit message *"
+		}else{
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "*I understand u want to commit current env. \nGot commit message: "+arg+".* \nInterpret finished."
+		}
+	}
+
+	def parseResetArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadResetIndModel
+
+  		val cont = msg.toLowerCase.split("\\s+").toList
+  		var arg1 = ""	// commit id
+  		var gotArg1 = false
+  		var arg2 = ""	// parseword
+  		var gotArg2 = false
+  		println(ResetIndMap)
+  		for((k,v) <- ResetIndMap if (!gotArg1 || !gotArg2)) {
+			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
+				if(v.equals("1") && !gotArg1) {
+					arg1 = cont(cont.indexOf(k)+1)
+					gotArg1 = true
+				}
+				if(v.equals("2") && !gotArg2) {
+					arg2 = cont(cont.indexOf(k)+1)
+					gotArg2 = true
+				}
+			}
+		}
+
+		if(!gotArg1) {
+			nluInterpreter.writeToCache("reset to commit id ", nluCacheFileName)
+			return "but missing commit id, Please tell me the commit id u want to reset. *"
+		}else if(!gotArg2) {
+			nluInterpreter.writeToCache("reset to commit id "+arg1+" password ", nluCacheFileName)
+			return "\nplease tell me the password of this env. *"
+		}else {
+			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			return "\nGot commit id: "+arg1+".* \nInterpret finished."
+		}
+
+	}
+
 	def loadCreateEnvIndModel() = {
   		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -275,7 +347,7 @@ object argParser {
   			CreateEnvIndLine = CreateEnvIndReader.readLine
   		}
 
-  		println("*** create env map ***")
+  		println("*** create env arg map ***")
   		CreateEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
 
   	}
@@ -294,7 +366,7 @@ object argParser {
   			CreateDsIndLine = CreateDsIndReader.readLine
   		}
 
-  		println("*** create ds map ***")
+  		println("*** create ds arg map ***")
   		CreateDsIndMap.forEach{case (key, value) => println (key + "-->" + value)}
   	}
 
@@ -312,7 +384,7 @@ object argParser {
   			logInIndLine = logInIndReader.readLine
   		}
 
-  		println("*** log in map ***")
+  		println("*** log in arg map ***")
   		LogInIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
@@ -330,7 +402,7 @@ object argParser {
   			commentEnvIndLine = commentEnvIndReader.readLine
   		}
 
-  		println("*** commentEnv map ***")
+  		println("*** commentEnv arg map ***")
   		CommentEnvIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
@@ -348,8 +420,45 @@ object argParser {
   			checkOutIndLine = checkOutIndReader.readLine
   		}
 
-  		println("*** check out map ***")
+  		println("*** check out arg map ***")
   		CheckOutIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
+ 	def loadCommitIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val commitIndFileName = "commit_model.txt"
+  		val commitIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+commitIndFileName)
+  		val commitIndReader = new BufferedReader(new InputStreamReader(commitIndObj.getObjectContent()))
+  		var commitIndLine = commitIndReader.readLine
+  		while(commitIndLine != null){
+  			val cont = commitIndLine.split(",")
+  			CommitIndMap += (cont(0) -> cont(1))
+  			commitIndLine = commitIndReader.readLine
+  		}
+
+  		println("*** commit arg map ***")
+  		CommitIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
+ 	def loadResetIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val resetIndFileName = "reset_model.txt"
+  		val resetIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+resetIndFileName)
+  		val resetIndReader = new BufferedReader(new InputStreamReader(resetIndObj.getObjectContent()))
+  		var resetIndLine = resetIndReader.readLine
+  		while(resetIndLine != null) {
+  			//println("**"+resetIndLine+"**")
+  			val cont = resetIndLine.split(",")
+  			ResetIndMap += (cont(0) -> cont(1))
+  			resetIndLine = resetIndReader.readLine
+  		}
+
+  		println("*** reset arg map ***")
+  		ResetIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
 }
