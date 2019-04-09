@@ -116,6 +116,9 @@ object nluInterpreter {
 			case "reset" => {
 				return processResetAct(msg, nluCacheFileName)
 			}
+			case "append" => {
+				return argParser.parseAppendArg(msg, nluCacheFileName)
+			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
 			}
