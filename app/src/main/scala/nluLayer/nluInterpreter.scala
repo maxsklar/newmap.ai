@@ -16,7 +16,7 @@ import java.io.InputStreamReader
 import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils
 import scala.collection.JavaConversions._
-import scala.collection.mutable.ListMap
+import scala.collection.immutable.ListMap
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.actionProcessor._
@@ -29,7 +29,7 @@ object nluInterpreter {
 	val S3_ModelFileName_Prefix = "Model/"
 	val S3_CacheFileName_Prefix = "CACHE/"
 
-	val ActionMap:ListMap[String, String] = ListMap.empty[String,String]
+	var ActionMap:ListMap[String, String] = ListMap.empty[String,String]
 
 	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -109,6 +109,12 @@ object nluInterpreter {
 			}
 			case "comment" => {
 				return argParser.parseCommentEnvArg(msg, nluCacheFileName)
+			}
+			case "commit" => {
+				return argParser.parseCommitArg(msg, nluCacheFileName)
+			}
+			case "reset" => {
+				return processResetAct(msg, nluCacheFileName)
 			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
