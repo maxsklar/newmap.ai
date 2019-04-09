@@ -41,6 +41,8 @@ object argParser {
 
 	var ResetIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
+	var AppendIndMap:ListMap[String, String] = ListMap.empty[String, String]
+
 	def parseCommentEnvArg(msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -340,11 +342,11 @@ object argParser {
   		loadCreateDsIndModel
 
   		val cont = msg.toLowerCase.split("\\s+").toList
-  		var arg1 = ""
+  		var arg1 = ""	// ds name
   		var gotArg1 = false
-  		var arg2 = ""
+  		var arg2 = ""	// variable
   		var gotArg2 = false
-  		var arg3 = ""
+  		var arg3 = ""	// type
   		var gotArg3 = false
   		var varMap:ListMap[String, String] = ListMap.empty[String,String]
 
@@ -386,9 +388,67 @@ object argParser {
   			return "missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-  			return "var map: "+varMap.toString+"\nInterpret finished."
+  			return "create var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished."
   		}
 
+	}
+
+	def parseAppendArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadAppendIndModel
+
+  		val cont = msg.toLowerCase.split("\\s+").toList
+  		var arg1 = ""	// ds name
+  		var gotArg1 = false
+  		var arg2 = ""	// variable 
+  		var gotArg2 = false
+  		var arg3 = ""	// type
+  		var gotArg3 = false
+  		var varMap:ListMap[String, String] = ListMap.empty[String,String]
+
+  		for((k,v) <- AppendIndMap if !gotArg1){
+  			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
+  				if(v.equals("1") && !gotArg1) {
+					arg1 = cont(cont.indexOf(k)+1)
+					gotArg1 = true
+				}
+  			}
+  		}
+
+  		for(i <- 0 to cont.size-1 ){
+			val tok = cont(i)
+			if(AppendIndMap.contains(tok)){
+				val tmp = AppendIndMap(tok)
+				if(!gotArg2 && tmp.equals("2") && i < cont.size-1){
+					arg2 = cont(i+1)
+					gotArg2 = true
+				}
+				if(gotArg2 && tmp.equals("3") && i < cont.size-1){
+					arg3 = cont(i+1)
+					gotArg3 = true
+				}
+				if(gotArg2 && gotArg3){
+					varMap += (arg2 -> arg3)
+					gotArg2 = false
+					gotArg3 = false
+				}
+			}
+		}
+
+		val ret: String = "I understand u want to append on data structure "
+
+		if(!gotArg1) {
+  			nluInterpreter.writeToCache("append on data structure ", nluCacheFileName)
+  			return ret+"\nbut missing data structure name, Please tell me the name of the data structure you want to create."
+  		}else if(varMap.isEmpty) {
+  			nluInterpreter.writeToCache("append on data structure "+arg1+" ", nluCacheFileName)
+  			return ret+arg1+"\nbut missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
+  		}else{
+  			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+  			return ret+arg1+"\nappend var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished."
+  		}
 	}
 
 	def loadCreateEnvIndModel() = {
@@ -517,6 +577,25 @@ object argParser {
 
   		println("*** reset arg map ***")
   		ResetIndMap.forEach{case (key, value) => println (key + "-->" + value)}
+ 	}
+
+ 	def loadAppendIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val appendIndFileName = "append_model.txt"
+  		val appendIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+appendIndFileName)
+  		val appendIndReader = new BufferedReader(new InputStreamReader(appendIndObj.getObjectContent()))
+  		var appendIndLine = appendIndReader.readLine
+  		while(appendIndLine != null) {
+  			//println("**"+appendIndLine+"**")
+  			val cont = appendIndLine.split(",")
+  			AppendIndMap += (cont(0) -> cont(1))
+  			appendIndLine = appendIndReader.readLine
+  		}
+
+  		println("*** append arg map ***")
+  		AppendIndMap.forEach{case (key, value) => println (key + "-->" + value)} 
  	}
 
 }
