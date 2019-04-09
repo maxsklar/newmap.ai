@@ -49,6 +49,8 @@ object trainer {
 	val HardResetIndMap:HashMap[String, String] = HashMap.empty[String, String]
 	val ResetIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
+	val AppendIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def train() = {
 		act_create_train()
 		act_access_env_train()
@@ -56,6 +58,7 @@ object trainer {
 		act_comment_train()
 		act_commit_train()
 		act_reset_train()
+		act_append_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
@@ -92,6 +95,9 @@ object trainer {
 
 		val hardResetIndFileName = "hard_reset_model.txt"
 		write_into_AWS(hardResetIndFileName, HardResetIndMap)
+
+		val appendIndFileName = "append_model.txt"
+		write_into_AWS(appendIndFileName, AppendIndMap)
 
 	}
 
@@ -390,6 +396,36 @@ object trainer {
 				}
 			}
 			resetActLine = resetActReader.readLine
+		}
+	}
+
+	def act_append_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+		// read from training doc labeled reset
+		val appendActTrainFileName = "append_act_train.txt"
+
+		// interpret train file for each specific action
+		val appendActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+appendActTrainFileName)
+		val appendActReader = new BufferedReader(new InputStreamReader(appendActObj.getObjectContent()))
+		var appendActLine = appendActReader.readLine
+
+		while(appendActLine != null) {
+			for(word <- appendActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i = cont(0)
+				val tok = cont(2)+"_"+cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "append")
+				}else if(!i.equals("F")){
+					AppendIndMap += (tok -> i)
+				}
+			}
+
+			appendActLine = appendActReader.readLine
 		}
 	}
 
