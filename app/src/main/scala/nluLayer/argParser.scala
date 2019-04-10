@@ -43,6 +43,8 @@ object argParser {
 
 	var AppendIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
+	var CopyIndMap:ListMap[String, String] = ListMap.empty[String, String]
+
 	def parseCommentEnvArg(msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -82,21 +84,20 @@ object argParser {
 */		
 		
 		//println(CommentEnvIndMap)
-		for((k,v) <- CommentEnvIndMap if(!gotArg1 || !gotArg2 || gotArg3)) {
+		for((k,v) <- CommentEnvIndMap if(!gotArg1 || !gotArg2 || !gotArg3)) {
 			if(cont.contains(k)){
 				val index = cont.indexOf(k)
-				val tmp = CommentEnvIndMap(k)
-				if(!gotArg1 && tmp.equals("1") && index < cont.size-1) {
+				if(!gotArg1 && v.equals("1") && index < cont.size-1) {
 					arg1 = cont(index+1)
 					gotArg1 = true
 				}
-				if(!gotArg2 && tmp.equals("2") && index < cont.size-1) {
+				if(!gotArg2 && v.equals("2") && index < cont.size-1) {
 					arg2 = cont(index+1)
 					gotArg2 = true
 				}
-				if(!gotArg2 && tmp.equals("3") && index < cont.size-1) {
+				if(!gotArg3 && v.equals("3") && index < cont.size-1) {
 					var i: Int = index + 1
-					while(i < cont.size && cont(i) != "#"){
+					while(i < cont.size && !cont(i).equals("$")){
 						arg3 += cont(i)+" "
 						i += 1
 					}
@@ -104,7 +105,6 @@ object argParser {
 				}
 			} 
 		}
-
 		if(!gotArg1){
 			nluInterpreter.writeToCache("comment on env ", nluCacheFileName)
 			return "*I understand u want to comment, but missing env name, Please tell me a env name*"
@@ -112,11 +112,13 @@ object argParser {
 			nluInterpreter.writeToCache("comment on  env "+arg1+" with ", nluCacheFileName)
 			return "I understand u want to comment, but missing comment string, Please tell me what u want to comment*"
 		}else if(!gotArg2){
-			nluInterpreter.writeToCache("comment on env "+arg1+" with "+arg3+" # password ", nluCacheFileName)
+			nluInterpreter.writeToCache("comment on env "+arg1+" with "+arg3+" $ password ", nluCacheFileName)
 			return "*Please tell me the password for this env*"
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand u want to comment on "+arg1+" with comment: "+arg3+". \nInterpret finished."
+			val cmd = ":comment on "+arg1+" "+arg2+" ("+arg3+")"
+			return "*I understand u want to comment on "+arg1+" with comment: "+arg3+". \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}
 
 	}
@@ -171,7 +173,9 @@ object argParser {
 			return "*missing password, Please tell me the password for this env.*"
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*got env name: "+arg1+". got password "+arg2+". * \nInterpret finished."
+			val cmd = ":log in "+arg1+" "+arg2
+			return "*got env name: "+arg1+". got password "+arg2+". * \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}	
 	}
 
@@ -237,7 +241,8 @@ object argParser {
 		}
 		println("*** Finish interpret a create env message! ***")
 		amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-		ret+"\nInterpret finished. *"
+		val cmd = ":create "+arg1+" "+arg2
+		ret+"\nInterpret finished. *\n"+"generate newmap script cmd: "+cmd
 	}
 
 	def parseCheckOutArg(msg: String, nluCacheFileName: String): String = {
@@ -262,7 +267,9 @@ object argParser {
 			return "*missing the commit number you want to check, Please tell me the commit number \n(you can type 'what's in the log' to check all commit numbers)*"
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*Got commit number "+arg+".* \nInterpret finished."
+			val cmd = ":checkout "+arg
+			return "*Got commit number "+arg+".* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}
 
 	}
@@ -293,11 +300,13 @@ object argParser {
 			return "*I understand u want to commit, but missing the commit message, Please tell me the commit message *"
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand u want to commit current env. \nGot commit message: "+arg+".* \nInterpret finished."
+			val cmd = ":commit "+arg
+			return "*I understand u want to commit current env. \nGot commit message: "+arg+".* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}
 	}
 
-	def parseResetArg(msg: String, nluCacheFileName: String): String = {
+	def parseResetArg(msg: String, nluCacheFileName: String, hardFlag: Boolean): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
@@ -308,7 +317,7 @@ object argParser {
   		var gotArg1 = false
   		var arg2 = ""	// parseword
   		var gotArg2 = false
-  		println(ResetIndMap)
+
   		for((k,v) <- ResetIndMap if (!gotArg1 || !gotArg2)) {
 			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
 				if(v.equals("1") && !gotArg1) {
@@ -330,7 +339,14 @@ object argParser {
 			return "\nplease tell me the password of this env. *"
 		}else {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "\nGot commit id: "+arg1+".* \nInterpret finished."
+			var cmd = ""
+			if(hardFlag){
+				cmd += ":hard reset "+arg1+" "+arg2
+			}else{
+				cmd += ":reset "+arg1+" "+arg2
+			}
+			return "\nGot commit id: "+arg1+".* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}
 
 	}
@@ -388,7 +404,14 @@ object argParser {
   			return "missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-  			return "create var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished."
+  			var cmd = "val "+arg1+":Map = ("
+  			for((k,v) <- varMap) {
+  				cmd += k+": "+v+", "
+  			}
+  			cmd = cmd.stripSuffix(", ")
+  			cmd += ")"
+  			return "create var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished.\n"+
+  				   "generate newmap script cmd: "+cmd
   		}
 
 	}
@@ -447,8 +470,83 @@ object argParser {
   			return ret+arg1+"\nbut missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-  			return ret+arg1+"\nappend var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished."
+  			var cmd = "val "+arg1+" = appendMap "+arg1+" ("
+  			for((k,v) <- varMap) {
+  				cmd += k+": "+v+", "
+  			}
+  			cmd = cmd.stripSuffix(", ")
+  			cmd += ")"
+  			return ret+arg1+"\nappend var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished.\n"+
+  				   "generate newmap script cmd: "+cmd
   		}
+	}
+
+	def parseCopyArg(msg: String, nluCacheFileName: String): String = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		loadCopyIndModel
+
+  		val cont = msg.toLowerCase.split("\\s+").toList
+  		var arg1 = ""	// from channel name
+  		var gotArg1 = false
+  		var arg2 = ""	// from env name
+  		var gotArg2 = false
+  		var arg3 = ""	// from env password
+  		var gotArg3 = false
+  		var arg4 = ""	// new env name
+  		var gotArg4 = false
+  		var arg5 = ""	// new env password
+  		var gotArg5 = false
+
+  		for((k,v) <- CopyIndMap if (!gotArg1 || !gotArg2 || !gotArg3 || !gotArg4 || !gotArg5) ){
+  			if(cont.contains(k) && cont.indexOf(k) < cont.size-1){
+  				if(v.equals("1") && !gotArg1) {
+					arg1 = cont(cont.indexOf(k)+1)
+					gotArg1 = true
+				}
+				if(v.equals("2") && !gotArg2) {
+					arg2 = cont(cont.indexOf(k)+1)
+					gotArg2 = true
+				}
+				if(v.equals("3") && !gotArg3) {
+					arg3 = cont(cont.indexOf(k)+1)
+					gotArg3 = true
+				}
+				if(v.equals("4") && !gotArg4) {
+					arg4 = cont(cont.indexOf(k)+1)
+					gotArg4 = true
+				}
+				if(v.equals("5") && !gotArg5) {
+					arg5 = cont(cont.indexOf(k)+1)
+					gotArg5 = true
+				}
+  			}
+  		}
+
+  		val tmp = "I understand you want to copy a environment.\n"
+  		if(!gotArg1){
+  			nluInterpreter.writeToCache("copy from channel ", nluCacheFileName)
+  			return tmp+"But missing the channel name you want to copy from, Please tell me the channel name."
+  		}else if(!gotArg2){
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env ", nluCacheFileName)
+  			return tmp+"But missing the environment name you want to copy from, Please tell me the environment name."
+  		}else if(!gotArg3){
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password ", nluCacheFileName)
+  			return tmp+"But Please tell me the password of the environment "+arg2+" from channel "+arg1+"."
+  		}else if(!gotArg4){
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password "+arg3+" newenv ", nluCacheFileName)
+  			return tmp+"Please tell me the name of the new environment that you want to store the coppied content."
+  		}else if(!gotArg5){
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password "+arg3+" newenv "+arg4+" newpassword ", nluCacheFileName)
+  			return tmp+"Please tell me the password of the new environment that you want to store the coppied content."
+  		}else{
+  			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+  			val cmd = ":copy "+arg1+" "+arg2+" "+arg3+" "+arg4+" "+arg5
+  			return "I understand you want to copy from "+arg1+" env "+arg2+" with password "+arg3+", and create a new env "+arg4+" with password "+arg5+"\nInterpret finished."+
+  				   "generate newmap script cmd: "+cmd
+  		}
+
 	}
 
 	def loadCreateEnvIndModel() = {
@@ -596,6 +694,25 @@ object argParser {
 
   		println("*** append arg map ***")
   		AppendIndMap.forEach{case (key, value) => println (key + "-->" + value)} 
+ 	}
+
+ 	def loadCopyIndModel() = {
+ 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val copyIndFileName = "copy_model.txt"
+  		val copyIndObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+copyIndFileName)
+  		val copyIndReader = new BufferedReader(new InputStreamReader(copyIndObj.getObjectContent()))
+  		var copyIndLine = copyIndReader.readLine
+  		while(copyIndLine != null) {
+  			//println("**"+copyIndLine+"**")
+  			val cont = copyIndLine.split(",")
+  			CopyIndMap += (cont(0) -> cont(1))
+  			copyIndLine = copyIndReader.readLine
+  		}
+
+  		println("*** copy arg map ***")
+  		CopyIndMap.forEach{case (key, value) => println (key + "-->" + value)}
  	}
 
 }
