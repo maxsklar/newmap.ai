@@ -81,16 +81,23 @@ object actionProcessor {
 
 		if(!gotPrintType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			// TODO
 			return "*couldn't identify what u want to print"
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand you want to print the envs in this channel* \nInterpret finished."
+			val cmd = ":envs"
+			return "*I understand you want to print the envs in this channel* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}else if(printType.equals("env")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand you want to print the content in this env* \nInterpret finished."
+			val cmd = ":printEnv"
+			return "*I understand you want to print the content in this env* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}else if(printType.equals("log")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand you want to print the log history in this env* \nInterpret finished."
+			val cmd = ":printLog"
+			return "*I understand you want to print the log history in this env* \nInterpret finished.\n"+
+				   "generate newmap script cmd: "+cmd
 		}else if(printType.equals("commit")){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val ret = parseCheckOutArg(msg, nluCacheFileName)
@@ -141,10 +148,11 @@ object actionProcessor {
 			}
 		}
 
-		val ret = parseResetArg(msg, nluCacheFileName)
 		if(!gotHardResetType) {
+			val ret = parseResetArg(msg, nluCacheFileName, false)
 			return "*I understand u want to reset to previous commit, "+ret
 		}else{
+			val ret = parseResetArg(msg, nluCacheFileName, true)
 			return "*I understand u want to hard reset to previous commit, "+ret
 		}
 	}
