@@ -51,6 +51,8 @@ object trainer {
 
 	val AppendIndMap:HashMap[String, String] = HashMap.empty[String, String]
 
+	val CopyIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
 	def train() = {
 		act_create_train()
 		act_access_env_train()
@@ -59,6 +61,7 @@ object trainer {
 		act_commit_train()
 		act_reset_train()
 		act_append_train()
+		act_copy_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
@@ -98,6 +101,9 @@ object trainer {
 
 		val appendIndFileName = "append_model.txt"
 		write_into_AWS(appendIndFileName, AppendIndMap)
+
+		val copyIndFileName = "copy_model.txt"
+		write_into_AWS(copyIndFileName, CopyIndMap)
 
 	}
 
@@ -403,7 +409,7 @@ object trainer {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
-		// read from training doc labeled reset
+		// read from training doc labeled append
 		val appendActTrainFileName = "append_act_train.txt"
 
 		// interpret train file for each specific action
@@ -427,6 +433,37 @@ object trainer {
 
 			appendActLine = appendActReader.readLine
 		}
+	}
+
+	def act_copy_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		// read from training doc labeled copy 
+  		val copyActTrainFileName = "copy_act_train.txt"
+
+		// interpret train file for each specific action
+		val copyActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+copyActTrainFileName)
+		val copyActReader = new BufferedReader(new InputStreamReader(copyActObj.getObjectContent()))
+		var copyActLine = copyActReader.readLine
+
+		while(copyActLine != null) {
+			for(word <- copyActLine.split("\\s+")){
+				val cont = act_interp(word).split("_")
+
+				val i = cont(0)
+				val tok = cont(2)+"_"+cont(1)
+
+				if(i.equals("$")){
+					ActionMap += (tok -> "copy")
+				}else if(!i.equals("F")){
+					CopyIndMap += (tok -> i)
+				}
+			}
+
+			copyActLine = copyActReader.readLine
+		} 
+
 	}
 
 	def write_into_AWS(modelFileName: String, modelMap: HashMap[String, String]) = {
@@ -481,6 +518,18 @@ object trainer {
 				val tok = cont(0)
 				val priority = cont(1)
 				return "3_"+tok+"_"+priority
+			}
+			case word if word.startsWith("_4_") => {
+				val cont = word.stripPrefix("_4_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "4_"+tok+"_"+priority
+			}
+			case word if word.startsWith("_5_") => {
+				val cont = word.stripPrefix("_5_").stripSuffix("_").split("_")
+				val tok = cont(0)
+				val priority = cont(1)
+				return "5_"+tok+"_"+priority
 			}
 			case _ =>{
 				return "F_"+word+"_0"
