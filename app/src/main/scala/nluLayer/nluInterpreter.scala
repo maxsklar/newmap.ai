@@ -20,6 +20,7 @@ import scala.collection.immutable.ListMap
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.actionProcessor._
+import ai.newmap.nluLayer.onBoardConstant._
 
 object nluInterpreter {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -64,7 +65,6 @@ object nluInterpreter {
 
 		// read from nlu cache
 		var msg = ""
-		var cache_cont = ""
 		val nluCacheFileName = chanName+"_"+userName+"_nlu_cache.txt"
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)){
 			val nluCacheObj = amazonS3Client.getObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
@@ -73,6 +73,7 @@ object nluInterpreter {
 			msg += nluCacheLine+" "
 		}
 		msg += code
+		msg = preProcess(msg)
 		// append msg
 
 		// interpete
@@ -92,8 +93,8 @@ object nluInterpreter {
 
 		if(!gotActionType){
 
-			return "*Didn't recognize action in this message, please tell me exactly what you want to do*"
-					// TODO: add recommend actions as response
+			return "*Didn't recognize action in this message, please tell me exactly what you want to do*\n"+
+					ActRecommendation
 		}
 
 		// process action
@@ -119,6 +120,9 @@ object nluInterpreter {
 			case "append" => {
 				return argParser.parseAppendArg(msg, nluCacheFileName)
 			}
+			case "copy" =>{
+				return argParser.parseCopyArg(msg, nluCacheFileName)
+			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
 			}
@@ -136,5 +140,9 @@ object nluInterpreter {
 		cacheBufferedWriter.write(str)
 		cacheBufferedWriter.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName, cacheFile)
+	}
+
+	def preProcess(str: String): String = {
+		str.replaceAll("""[()?.!:,]""", "").toLowerCase
 	}
 }
