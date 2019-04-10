@@ -15,6 +15,8 @@ import ai.newmap.environment.envPrinter.prettyPrinter
 
 import ai.newmap.nluLayer.trainer.train
 import ai.newmap.nluLayer.nluInterpreter.nluInterp
+import ai.newmap.nluLayer.nluInterpreter.preProcess
+import ai.newmap.nluLayer.convTerminator.stopConv
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -160,7 +162,10 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     val userName = "admin"
     if(code.equals("train")){
       train
-      Ok("train finished")
+      Ok("Train Finished")
+    }else if(code.equals("stop")){
+      stopConv(chanName, userName)
+      Ok("Conversation Stopped")
     }else{
       val ret = nluInterp(chanName, userName, code)
       Ok(ret)
