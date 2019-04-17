@@ -20,6 +20,9 @@ import ai.newmap.nluLayer.convTerminator.stopConv
 import ai.newmap.nluLayer.nluChecker.GoingToGet
 import ai.newmap.nluLayer.nluChecker.Got
 import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
+import ai.newmap.nluLayer.nluInterpreter.retJsonFormatFlag
+import ai.newmap.nluLayer.nluInterpreter.dummyGreetingResp
+import ai.newmap.nluLayer.onBoardConstant.ActRecommendation
 
 import play.api.libs.json._
 
@@ -54,12 +57,26 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     if(msg.equals("train")){
       train
       Ok("Train Finished")
+    }else if(msg.toLowerCase.equals("help")){
+      Ok(Json.parse(generateRegularJsonRespond(ActRecommendation)))
     }else if(msg.equals("stop")){
       stopConv(chanName, userName)
       Ok("Conversation Stopped")
     }else{
-      val ret = nluInterp(chanName, userName, msg)
-      Ok(Json.parse(ret))
+      val checkGreeting = dummyGreetingResp(msg)
+      checkGreeting match {
+        case "N" => {
+          val ret = nluInterp(chanName, userName, msg)
+          if(retJsonFormatFlag){
+            Ok(Json.parse(ret))
+          }else{
+            Ok(ret)
+          }
+        }
+        case _ => {
+          Ok(Json.parse(checkGreeting))
+        }
+      }
     }
   }
 
