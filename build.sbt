@@ -58,6 +58,7 @@ libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % 
 
 libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "4.0.1"
 libraryDependencies += "com.amazonaws" % "aws-java-sdk" % "1.11.49"
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.9"
 
 // ============================================================================
 
