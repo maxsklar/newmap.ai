@@ -36,7 +36,7 @@ object nluChecker {
 	var Got = "_"
 	var GoingToGet = "_"
 
-	def generateJsonString(got: String, goingToGet: String): String = {
+	def generateButtonJsonString(got: String, goingToGet: String): String = {
 		this.Got = got
 		this.GoingToGet = goingToGet
 		CheckPrefix+""" "text": """"+got+"""","""+CheckSuffix

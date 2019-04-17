@@ -22,6 +22,8 @@ import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.argParser._
 import ai.newmap.nluLayer.baseLayerInterpreter.interp
 import ai.newmap.nluLayer.nluInterpreter.preProcess
+import ai.newmap.nluLayer.nluInterpreter.OriginalMessage
+import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
 
 object actionProcessor {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -54,7 +56,7 @@ object actionProcessor {
 		if(!gotActObjectType){
 			nluInterpreter.writeToCache("create ", nluCacheFileName)
 			//println("*** no action object type in message, please tell me what do u want to create env or data structure ***")
-			return "*Didn't recognize action object in message, please tell me what do u want to create, env or data structure*"
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Didn't recognize action object in this message, please tell me what do u want to create, env or data structure*")
 		}else{
 			if(actObjectType.equals("env")){
 				return parseCreateEnvArg(chanName, userName, msg, nluCacheFileName)
@@ -82,35 +84,37 @@ object actionProcessor {
 		if(!gotPrintType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			// TODO
-			return "*couldn't identify what u want to print"
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Couldn't identify the content of what u want to see*")
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":envs"
 			//return "*I understand you want to print the envs in this channel* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			nluInterpreter.retJsonFormatFlag =false
+			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("env")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":printEnv"
 			//return "*I understand you want to print the content in this env* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			nluInterpreter.retJsonFormatFlag =false
+			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("log")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":printLog"
 			//return "*I understand you want to print the log history in this env* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			nluInterpreter.retJsonFormatFlag = false
+			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("commit")){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			val ret = parseCheckOutArg(chanName, userName, msg, nluCacheFileName)
-			return "*I understand you want to check the content of a previous commmit in this env* \n"+ret
+			return parseCheckOutArg(chanName, userName, msg, nluCacheFileName)
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*system logic error*"
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*system logic error*")
 		}
 	}
 
@@ -131,16 +135,15 @@ object actionProcessor {
 
 		if(!gotAccessEnvType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "* couldn't identify log in env or log off *"
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Couldn't identify log in env or log off *")
 		}else if(accessEnvType.equals("in")){
-			val ret = parseLogInArg(chanName, userName, msg, nluCacheFileName)
-			return "*I understand you want to log in an environment*\n"+ret
+			return parseLogInArg(chanName, userName, msg, nluCacheFileName)
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":log off"
 			//return "*I understand you want to log off an environment* \nInterpret finished"
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 	}
 
@@ -158,11 +161,9 @@ object actionProcessor {
 		}
 
 		if(!gotHardResetType) {
-			val ret = parseResetArg(chanName, userName, msg, nluCacheFileName, false)
-			return "*I understand u want to reset to previous commit, "+ret
+			return parseResetArg(chanName, userName, msg, nluCacheFileName, false)
 		}else{
-			val ret = parseResetArg(chanName, userName, msg, nluCacheFileName, true)
-			return "*I understand u want to hard reset to previous commit, "+ret
+			return parseResetArg(chanName, userName, msg, nluCacheFileName, true)
 		}
 	}
 

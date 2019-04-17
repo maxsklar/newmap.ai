@@ -21,7 +21,7 @@ import scala.collection.immutable.ListMap
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.baseLayerInterpreter.interp
 import ai.newmap.nluLayer.nluInterpreter.preProcess
-import ai.newmap.nluLayer.nluChecker.generateJsonString
+import ai.newmap.nluLayer.nluChecker.generateButtonJsonString
 import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
 import ai.newmap.nluLayer.nluInterpreter.OriginalMessage
 
@@ -113,13 +113,13 @@ object argParser {
 		}
 		if(!gotArg1){
 			nluInterpreter.writeToCache("comment on env ", nluCacheFileName)
-			return "*I understand u want to comment, but missing env name, Please tell me a env name*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to comment on an environment*""", "*but missing env name, Please tell me a env name*")
 		}else if(!gotArg3){
 			nluInterpreter.writeToCache("comment on  env "+arg1+" with ", nluCacheFileName)
-			return "I understand u want to comment, but missing comment string, Please tell me what u want to comment*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to comment on environment """+arg1+"*", "*but missing comment string, Please tell me what u want to comment*")
 		}else if(!gotArg2){
 			nluInterpreter.writeToCache("comment on env "+arg1+" with "+arg3+" $ password ", nluCacheFileName)
-			return "*Please tell me the password for this env*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to comment on """+arg1+""" with comment: """+arg3, "*Please tell me the password for this env*")
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":comment on "+arg1+" "+arg2+" ("+arg3+")"
@@ -128,7 +128,7 @@ object argParser {
 			//	   "generate newmap script cmd: "+cmd
 
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 
 	}
@@ -178,10 +178,10 @@ object argParser {
 
 		if(!gotArg1){
 			nluInterpreter.writeToCache("access ", nluCacheFileName)
-			return "*missing env name, Please tell me a env name*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to log into an environment*""", "*missing env name, Please tell me a env name*")
 		}else if(!gotArg2){
 			nluInterpreter.writeToCache("access "+arg1+" with password ", nluCacheFileName)
-			return "*missing password, Please tell me the password for this env.*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to log in environment """+arg1+"*", "*missing password, Please tell me the password for this env*")
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":log in "+arg1+" "+arg2
@@ -189,7 +189,7 @@ object argParser {
 			//	   "generate newmap script cmd: "+cmd
 
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}	
 	}
 
@@ -241,16 +241,16 @@ object argParser {
 
 		if(!gotArg1){
 			nluInterpreter.writeToCache("create env called ", nluCacheFileName)
-			return generateJsonString(">> "+OriginalMessage+"""\n*I understand u want to create an environment*""", "*missing env name. Please tell me a env name*")	
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to create an environment*""", "*missing env name. Please tell me a env name*")	
 		}else if(!gotArg2){
 			nluInterpreter.writeToCache("create env called " + arg1 + " password ", nluCacheFileName)
-			return generateJsonString(">> "+OriginalMessage+"""\n*I understand u want to create an env named """+arg1+"*", "*missing password. Please tell me a password*")
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to create an env named """+arg1+"*", "*missing password. Please tell me a password*")
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":create "+arg1+" "+arg2
 			//ret+"\nInterpret finished. *\n"+"generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return generateRegularJsonRespond(ret)
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 	}
 
@@ -274,14 +274,15 @@ object argParser {
 
 		if(!gotArg){
 			nluInterpreter.writeToCache("show me the content with commit num ", nluCacheFileName)
-			return "*missing the commit number you want to check, Please tell me the commit number \n(you can type 'what's in the log' to check all commit numbers)*"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to check out a previous commit content""", """*missing the commit number you want to check, Please tell me the commit number \n(you can type 'what's in the log' to check all commit numbers)*""")
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":checkout "+arg
 			//return "*Got commit number "+arg+".* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			nluInterpreter.retJsonFormatFlag = false
+			return ">> "+OriginalMessage+"\n"+ret
 		}
 
 	}
@@ -310,14 +311,14 @@ object argParser {
 
 		if(!gotArg){
 			nluInterpreter.writeToCache("commit ", nluCacheFileName)
-			return "*I understand u want to commit, but missing the commit message, Please tell me the commit message *"
+			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to commit*""", "*but missing the commit message, Please tell me the commit message*")
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":commit "+arg
 			//return "*I understand u want to commit current env. \nGot commit message: "+arg+".* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 	}
 
@@ -350,17 +351,19 @@ object argParser {
 		if(!gotArg1) {
 			if(hardFlag){
 				nluInterpreter.writeToCache("hard reset to commit id ", nluCacheFileName)
+				return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to hard reset to a previous commit*""", "*but missing commit id, Please tell me the commit id u want to hard reset*")
 			}else{
 				nluInterpreter.writeToCache("reset to commit id ", nluCacheFileName)
+				return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to reset to a previous commit*""", "*but missing commit id, Please tell me the commit id u want to reset*")
 			}
-			return "but missing commit id, Please tell me the commit id u want to reset. *"
 		}else if(!gotArg2) {
 			if(hardFlag){
 				nluInterpreter.writeToCache("hard reset to commit id "+arg1+" password ", nluCacheFileName)
+				return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to hard reset to commit """+arg1+"*", "*please tell me the password of this env*")
 			}else{
 				nluInterpreter.writeToCache("reset to commit id "+arg1+" password ", nluCacheFileName)
+				return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to reset to commit """+arg1+"*", "*please tell me the password of this env*")
 			}
-			return "\nplease tell me the password of this env. *"
 		}else {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			var cmd = ""
@@ -372,7 +375,7 @@ object argParser {
 			//return "\nGot commit id: "+arg1+".* \nInterpret finished.\n"+
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 
 	}
@@ -425,10 +428,10 @@ object argParser {
 
   		if(!gotArg1) {
   			nluInterpreter.writeToCache("create data structure called ", nluCacheFileName)
-  			return "missing data structure name, Please tell me the name of the data structure you want to create."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understant u want to create a data structure*""", "*missing data structure name, Please tell me the name of the data structure you want to create*")
   		}else if(varMap.isEmpty) {
   			nluInterpreter.writeToCache("create data structure called "+arg1+" ", nluCacheFileName)
-  			return "missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understant u want to create a data structure named """+arg1+"*", """*missing content in this data structure,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
   			var cmd = "val "+arg1+":Map Identifier Identifier String = ("
@@ -440,7 +443,7 @@ object argParser {
   			//return "create var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished.\n"+
   			//	   "generate newmap script cmd: "+cmd
   			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
   		}
 
 	}
@@ -490,14 +493,12 @@ object argParser {
 			}
 		}
 
-		val ret: String = "I understand u want to append on data structure "
-
 		if(!gotArg1) {
   			nluInterpreter.writeToCache("append on data structure ", nluCacheFileName)
-  			return ret+"\nbut missing data structure name, Please tell me the name of the data structure you want to create."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to append on a data structure*""", "*but missing data structure name, Please tell me the name of the data structure you want to append*")
   		}else if(varMap.isEmpty) {
   			nluInterpreter.writeToCache("append on data structure "+arg1+" ", nluCacheFileName)
-  			return ret+arg1+"\nbut missing content in this data structure "+arg1+" ,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to append on data structure """+arg1+"*","""*but missing content in this data structure, \nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
   			var cmd = "val "+arg1+" = appendMap Identifier Identifier String "+arg1+" ("
@@ -509,7 +510,7 @@ object argParser {
   			//return ret+arg1+"\nappend var map: "+varMap.toString.stripPrefix("ListMap")+"\nInterpret finished.\n"+
   			//	   "generate newmap script cmd: "+cmd
   			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
   		}
 	}
 
@@ -557,29 +558,28 @@ object argParser {
   			}
   		}
 
-  		val tmp = "I understand you want to copy a environment.\n"
   		if(!gotArg1){
   			nluInterpreter.writeToCache("copy from channel ", nluCacheFileName)
-  			return tmp+"But missing the channel name you want to copy from, Please tell me the channel name."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to copy an environment*""", "*But missing the channel name you want to copy from, Please tell me the channel name*")
   		}else if(!gotArg2){
   			nluInterpreter.writeToCache("copy from channel "+arg1+" env ", nluCacheFileName)
-  			return tmp+"But missing the environment name you want to copy from, Please tell me the environment name."
-  		}else if(!gotArg3){
-  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password ", nluCacheFileName)
-  			return tmp+"But Please tell me the password of the environment "+arg2+" from channel "+arg1+"."
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to copy an environment from channel """+arg1+"*", "*But missing the environment name you want to copy from, Please tell me the environment name*")
   		}else if(!gotArg4){
-  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password "+arg3+" newenv ", nluCacheFileName)
-  			return tmp+"Please tell me the name of the new environment that you want to store the coppied content."
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" newenv ", nluCacheFileName)
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to copy environment """+arg2+" from channel "+arg1+"*", "*Please tell me the name of the new environment that you want to store the coppied content*")
   		}else if(!gotArg5){
-  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" password "+arg3+" newenv "+arg4+" newpassword ", nluCacheFileName)
-  			return tmp+"Please tell me the password of the new environment that you want to store the coppied content."
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" newenv "+arg4+" newpassword ", nluCacheFileName)
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to create environment """+arg4+" to store the coppied content*", "*Please tell me a password for this new environment*")
+  		}else if(!gotArg3){
+  			nluInterpreter.writeToCache("copy from channel "+arg1+" env "+arg2+" newenv "+arg4+" newpassword "+arg5+" password ", nluCacheFileName)
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*Got password for new environment """+arg4+"*", "*Please tell me the password for the original environment*")
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
   			val cmd = ":copy "+arg1+" "+arg2+" "+arg3+" "+arg4+" "+arg5
   			//return "I understand you want to copy from "+arg1+" env "+arg2+" with password "+arg3+", and create a new env "+arg4+" with password "+arg5+"\nInterpret finished."+
   			//	   "generate newmap script cmd: "+cmd
   			val ret = interp(chanName, userName, cmd)
-			return ret
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
   		}
 
 	}
