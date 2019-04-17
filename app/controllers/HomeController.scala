@@ -55,8 +55,12 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     //Ok(chanName+" "+userName)
     //Ok(">> "+msg)
     if(msg.equals("train")){
-      train
-      Ok("Train Finished")
+      if(userName.equals("yw2983")) {
+        train
+        Ok("*Train Finished*")
+      }else{
+        Ok("*You are not authorized to train the model*")
+      }
     }else if(msg.toLowerCase.equals("help")){
       Ok(Json.parse(generateRegularJsonRespond(ActRecommendation)))
     }else if(msg.equals("stop")){
@@ -89,7 +93,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     resp match {
       case "No" => {
         stopConv(chanName, userName)
-        Ok("*Conversation stopped!*")
+        Ok("*Conversation stopped!*\n*Please type 'Help' for more instructions*")
         //Ok(request.body.asFormUrlEncoded.get.get("payload").get.head)
       }
       case _ => {
