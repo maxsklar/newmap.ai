@@ -17,6 +17,11 @@ import ai.newmap.nluLayer.trainer.train
 import ai.newmap.nluLayer.nluInterpreter.nluInterp
 import ai.newmap.nluLayer.nluInterpreter.preProcess
 import ai.newmap.nluLayer.convTerminator.stopConv
+import ai.newmap.nluLayer.nluChecker.GoingToGet
+import ai.newmap.nluLayer.nluChecker.Got
+import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
+
+import play.api.libs.json._
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -45,56 +50,36 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     // user name:
     val userName = body.asFormUrlEncoded.get.get("user_name").get.head
     //Ok(chanName+" "+userName)
-    var response:String = ""
-    msg match{
-      case msg if (msg.startsWith(":create ") ||
-                    msg.startsWith(":log in ") ||
-                    msg.startsWith(":copy ") ||
-                    msg.startsWith(":comment on")||
-                    msg.startsWith(":commit") ||
-                    msg.startsWith(":checkout ") ||
-                    msg.startsWith(":reset ") ||
-                    msg.startsWith(":hard reset "))=>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
+    //Ok(">> "+msg)
+    if(msg.equals("train")){
+      train
+      Ok("Train Finished")
+    }else if(msg.equals("stop")){
+      stopConv(chanName, userName)
+      Ok("Conversation Stopped")
+    }else{
+      val ret = nluInterp(chanName, userName, msg)
+      Ok(Json.parse(ret))
+    }
+  }
+
+  def handle_button_request = Action { request: Request[AnyContent] =>
+    val resp = request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(3).replaceAll("\"", "").stripSuffix("}]").split(":")(1)
+    // channel name:
+    val chanName = request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(8).replaceAll("\"", "").stripSuffix("}").split(":")(1)
+    // user name:
+    val userName = request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(10).replaceAll("\"", "").stripSuffix("}").split(":")(1)
+    resp match {
+      case "No" => {
+        stopConv(chanName, userName)
+        Ok("*Conversation stopped!*")
+        //Ok(request.body.asFormUrlEncoded.get.get("payload").get.head)
       }
-      case ":printEnv" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
-      }
-      case ":envs" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
-      }
-      case ":log off" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
-      }
-      case ":printLog" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
-      }
-      case ":help" =>{
-        var envInterp = new EnvironmentInterpreter()
-        envInterp.setChanName(chanName)
-        envInterp.setUserName(userName)
-        response = prettyPrinter(""+envInterp(msg))
-      }
-      case _ =>{
-        response = ""+envRead(chanName, userName, msg)
+      case _ => {
+        Ok(Json.parse(generateRegularJsonRespond(Got+"""\n"""+GoingToGet)))
       }
     }
-    Ok(">> "+msg+" \n"+response)
+    // Ok(request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(3).replaceAll("\"", "").stripSuffix("}]").split(":")(1)+"")
   }
 
   def newmap_get(code : String) = Action {
