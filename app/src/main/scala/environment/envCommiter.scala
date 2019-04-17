@@ -210,12 +210,12 @@ object envCommiter {
 		}
 
 		val res = new StringBuilder
-		res ++= "*Log of environment "+envName+"*\n"
+		res ++= "*Log of environment "+envName+"*\n "
 		val verObj = amazonS3Client.getObject(BUCKET_NAME, S3_versionFileName_prefix+versionFileName)
 		val verReader = new BufferedReader(new InputStreamReader(verObj.getObjectContent()))
 		var verLine = verReader.readLine
 		while(verLine != null){
-			res ++= verLine+"\n"
+			res ++= verLine+"\n "
 			verLine = verReader.readLine
 		}
 		res.toString
@@ -259,7 +259,7 @@ object envCommiter {
 		envInterp.setUserName(userName)
 		val envSet: HashSet[String] = HashSet()
 		val str = new StringBuilder
-  		str ++= "*Environment "+envName+", commit id "+uuid+":* \n"
+  		str ++= "*Environment "+envName+", commit id "+uuid+":* \n "
   		var verLine = verReader.readLine
   		if(verLine == null){return "*There is no content in this commit of "+envName+"* \n"}
   		while (verLine!=null){
@@ -274,7 +274,7 @@ object envCommiter {
 		for(element:String <- envSet){
 			//println("******"+element+"******")
 			val response = envInterp(element)
-			str ++= "\t"+element+" = "+envPrinter.prettyPrinter(""+response) + "\n"
+			str ++= "\t"+element+" = "+envPrinter.prettyPrinter(""+response) + "\n "
 		}
 		str.toString
 	}
