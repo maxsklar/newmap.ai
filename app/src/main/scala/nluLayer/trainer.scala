@@ -62,7 +62,6 @@ object trainer {
 		act_reset_train()
 		act_append_train()
 		act_copy_train()
-		act_greeting_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
