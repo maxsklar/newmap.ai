@@ -32,6 +32,8 @@ object nluInterpreter {
 
 	var ActionMap:ListMap[String, String] = ListMap.empty[String,String]
 
+	var OriginalMessage = ""
+
 	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
@@ -60,6 +62,8 @@ object nluInterpreter {
 	def nluInterp(chanName:String, userName: String, code: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		this.OriginalMessage = code
 
   		loadActionModel
 
@@ -100,28 +104,28 @@ object nluInterpreter {
 		// process action
 		actionType match {
 			case "create" => {
-				return processCreateAct(msg, nluCacheFileName)
+				return processCreateAct(chanName, userName, msg, nluCacheFileName)
 			}
 			case "accessEnv" => {
-				return processAccessEnvAct(msg, nluCacheFileName)
+				return processAccessEnvAct(chanName, userName, msg, nluCacheFileName)
 			}
 			case "print" => {
-				return processPrintAct(msg, nluCacheFileName)
+				return processPrintAct(chanName, userName, msg, nluCacheFileName)
 			}
 			case "comment" => {
-				return argParser.parseCommentEnvArg(msg, nluCacheFileName)
+				return argParser.parseCommentEnvArg(chanName, userName, msg, nluCacheFileName)
 			}
 			case "commit" => {
-				return argParser.parseCommitArg(msg, nluCacheFileName)
+				return argParser.parseCommitArg(chanName, userName, msg, nluCacheFileName)
 			}
 			case "reset" => {
-				return processResetAct(msg, nluCacheFileName)
+				return processResetAct(chanName, userName, msg, nluCacheFileName)
 			}
 			case "append" => {
-				return argParser.parseAppendArg(msg, nluCacheFileName)
+				return argParser.parseAppendArg(chanName, userName, msg, nluCacheFileName)
 			}
 			case "copy" =>{
-				return argParser.parseCopyArg(msg, nluCacheFileName)
+				return argParser.parseCopyArg(chanName, userName, msg, nluCacheFileName)
 			}
 			case _ => {
 				return "*** Fail because of logic error. "+actionType+" does not exist ***"
@@ -143,6 +147,15 @@ object nluInterpreter {
 	}
 
 	def preProcess(str: String): String = {
-		str.replaceAll("""[()?.!:,]""", "").toLowerCase
+		str.replaceAll("""[()?.!:,]""", "")
+	}
+
+	def generateRegularJsonRespond(str: String): String = {
+		val jsonPrefix = """{
+ 	   "text": """"
+    	val jsonSuffix = """",
+		    "mrkdwn": true
+		}"""
+		return jsonPrefix+str+jsonSuffix
 	}
 }

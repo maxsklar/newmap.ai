@@ -20,6 +20,8 @@ import scala.collection.immutable.ListMap
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.argParser._
+import ai.newmap.nluLayer.baseLayerInterpreter.interp
+import ai.newmap.nluLayer.nluInterpreter.preProcess
 
 object actionProcessor {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -34,12 +36,12 @@ object actionProcessor {
 	var PrintIndMap:ListMap[String, String] = ListMap.empty[String, String]
 	var HardResetIndMap:ListMap[String, String] = ListMap.empty[String, String]
 
-	def processCreateAct(msg: String, nluCacheFileName: String): String = {
+	def processCreateAct(chanName: String, userName: String, msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
 		loadCreateIndModel
-		val cont = msg.toLowerCase.split("\\s+")
+		val cont = msg.toLowerCase().split("\\s+")
 		var actObjectType = ""
 		var gotActObjectType = false
 		for(tok <- cont if !gotActObjectType){
@@ -55,21 +57,19 @@ object actionProcessor {
 			return "*Didn't recognize action object in message, please tell me what do u want to create, env or data structure*"
 		}else{
 			if(actObjectType.equals("env")){
-				val ret = parseCreateEnvArg(msg, nluCacheFileName)
-				return "*I understand you want to create a/an "+actObjectType+"*\n"+ret
+				return parseCreateEnvArg(chanName, userName, msg, nluCacheFileName)
 			}else{
-				val ret = parseCreateDSArg(msg, nluCacheFileName)
-				return "*I understand you want to create a/an "+actObjectType+"*\n"+ret
+				return parseCreateDSArg(chanName, userName, msg, nluCacheFileName)
 			}
 		}
 	}
 
-	def processPrintAct(msg: String, nluCacheFileName: String): String = {
+	def processPrintAct(chanName: String, userName: String, msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
 		loadPrintIndModel
-		val cont = msg.toLowerCase.split("\\s+")
+		val cont = msg.toLowerCase().split("\\s+")
 		var printType = ""
 		var gotPrintType = false
 		for(tok <- cont if !gotPrintType){
@@ -86,21 +86,27 @@ object actionProcessor {
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":envs"
-			return "*I understand you want to print the envs in this channel* \nInterpret finished.\n"+
-				   "generate newmap script cmd: "+cmd
+			//return "*I understand you want to print the envs in this channel* \nInterpret finished.\n"+
+			//	   "generate newmap script cmd: "+cmd
+			val ret = interp(chanName, userName, cmd)
+			return ret
 		}else if(printType.equals("env")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":printEnv"
-			return "*I understand you want to print the content in this env* \nInterpret finished.\n"+
-				   "generate newmap script cmd: "+cmd
+			//return "*I understand you want to print the content in this env* \nInterpret finished.\n"+
+			//	   "generate newmap script cmd: "+cmd
+			val ret = interp(chanName, userName, cmd)
+			return ret
 		}else if(printType.equals("log")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":printLog"
-			return "*I understand you want to print the log history in this env* \nInterpret finished.\n"+
-				   "generate newmap script cmd: "+cmd
+			//return "*I understand you want to print the log history in this env* \nInterpret finished.\n"+
+			//	   "generate newmap script cmd: "+cmd
+			val ret = interp(chanName, userName, cmd)
+			return ret
 		}else if(printType.equals("commit")){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			val ret = parseCheckOutArg(msg, nluCacheFileName)
+			val ret = parseCheckOutArg(chanName, userName, msg, nluCacheFileName)
 			return "*I understand you want to check the content of a previous commmit in this env* \n"+ret
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
@@ -108,12 +114,12 @@ object actionProcessor {
 		}
 	}
 
-	def processAccessEnvAct(msg: String, nluCacheFileName: String): String = {
+	def processAccessEnvAct(chanName: String, userName: String, msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
 		loadAccessEnvIndModel
-		val cont = msg.toLowerCase.split("\\s+")
+		val cont = msg.toLowerCase().split("\\s+")
 		var accessEnvType = ""
 		var gotAccessEnvType = false
 		for(tok <- cont if !gotAccessEnvType){
@@ -127,20 +133,23 @@ object actionProcessor {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			return "* couldn't identify log in env or log off *"
 		}else if(accessEnvType.equals("in")){
-			val ret = parseLogInArg(msg, nluCacheFileName)
+			val ret = parseLogInArg(chanName, userName, msg, nluCacheFileName)
 			return "*I understand you want to log in an environment*\n"+ret
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
-			return "*I understand you want to log off an environment* \nInterpret finished"
+			val cmd = ":log off"
+			//return "*I understand you want to log off an environment* \nInterpret finished"
+			val ret = interp(chanName, userName, cmd)
+			return ret
 		}
 	}
 
-	def processResetAct(msg: String, nluCacheFileName: String): String = {
+	def processResetAct(chanName: String, userName: String, msg: String, nluCacheFileName: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		loadHardResetIndMode
-  		val cont = msg.toLowerCase.split("\\s+")
+  		val cont = msg.toLowerCase().split("\\s+")
 		var gotHardResetType = false
 		for(tok <- cont if !gotHardResetType){
 			if(HardResetIndMap.contains(tok)){
@@ -149,10 +158,10 @@ object actionProcessor {
 		}
 
 		if(!gotHardResetType) {
-			val ret = parseResetArg(msg, nluCacheFileName, false)
+			val ret = parseResetArg(chanName, userName, msg, nluCacheFileName, false)
 			return "*I understand u want to reset to previous commit, "+ret
 		}else{
-			val ret = parseResetArg(msg, nluCacheFileName, true)
+			val ret = parseResetArg(chanName, userName, msg, nluCacheFileName, true)
 			return "*I understand u want to hard reset to previous commit, "+ret
 		}
 	}
