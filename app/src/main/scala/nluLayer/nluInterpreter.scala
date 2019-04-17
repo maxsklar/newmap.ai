@@ -17,10 +17,12 @@ import java.io.FileOutputStream
 import org.apache.commons.io.IOUtils
 import scala.collection.JavaConversions._
 import scala.collection.immutable.ListMap
+import scala.collection.immutable.HashSet
 
 import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.actionProcessor._
 import ai.newmap.nluLayer.onBoardConstant._
+import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
 
 object nluInterpreter {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -32,7 +34,11 @@ object nluInterpreter {
 
 	var ActionMap:ListMap[String, String] = ListMap.empty[String,String]
 
+	var GreetingSet = HashSet.empty[String]
+
 	var OriginalMessage = ""
+
+	var retJsonFormatFlag = true
 
 	def loadActionModel() = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
@@ -59,11 +65,39 @@ object nluInterpreter {
   		ActionMap.forEach{case (key, value) => println (key + "-->" + value)}
   	}
 
+  	def loadGreetingModel() = {
+  		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val greetingModFileName = "greeting_model.txt"
+  		val greetingModObj = amazonS3Client.getObject(BUCKET_NAME, S3_ModelFileName_Prefix+greetingModFileName)
+  		val greetingModReader = new BufferedReader(new InputStreamReader(greetingModObj.getObjectContent()))
+  		var greetingModLine = greetingModReader.readLine
+  		while(greetingModLine != null){
+  			GreetingSet += greetingModLine
+  			greetingModLine = greetingModReader.readLine
+  		}
+
+  		println("*** greeting set ***")
+  		println(GreetingSet)
+  	}
+
+  	def dummyGreetingResp(code: String): String = {
+  		loadGreetingModel
+
+  		if(GreetingSet.contains(code.toLowerCase)){
+  			return generateRegularJsonRespond(GreetingConstant)
+  		}else{
+  			return "N"
+  		}
+  	}
+
 	def nluInterp(chanName:String, userName: String, code: String): String = {
 		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		this.OriginalMessage = code
+  		retJsonFormatFlag = true
 
   		loadActionModel
 
@@ -97,8 +131,8 @@ object nluInterpreter {
 
 		if(!gotActionType){
 
-			return "*Didn't recognize action in this message, please tell me exactly what you want to do*\n"+
-					ActRecommendation
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"""*Didn't recognize action in this message, please tell me exactly what you want to do*\n"""+
+					ActRecommendation)
 		}
 
 		// process action
@@ -128,7 +162,7 @@ object nluInterpreter {
 				return argParser.parseCopyArg(chanName, userName, msg, nluCacheFileName)
 			}
 			case _ => {
-				return "*** Fail because of logic error. "+actionType+" does not exist ***"
+				return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*** Fail because of logic error. "+actionType+" does not exist ***")
 			}
 		}
 
