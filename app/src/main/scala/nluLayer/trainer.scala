@@ -62,6 +62,7 @@ object trainer {
 		act_reset_train()
 		act_append_train()
 		act_copy_train()
+		act_greeting_train()
 
 		val actionModFileName = "action_model.txt"
 		write_into_AWS(actionModFileName, ActionMap)
@@ -464,6 +465,27 @@ object trainer {
 			copyActLine = copyActReader.readLine
 		} 
 
+	}
+
+	def act_greeting_train() = {
+		val awsCredentials = new BasicAWSCredentials(AWS_ACCESS_KEY, AWS_SECRET_KEY)
+  		val amazonS3Client = new AmazonS3Client(awsCredentials)
+
+  		val greetingActTrainFileName = "greeting_act_train.txt"
+
+  		val greetingActObj = amazonS3Client.getObject(BUCKET_NAME, S3_TrainFileName_Prefix+greetingActTrainFileName)
+		val greetingActReader = new BufferedReader(new InputStreamReader(greetingActObj.getObjectContent()))
+		var greetingActLine = greetingActReader.readLine
+
+		val greetingIndMap:HashMap[String, String] = HashMap.empty[String, String]
+
+		while(greetingActLine != null) {
+			println(greetingActLine)
+			greetingIndMap += (greetingActLine -> "1_greeting")
+			greetingActLine = greetingActReader.readLine
+		}
+		println(greetingIndMap)
+		write_into_AWS("greeting_model.txt", greetingIndMap)
 	}
 
 	def write_into_AWS(modelFileName: String, modelMap: HashMap[String, String]) = {
