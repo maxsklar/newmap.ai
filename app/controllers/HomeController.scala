@@ -15,6 +15,7 @@ import ai.newmap.environment.envPrinter.prettyPrinter
 
 import ai.newmap.nluLayer.trainer.train
 import ai.newmap.nluLayer.nluInterpreter.nluInterp
+import ai.newmap.nluLayer.nluInterpreter.loadModel
 
 /**
  * This controller creates an `Action` to handle HTTP requests to the
@@ -155,6 +156,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(">> "+code+" \n"+response)
   }
 
+
+
   def test_get(code : String) = Action {
     // channel name:
     val chanName = "testChanName"
@@ -163,9 +166,14 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     if(code.equals("train")){
       train
       Ok("train finished")
+    }elseelse if(code.equals("load")){
+      loadModel
+      Ok("model loaded")
     }else{
-      val ret = nluInterp(chanName, userName, code)
-      Ok(ret)
+      Ok("failed")
     }
   }
-}
+
+  def newmap_script = Action { request: Request[AnyContent] =>
+    val body: AnyContent = request.body
+    val script = body.asFormUrlEncoded.get.get("text").get.head
