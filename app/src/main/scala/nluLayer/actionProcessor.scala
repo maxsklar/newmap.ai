@@ -24,6 +24,7 @@ import ai.newmap.nluLayer.baseLayerInterpreter.interp
 import ai.newmap.nluLayer.nluInterpreter.preProcess
 import ai.newmap.nluLayer.nluInterpreter.OriginalMessage
 import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
+import ai.newmap.logger.adminLogger
 
 object actionProcessor {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -54,8 +55,9 @@ object actionProcessor {
 			}
 		}
 		if(!gotActObjectType){
-			nluInterpreter.writeToCache("create ", nluCacheFileName)
+			nluInterpreter.writeToCache("create ", nluCacheFileName) 
 			//println("*** no action object type in message, please tell me what do u want to create env or data structure ***")
+			adminLogger.log(chanName, userName, "*Didn't recognize action object in this message, please tell me what do u want to create, env or data structure*")
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Didn't recognize action object in this message, please tell me what do u want to create, env or data structure*")
 		}else{
 			if(actObjectType.equals("env")){
@@ -84,6 +86,7 @@ object actionProcessor {
 		if(!gotPrintType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			// TODO
+			adminLogger.log(chanName, userName, "*Couldn't identify the content of what u want to see*")
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Couldn't identify the content of what u want to see*")
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
@@ -92,6 +95,7 @@ object actionProcessor {
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
 			nluInterpreter.retJsonFormatFlag =false
+			adminLogger.log(chanName, userName, ret)
 			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("env")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
@@ -100,6 +104,7 @@ object actionProcessor {
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
 			nluInterpreter.retJsonFormatFlag =false
+			adminLogger.log(chanName, userName, ret)
 			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("log")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
@@ -108,12 +113,14 @@ object actionProcessor {
 			//	   "generate newmap script cmd: "+cmd
 			val ret = interp(chanName, userName, cmd)
 			nluInterpreter.retJsonFormatFlag = false
+			adminLogger.log(chanName, userName, ret)
 			return ">> "+OriginalMessage+"\n"+ret
 		}else if(printType.equals("commit")){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			return parseCheckOutArg(chanName, userName, msg, nluCacheFileName)
 		}else{
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			adminLogger.log(chanName, userName, "*system logic error*")
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*system logic error*")
 		}
 	}
@@ -135,6 +142,7 @@ object actionProcessor {
 
 		if(!gotAccessEnvType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
+			adminLogger.log(chanName, userName, "*Couldn't identify log in env or log off *")
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Couldn't identify log in env or log off *")
 		}else if(accessEnvType.equals("in")){
 			return parseLogInArg(chanName, userName, msg, nluCacheFileName)
@@ -143,6 +151,7 @@ object actionProcessor {
 			val cmd = ":log off"
 			//return "*I understand you want to log off an environment* \nInterpret finished"
 			val ret = interp(chanName, userName, cmd)
+			adminLogger.log(chanName, userName, ret)
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+ret)
 		}
 	}

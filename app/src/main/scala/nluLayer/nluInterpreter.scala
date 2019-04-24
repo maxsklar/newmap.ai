@@ -23,6 +23,7 @@ import ai.newmap.environment.envConstant
 import ai.newmap.nluLayer.actionProcessor._
 import ai.newmap.nluLayer.onBoardConstant._
 import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
+import ai.newmap.logger.adminLogger
 
 object nluInterpreter {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -97,6 +98,7 @@ object nluInterpreter {
   		val amazonS3Client = new AmazonS3Client(awsCredentials)
 
   		this.OriginalMessage = code
+
   		retJsonFormatFlag = true
 
   		loadActionModel
@@ -130,7 +132,7 @@ object nluInterpreter {
 		}
 
 		if(!gotActionType){
-
+			adminLogger.log(chanName, userName, """*Didn't recognize action in this message, please tell me exactly what you want to do*\n"""+ActRecommendation)
 			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"""*Didn't recognize action in this message, please tell me exactly what you want to do*\n"""+
 					ActRecommendation)
 		}
@@ -181,7 +183,7 @@ object nluInterpreter {
 	}
 
 	def preProcess(str: String): String = {
-		str.replaceAll("""[()?.!:,]""", "")
+		str.replaceAll("I want to ", "").replaceAll("""[()?.!:,]""", "")
 	}
 
 	def generateRegularJsonRespond(str: String): String = {
