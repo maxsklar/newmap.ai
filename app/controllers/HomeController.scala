@@ -23,6 +23,9 @@ import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
 import ai.newmap.nluLayer.nluInterpreter.retJsonFormatFlag
 import ai.newmap.nluLayer.nluInterpreter.dummyGreetingResp
 import ai.newmap.nluLayer.onBoardConstant.ActRecommendation
+import ai.newmap.nluLayer.onBoardConstant.GreetingConstant
+import ai.newmap.logger.adminLogger
+import scala.collection.immutable.HashSet
 
 import play.api.libs.json._
 
@@ -54,31 +57,49 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     val userName = body.asFormUrlEncoded.get.get("user_name").get.head
     //Ok(chanName+" "+userName)
     //Ok(">> "+msg)
-    if(msg.equals("train")){
-      if(userName.equals("yw2983")) {
-        train
-        Ok("*Train Finished*")
+
+    val AuthorizedUser:HashSet[String] = HashSet("yw2983", "max.sklar", "na2196", "yg1702")
+
+    if(msg.equals("admin print")){
+      if(AuthorizedUser.contains(userName)){
+        val ret = adminLogger.adminPrint
+        Ok(">> admin print\n"+ret)
       }else{
-        Ok("*You are not authorized to train the model*")
+        Ok("*You are not authorized to see the admin log*")
       }
-    }else if(msg.toLowerCase.equals("help")){
-      Ok(Json.parse(generateRegularJsonRespond(ActRecommendation)))
-    }else if(msg.equals("stop")){
-      stopConv(chanName, userName)
-      Ok("Conversation Stopped")
     }else{
-      val checkGreeting = dummyGreetingResp(msg)
-      checkGreeting match {
-        case "N" => {
-          val ret = nluInterp(chanName, userName, msg)
-          if(retJsonFormatFlag){
-            Ok(Json.parse(ret))
-          }else{
-            Ok(ret)
-          }
+      adminLogger.log(chanName, userName, ">> "+msg)
+      if(msg.equals("train")){
+        if(userName.equals("yw2983")) {
+          train
+          adminLogger.log(chanName, userName, "*Train Finished*")
+          Ok("*Train Finished*")
+        }else{
+          adminLogger.log(chanName, userName, "*You are not authorized to train the model*")
+          Ok("*You are not authorized to train the model*")
         }
-        case _ => {
-          Ok(Json.parse(checkGreeting))
+      }else if(msg.toLowerCase.equals("help")){
+        adminLogger.log(chanName, userName, ActRecommendation)
+        Ok(Json.parse(generateRegularJsonRespond(ActRecommendation)))
+      }else if(msg.equals("stop")){
+        stopConv(chanName, userName)
+        adminLogger.log(chanName, userName, "Conversation Stopped")
+        Ok("Conversation Stopped")
+      }else{
+        val checkGreeting = dummyGreetingResp(msg)
+        checkGreeting match {
+          case "N" => {
+            val ret = nluInterp(chanName, userName, msg)
+            if(retJsonFormatFlag){
+              Ok(Json.parse(ret))
+            }else{
+              Ok(ret)
+            }
+          }
+          case _ => {
+            adminLogger.log(chanName, userName, GreetingConstant)
+            Ok(Json.parse(checkGreeting))
+          }
         }
       }
     }
@@ -92,17 +113,46 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     val userName = request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(10).replaceAll("\"", "").stripSuffix("}").split(":")(1)
     resp match {
       case "No" => {
+        adminLogger.log(chanName, userName, ">> Button(No)")
         stopConv(chanName, userName)
+        adminLogger.log(chanName, userName, "*Conversation stopped!*\n*Please type 'Help' for more instructions*")
         Ok("*Conversation stopped!*\n*Please type 'Help' for more instructions*")
         //Ok(request.body.asFormUrlEncoded.get.get("payload").get.head)
       }
       case _ => {
+        adminLogger.log(chanName, userName, ">> Button(Yes)")
+        adminLogger.log(chanName, userName, GoingToGet)
         Ok(Json.parse(generateRegularJsonRespond(Got+"""\n"""+GoingToGet)))
       }
     }
     // Ok(request.body.asFormUrlEncoded.get.get("payload").get.head.split(",")(3).replaceAll("\"", "").stripSuffix("}]").split(":")(1)+"")
   }
 
+  def test_get(code : String) = Action {
+    // channel name:
+    val chanName = "testChanName"
+    // user name:
+    val userName = "admin"
+    if(code.equals("train")){
+      train
+      Ok("Train Finished")
+    }else if(code.equals("stop")){
+      stopConv(chanName, userName)
+      Ok("Conversation Stopped")
+    }else if(code.equals("adminLog")){
+      adminLogger.adminPrint
+      Ok("Admin Log")
+    }else{
+      val ret = nluInterp(chanName, userName, code)
+      Ok(ret)
+    }
+  }
+
+
+
+
+
+  // deprecated
   def newmap_get(code : String) = Action {
     // channel name:
     val chanName = "testChanName"
@@ -161,29 +211,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(">> "+code+" \n"+response)
   }
 
-  def test_get(code : String) = Action {
-    // channel name:
-    val chanName = "testChanName"
-    // user name:
-    val userName = "admin"
-    if(code.equals("train")){
-      train
-      Ok("Train Finished")
-    }else if(code.equals("stop")){
-      stopConv(chanName, userName)
-      Ok("Conversation Stopped")
-    }else{
-      val ret = nluInterp(chanName, userName, code)
-      Ok(ret)
-    }
-  }
-
-
-
-
-
-
-
   // deprecated
   def newmap_script = Action { request: Request[AnyContent] =>
     val body: AnyContent = request.body
@@ -197,6 +224,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     Ok(""+res)
   }
 
+  // deprecated
   def newmap_script_get(code : String) = Action {
     var envInterp = new EnvironmentInterpreter()
     var c : String = ""
