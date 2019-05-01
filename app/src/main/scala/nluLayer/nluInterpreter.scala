@@ -87,7 +87,7 @@ object nluInterpreter {
   		loadGreetingModel
 
   		if(GreetingSet.contains(code.toLowerCase)){
-  			return generateRegularJsonRespond(GreetingConstant)
+  			return GreetingConstant
   		}else{
   			return "N"
   		}

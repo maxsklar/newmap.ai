@@ -453,7 +453,7 @@ object argParser {
   		}else if(varMap.isEmpty) {
   			nluInterpreter.writeToCache("create data structure called "+arg1+" ", nluCacheFileName)
   			adminLogger.log(chanName, userName, """*I understant u want to create a data structure named """+arg1+"*")
-  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understant u want to create a data structure named """+arg1+"*", """*missing content in this data structure,\nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understant u want to create a data structure named """+arg1+"*", """*missing content in this data structure,* \n*Please tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
   			var cmd = "val "+arg1+":Map Identifier Identifier String = ("
@@ -523,7 +523,7 @@ object argParser {
   		}else if(varMap.isEmpty) {
   			nluInterpreter.writeToCache("append on data structure "+arg1+" ", nluCacheFileName)
   			adminLogger.log(chanName, userName, """*I understand u want to append on data structure """+arg1+"*")
-  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to append on data structure """+arg1+"*","""*but missing content in this data structure, \nPlease tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
+  			return generateButtonJsonString(">> "+OriginalMessage+"""\n*I understand u want to append on data structure """+arg1+"*","""*but missing content in this data structure,* \n*Please tell me the variable(s) and the type(s) in 'variable <variable name> type <type>' syntax*""")
   		}else{
   			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
   			var cmd = "val "+arg1+" = appendMap Identifier Identifier String "+arg1+" ("
