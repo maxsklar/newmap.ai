@@ -26,6 +26,7 @@ import ai.newmap.nluLayer.onBoardConstant.ActRecommendation
 import ai.newmap.nluLayer.onBoardConstant.GreetingConstant
 import ai.newmap.logger.adminLogger
 import scala.collection.immutable.HashSet
+import ai.newmap.environment.envCommiter.getNextNameableChar
 
 import play.api.libs.json._
 
@@ -46,6 +47,8 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
   def index() = Action { implicit request: Request[AnyContent] =>
     Ok(views.html.index())
   }
+
+  var randomKey = ""
 	
   def newmap = Action { request: Request[AnyContent] =>
   	val body: AnyContent = request.body
@@ -62,8 +65,14 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
 
     if(msg.equals("admin print")){
       if(AuthorizedUser.contains(userName)){
-        val ret = adminLogger.adminPrint
-        Ok(">> admin print\n"+ret)
+        val adminEndpoint = "https://newmap-ai.herokuapp.com/adminPrint?code="
+        val res = new StringBuilder
+        val r = scala.util.Random
+        for(c <- for (i <- 1 to 4) yield getNextNameableChar(r)) {
+          res += c
+        }
+        randomKey = res.toString
+        Ok(">> admin print\n"+adminEndpoint+randomKey)
       }else{
         Ok("*You are not authorized to see the admin log*")
       }
@@ -80,11 +89,11 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
         }
       }else if(msg.toLowerCase.equals("help")){
         adminLogger.log(chanName, userName, ActRecommendation)
-        Ok(Json.parse(generateRegularJsonRespond(ActRecommendation)))
+        Ok(">> "+msg+"\n"+ActRecommendation)
       }else if(msg.equals("stop")){
         stopConv(chanName, userName)
         adminLogger.log(chanName, userName, "Conversation Stopped")
-        Ok("Conversation Stopped")
+        Ok(">> "+msg+"\n"+"Conversation Stopped")
       }else{
         val checkGreeting = dummyGreetingResp(msg)
         checkGreeting match {
@@ -98,7 +107,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
           }
           case _ => {
             adminLogger.log(chanName, userName, GreetingConstant)
-            Ok(Json.parse(checkGreeting))
+            Ok(">> "+msg+"\n"+checkGreeting)
           }
         }
       }
@@ -146,6 +155,80 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       val ret = nluInterp(chanName, userName, code)
       Ok(ret)
     }
+  }
+
+  def admin_print(code: String) = Action {
+    if(code.equals(randomKey)) {
+      val ret = adminLogger.adminPrint
+      Ok("Administor LOG: \n"+ret)
+    }else{
+      Ok("Deprecated Endpoint \nPlease try 'admin print' again on slack")
+    }
+  }
+
+  def newmap_script = Action { request: Request[AnyContent] =>
+    val body: AnyContent = request.body
+    val code = body.asFormUrlEncoded.get.get("text").get.head
+
+    // channel name:
+    val chanName = body.asFormUrlEncoded.get.get("channel_name").get.head
+    // user name:
+    val userName = body.asFormUrlEncoded.get.get("user_name").get.head
+
+    var response:String = ""
+    var envInterp = new EnvironmentInterpreter()
+    envInterp.setChanName(chanName)
+    envInterp.setUserName(userName)
+
+    if(code.equals("admin print")){
+      val AuthorizedUser:HashSet[String] = HashSet("yw2983", "max.sklar", "na2196", "yg1702")
+      if(AuthorizedUser.contains(userName)){
+        val adminEndpoint = "https://newmap-ai.herokuapp.com/adminPrint?code="
+        val res = new StringBuilder
+        val r = scala.util.Random
+        for(c <- for (i <- 1 to 4) yield getNextNameableChar(r)) {
+          res += c
+        }
+        randomKey = res.toString
+        Ok(">```> admin print```\n>```< "+adminEndpoint+randomKey+"```")
+      }else{
+        Ok("You are not authorized to see the admin log")
+      }
+
+    }else{
+      code match {
+        case code if (code.startsWith(":create ") ||
+                      code.startsWith(":log in ") ||
+                      code.startsWith(":copy ") ||
+                      code.startsWith(":comment on") ||
+                      code.startsWith(":commit") ||
+                      code.startsWith(":checkout ") ||
+                      code.startsWith(":reset ") ||
+                      code.startsWith(":hard set ")) => {
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case ":printEnv" => {
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case ":envs" => {
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case ":log off" => {
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case ":printLog" =>{
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case ":help" =>{
+          response = prettyPrinter(""+envInterp(code))
+        }
+        case _ =>{
+          response = ""+envRead(chanName, userName, code)
+        }
+      }
+      Ok(">```newmap script lang > "+code+"```\n>```newmap script lang < "+response.replaceAll("""[*]""", "")+"```")
+    }
+
   }
 
 
@@ -209,30 +292,6 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
       }
     }
     Ok(">> "+code+" \n"+response)
-  }
-
-  // deprecated
-  def newmap_script = Action { request: Request[AnyContent] =>
-    val body: AnyContent = request.body
-    val script = body.asFormUrlEncoded.get.get("text").get.head
-    var envInterp = new EnvironmentInterpreter()
-    var c : String = ""
-    var res :String = ""
-    for( c <-script.split(";") ){
-      res += "Input: "+c.replaceAll("^\\s+", "")+"; Output: "+envInterp(c)+" \n"
-    }
-    Ok(""+res)
-  }
-
-  // deprecated
-  def newmap_script_get(code : String) = Action {
-    var envInterp = new EnvironmentInterpreter()
-    var c : String = ""
-    var res :String = ""
-    for( c <-code.split(";") ){
-      res += "Input: "+c.replaceAll("^\\s+", "")+"; Output: "+envInterp(c)+" \n"
-    }
-    Ok(""+res)
   }
 
 }
