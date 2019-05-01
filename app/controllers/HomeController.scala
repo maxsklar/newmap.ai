@@ -61,7 +61,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     //Ok(chanName+" "+userName)
     //Ok(">> "+msg)
 
-    val AuthorizedUser:HashSet[String] = HashSet("yw2983", "max.sklar", "na2196", "yg1702")
+    val AuthorizedUser:HashSet[String] = HashSet("max.sklar", "yw2983", "na2196", "yg1702")
 
     if(msg.equals("admin print")){
       if(AuthorizedUser.contains(userName)){
@@ -181,7 +181,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     envInterp.setUserName(userName)
 
     if(code.equals("admin print")){
-      val AuthorizedUser:HashSet[String] = HashSet("yw2983", "max.sklar", "na2196", "yg1702")
+      val AuthorizedUser:HashSet[String] = HashSet("max.sklar", "yw2983", "na2196", "yg1702")
       if(AuthorizedUser.contains(userName)){
         val adminEndpoint = "https://newmap-ai.herokuapp.com/adminPrint?code="
         val res = new StringBuilder
@@ -226,7 +226,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
           response = ""+envRead(chanName, userName, code)
         }
       }
-      Ok(">```newmap script lang > "+code+"```\n>```newmap script lang < "+response.replaceAll("""[*]""", "")+"```")
+      Ok(">```newmap script lang > "+code+"```\n>```newmap script lang < "+response.replaceAll("""[*]""", "").trim+"```")
     }
 
   }

@@ -21,5 +21,10 @@ object onBoardConstant {
 						   "I'm a version system of data structure with a natural language operating interface\n"+
 						   "I'm here to help you improve the efficiency of your software development\n"	+
 						   "Please type 'Help' for further using instructions :)"
+
+	val PrintConstant = """*You can try 'print envs'*\n"""+
+						"""*\t'print env'*\n"""+
+						"""*\t'print log'*\n"""+
+						"""*\t'print commit'*"""
 }
 

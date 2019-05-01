@@ -25,6 +25,7 @@ import ai.newmap.nluLayer.nluInterpreter.preProcess
 import ai.newmap.nluLayer.nluInterpreter.OriginalMessage
 import ai.newmap.nluLayer.nluInterpreter.generateRegularJsonRespond
 import ai.newmap.logger.adminLogger
+import ai.newmap.nluLayer.onBoardConstant.PrintConstant
 
 object actionProcessor {
 	val BUCKET_NAME = envConstant.BUCKET_NAME
@@ -86,8 +87,8 @@ object actionProcessor {
 		if(!gotPrintType){
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			// TODO
-			adminLogger.log(chanName, userName, "*Couldn't identify the content of what u want to see*")
-			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"*Couldn't identify the content of what u want to see*")
+			adminLogger.log(chanName, userName, "*Couldn't identify what u want me to show u*\n"+PrintConstant)
+			return generateRegularJsonRespond(">> "+OriginalMessage+"""\n"""+"""*Couldn't identify what u want me to show u*\n"""+PrintConstant)
 		}else if(printType.equals("envs")) {
 			amazonS3Client.deleteObject(BUCKET_NAME, S3_CacheFileName_Prefix+nluCacheFileName)
 			val cmd = ":envs"
