@@ -35,6 +35,7 @@ object envCreater {
 		// check if that's exits in AWS S3
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+fileName)) {return false}
 
+
 		// write envName into a chanName_envs.txt file
 		val envsFileName:String = chanName+"_Envs.txt"
 		val envsFile:File = new File(envsFileName)
@@ -73,6 +74,10 @@ object envCreater {
 		envFile.write("AC: "+envAccessCode+"\n")
 		envFile.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+fileName, e_file)
+
+		// create initial commit
+		envCommiter.envCommit(chanName, userName, "initial env")
+
 		true
 	}
 
