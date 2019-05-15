@@ -106,6 +106,8 @@ object envCreater {
 		val newFileName:String = toChanName+"_"+newEnvName+"_Env.txt"
 		if(amazonS3Client.doesObjectExist(BUCKET_NAME, S3_EnvFileName_Prefix+newFileName)) {return 3}
 
+		envCreate(toChanName, userName, newEnvName, newAccessCode)
+
 		// write to new env file
 		val e_file = new File(newFileName)
 		e_file.createNewFile();
@@ -120,6 +122,7 @@ object envCreater {
 		envFile.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_EnvFileName_Prefix+newFileName, e_file)
 
+/*
 		// write envName into a chanName_envs.txt file
 		val envsFileName:String = toChanName+"_Envs.txt"
 
@@ -151,6 +154,9 @@ object envCreater {
 		cacheFile.write(toChanName+","+newEnvName+","+newAccessCode)
 		cacheFile.close()
 		amazonS3Client.putObject(BUCKET_NAME, S3_CacheFileName_Prefix+cacheFileName, c_file)
+		// create initial commit
+		envCommiter.envCommit(chanName, userName, "initial env")
+*/
 		0
 
 	}
