@@ -79,7 +79,7 @@ class HomeController @Inject()(cc: ControllerComponents) extends AbstractControl
     }else{
       adminLogger.log(chanName, userName, ">> "+msg)
       if(msg.equals("train")){
-        if(userName.equals("yw2983")) {
+        if(AuthorizedUser.contains(userName)) {
           train
           adminLogger.log(chanName, userName, "*Train Finished*")
           Ok("*Train Finished*")
