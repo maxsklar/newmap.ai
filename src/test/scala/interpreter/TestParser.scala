@@ -50,6 +50,74 @@ class TestParser extends FlatSpec {
     ))
   }
 
+  "A List of tokens of a count statement " should " be parsed correctly" in {
+    val tokens = List(
+      Identifier("val"), 
+      Identifier("a"), 
+      Colon(), 
+      Identifier("Count"), 
+      Equals(), 
+      Number(5)
+    )
+    assert(NewMapParser.statementParse(tokens) == 
+      Success(
+        FullStatementParse(ValStatement,
+          IdentifierParse("a", false),
+          IdentifierParse("Count", false),
+          NaturalNumberParse(5)
+        )
+      )
+    )
+  }
+
+  "A List of tokens of map statement " should " be parsed correctly" in {
+    val tokens = List(
+      Identifier("val"), 
+      Identifier("a"), 
+      Colon(), 
+      Identifier("Map"), 
+      Enc(Paren,true), 
+      Number(3), 
+      Comma(), 
+      Number(100), 
+      Comma(), 
+      Number(0), 
+      Enc(Paren,false), 
+      Equals(), 
+      Enc(Paren,true), 
+      Number(0), 
+      Colon(), 
+      Number(20), 
+      Comma(), 
+      Number(1), 
+      Colon(), 
+      Number(43), 
+      Comma(), 
+      Number(2), 
+      Colon(), 
+      Number(67), 
+      Enc(Paren,false)
+    )
+    assert(NewMapParser.statementParse(tokens) == 
+      Success(
+        FullStatementParse(ValStatement,
+          IdentifierParse("a",false),
+          ApplyParse(IdentifierParse("Map",false),
+            Vector(CommandList(Vector(NaturalNumberParse(3), 
+              NaturalNumberParse(100), 
+              NaturalNumberParse(0))))
+          ),
+          CommandList(Vector(BindingCommandItem(NaturalNumberParse(0),
+            NaturalNumberParse(20)), 
+            BindingCommandItem(NaturalNumberParse(1),
+              NaturalNumberParse(43)), 
+              BindingCommandItem(NaturalNumberParse(2),NaturalNumberParse(67)))
+          )
+        )
+      )
+    )
+  }
+
   "A command list " should " be parsed with one element" in {
     val tokens = Vector(
       Enc(Paren, true),
