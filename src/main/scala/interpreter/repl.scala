@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 object Repl {
   var envInterp = new EnvironmentInterpreter()
-/*
+
   def main(args: Array[String]): Unit = {
     var continue = true
     while(continue) {
@@ -25,5 +25,4 @@ object Repl {
       }
     }
   }
-*/
 }

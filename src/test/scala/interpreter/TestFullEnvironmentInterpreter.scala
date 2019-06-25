@@ -9,7 +9,7 @@ import ai.newmap.util.{Failure, Success}
 
 case class CodeExpectation(
   line: String, // The line of code entered into an environment interpreter
-  resultExpectation: ResultExpectation // The expected response from the interpreter
+  resultExpectation: ResultExpectation // The expected response from the interpreter  
 )
 
 sealed abstract class ResultExpectation
@@ -27,7 +27,7 @@ case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 class TestFullEnvironmentInterpreter extends FlatSpec {
   /**
    * test a bunch of lines of newmap code
-   * on each line, you can check that it succeeds, fails, or
+   * on each line, you can check that it succeeds, fails, or 
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
     val interp = new EnvironmentInterpreter()
@@ -154,7 +154,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "A struct " should " be created" in {
     val code = "val s: (Struct (a: 2, b: 3)) = (a:0, b:0)"
-
+    
     val correctCommand = Environment.eCommand(
       "s",
       StructT(Vector(("a",IndexT(2)), ("b",IndexT(3)))),
@@ -347,24 +347,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val Bool: Subtype Identifier = (True: 1, False: 1)", GeneralSuccessCheck),
       CodeExpectation("val f: Bool => 100 = x => (True: 10, False: 20) x", GeneralSuccessCheck),
       CodeExpectation("val x: 100 = f True", GeneralSuccessCheck)
-    ))
-  }
-
-  // error test
-  // val a : 3 = 1
-  // val m: Map(3, 4, 0) = (0: 2, 1: 3, 2: 1)
-  // val fSig: Type = ((a: 3) => 4)
-  // val f: fSig = ((a: 3) => m a)
-  // m a
-  // val result: 4 = f (a: 1)
-
-  it should "report an error of type mismatch" in {
-    testCodeScript(Vector(
-      CodeExpectation("val a: 3 = 1", GeneralSuccessCheck),
-      CodeExpectation("val fSig: Type = ((a: 3) => 4)", GeneralSuccessCheck),
-      CodeExpectation("val m: Map(3, 4, 0) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
-      CodeExpectation("val f: fSig = ((a: 3) => m a)", GeneralSuccessCheck),
-      CodeExpectation("val result: 4 = f (a: 1)", GeneralSuccessCheck),
     ))
   }
 }
