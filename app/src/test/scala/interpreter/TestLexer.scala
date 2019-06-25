@@ -42,6 +42,49 @@ class TestLexer extends FlatSpec {
     )))
   }
 
+  "A count statement" should " be lexed correctly" in {
+    val code = "val a: Count = 5"
+    assert(Lexer(code) == Success(List(
+        Identifier("val"), 
+        Identifier("a"), 
+        Colon(), 
+        Identifier("Count"), 
+        Equals(), 
+        Number(5)
+    )))
+  }
+
+  test("A map statement should be lexed correctly"){
+    val code = "val a : Map(3, 100, 0) = (0:20, 1:43, 2:67)"
+    assert(Lexer(code) == Success(List(
+        Identifier("val"),
+        Identifier("a"),
+        Colon(),
+        Identifier("Map"),
+        Enc(Paren, isOpen = true),
+        Number(3),
+        Comma(),
+        Number(100),
+        Comma(),
+        Number(0),
+        Enc(Paren, isOpen = false),
+        Equals(),
+        Enc(Paren, isOpen = true),
+        Number(0),
+        Colon(),
+        Number(20),
+        Comma(),
+        Number(1),
+        Colon(),
+        Number(43),
+        Comma(),
+        Number(2),
+        Colon(),
+        Number(67),
+        Enc(Paren, isOpen = false)
+      )))
+    }
+
   "A list of parameters " should " be lexed correctly" in {
     val code = "(a: 6, b: a, c: Type)"
     assert(Lexer(code) == Success(List(
