@@ -17,6 +17,8 @@ import ai.newmap.environment.envCommiter.checkout
 import ai.newmap.environment.envCommiter.resetHard
 import ai.newmap.environment.envCommiter.reset
 
+import ai.newmap.scripting.Processor
+
 class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
   var chanName = ""
@@ -44,6 +46,11 @@ class EnvironmentInterpreter() {
       case CommandPrintSomething(response) => Success(response)
       case CommandExit => Success(":exit")
       case CommandPassThrough => applyEnvCommand(code)
+      case CommandFileProcessor(filepath) => {
+        val fileProc = new Processor
+        var response = fileProc.FileProcessor(filepath)
+        Success(response)
+      }
     }
   }
 
@@ -51,6 +58,7 @@ class EnvironmentInterpreter() {
   case class CommandPrintSomething(s: String) extends CommandInterpResponse
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
+  case class CommandFileProcessor(s: String) extends CommandInterpResponse
 
   def createEnv(input: String): CommandInterpResponse = {
     val cont = input.split("\\s+")
@@ -228,6 +236,7 @@ class EnvironmentInterpreter() {
         "*:hard reset <commit id> <env password>*\t Reset to commit version with that commit id and delete afterwards versions\n"++
         "*:help*\tPrint this help message\n"
       )
+      case s if (s.startsWith(":script")) => CommandFileProcessor(s.drop(8))
       case _ => CommandPassThrough
     }
   }
