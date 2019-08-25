@@ -54,7 +54,7 @@ class TestLexer extends FlatSpec {
     )))
   }
 
-  test("A map statement should be lexed correctly"){
+  "A map statement" should " be lexed correctly" in {
     val code = "val a : Map(3, 100, 0) = (0:20, 1:43, 2:67)"
     assert(Lexer(code) == Success(List(
         Identifier("val"),
