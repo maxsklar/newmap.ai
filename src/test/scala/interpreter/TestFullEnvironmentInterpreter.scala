@@ -272,6 +272,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  // TODO: rename
+  it should "be able to work as a map" in {
+    testCodeScript(Vector(
+      CodeExpectation("val fSig: Type = \\(3: 4)", SuccessCheck(Environment.eCommand(
+        "fSig",
+        TypeT,
+        ConvertNewMapTypeToObject(LambdaT(
+          ReqMapInstance(Vector((Index(3), Index(4))))
+        ))
+      )))
+    ))
+  }
+
   it should "be creatable without a type given" in {
     val line = "val f = t => t"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
@@ -307,10 +320,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val f: (inputOne: 5, inputTwo: inputOne) => inputOne = (inputOne: 5, inputTwo: inputOne) => inputTwo", GeneralSuccessCheck),
       CodeExpectation("val ff = f 3", SuccessCheck(correctCommand)),
     ))
-  }
-
-  "Lambda Transformer Expressions " should " work" in {
-    testLineWorks("val id: \\ (T => T) = t => t")
   }
 
   it should " fail when the input makes no sense" in {

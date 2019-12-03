@@ -270,7 +270,7 @@ object Evaluator {
           evaluatedKey match {
             case ParameterObj(s) => UnableToApplyDueToUnknownInput
             case _ => {
-              values.find(_._1 == evaluatedKey).map(_._2) match {
+              values.reverse.find(_._1 == evaluatedKey).map(_._2) match {
                 case Some(result) => AbleToApplyFunction(result)
                 case None => AbleToApplyFunction(default)
               }
@@ -284,7 +284,7 @@ object Evaluator {
           ans <- evaluatedKey match {
             case ParameterObj(s) => Success(UnableToApplyDueToUnknownInput)
             case _ => {
-              values.find(_._1 == evaluatedKey).map(_._2) match {
+              values.reverse.find(_._1 == evaluatedKey).map(_._2) match {
                 case Some(result) => Success(AbleToApplyFunction(result))
                 case None => Failure("Key " + key + " don't fit in reqmap. There is a bug in the type checker")
               }

@@ -224,9 +224,8 @@ object TypeChecker {
         }
       }
       case LambdaTransformerParse(expression) => {
-        val expectedType = LambdaT(MapInstance(Vector(TypeType -> TypeType), Index(0)))
         for {
-          baseExp <- typeCheck(expression, ExplicitlyTyped(expectedType), env)
+          baseExp <- typeCheck(expression, ExplicitlyTyped(MapT(TypeT, TypeT, Index(0))), env)
         } yield {
           NewMapObjectWithType.withTypeE(LambdaType(baseExp.nObject), TypeT)
         }
@@ -301,12 +300,17 @@ object TypeChecker {
           case InputStackParam(typeAsObj) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
         }
       }
+      case LambdaType(tt) => {
+        Failure(msg + " You got me!")
+      }
       case _ => {
         Failure(msg + " Type Transformers must be a Map Instance or Lambda Instance.")
       }
     }
   }
 
+  // This map could include pattern matching
+  // TODO: in the future - include a boolean that tells us whether to include pattern matching or not??
   def typeCheckLiteralMap(
     values: Vector[ParseTree],
     expectedKeyType: Option[NewMapType],
@@ -319,10 +323,10 @@ object TypeChecker {
         val vType = expectedValueType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
 
         for {
-          tc <- typeCheck(k, kType, env)
-          objectFoundKey = tc.nObject
+          resultKey <- typeCheckWithPatternMatching(k, kType, env)
+          objectFoundKey = resultKey.typeCheckResult.nObject
 
-          tc2 <- typeCheck(v, vType, env)
+          tc2 <- typeCheck(v, vType, resultKey.newEnvironment)
           objectFoundValue = tc2.nObject
 
           restOfMap <- typeCheckLiteralMap(restOfValues, expectedKeyType, expectedValueType, env)
@@ -335,6 +339,41 @@ object TypeChecker {
       }
       case _ => Success(Vector.empty)
     }
+  }
+
+  case class TypeCheckWithPatternMatchingResult(
+    typeCheckResult: NewMapObjectWithType,
+    newEnvironment: Environment
+  )
+
+  // TODO: This should be integrated into the regular type-check script.
+  // we just need a way to know whether we are in an area where pattern matching is allowed or not!
+  def typeCheckWithPatternMatching(
+    expression: ParseTree,
+    expectedType: NewMapTypeInfo,
+    env: Environment
+  ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
+    expression match {
+      case IdentifierParse(id, false) if (env.lookup(id).isEmpty)=> {
+        // This is the generic pattern
+        // TODO: rethink what to do if the identifier is already defined in the environement
+        // We may need some new symbol to ensure that we know this is a pattern!
+        val tcResult = NewMapObjectWithType(ParameterObj(id), expectedType)
+        val envCommand = FullEnvironmentCommand(id, NewMapObjectWithType(ParameterObj(id), expectedType))
+        val newEnv = env.newCommand(envCommand)
+
+        Success(TypeCheckWithPatternMatchingResult(tcResult, newEnv))
+      }
+      case _ => {
+        // No patterns matched, fall back to regular type checking
+        for {
+          tc <- typeCheck(expression, expectedType, env)
+        } yield {
+          TypeCheckWithPatternMatchingResult(tc, env)
+        }
+      }
+    }
+
   }
 
   /** 
@@ -385,6 +424,8 @@ object TypeChecker {
       }
     }
   }
+
+  val LambdaTransformType = LambdaT(MapInstance(Vector(TypeType -> TypeType), Index(0)))
 
   def additionalExpectedTypes(
     objectWithType: NewMapObjectWithType,
@@ -556,7 +597,6 @@ object TypeChecker {
         case _ => failMsg("H")
       }
       case SubstitutableT(s) => {
-        // TODO: I believe that if we don't actually know the type we can't figure this out
         failMsg("I")
       }
       case Subtype(parent) => nObject match {
@@ -567,6 +607,11 @@ object TypeChecker {
         case _ => failMsg("J")
       }
       case SubtypeFromMapType(mi) => {
+        println("***")
+        println(mi)
+        println(mi.values)
+        println(nObject)
+        println(nType)
         if (mi.values.exists(_._1 == nObject)) success else failMsg("K")
       }
       case IncrementT(_) => failMsg("L")
@@ -951,6 +996,7 @@ object TypeChecker {
     applications: Vector[ParseTree],
     env: Environment
   ): Outcome[NewMapObjectWithType, String] = {
+
     applications match {
       case (firstApplication +: restOfApplications) => {
         for {
