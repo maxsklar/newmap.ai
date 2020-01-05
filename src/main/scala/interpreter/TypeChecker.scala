@@ -51,7 +51,7 @@ object TypeChecker {
           case ExplicitlyTyped(MapT(keyType, valueType, defaultValue)) => {
             val mapT = MapT(keyType, valueType, defaultValue)
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env)
+              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env, patternMatchingAllowed = false)
             } yield {
               NewMapObjectWithType.withTypeE(MapInstance(mapValues, defaultValue), mapT)
             }
@@ -59,7 +59,7 @@ object TypeChecker {
           case ExplicitlyTyped(ReqMapT(keyType, valueType)) => {
             val reqMapT = ReqMapT(keyType, valueType)
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env)
+              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env, patternMatchingAllowed = true)
               isCovered <- doMapValuesCoverType(mapValues, keyType)
               _ <- Outcome.failWhen(!isCovered, "Incomplete mapping of " + keyType)
             } yield {
@@ -113,7 +113,16 @@ object TypeChecker {
           }
           case ExplicitlyTyped(Subtype(parentType)) => {
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(parentType), Some(IndexT(2)), env)
+              mapValues <- typeCheckLiteralMap(
+                values,
+                Some(parentType),
+                Some(IndexT(2)),
+                env,
+                // NOTE - it's unclear if pattern matching should be allowed here, since
+                // technically this is not a ReqMap (which has patterns), but it seems like
+                // patterns would be useful here. Let's revisit
+                patternMatchingAllowed = false
+              )
             } yield {
               NewMapObjectWithType.withTypeE(
                 SubtypeFromMap(ReqMapInstance(mapValues)),
@@ -125,7 +134,7 @@ object TypeChecker {
             // Assume that it's a reqmap?
             // TODO - maybe there needs to be more logic here
             for {
-              mapValues <- typeCheckLiteralMap(values, None, None, env)
+              mapValues <- typeCheckLiteralMap(values, None, None, env, patternMatchingAllowed = true)
             } yield {
               // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMap
               val reqMap = ReqMapInstance(mapValues)
@@ -249,18 +258,34 @@ object TypeChecker {
     nType: NewMapType
   ): Outcome[Boolean, String] = {
     val keys = values.map(_._1).toSet
-    nType match {
-      case IndexT(i) => {
-        val keysToMatch: Set[NewMapObject] = (0 until i.toInt).map(j => Index(j.toLong)).toSet
-        Success((keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty)
+
+    // This is the generic pattern, which means that everything will match
+    // TODO: This is going to get more complicated with more patterns!!
+    val genericPatternExists = keys.exists(key => key match {
+      case ParameterObj(_) => true
+      case _ => false
+    })
+
+    if (genericPatternExists) Success(true)
+    else {
+      for {
+        keysToMatch <- findAllKeysToMatch(nType)
+      } yield {
+
+        (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
       }
-      case SubtypeFromMapType(valuesInType) => {
-        val keysToMatch = valuesInType.values.map(_._2).toSet
-        Success((keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty)
-      }
-      case _ => {
-        Failure("Can't create a ReqMap with keyType " + nType + ". Either this is an infinite type, or the functionality is unimplemented")
-      }
+    }
+  }
+
+  def findAllKeysToMatch(nType: NewMapType): Outcome[Set[NewMapObject], String] = nType match {
+    case IndexT(i) => {
+      Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
+    }
+    case SubtypeFromMapType(valuesInType) => {
+      Success(valuesInType.values.map(_._2).toSet)
+    }
+    case _ => {
+      Failure("Can't create a ReqMap with keyType " + nType + ". Either this is an infinite type, or the functionality is unimplemented")
     }
   }
 
@@ -310,12 +335,12 @@ object TypeChecker {
   }
 
   // This map could include pattern matching
-  // TODO: in the future - include a boolean that tells us whether to include pattern matching or not??
   def typeCheckLiteralMap(
     values: Vector[ParseTree],
     expectedKeyType: Option[NewMapType],
     expectedValueType: Option[NewMapType],
-    env: Environment
+    env: Environment,
+    patternMatchingAllowed: Boolean
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
@@ -323,13 +348,19 @@ object TypeChecker {
         val vType = expectedValueType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
 
         for {
-          resultKey <- typeCheckWithPatternMatching(k, kType, env)
+          resultKey <- typeCheckWithPatternMatching(k, kType, env, patternMatchingAllowed)
           objectFoundKey = resultKey.typeCheckResult.nObject
 
           tc2 <- typeCheck(v, vType, resultKey.newEnvironment)
           objectFoundValue = tc2.nObject
 
-          restOfMap <- typeCheckLiteralMap(restOfValues, expectedKeyType, expectedValueType, env)
+          restOfMap <- typeCheckLiteralMap(
+            restOfValues,
+            expectedKeyType,
+            expectedValueType,
+            env,
+            patternMatchingAllowed
+          )
         } yield {
           (objectFoundKey -> objectFoundValue) +: restOfMap
         }
@@ -351,18 +382,22 @@ object TypeChecker {
   def typeCheckWithPatternMatching(
     expression: ParseTree,
     expectedType: NewMapTypeInfo,
-    env: Environment
+    env: Environment,
+    patternMatchingAllowed: Boolean
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     expression match {
-      case IdentifierParse(id, false) if (env.lookup(id).isEmpty)=> {
+      case IdentifierParse(id, false) if (patternMatchingAllowed) => {
         // This is the generic pattern
-        // TODO: rethink what to do if the identifier is already defined in the environement
-        // We may need some new symbol to ensure that we know this is a pattern!
-        val tcResult = NewMapObjectWithType(ParameterObj(id), expectedType)
-        val envCommand = FullEnvironmentCommand(id, NewMapObjectWithType(ParameterObj(id), expectedType))
-        val newEnv = env.newCommand(envCommand)
+        if (env.lookup(id).nonEmpty) {
+          // TODO: rethink what to do if the identifier is already defined in the environement
+          Failure(s"Pattern matching clashes with defined variable: $id")
+        } else {
+          val tcResult = NewMapObjectWithType(ParameterObj(id), expectedType)
+          val envCommand = FullEnvironmentCommand(id, NewMapObjectWithType(ParameterObj(id), expectedType))
+          val newEnv = env.newCommand(envCommand)
 
-        Success(TypeCheckWithPatternMatchingResult(tcResult, newEnv))
+          Success(TypeCheckWithPatternMatchingResult(tcResult, newEnv))
+        }
       }
       case _ => {
         // No patterns matched, fall back to regular type checking

@@ -343,6 +343,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be able to handle the most basic pattern matching" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: ReqMap 4 4 = (0: 3, t: t)", GeneralSuccessCheck),
+      CodeExpectation("x 0", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
+      CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
+      CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2))))
+    ))
+  }
+
   "A Subset Type " should "work" in {
     testCodeScript(Vector(
       CodeExpectation("val x: Subtype 8 = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),

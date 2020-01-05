@@ -28,10 +28,15 @@ class EnvironmentInterpreter() {
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
 
+  val Pattern = "(:parse )(.*)".r
+
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
       case ":env" => CommandPrintSomething(env.toString)
       case ":exit" | ":quit" => CommandExit
+      case _ if (code.startsWith(":parse ")) => {
+        CommandPrintSomething(formatStatementParserCode(code.drop(7)))
+      }
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
@@ -40,6 +45,20 @@ class EnvironmentInterpreter() {
       )
       case _ => CommandPassThrough
     }
+  }
+
+  private def formatStatementParserCode(code: String): String = {
+    statementParser(code) match {
+      case Success(p) => p.toString
+      case Failure(s) => s"Parse Failed: $s"
+    }
+  }
+
+  private def statementParser(code: String): Outcome[EnvStatementParse, String] = {
+    for {
+      tokens <- Lexer(code)
+      statementParse <- NewMapParser.statementParse(tokens)
+    } yield statementParse
   }
 
   def applyEnvCommand(code: String): Outcome[String, String] = {

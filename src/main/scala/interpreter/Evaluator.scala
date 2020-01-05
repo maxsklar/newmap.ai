@@ -283,11 +283,10 @@ object Evaluator {
           evaluatedKey <- this(NewMapObjectWithType.untyped(key), env)
           ans <- evaluatedKey match {
             case ParameterObj(s) => Success(UnableToApplyDueToUnknownInput)
-            case _ => {
-              values.reverse.find(_._1 == evaluatedKey).map(_._2) match {
-                case Some(result) => Success(AbleToApplyFunction(result))
-                case None => Failure("Key " + key + " don't fit in reqmap. There is a bug in the type checker")
-              }
+            case _ => for {
+              result <- attemptPatternMatchInOrder(values, evaluatedKey, env)
+            } yield {
+              AbleToApplyFunction(result)
             }
           }
         } yield ans
@@ -310,6 +309,38 @@ object Evaluator {
         Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
       }
     }
+  }
+
+  def attemptPatternMatchInOrder(
+    remainingPatterns: Vector[(NewMapObject, NewMapObject)],
+    input: NewMapObject,
+    env: Environment
+  ): Outcome[NewMapObject, String] = {
+    remainingPatterns match {
+      case (pattern, answer) +: addlPatterns => {
+        val newEnvIfMatched = attemptPatternMatch(pattern, input, env)
+        newEnvIfMatched match {
+          case Some(newEnv) => Success(makeRelevantSubsitutions(answer, newEnv))
+          case None => attemptPatternMatchInOrder(addlPatterns, input, env)
+        }
+      }
+      case _ => Failure(s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there")
+    }
+  }
+
+  def attemptPatternMatch(
+    pattern: NewMapObject,
+    input: NewMapObject,
+    env: Environment
+  ): Option[Environment] = pattern match {
+    case ParameterObj(param) => {
+      Some(env.newCommand(FullEnvironmentCommand(
+        param,
+        NewMapObjectWithType.untyped(input)
+      )))
+    }
+    case _ if (pattern == input) => Some(env)
+    case _ => None
   }
 
   def updateEnvironmentWithParamValues(

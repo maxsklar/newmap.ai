@@ -26,6 +26,7 @@ case class MapInstance(
 ) extends NewMapObject
 
 case class ReqMapType(key: NewMapObject, value: NewMapObject) extends NewMapObject
+
 case class ReqMapInstance(values: Vector[(NewMapObject, NewMapObject)]) extends NewMapObject
 
 case class LambdaType(
