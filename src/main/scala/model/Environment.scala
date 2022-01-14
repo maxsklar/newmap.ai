@@ -189,34 +189,7 @@ object Environment {
         ParameterObj("input")
       )
     )),
-    eCommand(
-      "increment",
-      Environment.simpleFuncT(CountT, CountT),
-      Increment
-    ),
-    eCommand(
-      "appendSeq",
-      simpleFuncT(
-        StructT(Vector(
-          "currentSize" -> CountT,
-          "valueType" -> TypeT,
-          "defaultValue" -> SubstitutableT("valueType"),
-          "currentSeq" -> MapT(SubstitutableT("currentSize"), SubstitutableT("valueType"), ParameterObj("defaultValue")),
-          "nextValue" -> SubstitutableT("valueType")
-        )),
-        MapT(IncrementT(SubstitutableT("currentSize")), SubstitutableT("valueType"), ParameterObj("defaultValue"))
-      ),
-      LambdaInstance(
-        paramStrategy = StructParams(Vector(
-          "currentSize" -> CountType,
-          "valueType" -> TypeType,
-          "defaultValue" -> ParameterObj("valueType"),
-          "currentSeq" -> MapType(ParameterObj("currentSize"), ParameterObj("valueType"), ParameterObj("defaultValue")),
-          "nextValue" -> ParameterObj("valueType")
-        )),
-        expression = AppendToSeq(ParameterObj("currentSeq"), ParameterObj("nextValue"))
-      ),
-    ),
+
     eCommand(
       "appendMap",
       simpleFuncT(

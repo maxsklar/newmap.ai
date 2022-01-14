@@ -649,7 +649,6 @@ object TypeChecker {
         println(nType)
         if (mi.values.exists(_._1 == nObject)) success else failMsg("K")
       }
-      case IncrementT(_) => failMsg("L")
       case AppliedFunctionT(func, input) => failMsg("M")
       //case MutableT(_, _, _, _) => failMsg("Not implemented: MutableT\n")
     }
@@ -887,7 +886,7 @@ object TypeChecker {
     env: Environment
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case IndexT(_) | TypeT | IdentifierT | SubstitutableT(_) | Subtype(_) | SubtypeFromMapType(_) | CountT | IncrementT(_) => {
+      case IndexT(_) | TypeT | IdentifierT | SubstitutableT(_) | Subtype(_) | SubtypeFromMapType(_) | CountT  => {
         Failure("Type " + functionType + " not generally callable.")
       }
       case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
@@ -1019,7 +1018,6 @@ object TypeChecker {
       1 // TODO: this is fishy, make a test
     }
     case CountT => Long.MaxValue // TODO: should be infinite
-    case IncrementT(base) => Long.MaxValue
     case AppliedFunctionT(func, input) => {
       // TODO: this can be more than 0
       0

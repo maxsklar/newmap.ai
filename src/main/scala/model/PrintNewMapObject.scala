@@ -72,7 +72,6 @@ object PrintNewMapObject {
     case SubtypeFromMap(mi) => mi match {
       case ReqMapInstance(vals) => "Set(" + vals.map(x => this(x._1)).mkString(", ") + ")"
     }
-    case Increment => "increment"
     case AppendToSeq(currentSeq, newValue) => "appendSeq " + currentSeq + " " + newValue
     case AppendToMap(currentMap, newValues) => "appendMap " + currentMap + " " + newValues
     /*case MutableObject(commands, currentState) => {
@@ -81,9 +80,6 @@ object PrintNewMapObject {
     case MutableType(staticType, init, commandType, updateFunction) => {
       "VersionedType (staticType: " + staticType + ", init: " + init + ", commandType: " + commandType + ", updateFunction " + updateFunction + ")"
     }*/
-    case IncrementType(baseType) => {
-      "IncrementType (" + baseType + ")"
-    }
   }
 
   def applyType(nType: NewMapType): String = {

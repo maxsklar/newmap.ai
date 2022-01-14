@@ -91,12 +91,9 @@ case class SubtypeFromMap(map: ReqMapInstance) extends NewMapObject
 // Basic Function Section
 // These are pre-defined functions, their types are in comment
 
-// Type Count => Count
-case object Increment extends NewMapObject
-case class IncrementType(baseType: NewMapObject) extends NewMapObject
-
 //Type:
 // (t: Type, currentSeq: Map n T default, t: T) => Map (increment n) T default
+// TODO: Redo this with respect to commands
 case class AppendToSeq(
   currentSeq: NewMapObject,
   newValue: NewMapObject

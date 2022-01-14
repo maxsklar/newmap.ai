@@ -14,7 +14,6 @@ object ConvertNewMapTypeToObject {
     case TypeT => TypeType
     case Subtype(t: NewMapType) => SubtypeType(this(t))
     case SubtypeFromMapType(m) => SubtypeFromMap(m)
-    case IncrementT(baseType) => IncrementType(this(baseType))
     case AppliedFunctionT(func, input) => ApplyFunction(func, input)
   }
 

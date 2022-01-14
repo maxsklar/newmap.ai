@@ -9,15 +9,9 @@ sealed abstract class NewMapType{
 }
 
 case class IndexT(i: Long) extends NewMapType
-
-// This is meant to apply to an index, increment the type by 1.
-// Can it apply to other types as well? Remains to be seen, but not checked as of yet.
-// TODO - there's a lot that needs to be figured out with this one!
-// Perhaps this doesn't need to be type checked because it's only used internally
-case class IncrementT(base: NewMapType) extends NewMapType
+case object CountT extends NewMapType
 
 case object TypeT extends NewMapType
-case object CountT extends NewMapType
 case object IdentifierT extends NewMapType
 case class MapT(key: NewMapType, value: NewMapType, default: NewMapObject) extends NewMapType
 case class ReqMapT(key: NewMapType, value: NewMapType) extends NewMapType

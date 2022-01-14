@@ -11,7 +11,7 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) | Increment => {
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) => {
         Success(nObject)
       }
       case MapType(key, value, default) => {
@@ -99,11 +99,6 @@ object Evaluator {
         for {
           evalMapValues <- evalMapInstanceVals(map.values, env)
         } yield SubtypeFromMap(ReqMapInstance(evalMapValues))
-      }
-      case IncrementType(baseType) => {
-        for {
-          evalBaseType <- this(NewMapObjectWithType.withTypeE(baseType, CountT), env)
-        } yield IncrementType(evalBaseType)
       }
       case AppendToSeq(currentSeq, newValue) => {
         for {
@@ -299,8 +294,6 @@ object Evaluator {
           )
         )
       }
-      case (Increment, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
-      case (Increment, _) => Success(UnableToApplyDueToUnknownInput)
       case (ParameterObj(id), input) => {
         // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
         Success(UnableToApplyDueToUnknownInput)
@@ -377,7 +370,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | Increment => expression
+      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) => expression
       case MapType(key, value, default) => {
         MapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env), makeRelevantSubsitutions(default, env))
       }
@@ -441,14 +434,6 @@ object Evaluator {
         } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
 
         SubtypeFromMap(ReqMapInstance(newValues))
-      }
-      case IncrementType(baseType) => {
-        val substBaseType = makeRelevantSubsitutions(baseType, env)
-
-        makeRelevantSubsitutions(baseType, env) match {
-          case Index(i) => Index(i + 1)
-          case other => IncrementType(substBaseType)
-        }
       }
       case AppendToSeq(currentSeq, newValue) => {
         AppendToSeq(makeRelevantSubsitutions(currentSeq, env), makeRelevantSubsitutions(newValue, env))
@@ -565,12 +550,6 @@ object Evaluator {
           Success(SubstitutableT(name))
         //}
       }
-      case ApplyFunction(Increment, input) => {
-        for {
-          evalInput <- this(NewMapObjectWithType.untyped(input), env)
-          inputType <- convertObjectToType(evalInput, env)
-        } yield IncrementT(inputType)
-      }
       case ApplyFunction(func, input) => {
         for {
           evalInput <- this(NewMapObjectWithType.untyped(input), env)
@@ -615,11 +594,6 @@ object Evaluator {
       }
       case IdentifierInstance(name) => {
         Failure("Identifier " + name + " is not connected to a type.")
-      }
-      case IncrementType(baseType) => {
-        for {
-          baseT <- convertObjectToType(baseType, env)
-        } yield IncrementT(baseT)      
       }
       case SubtypeType(parentType) => {
         for {
