@@ -11,37 +11,25 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) | ParameterObj(_) => {
+      case Index(_) | CountT | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) | ParameterObj(_) | SubstitutableT(_) => {
         Success(nObject)
       }
-      case MapType(key, value, default) => {
+      case MapT(inputType, outputType, completeness, featureSet) => {
+        val typeOfTheOutputType = {
+          if (completeness == CommandOutput) CommandTypeT else TypeT
+        }
+
         for {
-          evalKey <- this(NewMapObjectWithType.withTypeE(key, TypeT), env)
-          evalValue <- this(NewMapObjectWithType.withTypeE(value, TypeT), env)
-          valueType <- convertObjectToType(evalValue, env)
-          evalDefault <- this(NewMapObjectWithType.withTypeE(default, valueType), env)
+          evalInputType <- this(NewMapObjectWithType.withTypeE(inputType, TypeT), env)
+          evalOutputType <- this(NewMapObjectWithType.withTypeE(outputType, typeOfTheOutputType), env)
         } yield {
-          MapType(evalKey, evalValue, evalDefault)
+          MapT(evalInputType, evalOutputType, completeness, featureSet)
         }
       }
-      case MapInstance(values: Vector[(NewMapObject, NewMapObject)], default) => {
-        for {
-          evalDefault <- this(NewMapObjectWithType.untyped(default), env)
-          evalValues <- evalMapInstanceVals(values, env)
-        } yield MapInstance(evalValues, evalDefault)
-      }
-      case ReqMapType(key, value) => {
-        for {
-          evalKey <- this(NewMapObjectWithType.withTypeE(key, TypeT), env)
-          evalValue <- this(NewMapObjectWithType.withTypeE(value, TypeT), env)
-        } yield {
-          ReqMapType(evalKey, evalValue)
-        }
-      }
-      case ReqMapInstance(values: Vector[(NewMapObject, NewMapObject)]) => {
+      case MapInstance(values: Vector[(NewMapObject, NewMapObject)]) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
-        } yield ReqMapInstance(evalValues)
+        } yield MapInstance(evalValues)
       }
       case LambdaInstance(lambdaParams, expression) => {
         val newEnv = includeLambdaParams(lambdaParams, env)
@@ -51,34 +39,43 @@ object Evaluator {
           LambdaInstance(lambdaParams, evalExpression)
         }
       }
-      case LambdaType(typeTransformer) => {
-        val transformerWithType = {
-          NewMapObjectWithType.withTypeE(typeTransformer, LambdaT(MapInstance(Vector((TypeType, TypeType)), Index(0))))
-        }
-        for {
-          evalTransformer <- this(transformerWithType, env)
-        } yield LambdaType(evalTransformer)
-      }
       case ApplyFunction(func, input) => {
         for {
           evalInput <- this(NewMapObjectWithType.untyped(input), env)
           evalFunc <- this(NewMapObjectWithType.untyped(func), env)
+
           applicationAttempt <- applyFunctionAttempt(evalFunc, evalInput, env)
-          result = applicationAttempt match {
-            case AbleToApplyFunction(nObject) => nObject
-            case UnableToApplyDueToUnknownInput => ApplyFunction(evalFunc, evalInput)
+
+          result <- applicationAttempt match {
+            case AbleToApplyFunction(nObject) => Success(nObject)
+            case UnableToApplyDueToUnknownInput => Success(ApplyFunction(evalFunc, evalInput))
+            case NoMatchForInputInFunction => {
+              // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+              // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+              nObjectWithType.nTypeInfo match {
+                case ExplicitlyTyped(nType) => getDefaultValueOfCommandType(nType, env)
+                case ImplicitlyTyped(_) => Failure("Could not get default value for implicit type, currently unimplemented")
+              }
+            }
           }
         } yield result
       }
-      case StructType(params) => {
+      case StructT(fieldType, params) => {
         for {
-          evalParams <- this(NewMapObjectWithType.untyped(params), env)
-        } yield StructType(evalParams)
+          evalFieldType <- this(NewMapObjectWithType.withTypeE(fieldType, TypeT), env)
+          evalParams <- this(
+            NewMapObjectWithType.withTypeE(
+              params,
+              MapT(evalFieldType, TypeT, RequireCompleteness, BasicMap)
+            ),
+            env
+          )
+        } yield StructT(evalFieldType, evalParams)
       }
-      case CaseType(params) => {
+      case CaseT(params) => {
         for {
-          evalParams <- this(NewMapObjectWithType.untyped(params), env)
-        } yield CaseType(evalParams)
+          evalParams <- evalParameters(params, env)
+        } yield CaseT(evalParams)
       }
       case StructInstance(value: Vector[(String, NewMapObject)]) => {
         for {
@@ -90,28 +87,18 @@ object Evaluator {
           evalInput <- this(NewMapObjectWithType.untyped(input), env)
         } yield CaseInstance(constructor, evalInput)
       }
-      case SubtypeType(parentType) => {
-        for {
-          evalParentType <- this(NewMapObjectWithType.withTypeE(parentType, TypeT), env)
-        } yield SubtypeType(evalParentType)
-      }
-      case SubtypeFromMap(map: ReqMapInstance) => {
-        for {
-          evalMapValues <- evalMapInstanceVals(map.values, env)
-        } yield SubtypeFromMap(ReqMapInstance(evalMapValues))
-      }
       case AppendToSeq(currentSeq, newValue) => {
         for {
           evalCurrentSeq <- this(NewMapObjectWithType.untyped(currentSeq), env)
           evalNewValue <- this(NewMapObjectWithType.untyped(newValue), env)
         } yield {
           evalCurrentSeq match {
-            case MapInstance(values, default) => {
+            case MapInstance(values) => {
               val keyNums: Vector[Long] = values.map(_._1).flatMap(extractNumber(_))
 
               val newIndex = if (keyNums.isEmpty) 0 else (keyNums.max + 1)
 
-              MapInstance(values ++ Vector(Index(newIndex) -> evalNewValue), default)
+              MapInstance(values ++ Vector(Index(newIndex) -> evalNewValue))
             }
             case _ => AppendToSeq(evalCurrentSeq, evalNewValue)
           }
@@ -123,32 +110,77 @@ object Evaluator {
           evalNewValues <- this(NewMapObjectWithType.untyped(newValues), env)
         } yield {
           (evalCurrentMap, evalNewValues) match {
-            case (MapInstance(values, default), MapInstance(newValues, _)) => {
+            case (MapInstance(values), MapInstance(newValues)) => {
               val updatedKeys = newValues.map(_._1).toSet
               val removedValues = values.filter(v => !updatedKeys.contains(v._1))
 
-              MapInstance(removedValues ++ newValues, default)
+              MapInstance(removedValues ++ newValues)
             }
             case _ => AppendToMap(evalCurrentMap, evalNewValues)
           }
         }
       }
+      case Subtype(parentType, func) => {
+        for {
+          parentT <- Evaluator.convertObjectToType(parentType, env)
+          evalFunc <- this(NewMapObjectWithType.withTypeE(func, parentT), env)
+        } yield {
+          Subtype(parentType, evalFunc)
+        }
+      }
     }
   }
 
-  def evalSequence(
-    values: Vector[NewMapObject],
-    env: Environment
-  ): Outcome[Vector[NewMapObject], String] = values match {
-    case v +: restOfValues => {
-      for {
-        evalV <- this(NewMapObjectWithType.untyped(v), env)
-        evalRest <- evalSequence(restOfValues, env)
-      } yield {
-        evalV +: evalRest
+  def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
+    nType match {
+      case Index(0) => Failure("Zero Type has no default value")
+      case Index(i) => Success(Index(0))
+      case CountT => Success(Index(0))
+      case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      case CommandTypeT => Failure("Type of Command Types has no implemented default value")
+      case IdentifierT => Failure("Type of Identifiers has no default value")
+      case MapT(inputType, outputType, CommandOutput, _) => Success(MapInstance(Vector.empty))
+      case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
+      case StructT(fieldType, params) => {
+        for {
+          parameterList <- TypeChecker.structParamsIntoParameterList(params, env)
+          paramsT <- TypeChecker.convertParamsObjectToType(parameterList, env)
+          defaultValue <- getDefaultValueFromStructParams(paramsT, env)
+        } yield {
+          StructInstance(defaultValue)
+        }
       }
+      case CaseT(params) if (params.length == 0) => Failure("Empty Case Types do not have a default value")
+      case CaseT(params) => {
+        // TODO: Revisit when revisiting Cases
+        for {
+          t <- Evaluator.convertObjectToType(params.head._2, env)
+          initValueInFirstField <- getDefaultValueOfCommandType(t, env)
+        } yield {
+          CaseInstance(params.head._1, initValueInFirstField)
+        }
+      }
+      case SubstitutableT(s) => Failure("No default case for subsitutableT " + s)
+      case Subtype(_, _) => Failure("No default case for a subtype")
     }
-    case _ => Success(Vector.empty)
+  }
+
+  def getDefaultValueFromStructParams(
+    params: Vector[(String, NewMapObject)],
+    env: Environment
+  ): Outcome[Vector[(String, NewMapObject)], String] = {
+    params match {
+      case (s, obj) +: restOfParams => {
+        for {
+          restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
+          paramType <- Evaluator.convertObjectToType(obj, env)
+          paramDefault <- getDefaultValueOfCommandType(paramType, env)
+        } yield {
+          (s -> paramDefault) +: restOfParamsDefault
+        }
+      }
+      case _ => Success(Vector.empty)
+    }
   }
 
   def evalMapInstanceVals(
@@ -211,7 +243,9 @@ object Evaluator {
   sealed abstract class ApplyFunctionAttemptResult
   case class AbleToApplyFunction(nObject: NewMapObject) extends ApplyFunctionAttemptResult
   case object UnableToApplyDueToUnknownInput extends ApplyFunctionAttemptResult
+  case object NoMatchForInputInFunction extends ApplyFunctionAttemptResult
 
+  // Assume that both the function and the input have been evaluated
   def applyFunctionAttempt(
     func: NewMapObject,
     input: NewMapObject,
@@ -222,7 +256,7 @@ object Evaluator {
         for {
           nType <- convertObjectToType(typeOfParam, env)
           newEnv = env.newCommand(Environment.eCommand(id, nType, param))
-          substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
+          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
           result <- this(NewMapObjectWithType.untyped(substitutedExpression), env)
         } yield AbleToApplyFunction(result)
       }
@@ -232,7 +266,7 @@ object Evaluator {
       case (LambdaInstance(StructParams(params), expression), StructInstance(paramValues)) => {
         for {
           newEnv <- updateEnvironmentWithParamValues(params, paramValues, env)
-          substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
+          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
           result <- this(NewMapObjectWithType.untyped(substitutedExpression), env)
         } yield AbleToApplyFunction(result)
       }
@@ -243,13 +277,13 @@ object Evaluator {
           // TODO: there should be an enforcement of at-least-one-param-rule in the param object
           firstParam <- Outcome(params.headOption, "Tried to pass a parameter to a function that takes no parameters")
           newEnv <- updateEnvironmentWithParamValues(Vector(firstParam), Vector(firstParam._1 -> firstParamValue), env)
-          substitutedExpression = makeRelevantSubsitutions(expression, newEnv)
+          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
 
           paramErasedExpression = if (params.length == 1) {
             substitutedExpression
           } else {
             val newParams = params.drop(1).map(param => {
-              param._1 -> makeRelevantSubsitutions(param._2, newEnv)
+              param._1 -> makeRelevantSubstitutions(param._2, newEnv)
             })
 
             LambdaInstance(StructParams(newParams), substitutedExpression)
@@ -258,36 +292,23 @@ object Evaluator {
           result <- this(NewMapObjectWithType.untyped(paramErasedExpression), env)
         } yield AbleToApplyFunction(result)
       }
-      case (MapInstance(values, default), key) => {
+      case (MapInstance(values), key) => {
         for {
           evaluatedKey <- this(NewMapObjectWithType.untyped(key), env)
         } yield {
-          evaluatedKey match {
+          key match {
             case ParameterObj(s) => UnableToApplyDueToUnknownInput
             case _ => {
-              values.reverse.find(_._1 == evaluatedKey).map(_._2) match {
-                case Some(result) => AbleToApplyFunction(result)
-                case None => AbleToApplyFunction(default)
+              attemptPatternMatchInOrder(values, evaluatedKey, env) match {
+                case Success(result) => AbleToApplyFunction(result)
+                case Failure(_) => NoMatchForInputInFunction
               }
             }
           }
         }
       }
-      case (ReqMapInstance(values), key) => {
-        for {
-          evaluatedKey <- this(NewMapObjectWithType.untyped(key), env)
-          ans <- evaluatedKey match {
-            case ParameterObj(s) => Success(UnableToApplyDueToUnknownInput)
-            case _ => for {
-              result <- attemptPatternMatchInOrder(values, evaluatedKey, env)
-            } yield {
-              AbleToApplyFunction(result)
-            }
-          }
-        } yield ans
-      }
       case (StructInstance(value: Vector[(String, NewMapObject)]), identifier) => {
-        val id = makeRelevantSubsitutions(identifier, env)
+        val id = makeRelevantSubstitutions(identifier, env)
         Success(
           AbleToApplyFunction(
             value.find(x => IdentifierInstance(x._1) == id).map(_._2).getOrElse(Index(0))
@@ -313,7 +334,7 @@ object Evaluator {
       case (pattern, answer) +: addlPatterns => {
         val newEnvIfMatched = attemptPatternMatch(pattern, input, env)
         newEnvIfMatched match {
-          case Some(newEnv) => Success(makeRelevantSubsitutions(answer, newEnv))
+          case Some(newEnv) => Success(makeRelevantSubstitutions(answer, newEnv))
           case None => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
@@ -365,46 +386,36 @@ object Evaluator {
     }
   }
 
-  def makeRelevantSubsitutions(
+  def makeRelevantSubstitutions(
     expression: NewMapObject,
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | CountType | TypeType | IdentifierType | IdentifierInstance(_) => expression
-      case MapType(key, value, default) => {
-        MapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env), makeRelevantSubsitutions(default, env))
-      }
-      case MapInstance(values, default) => {
-        val newValues = for {
-          (k, v) <- values
-        } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
-
-        MapInstance(newValues, default)
-      }
-      case ReqMapType(key, value) => {
-        ReqMapType(makeRelevantSubsitutions(key, env), makeRelevantSubsitutions(value, env))
-      }
-      case ReqMapInstance(values) => {
-        val newValues = for {
-          (k, v) <- values
-        } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
-
-        ReqMapInstance(newValues)
-      }
-      case LambdaType(typeTransformer) => {
-        LambdaType(
-          makeRelevantSubsitutions(typeTransformer, env)
+      case Index(_) | CountT | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) => expression
+      case MapT(inputType, outputType, completeness, featureSet) => {
+        MapT(
+          makeRelevantSubstitutions(inputType, env),
+          makeRelevantSubstitutions(outputType, env),
+          completeness,
+          featureSet
         )
+      }
+      case MapInstance(values) => {
+        val newValues = for {
+          (k, v) <- values
+        } yield (makeRelevantSubstitutions(k, env) -> makeRelevantSubstitutions(v, env))
+
+        MapInstance(newValues)
       }
       case LambdaInstance(params, expression) => {
         val newEnv = includeLambdaParams(params, env)
-        val newExpression = makeRelevantSubsitutions(expression, newEnv)
+        val newExpression = makeRelevantSubstitutions(expression, newEnv)
         LambdaInstance(params, newExpression)
       }
       case ApplyFunction(func, input) => {
         ApplyFunction(
-          makeRelevantSubsitutions(func, env),
-          makeRelevantSubsitutions(input, env)
+          makeRelevantSubstitutions(func, env),
+          makeRelevantSubstitutions(input, env)
         )
       }
       case ParameterObj(name) => {
@@ -413,33 +424,42 @@ object Evaluator {
           case None => expression
         }
       }
-      case StructType(values) => {
-        StructType(makeRelevantSubsitutions(values, env))
+      case StructT(fieldType, values) => {
+        StructT(
+          makeRelevantSubstitutions(fieldType, env),
+          makeRelevantSubstitutions(values, env)
+        )
       }
-      case CaseType(values) => {
-        CaseType(makeRelevantSubsitutions(values, env))
+      case CaseT(values) => {
+        val substitutedValues = {
+          values.map(x => (x._1, makeRelevantSubstitutions(x._2, env)))
+        }
+
+        CaseT(substitutedValues)
       }
       case StructInstance(value) => {
-        StructInstance(value.map(x => (x._1 -> makeRelevantSubsitutions(x._2, env))))
+        StructInstance(value.map(x => (x._1 -> makeRelevantSubstitutions(x._2, env))))
       }
       case CaseInstance(constructor, value) => {
-        CaseInstance(constructor, makeRelevantSubsitutions(value, env))      
-      }
-      case SubtypeType(parentType) => {
-        SubtypeType(makeRelevantSubsitutions(parentType, env))
-      }
-      case SubtypeFromMap(ReqMapInstance(values)) => {
-        val newValues = for {
-          (k, v) <- values
-        } yield (makeRelevantSubsitutions(k, env) -> makeRelevantSubsitutions(v, env))
-
-        SubtypeFromMap(ReqMapInstance(newValues))
+        CaseInstance(constructor, makeRelevantSubstitutions(value, env))      
       }
       case AppendToSeq(currentSeq, newValue) => {
-        AppendToSeq(makeRelevantSubsitutions(currentSeq, env), makeRelevantSubsitutions(newValue, env))
+        AppendToSeq(makeRelevantSubstitutions(currentSeq, env), makeRelevantSubstitutions(newValue, env))
       }
       case AppendToMap(currentMap, newValues) => {
-        AppendToMap(makeRelevantSubsitutions(currentMap, env), makeRelevantSubsitutions(newValues, env))
+        AppendToMap(makeRelevantSubstitutions(currentMap, env), makeRelevantSubstitutions(newValues, env))
+      }
+      case SubstitutableT(s) => {
+        env.objectOf(s) match {
+          case Some(obj) => obj
+          case None => expression
+        }
+      }
+      case Subtype(parentType, func) => {
+        Subtype(
+          makeRelevantSubstitutions(parentType, env),
+          makeRelevantSubstitutions(func, env)
+        )
       }
     }
   }
@@ -449,7 +469,9 @@ object Evaluator {
     env: Environment
   ): Environment = {
     lambdaParams match {
-      case StructParams(params) => includeParams(params, env)
+      case StructParams(params) => {
+        includeParams(params, env)
+      }
       case IdentifierParam(param, typeAsObj) => includeParams(Vector(param -> typeAsObj), env)
       case InputStackParam(typeAsObj) => {
         // TODO - add to the input stack
@@ -480,50 +502,36 @@ object Evaluator {
   }
 
   // Converts a New Map Object (that is convertible to type Type) into the corresponding NewMapType object
+  // TODO(2022): Move this to its own file (or possibly remove entirely!)
   def convertObjectToType(
     objectFound: NewMapObject,
     env: Environment
   ): Outcome[NewMapType, String] = {
     objectFound match {
-      case Index(i) => Success(IndexT(i))
-      case TypeType => Success(TypeT)
-      case CountType => Success(CountT)
-      case IdentifierType => Success(IdentifierT)
-      case MapType(key, value, default) => {
-        for {
-          keyType <- convertObjectToType(key, env) 
-          valueType <- convertObjectToType(value, env)
-        } yield {
-          MapT(keyType, valueType, default)
-        }
+      case Index(i) => Success(Index(i))
+      case TypeT => Success(TypeT)
+      case CommandTypeT => Success(CommandTypeT)
+      case CountT => Success(CountT)
+      case IdentifierT => Success(IdentifierT)
+      case SubstitutableT(s) => Success(SubstitutableT(s))
+      case Subtype(parentType, func) => Success(Subtype(parentType, func))
+      case MapT(inputType, outputType, completeness, featureSet) => {
+        Success(MapT(inputType, outputType, completeness, featureSet))
       }
-      case LambdaType(typeTransformer) => {
-        Success(LambdaT(typeTransformer))
-      }
-      case MapInstance(values, Index(1)) => {
-        // TODO - require an explicit conversion here? Maybe this should be left to struct type
-        for {
-          // This must be a identifier -> type map
-          newParams <- convertMapInstanceStructToParams(values, env)
-        } yield {
-          StructT(newParams)
-        }
-      }
-      case MapInstance(values, Index(0)) => {
+      case MapInstance(values) => {
         // TODO - require an explicit conversion here? Maybe this should be left to struct type
         for {
           // TODO - is the convertMapInstanceStructToParams appropriate for cases?
           newParams <- convertMapInstanceStructToParams(values, env)
         } yield {
-          CaseT(newParams)
-        }
-      }
-      case ReqMapType(key, value) => {
-        for {
-          keyType <- convertObjectToType(key, env) 
-          valueType <- convertObjectToType(value, env)
-        } yield {
-          ReqMapT(keyType, valueType)
+          val fieldType = {
+            Subtype(
+              IdentifierT,
+              MapInstance(newParams.map(x => IdentifierInstance(x._1) -> Index(1)))
+            )
+          }
+          // PROBLEM!!!!!!! - sometimes it should be case
+          StructT(fieldType, objectFound)
         }
       }
       case ParameterObj(name) => {
@@ -558,51 +566,19 @@ object Evaluator {
 
           result <- functionApplied match {
             case AbleToApplyFunction(nTypeAsObject) => convertObjectToType(nTypeAsObject, env)
-            case UnableToApplyDueToUnknownInput => Success(AppliedFunctionT(func, input))
+            case UnableToApplyDueToUnknownInput => Failure("Unable to Apply Function and get type")
+            case NoMatchForInputInFunction => Failure("No Match for function application - shouldn't happen")
           }
         } yield result
       }
-      case StructType(params) => {
-        for {
-          mapInstance <- this(NewMapObjectWithType.untyped(params), env)
-
-          values <- mapInstance match {
-            case MapInstance(v, Index(1)) => Success(v)
-            case _ => Failure("Map Instance could not be resolved")
-          }
-
-          newParams <- convertMapInstanceStructToParams(values, env)
-        } yield {
-          StructT(newParams)
-        }
-      }
-      case CaseType(params) => {
-        // TODO - this is repeated code from StructType
-        for {
-          mapInstance <- this(NewMapObjectWithType.untyped(params), env)
-
-          values <- mapInstance match {
-            case MapInstance(v, Index(0)) => Success(v)
-            case MapInstance(v, default) => Failure("Map Instance " + mapInstance + " has the wrong default: " + default)
-            case _ => Failure("Map Instance could not be resolved for params " + params + "\nInstead recieved: " + mapInstance)
-          }
-
-          newParams <- convertMapInstanceStructToParams(values, env)
-        } yield {
-          CaseT(newParams)
-        }
-      }
+      case StructT(fieldType, params) => Success(StructT(fieldType, params))
+      case CaseT(params) => Success(CaseT(params))
       case IdentifierInstance(name) => {
+        if (name == "T")
+          throw new Exception("Identifier " + name + " is not connected to a type.")
         Failure("Identifier " + name + " is not connected to a type.")
       }
-      case SubtypeType(parentType) => {
-        for {
-          parentT <- convertObjectToType(parentType, env)
-        } yield Subtype(parentT)
-      }
-      case SubtypeFromMap(map) => Success(SubtypeFromMapType(map))
       case _ => {
-        // TODO: Need to explicitly handle every case
         Failure("Couldn't convert into type: " + objectFound + " -- could be unimplemented")
       }
     }

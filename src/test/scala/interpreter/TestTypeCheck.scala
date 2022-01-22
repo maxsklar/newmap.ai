@@ -29,7 +29,7 @@ class TestTypeCheck extends FlatSpec {
   	TypeChecker(IdentifierParse("Type")) match {
   	  case Success(result) => {
   	  	assert(result.nTypeInfo == ExplicitlyTyped(TypeT))
-  	  	assert(result.nObject == TypeType)
+  	  	assert(result.nObject == TypeT)
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -195,8 +195,7 @@ class TestTypeCheck extends FlatSpec {
       IdentifierParse("Map"),
       Vector(CommandList(Vector(
         BindingCommandItem(IdentifierParse("key"), NaturalNumberParse(2)),
-        BindingCommandItem(IdentifierParse("value"), NaturalNumberParse(2)),
-        BindingCommandItem(IdentifierParse("default"), NaturalNumberParse(0))
+        BindingCommandItem(IdentifierParse("value"), NaturalNumberParse(2))
     ))))
 
     TypeChecker(booleanMap) match {
@@ -218,7 +217,7 @@ class TestTypeCheck extends FlatSpec {
       case Success(envCommands) => {
         assert(envCommands.length == 1)
         val com = envCommands(0)
-        assert(com == Environment.eCommand("x",IndexT(1),Index(0)))
+        assert(com == Environment.eCommand("x",Index(1),Index(0)))
       }
       case Failure(reason) => fail(reason)
     }

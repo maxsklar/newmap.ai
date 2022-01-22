@@ -100,10 +100,12 @@ case class Environment(
     env
   }
 
+  // TODO: perhaps this should take NewMapObject
   def newParam(id: String, nType: NewMapType): Environment = {
     newCommand(Environment.paramToEnvCommand((id, nType)))
   }
 
+  // TODO: perhaps this should take NewMapObject
   def newParams(xs: Vector[(String, NewMapType)]) = {
     newCommands(xs.map(Environment.paramToEnvCommand))
   }
@@ -115,100 +117,142 @@ object Environment {
   }
 
   def simpleFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
-    val transformV = Vector(
-      ConvertNewMapTypeToObject(inputType) -> ConvertNewMapTypeToObject(outputType)
-    )
-    val transformer = MapInstance(transformV, Index(0))
-    LambdaT(transformer)
+    MapT(inputType, outputType, RequireCompleteness, BasicMap)
+  }
+
+  def structTypeFromParams(params: Vector[(String, NewMapType)]) = {
+    val fieldType = {
+      Subtype(
+        IdentifierT,
+        MapInstance(params.map(x => IdentifierInstance(x._1) -> Index(1)))
+      )
+    }
+
+    val paramsToObject = {
+      params.map(x => IdentifierInstance(x._1) -> x._2)
+    }
+
+    StructT(fieldType, MapInstance(paramsToObject))
+  }
+
+  // For Debugging
+  def printEnvWithoutBase(env: Environment): Unit = {
+    for ((id, objWithTypeInfo) <- env.idToObjectWithType) {
+      if (!Base.idToObjectWithType.contains(id)) {
+        val command = FullEnvironmentCommand(id, objWithTypeInfo)
+        println(command.toString)
+      }
+    }
   }
 
 
   val Base: Environment = Environment().newCommands(Vector(
-    eCommand("Type", TypeT, TypeType),
-    eCommand("Count", TypeT, CountType),
-    eCommand("Identifier", TypeT, IdentifierType),
+    eCommand("Type", TypeT, TypeT),
+    eCommand("Count", TypeT, CountT),
+    eCommand("Identifier", TypeT, IdentifierT),
     eCommand("Map", simpleFuncT(
-      StructT(Vector(
-        "key" -> TypeT,
-        "value" -> TypeT,
-        "default" -> SubstitutableT("value")
-      )),
+      structTypeFromParams(
+        Vector(
+          "key" -> TypeT,
+          "value" -> CommandTypeT
+        )
+      ),
       TypeT
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "key" -> TypeType,
-        "value" -> TypeType,
-        "default" -> ParameterObj("value")
+        "key" -> TypeT,
+        "value" -> TypeT
       )),
-      expression = MapType(
+      expression = MapT(
         ParameterObj("key"),
         ParameterObj("value"),
-        ParameterObj("default")
+        CommandOutput,
+        BasicMap
       )
     )),
     eCommand("ReqMap", simpleFuncT(
-      StructT(Vector(
+      structTypeFromParams(Vector(
         "key" -> TypeT,
         "value" -> TypeT
       )),
       TypeT
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "key" -> TypeType,
-        "value" -> TypeType
+        "key" -> TypeT,
+        "value" -> TypeT
       )),
-      expression = ReqMapType(
+      expression = MapT(
         ParameterObj("key"),
-        ParameterObj("value")
-      )
-    )),  
-    eCommand("Struct", simpleFuncT(
-      MapT(IdentifierT, TypeT, Index(1)),
-      TypeT
-    ), LambdaInstance(
-      paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(1))),
-      expression = StructType(
-        ParameterObj("input")
+        ParameterObj("value"),
+        RequireCompleteness,
+        SimpleFunction
       )
     )),
-    eCommand("Case", simpleFuncT(
+    
+    eCommand("Struct", simpleFuncT(
+      structTypeFromParams(Vector(
+        "fieldType" -> TypeT,
+        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT, RequireCompleteness, BasicMap)
+      )),
+      TypeT
+    ), LambdaInstance(
+      paramStrategy = StructParams(Vector(
+        "fieldType" -> TypeT,
+        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT, RequireCompleteness, BasicMap)
+      )),
+      expression = StructT(
+        ParameterObj("fieldType"),
+        ParameterObj("structParams")
+      )
+    )),
+    // TODO: Case Commands must be added back in
+    /*eCommand("Case", simpleFuncT(
       MapT(IdentifierT, TypeT, Index(0)),
       TypeT
     ), LambdaInstance(
-      paramStrategy = IdentifierParam("input", MapType(IdentifierType, TypeType, Index(0))),
-      expression = CaseType(
+      paramStrategy = IdentifierParam("input", MapT(IdentifierT, TypeT, Index(0))),
+      expression = CaseT(
         ParameterObj("input")
       )
-    )),
+    )),*/
     eCommand("Subtype", simpleFuncT(
-      TypeT,
+      //TODO: this key type and value type are annoying - replace with generics when we can!!
+      structTypeFromParams(Vector(
+        "keyType" -> TypeT,
+        "valueType" -> TypeT,
+        "simpleFunction" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, SimpleFunction)
+      )),
       TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
     ), LambdaInstance(
-      paramStrategy = IdentifierParam("input", TypeType),
-      expression = SubtypeType(
-        ParameterObj("input")
+      paramStrategy = StructParams(Vector(
+        "keyType" -> TypeT,
+        "valueType" -> TypeT,
+        "simpleFunction" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, SimpleFunction)
+      )),
+      expression = Subtype(
+        ParameterObj("keyType"),
+        ParameterObj("simpleFunction")
       )
     )),
-
     eCommand(
       "appendMap",
       simpleFuncT(
-        StructT(Vector(
+        structTypeFromParams(Vector(
           "keyType" -> TypeT,
           "valueType" -> TypeT,
           "default" -> SubstitutableT("valueType"),
-          "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default")),
-          "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
+          "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap),
+          "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap)
         )),
-        MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), ParameterObj("default"))
+        MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap)
       ),
       LambdaInstance(
         StructParams(Vector(
-          "keyType" -> TypeType,
-          "valueType" -> TypeType,
+          "keyType" -> TypeT,
+          "valueType" -> TypeT,
           "default" -> ParameterObj("valueType"),
-          "currentMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default")),
-          "appendedMap" -> MapType(ParameterObj("keyType"), ParameterObj("valueType"), ParameterObj("default"))
+          "currentMap" -> MapT(ParameterObj("keyType"), ParameterObj("valueType"), CommandOutput, BasicMap),
+          "appendedMap" -> MapT(ParameterObj("keyType"), ParameterObj("valueType"), CommandOutput, BasicMap)
         )),
         AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
       ),

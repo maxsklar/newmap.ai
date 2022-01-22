@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object TypeChecker {
   /*
    * @param expression The literal expression that needs to be type-checked
-   * @param expectedType The type that we are expecting the expression to be . The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
+   * @param expectedType The type that we are expecting the expression to be. The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
    * @param env This is a map of identifiers which at this point are supposed to be subsituted.
    */
   def typeCheck(
@@ -40,36 +40,53 @@ object TypeChecker {
         } yield result
       }
       case CommandList(values: Vector[ParseTree]) => {
-        val ret = resolveTypeInfo(expectedType, env)
-
         resolveTypeInfo(expectedType, env) match {
-          case ExplicitlyTyped(MapT(IdentifierT, TypeT, default)) => {
-            val mapT = MapT(IdentifierT, TypeT, default)
+          case ExplicitlyTyped(MapT(IdentifierT, TypeT, completeness, featureSet)) => {
+            val mapT = MapT(IdentifierT, TypeT, completeness, featureSet)
             // TODO - do we really want to consider this a parameter list, or just treat it like another map?
-            typeCheckParamsStandalone(values, env, mapT, default)
+            typeCheckParamsStandalone(values, env, mapT)
           }
-          case ExplicitlyTyped(MapT(keyType, valueType, defaultValue)) => {
-            val mapT = MapT(keyType, valueType, defaultValue)
+          case ExplicitlyTyped(MapT(keyType, valueType, completeness, featureSet)) => {
+            val mapT = MapT(keyType, valueType, completeness, featureSet)
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env, patternMatchingAllowed = false)
+              keyTypeT <- Evaluator.convertObjectToType(keyType, env)
+              _ <- Evaluator.convertObjectToType(valueType, env)
+
+              allowPatternMatch = featureSet != BasicMap
+
+              mapValues <- typeCheckLiteralMap(
+                values,
+                Some(keyType),
+                Some(valueType),
+                env,
+                patternMatchingAllowed = allowPatternMatch
+              )
+
+              isCovered <- {
+                if (completeness != RequireCompleteness) Success(true)
+                else {
+                  doMapValuesCoverType(mapValues, keyTypeT)
+                }
+              }
+
+              _ <- Outcome.failWhen(
+                !isCovered,
+                "Incomplete mapping of " + keyType
+              )
             } yield {
-              NewMapObjectWithType.withTypeE(MapInstance(mapValues, defaultValue), mapT)
+              NewMapObjectWithType.withTypeE(MapInstance(mapValues), mapT)
             }
           }
-          case ExplicitlyTyped(ReqMapT(keyType, valueType)) => {
-            val reqMapT = ReqMapT(keyType, valueType)
+          case ExplicitlyTyped(StructT(fieldType, params)) => {
             for {
-              mapValues <- typeCheckLiteralMap(values, Some(keyType), Some(valueType), env, patternMatchingAllowed = true)
-              isCovered <- doMapValuesCoverType(mapValues, keyType)
-              _ <- Outcome.failWhen(!isCovered, "Incomplete mapping of " + keyType)
+              parameterList <- structParamsIntoParameterList(params, env)
+              result <- typeCheckStruct(parameterList, values, env)
             } yield {
-              NewMapObjectWithType.withTypeE(ReqMapInstance(mapValues), reqMapT)
+              val nObject = StructInstance(result.map(x => x._1 -> x._3))
+              NewMapObjectWithType.withTypeE(nObject, StructT(fieldType, params))
             }
           }
-          case ExplicitlyTyped(StructT(params: Vector[(String, NewMapType)])) => {
-            typeCheckStructStandalone(params, values, env)
-          }
-          case ExplicitlyTyped(CaseT(params: Vector[(String, NewMapType)])) => {
+          case ExplicitlyTyped(CaseT(params: Vector[(String, NewMapObject)])) => {
             if (values.length != 1) {
               Failure("A case may only select 1 value")
             } else {
@@ -83,7 +100,8 @@ object TypeChecker {
                       params.toMap.get(valueId) match {
                         case Some(nType) => {
                           for {
-                            nObjectWithType <- typeCheck(valueObject, ExplicitlyTyped(nType), env)
+                            nTypeT <- Evaluator.convertObjectToType(nType, env)
+                            nObjectWithType <- typeCheck(valueObject, ExplicitlyTyped(nTypeT), env)
                           } yield {
                             val valueObject = nObjectWithType.nObject
                             NewMapObjectWithType(CaseInstance(valueId, valueObject), expectedType)
@@ -106,45 +124,10 @@ object TypeChecker {
             }
           }
           case ExplicitlyTyped(TypeT) => {
-            // Since this commandList is a type, we're going to assume that it's a struct or case description
-            // TODO: This should be Index(0) if this is a "Case" - need to figure out that possibility
-            val default = Index(1) 
-            typeCheckParamsStandalone(values, env, TypeT, default)
-          }
-          case ExplicitlyTyped(Subtype(parentType)) => {
-            for {
-              mapValues <- typeCheckLiteralMap(
-                values,
-                Some(parentType),
-                Some(IndexT(2)),
-                env,
-                // NOTE - it's unclear if pattern matching should be allowed here, since
-                // technically this is not a ReqMap (which has patterns), but it seems like
-                // patterns would be useful here. Let's revisit
-                patternMatchingAllowed = false
-              )
-            } yield {
-              NewMapObjectWithType.withTypeE(
-                SubtypeFromMap(ReqMapInstance(mapValues)),
-                Subtype(parentType)
-              )
-            }
+            typeCheckParamsStandalone(values, env, TypeT)
           }
           case ImplicitlyTyped(Vector()) => {
-            // Assume that it's a reqmap?
-            // TODO - maybe there needs to be more logic here
-            for {
-              mapValues <- typeCheckLiteralMap(values, None, None, env, patternMatchingAllowed = true)
-            } yield {
-              // TODO: it's untyped, but should accumulate implicit types though typeCheckLiteralMap
-              val reqMap = ReqMapInstance(mapValues)
-              NewMapObjectWithType(ReqMapInstance(mapValues), ExplicitlyTyped(
-                ReqMapT(
-                  SubtypeFromMapType(reqMap),
-                  SubtypeFromMapType(ReqMapInstance(mapValues.map(x => (x._2 -> Index(1)))))
-                )
-              ))
-            }
+            Failure("CommandLists must be explicitly typed")
           }
           case _ => {
             Failure("CommandLists not working yet with this expected type: " + values + " exp: " + expectedType)
@@ -157,31 +140,48 @@ object TypeChecker {
       case LambdaParse(params, expression) if (expectedType == ExplicitlyTyped(TypeT)) => {
         for {
           inputType <- typeSpecificTypeChecker(params, env)
-          newEnv = inputType match {
-            case StructT(inputParams) => env.newParams(inputParams)
-            case _ => env
+          newEnv <- inputType match {
+            case StructT(fieldType, params) => {
+              for {
+                parameterList <- structParamsIntoParameterList(params, env)
+                inputParamsT <- convertParamsObjectToType(parameterList, env)
+              } yield {
+                env.newParams(inputParamsT)
+              }
+            }
+            case _ => Success(env)
           }
 
           outputType <- typeSpecificTypeChecker(expression, newEnv)
         } yield {
-          val typeTransformer = MapInstance(Vector(
-            ConvertNewMapTypeToObject(inputType) -> ConvertNewMapTypeToObject(outputType)
-          ), Index(0))
-          NewMapObjectWithType.withTypeE(LambdaType(typeTransformer), TypeT)
+          val mapType = MapT(
+            inputType,
+            outputType,
+            completeness = RequireCompleteness,
+            featureSet = FullFunction
+          )
+
+          NewMapObjectWithType.withTypeE(mapType, TypeT)
         }
       }
       case LambdaParse(params, expression) => {
+        val ErrorMessageForBasicMap = {
+          // Better error message?
+          "A Basic Map is expected, and a lambda expression does not cover this"
+        }
+
         for {
           newParams <- params match {
             case CommandList(values) => typeCheckParameterList(values, env)
             case BindingCommandItem(key, value) => typeCheckParameterList(Vector(params), env)
             case IdentifierParse(id, _) => {
               expectedType match {
-                case ExplicitlyTyped(LambdaT(typeTransformer)) => {
+                case ExplicitlyTyped(MapT(inputType, outputType, completeness, featureSet)) => {
                   for {
-                    result <- convertTypeTransformerToInputOutput("D -- " + params + " -- " + expression, typeTransformer, env)
+                    _ <- Outcome.failWhen(featureSet == BasicMap, ErrorMessageForBasicMap)
+                    inputT <- Evaluator.convertObjectToType(inputType, env)
                   } yield {
-                    Vector(id -> result._1)
+                    Vector(id -> inputT)
                   }
                 }
                 case _ => {
@@ -192,14 +192,12 @@ object TypeChecker {
             }
             case _ => Failure("Lambda Values must be variable bindings " + params + " -- " + expression)
           }
-
           expectedExpressionType <- expectedType match {
-            case ExplicitlyTyped(LambdaT(typeTransformer)) => {
+            case ExplicitlyTyped(MapT(inputType, outputType, completeness, featureSet)) => {
               for {
-                result <- convertTypeTransformerToInputOutput("E ", typeTransformer, env)
-              } yield {
-                ExplicitlyTyped(result._2)
-              }
+                _ <- Outcome.failWhen(featureSet == BasicMap, ErrorMessageForBasicMap)
+                outputT <- Evaluator.convertObjectToType(outputType, env)
+              } yield ExplicitlyTyped(outputT)
             }
             case _ => Success(NewMapTypeInfo.init)
           }
@@ -222,21 +220,18 @@ object TypeChecker {
             }
           }
         } yield {
-          val lambdaParams: Vector[(String, NewMapObject)] = {
-            ConvertNewMapTypeToObject.paramsToObjectParams(newParams)
+          val newParamsAsObj = newParams.map(x => IdentifierInstance(x._1) -> x._2)
+          val fieldType = {
+            Subtype(
+              IdentifierT,
+              MapInstance(newParamsAsObj.map(x => x._1 -> Index(1)))
+            )
           }
 
           NewMapObjectWithType.withTypeE(
-            LambdaInstance(StructParams(lambdaParams), tc.nObject),
-            Environment.simpleFuncT(StructT(newParams), typeFound)
+            LambdaInstance(StructParams(newParams), tc.nObject),
+            Environment.simpleFuncT(StructT(fieldType, MapInstance(newParamsAsObj)), typeFound)
           )
-        }
-      }
-      case LambdaTransformerParse(expression) => {
-        for {
-          baseExp <- typeCheck(expression, ExplicitlyTyped(MapT(TypeT, TypeT, Index(0))), env)
-        } yield {
-          NewMapObjectWithType.withTypeE(LambdaType(baseExp.nObject), TypeT)
         }
       }
     }
@@ -250,6 +245,25 @@ object TypeChecker {
         case ImplicitlyTyped(convs) => additionalExpectedTypes(objectWithType, convs, env)
       }
     } yield withAdditionalType
+  }
+
+  def convertParamsObjectToType(
+    params: Vector[(NewMapObject, NewMapObject)],
+    env: Environment
+  ): Outcome[Vector[(String, NewMapType)], String] = {
+    params match {
+      case (IdentifierInstance(id), nmObject) +: restOfParams => {
+        for {
+          restConverted <- convertParamsObjectToType(restOfParams, env)
+          nmType <- Evaluator.convertObjectToType(nmObject, env)
+        } yield {
+          (id, nmType) +: restConverted
+        }
+      }
+      case (id, nmObject) +: restOfParams => Failure(s"Expecting IdentifierInstance: $id")
+      case _ => Success(Vector.empty)
+    }
+    
   }
 
   // For ReqMaps, we need to ensure that all of the values are accounted for.
@@ -271,83 +285,59 @@ object TypeChecker {
       for {
         keysToMatch <- findAllKeysToMatch(nType)
       } yield {
-
         (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
       }
     }
   }
 
   def findAllKeysToMatch(nType: NewMapType): Outcome[Set[NewMapObject], String] = nType match {
-    case IndexT(i) => {
+    case Index(i) => {
       Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
     }
-    case SubtypeFromMapType(valuesInType) => {
-      Success(valuesInType.values.map(_._2).toSet)
+    case Subtype(parentType, simpleFunction) => simpleFunction match {
+      // TODO: What if values is too large? Should we make some restrictions here?
+      case MapInstance(values) => Success(values.map(_._1).toSet)
+      // TODO(2022): if simpleFunction is boolean function on a small finite parentType, we should be able to enumerate those
+      // TODO(2022): this is also one of those advanced cases where we want to know if one set is a subset of another through some advanced argument (like monotonicity)
+      case _ => Failure("Can't enumerate the allowed values of " + simpleFunction)
     }
     case _ => {
       Failure("Can't create a ReqMap with keyType " + nType + ". Either this is an infinite type, or the functionality is unimplemented")
     }
   }
 
-  def convertTypeTransformerToInputOutput(
-    msg: String,
-    typeTransformer: NewMapObject,
-    env: Environment
-  ): Outcome[(NewMapType, NewMapType), String] = {
-    typeTransformer match {
-      case MapInstance(values, _) => {
-        if (values.length == 1) {
-          for {
-            inputType <- Evaluator.convertObjectToType(values(0)._1, env)
-            outputType <- Evaluator.convertObjectToType(values(0)._2, env)
-          } yield (inputType -> outputType)
-        } else {
-          Failure(msg + " Type Transformer is mapped with multiple types, and this is not implemented yet.")
-        }
-      }
-      case LambdaInstance(paramStrategy, expression) => {
-        paramStrategy match {
-          case IdentifierParam(id, TypeType) => {
-            val inputType = SubstitutableT(id)
-            for {
-              outputType <- Evaluator.convertObjectToType(expression, env.newParam(id, TypeT))
-            } yield (inputType -> outputType)
-          }
-          case IdentifierParam(id, _) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
-          case StructParams(params) => {
-            // TODO - not type safe!!
-            val objParams = params.map(p => p._1 -> Evaluator.convertObjectToType(p._2, env).toOption.get)
-            val inputType = StructT(objParams)
-            for {
-              outputType <- Evaluator.convertObjectToType(expression, env.newParams(objParams))
-            } yield (inputType -> outputType)
-          }
-          case InputStackParam(typeAsObj) => Failure(msg + " LambdaInstance param strategy not implmented yet: " + paramStrategy)
-        }
-      }
-      case LambdaType(tt) => {
-        Failure(msg + " You got me!")
-      }
-      case _ => {
-        Failure(msg + " Type Transformers must be a Map Instance or Lambda Instance.")
-      }
-    }
-  }
-
   // This map could include pattern matching
   def typeCheckLiteralMap(
     values: Vector[ParseTree],
-    expectedKeyType: Option[NewMapType],
-    expectedValueType: Option[NewMapType],
+    expectedKeyType: Option[NewMapObject],
+    expectedValueType: Option[NewMapObject],
     env: Environment,
     patternMatchingAllowed: Boolean
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
-        val kType = expectedKeyType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
-        val vType = expectedValueType.map(e => ExplicitlyTyped(e)).getOrElse(NewMapTypeInfo.init)
+        // TODO(2022): We shouldn't have to do all these conversions in the future
+        val kTypeOutcome = expectedKeyType match {
+          case None => Success(NewMapTypeInfo.init)
+          case Some(e) => {
+            for {
+              eType <- Evaluator.convertObjectToType(e, env)
+            } yield ExplicitlyTyped(eType)
+          }
+        }
+
+        val vTypeOutcome = expectedValueType match {
+          case None => Success(NewMapTypeInfo.init)
+          case Some(e) => {
+            for {
+              eType <- Evaluator.convertObjectToType(e, env)
+            } yield ExplicitlyTyped(eType)
+          }
+        }
 
         for {
+          kType <- kTypeOutcome
+          vType <- vTypeOutcome
           resultKey <- typeCheckWithPatternMatching(k, kType, env, patternMatchingAllowed)
           objectFoundKey = resultKey.typeCheckResult.nObject
 
@@ -387,12 +377,14 @@ object TypeChecker {
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     expression match {
       case IdentifierParse(id, false) if (patternMatchingAllowed) => {
-        // This is the generic pattern
-        if (env.lookup(id).nonEmpty) {
+        val expectingIdentifier = expectedType == ExplicitlyTyped(IdentifierT)
+
+        if (!expectingIdentifier && env.lookup(id).nonEmpty) { // This is the generic pattern
           // TODO: rethink what to do if the identifier is already defined in the environement
           Failure(s"Pattern matching clashes with defined variable: $id")
         } else {
-          val tcResult = NewMapObjectWithType(ParameterObj(id), expectedType)
+          val nObject = if (expectingIdentifier) IdentifierInstance(id) else ParameterObj(id)
+          val tcResult = NewMapObjectWithType(nObject, expectedType)
           val envCommand = FullEnvironmentCommand(id, NewMapObjectWithType(ParameterObj(id), expectedType))
           val newEnv = env.newCommand(envCommand)
 
@@ -460,8 +452,6 @@ object TypeChecker {
     }
   }
 
-  val LambdaTransformType = LambdaT(MapInstance(Vector(TypeType -> TypeType), Index(0)))
-
   def additionalExpectedTypes(
     objectWithType: NewMapObjectWithType,
     typeConvs: Vector[NewMapType],
@@ -478,7 +468,25 @@ object TypeChecker {
     }
   }
 
+  def isTypeConvertibleAsObjects(
+    startingType: NewMapObject,
+    endingType: NewMapObject,
+    env: Environment
+  ): Boolean = {
+    val result = for {
+      startingT <- Evaluator.convertObjectToType(startingType, env)
+      endingT <- Evaluator.convertObjectToType(endingType, env)
+    } yield isTypeConvertible(startingT, endingT, env)
+
+    result match {
+      case Success(r) => r
+      case Failure(_) => false
+    }
+  }
+
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
+  // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
+  //  - To be used in cases where you want the programmer to specifically ask for a conversion!
   def isTypeConvertible(
     startingType: NewMapType,
     endingType: NewMapType,
@@ -489,44 +497,81 @@ object TypeChecker {
 
     (resolvedStartingType, resolvedEndingType) match {
       case (_, TypeT) => refersToAType(resolvedStartingType, env)
-      case (IndexT(j), IndexT(i)) => {
+      case (Index(j), Index(i)) => {
         // The indecies must match, even though you can theoretically convert a smaller index to a bigger index.
         // This conversion is not made explicit to prevent people from accessing an array or map with the wrong index value
         (j == i)
       }
-      case (SubtypeFromMapType(startingMi), SubtypeFromMapType(endingMi)) => {
-        (startingMi.values.forall(v => endingMi.values.exists(_._1 == v._1)))
-      }
-      case (LambdaT(startingTypeTransformer), LambdaT(endingTypeTransformer)) => {
-        val resultOutcome = for {
-          startingResult <- convertTypeTransformerToInputOutput("A ", startingTypeTransformer, env)
-          endingResult <- convertTypeTransformerToInputOutput("B ", endingTypeTransformer, env)
-        } yield {
-          val (startingInputType, startingOutputType) = startingResult
-          val (endingInputType, endingOutputType) = endingResult
-          val isInputTypeConvertible = isTypeConvertible(startingInputType, endingInputType, env)
+      // TODO: if these mapinstances contain pattern matches, we can run into trouble
+      //  - work this out further!
+      case (Subtype(startingParentType, MapInstance(startingMi)), Subtype(endingParentType, MapInstance(endingMi))) => {
+        val parentResult = for {
+          startingParentT <- Evaluator.convertObjectToType(startingParentType, env)
+          endingParentT <- Evaluator.convertObjectToType(endingParentType, env)
+        } yield isTypeConvertible(startingParentT, endingParentT, env)
 
-          // TODO: there could be more cases, and I'm pretty sure this is done elsewhere
-          val newEnv = startingInputType match {
-            case StructT(params) => env.newParams(params)
-            case _ => env
-          }
-
-          isInputTypeConvertible && isTypeConvertible(startingOutputType, endingOutputType, newEnv)
+        val parentsAreConverible = parentResult match {
+          case Success(true) => true
+          case _ => false
         }
 
-        resultOutcome.toOption.getOrElse(false)
+        parentsAreConverible && (startingMi.map(_._1).forall(v => endingMi.map(_._1).exists(_ == v)))
       }
-      case (SubtypeFromMapType(v), _) => {
-        v.values.forall(value => {
-          (value._2 == Index(0)) || isRawObjectConvertibleToType(value._1, resolvedEndingType, env).isSuccess
-        })
+      case (
+        MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
+        MapT(endingInputType, endingOutputType, endingCompleteness, endingFeatureSet)
+      ) => {
+        // TODO: there could be more cases, and I'm pretty sure this is done elsewhere
+        // TODO(2022): Removed during StructT refactoring.. not sure if this is needed
+        /*val newEnv = startingInputType match {
+          case StructT(params) => {
+            convertParamsObjectToType(params, env) match {
+              case Failure(_) => throw new Exception("This shouldn't happen.. investigate!")
+              case Success(newParams) => env.newParams(newParams)
+            }
+          }
+          case _ => env
+        }*/
+        val newEnv = env
+
+        val isFeatureSetConvertible = startingFeatureSet match {
+          case BasicMap => true
+          case SimpleFunction => (endingFeatureSet != BasicMap)
+          case FullFunction => (endingFeatureSet == FullFunction)
+        }
+
+        // TODO: We may be able to convert between different completeness types, but add this as needed
+        val isMapCompletenessConvertible = (startingCompleteness == endingCompleteness)
+
+        isTypeConvertibleAsObjects(startingInputType, endingInputType, env) &&
+          isTypeConvertibleAsObjects(startingOutputType, endingOutputType, newEnv) &&
+          isFeatureSetConvertible &&
+          isMapCompletenessConvertible
+      }
+      // TODO: we need to know the underlying type of v here to make a move!
+      // - In the future, types will require all underlying NewMapObjects already be type type-checked
+      // - Therefore, we can solve this more easily!
+      case (Subtype(parentType, MapInstance(v)), otherType) => {
+        val parentResult = for {
+          parentT <- Evaluator.convertObjectToType(parentType, env)
+        } yield isTypeConvertible(parentT, otherType, env)
+        
+        parentResult match {
+          case Success(true) => true
+          case _ => false
+        }
       }
       case _ => {
         (resolvedEndingType == resolvedStartingType) || {
           resolvedStartingType match {
-            case StructT(params) if (params.length == 1) => {
-              isTypeConvertible(params.head._2, resolvedEndingType, env)
+            case StructT(fieldType, params) => {
+              val outcomeResult = for {
+                parameterList <- structParamsIntoParameterList(params, env)
+                _ <- Outcome.failWhen(parameterList.length != 1, "requires a single param only")
+                paramT <- Evaluator.convertObjectToType(parameterList.head._2, env)
+              } yield isTypeConvertible(paramT, resolvedEndingType, env)
+
+              outcomeResult.toOption.getOrElse(false)
             }
             case _ => false
           }
@@ -548,13 +593,22 @@ object TypeChecker {
     val success = Success(())
 
     resolveType(nType, env) match {
-      case IndexT(i) => nObject match {
-        case Index(j) => if (j < i) success else failMsg("A")
+      case Index(i) => nObject match {
+        case Index(j) => if (j < i) success else {
+          failMsg("A")
+        }
         case _ => failMsg("B")
       }
       case TypeT => {
         for {
           _ <- Evaluator.convertObjectToType(nObject, env)
+        } yield ()
+      }
+      case CommandTypeT => {
+        // TODO(2022): remember that we should be able to define our own command types in the future!
+        for {
+          resultType <- Evaluator.convertObjectToType(nObject, env)
+          default <- Evaluator.getDefaultValueOfCommandType(resultType, env)
         } yield ()
       }
       case CountT => nObject match {
@@ -565,35 +619,26 @@ object TypeChecker {
         case IdentifierInstance(_) => success
         case _ => failMsg("D")
       }
-      case MapT(key, value, defaultInType) => nObject match {
-        case MapInstance(values, default) => {
-          // TODO: we need a helper function here to get the right message
-          if (
-            (defaultInType == default) && (
+      case MapT(input, output, _, _) => nObject match {
+        case MapInstance(values) => {
+          // TODO(2022): Make sure this is tested, and this is the behavior we want!
+          for {
+            inputT <- Evaluator.convertObjectToType(input, env)
+            outputT <- Evaluator.convertObjectToType(output, env)
+
+            successCondition = {
               values.forall(x => {
-                isRawObjectConvertibleToType(x._1, key, env).isSuccess &&
-                isRawObjectConvertibleToType(x._2, value, env).isSuccess
+                isRawObjectConvertibleToType(x._1, inputT, env).isSuccess &&
+                isRawObjectConvertibleToType(x._2, outputT, env).isSuccess
               })
-            )
-          ) success else failMsg("E")
+            }
+
+            _ <- Outcome.failWhen(!successCondition, "E")
+          } yield ()
         }
         case _ => failMsg("F")
       }
-      case ReqMapT(key, value) => nObject match {
-        case ReqMapInstance(values) => {
-          // TODO: we need a helper function here to get the right message
-          if (
-            (
-              values.forall(x => {
-                isRawObjectConvertibleToType(x._1, key, env).isSuccess &&
-                isRawObjectConvertibleToType(x._2, value, env).isSuccess
-              })
-            )
-          ) success else failMsg("Req E")
-        }
-        case _ => failMsg("Req F")
-      }
-      case StructT(params) => nObject match {
+      case StructT(fieldType, params) => nObject match {
         case StructInstance(value) => {
           //////////////////// TODO  not always
           success
@@ -602,10 +647,12 @@ object TypeChecker {
           // This could also be the first input to the struct
 
           params match {
-            case firstParam +: otherParams => {
+            case MapInstance(firstParam +: otherParams) => {
               if (otherParams.length == 0) {
-                val firstParamType: NewMapType = firstParam._2
-                isRawObjectConvertibleToType(nObject, firstParamType, env)
+                for {
+                  firstParamType <- Evaluator.convertObjectToType(firstParam._2, env)
+                  result <- isRawObjectConvertibleToType(nObject, firstParamType, env)
+                } yield result
               } else {
                 failMsg("Can't convert non-struct to multiple-valued struct")
               }
@@ -618,65 +665,61 @@ object TypeChecker {
         case CaseInstance(constructor, input) => {
           params.toMap.get(constructor) match {
             case None => failMsg("No constructor for type: " + constructor)
-            case Some(t) => isRawObjectConvertibleToType(input, t, env)
+            case Some(t) => for {
+              tT <- Evaluator.convertObjectToType(t, env)
+              result <- isRawObjectConvertibleToType(input, tT, env)
+            } yield result
           }
         }
         // TODO: there can be some conversions here; we don't neccesarily need to go to the fail case
         case _ => failMsg("G Case")
       }
-      case LambdaT(typeTransformer) => nObject match {
-        case LambdaInstance(params, expression) => {
-          //////////////////// TODO  not always
-          success
-        }
-        case _ => failMsg("H")
-      }
       case SubstitutableT(s) => {
         failMsg("I")
       }
-      case Subtype(parent) => nObject match {
-        case SubtypeFromMap(values) => {
-          //////////////////// TODO  not always
-          success
-        }
-        case _ => failMsg("J")
+      case Subtype(parentType, MapInstance(mi)) => {
+        for {
+          parentT <- Evaluator.convertObjectToType(parentType, env)
+          _ <- isRawObjectConvertibleToType(nObject, parentT, env)
+
+          // TODO: the equality here doesn't work - for example 
+          _ <- Outcome.failWhen(
+            !mi.map(x => x._1).exists(_ == nObject),
+            "[Subtype] Could not implicitly interpret object " + nObject + " as type " + nType
+          )
+        } yield ()
       }
-      case SubtypeFromMapType(mi) => {
-        println("***")
-        println(mi)
-        println(mi.values)
-        println(nObject)
-        println(nType)
-        if (mi.values.exists(_._1 == nObject)) success else failMsg("K")
+      case Subtype(parentType, func) => {
+        // TODO: maybe nObject can be passed to func and come out true.. we'll have to see!
+        // - Is it okay to apply nObject to func? think this through!!
+        failMsg("J")
       }
-      case AppliedFunctionT(func, input) => failMsg("M")
-      //case MutableT(_, _, _, _) => failMsg("Not implemented: MutableT\n")
     }
   }
 
-  def subsituteType(
-    newMapType: NewMapType,
+  def substituteType(
+    newMapType: NewMapObject,
     env: Environment
   ): Outcome[NewMapType, String] = {
     Evaluator.convertObjectToType(
-      Evaluator.makeRelevantSubsitutions(ConvertNewMapTypeToObject(newMapType), env),
+      Evaluator.makeRelevantSubstitutions(newMapType, env),
       env
     )
   }
 
-  // TODO - merge with subsituteType
+  // TODO - merge with substituteType
   def resolveType(
-    typeFound: NewMapType,
+    typeFound: NewMapObject,
     env: Environment
   ): NewMapType = {
     // TODO: not type safe
-    subsituteType(typeFound, env) match {
+    substituteType(typeFound, env) match {
       case Success(nType) => nType
       case Failure(reason) => {
         println(reason)
         // TODO: figure out what's going wrong here
         //Thread.dumpStack()
-        IndexT(0)
+        Index(0)
       }
     }
   }
@@ -772,38 +815,65 @@ object TypeChecker {
   def typeCheckParamsStandalone(
     parameterList: Vector[ParseTree],
     env: Environment,
-    expectedType: NewMapType,
-    default: NewMapObject
+    expectedType: NewMapType
   ): Outcome[NewMapObjectWithType, String] = for {
     newParams <- typeCheckParameterList(parameterList, env)
   } yield {
-    NewMapObjectWithType.withTypeE(ConvertNewMapTypeToObject.paramsToObject(newParams, default), expectedType)
+    NewMapObjectWithType.withTypeE(paramsToObject(newParams), expectedType)
+  }
+
+  def paramsToObject(
+    params: Vector[(String, NewMapType)]
+  ): MapInstance = {
+    val paramsAsObjects: Vector[(NewMapObject, NewMapObject)] = for {
+      (name, nmt) <- params
+    } yield {
+      IdentifierInstance(name) -> nmt
+    }
+    //// TODO
+    MapInstance(paramsAsObjects)
+  }
+
+  // Assume that params is already type checked
+  // We just want to concrete list of fields
+  def structParamsIntoParameterList(
+    params: NewMapObject,
+    env: Environment
+  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
+    params match {
+      case MapInstance(values) => Success(values)
+      case _ => Failure(s"Cannot convert params into parameter list: $params")
+    }
   }
 
   /*
    * We want to ensure that the struct was created correctly
+   * TODO(2022): This should no longer by the struct checking function because it manipulates the environment
+   * - We use this feature, though, so we need to wait until it's separated out
    */
   def typeCheckStruct(
-    parameterList: Vector[(String, NewMapType)],
+    parameterList: Vector[(NewMapObject, NewMapObject)],
+    //parameterList: Vector[(String, NewMapObject)],
     valueList: Vector[ParseTree],
     env: Environment
   ): Outcome[Vector[(String, NewMapType, NewMapObject)], String] = {
     (parameterList, valueList) match {
-      case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
+      case (((IdentifierInstance(paramId), typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         val valueIdOpt = checkForKnownIdentifier(valueIdentifier, env)
 
         valueIdOpt match {
           case Some(valueId) if (paramId == valueId) => {
             for {
-              tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
+              typeOfIdentifierT <- Evaluator.convertObjectToType(typeOfIdentifier, env)
+              tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifierT), env)
 
-              substObj = Evaluator.makeRelevantSubsitutions(tc.nObject, env)
+              substObj = Evaluator.makeRelevantSubstitutions(tc.nObject, env)
 
-              envCommand = Environment.eCommand(paramId, typeOfIdentifier, substObj)
+              envCommand = Environment.eCommand(paramId, typeOfIdentifierT, substObj)
               newEnv = env.newCommand(envCommand)
               result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
             } yield {
-              (paramId, typeOfIdentifier, substObj) +: result
+              (paramId, typeOfIdentifierT, substObj) +: result
             }
           }
           case Some(valueId) => {
@@ -814,16 +884,17 @@ object TypeChecker {
           }
         }
       }      
-      case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
+      case (((IdentifierInstance(paramId), typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
         for {
-          tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifier), env)
-          substObj = Evaluator.makeRelevantSubsitutions(tc.nObject, env)
-          envCommand = Environment.eCommand(paramId, typeOfIdentifier, substObj)
+          typeOfIdentifierT <- Evaluator.convertObjectToType(typeOfIdentifier, env)
+          tc <- typeCheck(valueObject, ExplicitlyTyped(typeOfIdentifierT), env)
+          substObj = Evaluator.makeRelevantSubstitutions(tc.nObject, env)
+          envCommand = Environment.eCommand(paramId, typeOfIdentifierT, substObj)
           newEnv = env.newCommand(envCommand)
           result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
         } yield {
-          (paramId, typeOfIdentifier, substObj) +: result
+          (paramId, typeOfIdentifierT, substObj) +: result
         }
       }
       case _ => {
@@ -836,18 +907,6 @@ object TypeChecker {
         }
       }
     }
-  }
-
-  def typeCheckStructStandalone(
-    parameterList: Vector[(String, NewMapType)],
-    valueList: Vector[ParseTree],
-    env: Environment
-  ): Outcome[NewMapObjectWithType, String] = for {
-    envCommands <- typeCheckStruct(parameterList, valueList, env)
-  } yield {
-    val typeFound = StructT(envCommands.map(c => c._1 -> c._2))
-    val objectFound = StructInstance(envCommands.map(c => c._1 -> c._3))
-    NewMapObjectWithType.withTypeE(objectFound, typeFound)
   }
 
   // In this case, we want the object to be a type, so we return that type
@@ -863,19 +922,17 @@ object TypeChecker {
   }
 
   sealed abstract class FunctionTypeChecked(val inputType: NewMapType)
+
   case class StaticTypeFunctionChecked(
     override val inputType: NewMapType,
     outputType: NewMapType
   ) extends FunctionTypeChecked(inputType)
 
   // This is what happens in a struct, where different inputs produce different outputs
-  case class DynamicTypeFunctionChecked(
+  case class StructTypeFunctionChecked(
     override val inputType: NewMapType,
-    params: Vector[(NewMapObject, NewMapObject)],
-    paramsDefault: NewMapObject
+    params: Vector[(NewMapObject, NewMapObject)]
   ) extends FunctionTypeChecked(inputType)
-
-  // TODO: there should be a case here for overloaded functions (accepts several different types and returns a type based on the input type)
 
   // The type in question is purported to be a function (or anything applyable)
   // Therefore, it should have an input type, and an output type
@@ -886,65 +943,25 @@ object TypeChecker {
     env: Environment
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case IndexT(_) | TypeT | IdentifierT | SubstitutableT(_) | Subtype(_) | SubtypeFromMapType(_) | CountT  => {
+      case Index(_) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CountT | CaseT(_) => {
         Failure("Type " + functionType + " not generally callable.")
       }
-      case MapT(key: NewMapType, value: NewMapType, default: NewMapObject) => {
-        Success(StaticTypeFunctionChecked(key, value))
-      }
-      case ReqMapT(key: NewMapType, value: NewMapType) => {
-        Success(StaticTypeFunctionChecked(key, value))
-      }
-      case StructT(params: Vector[(String, NewMapType)]) => {
-        // TODO: this is really complex.. hopefully we can simplify this whole process
-        val dynamicParams: Vector[(NewMapObject, NewMapObject)] = functionObject match {
-          case StructInstance(values) => {
-            var result: Vector[(NewMapObject, NewMapObject)] = Vector.empty
-            var newEnv: Environment = env
-
-            for (i <- (0 until params.length)) {
-              val (id, nType) = params(i)
-              val (oid, nObj) = values(i)
-
-              val substType = Evaluator.makeRelevantSubsitutions(ConvertNewMapTypeToObject(nType), newEnv)
-
-              result :+= (IdentifierInstance(id), substType)
-
-              // TODO - not type safe!!!
-              val substTypeAsType = Evaluator.convertObjectToType(substType, env).toOption.get
-              val substObj = Evaluator.makeRelevantSubsitutions(nObj, newEnv)
-
-              val newCommand = Environment.eCommand(id, substTypeAsType, substObj)
-              newEnv = newEnv.newCommand(newCommand)
-            }
-
-            result
-          }
-          case _ => ConvertNewMapTypeToObject.paramsToObject(params, Index(1)).values
-        }
-
-        Success(DynamicTypeFunctionChecked(
-          // TODO - this first param should really be SubtypeFromMapType(ConvertNewMapTypeToObject.paramsToObject(params))
-          //  However, the identifier currently can't be recognized as that type, even if it's a param.
-          //  So once that's fixed, this can be changed over 
-          IdentifierT,
-          dynamicParams,
-          Index(1)
-        ))
-      }
-      case CaseT(params: Vector[(String, NewMapType)]) => {
-        Failure("Case types are not functions: " + functionType)      
-      }
-      case LambdaT(typeTransformer: NewMapObject) => {
+      case MapT(
+        inputType: NewMapObject,
+        outputType: NewMapObject,
+        completeness: MapCompleteness,
+        featureSet: MapFeatureSet
+      ) => {
         for {
-          result <- convertTypeTransformerToInputOutput("C ", typeTransformer, env)
-        } yield {
-          // TODO: obviously this should go dynamic with the type transformer
-          StaticTypeFunctionChecked(result._1, result._2)
-        }
+          keyT <- Evaluator.convertObjectToType(inputType, env)
+          valueT <- Evaluator.convertObjectToType(outputType, env)
+        } yield StaticTypeFunctionChecked(keyT, valueT)
       }
-      case AppliedFunctionT(func, input) => {
-        Failure("Unimplemented: finding the function type from an already applied function")
+      case StructT(fieldType, params) => {
+        for {
+          paramList <- structParamsIntoParameterList(params, env)
+          fieldT <- Evaluator.convertObjectToType(fieldType, env)
+        } yield StructTypeFunctionChecked(fieldT, paramList)
       }
     }
   }
@@ -971,35 +988,32 @@ object TypeChecker {
     nType: NewMapType,
     env: Environment
   ): Long = nType match {
-    case IndexT(i) => Long.MaxValue
-    case TypeT => 1
+    case Index(_) | CountT => Long.MaxValue
+    case TypeT | CommandTypeT => 1
     case IdentifierT => 0
-    case StructT(params) => {
+    case StructT(fieldType, params) => {
       // TODO - define a maxByOption
-      if (params.isEmpty) 0L else params.map(_._2).map(t => typeDepth(t, env)).max
+      // TODO(2022) - redo this if not deleted!
+      //if (params.isEmpty) 0L else params.map(_._2).map(t => typeDepth(t, env)).max
+      0
+
     }
     case CaseT(params) => {
       // TODO - define a minByOption
       // TODO - default should be infinite, not long value
-      if (params.isEmpty) Long.MaxValue else params.map(_._2).map(t => typeDepth(t, env)).min
+      // TODO(2022) - redo this if not deleted!
+      //if (params.isEmpty) Long.MaxValue else params.map(_._2).map(t => typeDepth(t, env)).min
+      0
     }
-    case MapT(key, value, default) => {
-      if (isTypeConvertible(key, IdentifierT, env) && isTypeConvertible(value, TypeT, env)) {
-        // Index(0) indicates a case, and Index(1) indicates a struct. Both are in IndexT(2)
-        if (isRawObjectConvertibleToType(default, IndexT(2), env).isSuccess) 1 else 0
-      } else {
-        0
-      }
-    }
-    case ReqMapT(key, value) => 0
-    case LambdaT(_) => 0
+    case MapT(_, _, _, _) => 0
     case SubstitutableT(s: String) => {
+      // In the future, we may know that this value is a subtype of type, which will change our answer
       env.typeOf(s) match {
         case Failure(_) => -2 // TODO: this should be an error
         case Success(ExplicitlyTyped(nType)) => {
           val depth = typeDepth(nType, env)
-          if (depth == 0) -1 // TODO: this should also be an error.. this type shouldn't exist
-          else depth - 1
+          //if (depth == 0) -1 // TODO: this should also be an error.. this type shouldn't exist
+          //else depth - 1
           depth - 1
         }
         case Success(ImplicitlyTyped(types)) => {
@@ -1007,20 +1021,13 @@ object TypeChecker {
         }
       }
     }
-    case Subtype(t: NewMapType) => {
-      val baseTypeDef = typeDepth(t, env)
-      // TODO: this logic might be faulty
-      // This weird MaxValue test is due to the fact that we need a true infinite here. Working on it!
-      if (baseTypeDef == Long.MaxValue) Long.MaxValue
-      else typeDepth(t, env) + 1
-    }
-    case SubtypeFromMapType(baseMap: ReqMapInstance) => {
-      1 // TODO: this is fishy, make a test
-    }
-    case CountT => Long.MaxValue // TODO: should be infinite
-    case AppliedFunctionT(func, input) => {
-      // TODO: this can be more than 0
-      0
+    case Subtype(parentType, func) => {
+      Evaluator.convertObjectToType(parentType, env) match {
+        case Success(parentT) => typeDepth(parentT, env)
+        case _ => {
+          -1 // Error?
+        }
+      }
     }
   }
 
@@ -1029,7 +1036,6 @@ object TypeChecker {
     applications: Vector[ParseTree],
     env: Environment
   ): Outcome[NewMapObjectWithType, String] = {
-
     applications match {
       case (firstApplication +: restOfApplications) => {
         for {
@@ -1037,6 +1043,7 @@ object TypeChecker {
             case ExplicitlyTyped(nType) => Success(nType)
             case ImplicitlyTyped(convertibles) => {
               if (convertibles.length > 1) {
+                // TODO(2022): This can be removed when we ban implicit convertibles entirely!
                 Failure(
                   "Implicit function types are not yet supported for multiple convertibles\n" ++
                   startingFunction.nObject.toString
@@ -1069,131 +1076,31 @@ object TypeChecker {
   ): Outcome[NewMapObjectWithType, String] = {
     for {
       // Ensures that the input can be converted to the right type
-      typeCheckFunctionInputResult <- typeCheckFunctionInput(
+      successfullyTypeChecked <- typeCheck(
         input,
-        functionTypeChecked,
+        ExplicitlyTyped(functionTypeChecked.inputType),
         env
       )
 
-      successfullyTypeChecked = typeCheckFunctionInputResult.newMapObjectWithType
-
       inputValue = successfullyTypeChecked.nObject
 
-      fullOutputType <- functionTypeChecked match {
+      outputType <- functionTypeChecked match {
         case StaticTypeFunctionChecked(_, outputType) => Success(outputType)
-        case DynamicTypeFunctionChecked(_, params, paramsDefault) => {
-          dynamicTyping(inputValue, params, paramsDefault, env)
+        case StructTypeFunctionChecked(_, params) => {
+          params.toMap.get(inputValue) match {
+            case Some(param) => Evaluator.convertObjectToType(param, env)
+            case None => Failure("Unknown Field: " + inputValue)
+          }
         }
       }
-
-      // We're either peeling away one parameter, or we're going to the full output
-      outputType <- if (typeCheckFunctionInputResult.firstParamOnly) {
-        functionTypeChecked.inputType match {
-          case StructT(params) => {
-            if (params.length == 1) Success(fullOutputType) else {
-              var newEnv = env.newCommand(FullEnvironmentCommand(params(0)._1, successfullyTypeChecked))
-
-              var newParams: Vector[(String, NewMapType)] = Vector.empty
-
-              params.drop(1).foreach(param => {
-                newParams :+= (param._1 -> resolveType(param._2, newEnv))
-                newEnv = newEnv.newParam(param._1, resolveType(param._2, newEnv))
-              })
-
-              for {
-                newOutputType <- subsituteType(fullOutputType, newEnv)
-              } yield {
-                val typeTransformer = MapInstance(Vector(
-                  ConvertNewMapTypeToObject(StructT(newParams)) -> ConvertNewMapTypeToObject(newOutputType)
-                ), Index(0))
-                LambdaT(typeTransformer)
-              }
-            }
-          }
-          // TODO: refactor to avoid this case?
-          case _ => Failure("This shouldn't happen")
-        }
-      } else Success(fullOutputType)
-
-      nObjectWithType = NewMapObjectWithType.withTypeE(
+    } yield {
+      NewMapObjectWithType.withTypeE(
         ApplyFunction(
           startingFunction.nObject,
           inputValue
         ),
         outputType
       )
-
-      result <- Evaluator(nObjectWithType, env)
-    } yield NewMapObjectWithType.withTypeE(result, outputType)
-  }
-
-  def dynamicTyping(
-    inputValue: NewMapObject,
-    params: Vector[(NewMapObject, NewMapObject)],
-    paramsDefault: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapType, String] = params match {
-    case firstParam +: restOfParams => {
-      if (firstParam._1 == inputValue) {
-        Evaluator.convertObjectToType(firstParam._2, env)
-      } else {
-        for {
-          firstParamType <- Evaluator.convertObjectToType(firstParam._2, env)
-
-          newEnv = firstParam._1 match {
-            case IdentifierInstance(id) => env.newParam(id, firstParamType)
-            case _ => {
-              // TODO: I think this is unusable right now, check if we can get rid of this.
-              env
-            }
-          }
-
-          result <- dynamicTyping(inputValue, restOfParams, paramsDefault, newEnv)
-        } yield result
-        
-      }
-    }
-    case _ => {
-      Evaluator.convertObjectToType(paramsDefault, env)
-    }
-  }
-
-  case class TypeCheckFunctionInputResult(
-    newMapObjectWithType: NewMapObjectWithType,
-    firstParamOnly: Boolean
-  )
-
-  def typeCheckFunctionInput(
-    input: ParseTree,
-    functionTypeChecked: FunctionTypeChecked,
-    env: Environment
-  ): Outcome[TypeCheckFunctionInputResult, String] = {
-    typeCheck(
-      input,
-      ExplicitlyTyped(functionTypeChecked.inputType),
-      env
-    ) match {
-      case Success(nmo) => Success(TypeCheckFunctionInputResult(nmo, false))
-      case Failure(msg) => {
-        // Now we have a second try, because the input might be the first value of an input struct
-        functionTypeChecked.inputType match {
-          case StructT(params) => {
-            // TODO: type unsafe until we enforce at least one param in scala
-            val firstParam = params.head
-
-            typeCheck(input, ExplicitlyTyped(firstParam._2), env) match {
-              case Success(nmo) => Success(TypeCheckFunctionInputResult(nmo, true))
-              case Failure(msg2) => {
-                val introStr = "Could not interpret input " + input + " as valid for function explicitly typed as " + firstParam._2 + "."
-                val err1 = "Error for direct approach: " + msg
-                val err2 = "Error for trying to match it to the first parameter: " + msg2
-                Failure(introStr + "\n" + err1 + "\n" + err2)
-              }
-            }
-          }
-          case _ => Failure(msg)
-        }
-      }
     }
   }
 

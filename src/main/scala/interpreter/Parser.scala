@@ -71,12 +71,6 @@ object NewMapParser extends Parsers {
     comma | colon | arrow
   }
 
-  private def lambdaTransformerParse: Parser[LambdaTransformerParse] = {
-    Lexer.LambdaTransformer() ~ baseExpression ^^ {
-      case _ ~ baseExp => LambdaTransformerParse(baseExp)
-    }
-  }
-
   private def expressionListWithOperations: Parser[ParseTree] = {
     val pattern = expressionList ~ rep(binaryOpParse ~ expressionList)
 
@@ -173,7 +167,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpression: Parser[ParseTree] = {
-    expressionInParens | emptyParens | naturalNumber | identifier | forcedId | lambdaTransformerParse
+    expressionInParens | emptyParens | naturalNumber | identifier | forcedId
   }
 
   private def expressionList: Parser[ParseTree] = {

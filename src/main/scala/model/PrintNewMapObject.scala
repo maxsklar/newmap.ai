@@ -6,20 +6,26 @@ import ai.newmap.model._
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case Index(i) => i.toString
-    case CountType => "Count"
-    case TypeType => "Type"
-    case IdentifierType => "Identifier"
-    case IdentifierInstance(s) => s
-    case MapType(key, value, default) => "(Map " + this(key) + " " + this(value) + " " + this(default) + ")"
-    case MapInstance(values, default) => mapToString(values)
-    case ReqMapType(key, value) => "(ReqMap " + this(key) + " " + this(value) + ")"
-    case ReqMapInstance(values) => mapToString(values)
-    case LambdaType(typeTransformer) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("\\")
-      sb.append(this(typeTransformer))
-      sb.toString
+    case CountT => "Count"
+    case TypeT => "Type"
+    case CommandTypeT => "CommandType"
+    case IdentifierT => "Identifier"
+    case IdentifierInstance(s) => s + "~Id"
+    case MapT(key, value, completeness, featureSet) => {
+      (completeness, featureSet) match {
+        case (CommandOutput, BasicMap) => "Map(" + this(key) + ", " + this(value) + ")"
+        case (RequireCompleteness, SimpleFunction) => "ReqMap(" + this(key) + ", " + this(value) + ")"
+        case (RequireCompleteness, FullFunction) => {
+          // TODO(2022): Change the way lambda input works so that it's more like Map
+          "\\(" + this(key) + ": " + this(value) + ")"
+        }
+        case _ => {
+          // TODO(2022): Improve Notation so that we don't need this!
+          "SpecialMap(" + this(key) + ", " + this(value) + ", " + completeness + ", " + featureSet + ")"
+        }  
+      }
     }
+    case MapInstance(values) => "MI:" + mapToString(values)
     case LambdaInstance(lambdaParams, expression) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
@@ -49,12 +55,12 @@ object PrintNewMapObject {
     case ApplyFunction(func, input) => {
       this(func) + " " + this(input)
     }
-    case ParameterObj(name) => name
-    case StructType(params) => "Struct " + this(params)
-    case CaseType(params) => "Case " + this(params)
+    case ParameterObj(name) => name + "~Po"
+    case StructT(fieldType, params) => "Struct " + this(fieldType) + " " + this(params)
+    case CaseT(params) => "Case " + printParams(params)
     case StructInstance(value) => {
       val sb: StringBuilder = new StringBuilder()
-      sb.append("(")
+      sb.append("StructInstance(")
       var bindings: Vector[String] = Vector.empty
       for {
         (k, v) <- value
@@ -68,10 +74,9 @@ object PrintNewMapObject {
     case CaseInstance(constructor, value) => {
       constructor + " " + this(value)
     }
-    case SubtypeType(parent) => "Subtype(" + this(parent) + ")"
-    case SubtypeFromMap(mi) => mi match {
-      case ReqMapInstance(vals) => "Set(" + vals.map(x => this(x._1)).mkString(", ") + ")"
-    }
+    //TODO(2022): we might not want to print out the full parent here, because it could be large
+    // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
+    case Subtype(parent, func) => "Subtype(" + this(parent) + ", " + this(func) + ")"
     case AppendToSeq(currentSeq, newValue) => "appendSeq " + currentSeq + " " + newValue
     case AppendToMap(currentMap, newValues) => "appendMap " + currentMap + " " + newValues
     /*case MutableObject(commands, currentState) => {
@@ -80,16 +85,17 @@ object PrintNewMapObject {
     case MutableType(staticType, init, commandType, updateFunction) => {
       "VersionedType (staticType: " + staticType + ", init: " + init + ", commandType: " + commandType + ", updateFunction " + updateFunction + ")"
     }*/
+    case SubstitutableT(s) => s  + "~St"
   }
 
-  def applyType(nType: NewMapType): String = {
-    this(ConvertNewMapTypeToObject(nType))
+  def printParams(params: Vector[(String, NewMapObject)]): String = {
+    mapToString(params.map(x => IdentifierInstance(x._1) -> x._2))
   }
 
   def applyObjectWithType(nObjectWithType: NewMapObjectWithType): String = {
     apply(nObjectWithType.nObject) + " : " + (nObjectWithType.nTypeInfo match {
-      case ExplicitlyTyped(nType) => applyType(nType)
-      case ImplicitlyTyped(convs) => "{" + convs.map(applyType).mkString(", ") + "}"
+      case ExplicitlyTyped(nType) => apply(nType)
+      case ImplicitlyTyped(convs) => "{" + convs.map(apply).mkString(", ") + "}"
     })
   }
 

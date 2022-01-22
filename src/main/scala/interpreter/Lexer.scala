@@ -15,7 +15,6 @@ object Lexer extends RegexParsers {
   case class Equals() extends Token
   case class Tilda() extends Token
   case class Arrow() extends Token
-  case class LambdaTransformer() extends Token
 
 
   override def skipWhitespace = true
@@ -49,10 +48,6 @@ object Lexer extends RegexParsers {
     "=>" ^^ { str => Arrow() }
   }
 
-  def lambdaTransformer: Parser[LambdaTransformer] = {
-    "\\" ^^ { str => LambdaTransformer() }
-  }
-
   def enclosure: Parser[Enc] = {
     "[\\(\\[\\{\\}\\]\\)]".r ^^ { str => {
       str match {
@@ -67,7 +62,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | comma | colon | arrow | equals | tilda | enclosure | lambdaTransformer)) ^^ { rawTokens =>
+    phrase(rep1(identifier | number | comma | colon | arrow | equals | tilda | enclosure )) ^^ { rawTokens =>
       rawTokens
     }
   }

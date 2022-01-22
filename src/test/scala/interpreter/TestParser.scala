@@ -206,20 +206,4 @@ class TestParser extends FlatSpec {
       LambdaParse(LambdaParse(NaturalNumberParse(1), NaturalNumberParse(2)), NaturalNumberParse(3))
     ))
   }
-
-  "A lambda transformer " should " be possible to make" in {
-    val tokens = Vector(
-      LambdaTransformer(),
-      Enc(Paren, isOpen = true),
-      Identifier("T"),
-      Arrow(),
-      Identifier("T"),
-      Enc(Paren, isOpen = false)
-    )
-    assert(NewMapParser(tokens) == Success(
-      LambdaTransformerParse(
-        LambdaParse(IdentifierParse("T"), IdentifierParse("T"))
-      )
-    ))
-  }
 }
