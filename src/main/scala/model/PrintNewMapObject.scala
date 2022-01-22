@@ -57,7 +57,7 @@ object PrintNewMapObject {
     }
     case ParameterObj(name) => name + "~Po"
     case StructT(fieldType, params) => "Struct " + this(fieldType) + " " + this(params)
-    case CaseT(params) => "Case " + printParams(params)
+    case CaseT(casesType, caseToType) => "Case " + this(casesType) + " " + this(caseToType)
     case StructInstance(value) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("StructInstance(")
@@ -77,14 +77,6 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case Subtype(parent, func) => "Subtype(" + this(parent) + ", " + this(func) + ")"
-    case AppendToSeq(currentSeq, newValue) => "appendSeq " + currentSeq + " " + newValue
-    case AppendToMap(currentMap, newValues) => "appendMap " + currentMap + " " + newValues
-    /*case MutableObject(commands, currentState) => {
-      "V" + commands.length + "." + currentState.toString
-    }
-    case MutableType(staticType, init, commandType, updateFunction) => {
-      "VersionedType (staticType: " + staticType + ", init: " + init + ", commandType: " + commandType + ", updateFunction " + updateFunction + ")"
-    }*/
     case SubstitutableT(s) => s  + "~St"
   }
 

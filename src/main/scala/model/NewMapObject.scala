@@ -17,13 +17,13 @@ case class MapInstance(
 sealed abstract class LambdaParamStrategy
 
 // The parameter type is a struct, and the name of the parameters is how the values are called
-case class StructParams(params: Vector[(String, NewMapObject)]) extends LambdaParamStrategy
+case class StructParams(params: Vector[(String, NewMapType)]) extends LambdaParamStrategy
 
 // The parameter is named by an identifier
-case class IdentifierParam(name: String, typeAsObj: NewMapObject) extends LambdaParamStrategy
+case class IdentifierParam(name: String, nType: NewMapType) extends LambdaParamStrategy
 
 // The parameter is pushed onto an input stack
-case class InputStackParam(typeAsObj: NewMapObject) extends LambdaParamStrategy
+case class InputStackParam(nType: NewMapType) extends LambdaParamStrategy
 
 case class LambdaInstance(
   paramStrategy: LambdaParamStrategy,
@@ -38,20 +38,13 @@ case class ApplyFunction(
 // This is an object that we don't know the value of yet. It'll be passed in later.
 case class ParameterObj(name: String) extends NewMapObject
 
-// This is like a map instance, but it represents a struct (Map from Identifiers to Types)
-/*case class StructType(
-  params: NewMapObject // This must be of type MapType(Identifier, Type, 1)
-) extends NewMapObject
-
-case class CaseType(
-  params: NewMapObject // This must be of type MapType(Identifier, Type, 0)
-) extends NewMapObject*/
-
 // This one is a little different/complex because each object has a unique type as defined by the struct
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
+// TODO(2022): the first value should be "NewMapObject" instead of string, but this might hurt the
+//  type-checker/evaluator for now - change soon!
 case class StructInstance(value: Vector[(String, NewMapObject)]) extends NewMapObject
 
-case class CaseInstance(constructor: String, input: NewMapObject) extends NewMapObject
+case class CaseInstance(constructor: NewMapObject, input: NewMapObject) extends NewMapObject
 
 // The type inputs a case class and outputs a type - so for each case it creates a function to that type
 // Generally of type Case(params) => T
@@ -65,42 +58,9 @@ case class CaseInstance(constructor: String, input: NewMapObject) extends NewMap
 // Basic Function Section
 // These are pre-defined functions, their types are in comment
 
-//Type:
-// (t: Type, currentSeq: Map n T default, t: T) => Map (increment n) T default
-// TODO: Redo this with respect to commands
-case class AppendToSeq(
-  currentSeq: NewMapObject,
-  newValue: NewMapObject
-) extends NewMapObject
-
-// Type:
-// (keyType: Type, valueType: Type, currentMap: Map keyType valueType default, appendedMap: Map keyType valueType default) => Map keyType valueType default
-case class AppendToMap(
-  currentSeq: NewMapObject,
-  newValues: NewMapObject
-) extends NewMapObject
-
-
-// Mutables Section
-
-// Encapsulates all possible mutable objects (stacks, sequences, types, and counts)
-/*case class MutableObject(
-  commands: Vector[NewMapObject],
-  currentState: NewMapObject
-) extends NewMapObject
-
-case class MutableType(
-  staticType: NewMapObject,
-  init: NewMapObject,
-  commandType: NewMapObject,
-  updateFunction: NewMapObject
-) extends NewMapObject*/
-
 /*
  * The types in the NewMap Language
  * This is actually a subset of the Objects, and there are functions below that convert between the 2
- *
- * TODO - this should all be moved to NewMapObject, so that way it can be sealed
  */
 sealed abstract class NewMapType extends NewMapObject
 
@@ -139,8 +99,8 @@ case object IdentifierT extends NewMapType
  * - commandOutput means that the output types must all be command types, which means they start at an initial value.
  */
 case class MapT(
-  inputType: NewMapObject,
-  outputType: NewMapObject,
+  inputType: NewMapType,
+  outputType: NewMapType,
   completeness: MapCompleteness,
   featureSet: MapFeatureSet
 ) extends NewMapType
@@ -160,13 +120,16 @@ object FullFunction extends MapFeatureSet
 //case class StructT(params: Vector[(String, NewMapObject)]) extends NewMapType
 
 // Params should be connected to a NewMapObject which are of type
-//  MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
+//  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
 // They might also be a paramObj, to be filled in later
 // TODO(2022): once generics are introduced, fieldType might be unneccesary
-case class StructT(fieldType: NewMapObject, params: NewMapObject) extends NewMapType
+case class StructT(fieldType: NewMapType, params: NewMapObject) extends NewMapType
 // TODO: What about simpler product types (no identifiers) based on MapT(TypeT, Count, CommandOutput, BasicMap)
 
-case class CaseT(params: Vector[(String, NewMapObject)]) extends NewMapType
+// casesType: a type which specifies which cases are available
+// caseToType: should be connected to a NewMapObject of type
+//  MapT(casesType, TypeT, RequireCompleteness, SimpleFunction)
+case class CaseT(casesType: NewMapType, caseToType: NewMapObject) extends NewMapType
 
 case class SubstitutableT(s: String) extends NewMapType
 
@@ -175,9 +138,9 @@ case class SubstitutableT(s: String) extends NewMapType
 // - Anything that's left at the initial value is NOT in the subtype
 // For example, if the simple function is a Map from 10 to 2, and it reads (2: 1, 3: 1, 5: 1, 7: 1),
 //  then the values 2, 3, 5, and 7 are considered part of this new type; the rest are not
-//TODO(2022): Change once simpleFunction is required to be type checked already.
+// TODO(2022): Change once simpleFunction is required to be type checked already.
 case class Subtype(
-  parentType: NewMapObject,
+  parentType: NewMapType,
   simpleFunction: NewMapObject
 ) extends NewMapType
 

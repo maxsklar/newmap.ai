@@ -205,7 +205,24 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testLineFails("val m: Map (Identifier, Type) = (a: 6)")
   }
 
-  "A case " should " be created and instantiated" in {
+  "A case " should " be created and instantiated"  in {
+    val correctCommand = Environment.eCommand(
+      "x",
+      Environment.caseTypeFromParams(Vector(("a",Index(2)), ("b",Index(3)))),
+      CaseInstance(IdentifierInstance("a"), Index(0))
+    )
+
+    testCodeScript(Vector(
+      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
+      CodeExpectation("val MyCase: Type = Case(Fields, (a: 2, b: 3))", GeneralSuccessCheck),
+      CodeExpectation("val x: MyCase = (a:0)", SuccessCheck(correctCommand)),
+      CodeExpectation("val y: MyCase = (a:0, b:1)", FailureCheck),
+      CodeExpectation("val x: MyCase = (c:0)", FailureCheck),
+    ))
+  }
+
+  // TODO: Test an option case
+  /*"A case " should " be created and instantiated" in {
     testCodeScript(Vector(
       CodeExpectation("val Option: (Type => Type) = (t => Case (None: 1, Some: t))", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
@@ -213,7 +230,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val y: maybeSix = (Some: 1)", GeneralSuccessCheck),
       CodeExpectation("val z: maybeSix = (None: 3)", FailureCheck),
     ))
-  }
+  }*/
 
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = Environment.eCommand(

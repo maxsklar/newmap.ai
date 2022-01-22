@@ -86,7 +86,7 @@ object TypeChecker {
               NewMapObjectWithType.withTypeE(nObject, StructT(fieldType, params))
             }
           }
-          case ExplicitlyTyped(CaseT(params: Vector[(String, NewMapObject)])) => {
+          case ExplicitlyTyped(CaseT(casesType, MapInstance(caseToType))) => {
             if (values.length != 1) {
               Failure("A case may only select 1 value")
             } else {
@@ -97,18 +97,21 @@ object TypeChecker {
 
                   valueIdOpt match {
                     case Some(valueId) => {
-                      params.toMap.get(valueId) match {
+                      caseToType.toMap.get(IdentifierInstance(valueId)) match {
                         case Some(nType) => {
                           for {
                             nTypeT <- Evaluator.convertObjectToType(nType, env)
                             nObjectWithType <- typeCheck(valueObject, ExplicitlyTyped(nTypeT), env)
                           } yield {
                             val valueObject = nObjectWithType.nObject
-                            NewMapObjectWithType(CaseInstance(valueId, valueObject), expectedType)
+                            NewMapObjectWithType(
+                              CaseInstance(IdentifierInstance(valueId), valueObject),
+                              expectedType
+                            )
                           }
                         }
                         case _ => {
-                          Failure("Identifier " + valueId + " not a member of case class: " + params)
+                          Failure("Identifier " + valueId + " not a member of case class: " + valueObject)
                         }
                       }
                     }
@@ -118,7 +121,7 @@ object TypeChecker {
                   }
                 }
                 case _ => {
-                  Failure("Value " + firstValue + " not a member of case class: " + params)
+                  Failure("Value " + firstValue + " not a member of case class: " + caseToType)
                 }
               }
             }
@@ -661,9 +664,9 @@ object TypeChecker {
           }
         }
       }
-      case CaseT(params) => nObject match {
+      case CaseT(casesType, MapInstance(caseToType)) => nObject match {
         case CaseInstance(constructor, input) => {
-          params.toMap.get(constructor) match {
+          caseToType.toMap.get(constructor) match {
             case None => failMsg("No constructor for type: " + constructor)
             case Some(t) => for {
               tT <- Evaluator.convertObjectToType(t, env)
@@ -673,6 +676,10 @@ object TypeChecker {
         }
         // TODO: there can be some conversions here; we don't neccesarily need to go to the fail case
         case _ => failMsg("G Case")
+      }
+      case CaseT(_, _) => {
+        // TODO(2022): Definitely resolve this
+        Failure("Cases without explicit mapinstances as types are not converible yet")
       }
       case SubstitutableT(s) => {
         failMsg("I")
@@ -943,7 +950,7 @@ object TypeChecker {
     env: Environment
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case Index(_) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CountT | CaseT(_) => {
+      case Index(_) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CountT | CaseT(_, _) => {
         Failure("Type " + functionType + " not generally callable.")
       }
       case MapT(
@@ -998,7 +1005,7 @@ object TypeChecker {
       0
 
     }
-    case CaseT(params) => {
+    case CaseT(_, _) => {
       // TODO - define a minByOption
       // TODO - default should be infinite, not long value
       // TODO(2022) - redo this if not deleted!

@@ -135,6 +135,21 @@ object Environment {
     StructT(fieldType, MapInstance(paramsToObject))
   }
 
+  def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
+    val fieldType = {
+      Subtype(
+        IdentifierT,
+        MapInstance(params.map(x => IdentifierInstance(x._1) -> Index(1)))
+      )
+    }
+
+    val paramsToObject = {
+      params.map(x => IdentifierInstance(x._1) -> x._2)
+    }
+
+    CaseT(fieldType, MapInstance(paramsToObject))
+  }
+
   // For Debugging
   def printEnvWithoutBase(env: Environment): Unit = {
     for ((id, objWithTypeInfo) <- env.idToObjectWithType) {
@@ -164,8 +179,8 @@ object Environment {
         "value" -> TypeT
       )),
       expression = MapT(
-        ParameterObj("key"),
-        ParameterObj("value"),
+        SubstitutableT("key"),
+        SubstitutableT("value"),
         CommandOutput,
         BasicMap
       )
@@ -182,8 +197,8 @@ object Environment {
         "value" -> TypeT
       )),
       expression = MapT(
-        ParameterObj("key"),
-        ParameterObj("value"),
+        SubstitutableT("key"),
+        SubstitutableT("value"),
         RequireCompleteness,
         SimpleFunction
       )
@@ -201,20 +216,27 @@ object Environment {
         "structParams" -> MapT(SubstitutableT("fieldType"), TypeT, RequireCompleteness, BasicMap)
       )),
       expression = StructT(
-        ParameterObj("fieldType"),
+        SubstitutableT("fieldType"),
         ParameterObj("structParams")
       )
     )),
     // TODO: Case Commands must be added back in
-    /*eCommand("Case", simpleFuncT(
-      MapT(IdentifierT, TypeT, Index(0)),
+    eCommand("Case", simpleFuncT(
+      structTypeFromParams(Vector(
+        "casesType" -> TypeT,
+        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT, RequireCompleteness, BasicMap)
+      )),
       TypeT
     ), LambdaInstance(
-      paramStrategy = IdentifierParam("input", MapT(IdentifierT, TypeT, Index(0))),
+      paramStrategy = StructParams(Vector(
+        "casesType" -> TypeT,
+        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT, RequireCompleteness, BasicMap)
+      )),
       expression = CaseT(
-        ParameterObj("input")
+        SubstitutableT("casesType"),
+        ParameterObj("caseToType")
       )
-    )),*/
+    )),
     eCommand("Subtype", simpleFuncT(
       //TODO: this key type and value type are annoying - replace with generics when we can!!
       structTypeFromParams(Vector(
@@ -230,33 +252,10 @@ object Environment {
         "simpleFunction" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, SimpleFunction)
       )),
       expression = Subtype(
-        ParameterObj("keyType"),
+        SubstitutableT("keyType"),
         ParameterObj("simpleFunction")
       )
-    )),
-    eCommand(
-      "appendMap",
-      simpleFuncT(
-        structTypeFromParams(Vector(
-          "keyType" -> TypeT,
-          "valueType" -> TypeT,
-          "default" -> SubstitutableT("valueType"),
-          "currentMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap),
-          "appendedMap" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap)
-        )),
-        MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, BasicMap)
-      ),
-      LambdaInstance(
-        StructParams(Vector(
-          "keyType" -> TypeT,
-          "valueType" -> TypeT,
-          "default" -> ParameterObj("valueType"),
-          "currentMap" -> MapT(ParameterObj("keyType"), ParameterObj("valueType"), CommandOutput, BasicMap),
-          "appendedMap" -> MapT(ParameterObj("keyType"), ParameterObj("valueType"), CommandOutput, BasicMap)
-        )),
-        AppendToMap(ParameterObj("currentMap"), ParameterObj("appendedMap"))
-      ),
-    )
+    ))
   ))
   def paramToEnvCommand(x: (String, NewMapType)): EnvironmentCommand = {
     eCommand(x._1, x._2, ParameterObj(x._1))
