@@ -28,8 +28,8 @@ class TestTypeCheck extends FlatSpec {
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
   	  case Success(result) => {
-  	  	assert(result.nTypeInfo == ExplicitlyTyped(TypeT))
-  	  	assert(result.nObject == TypeT)
+  	  	assert(result.nTypeInfo == ExplicitlyTyped(TypeT(0)))
+  	  	assert(result.nObject == TypeT(0))
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -125,16 +125,11 @@ class TestTypeCheck extends FlatSpec {
     }
   }
 
-  "A numerical type " should " beget lots of subtypes" in {
+  "An ordinal type " should " not allow subtypes" in {
     val expression = LambdaParse(
       CommandList(Vector(
         BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(100)),
-        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a")),
-        BindingCommandItem(IdentifierParse("c"), IdentifierParse("b")),
-        BindingCommandItem(IdentifierParse("d"), IdentifierParse("c")),
-        BindingCommandItem(IdentifierParse("e"), IdentifierParse("d")),
-        BindingCommandItem(IdentifierParse("f"), IdentifierParse("e")),
-        BindingCommandItem(IdentifierParse("g"), IdentifierParse("f")),
+        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a"))
       )),
       IdentifierParse("g"),
     )
@@ -142,43 +137,18 @@ class TestTypeCheck extends FlatSpec {
     TypeChecker(expression) match {
       case Success(result) => {
         result.nTypeInfo match {
-          case ImplicitlyTyped(_) => fail(result + " should be explicit")
-          case _ => ()
+          case ImplicitlyTyped(_) => fail("Should not be allowed but was")
+          case _ => fail("Should not be allowed but was")
         }
-
-        // TODO: Check these are right
-        //println(typeFound)
-        //println(objectFound)
       }
-      case Failure(reason) => fail(reason)
-    }
-  }
-
-  "A numerical type " should " get infinite subtyping" in {
-    val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(3)),
-        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a")),
-        BindingCommandItem(IdentifierParse("c"), IdentifierParse("b")),
-        BindingCommandItem(IdentifierParse("d"), IdentifierParse("c")),
-        BindingCommandItem(IdentifierParse("e"), IdentifierParse("d")),
-        BindingCommandItem(IdentifierParse("f"), IdentifierParse("e")),
-        BindingCommandItem(IdentifierParse("g"), IdentifierParse("f")),
-      )),
-      IdentifierParse("g"),
-    )
-
-    TypeChecker(expression) match {
-      case Success(result) => ()
-      case Failure(reason) => fail(reason)
+      case Failure(reason) => ()
     }
   }
 
   "The zero type " should " be recognized as a type even though no object exists" in {
     val expression = LambdaParse(
       CommandList(Vector(
-        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(0)),
-        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a"))
+        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(0))
       )),
       IdentifierParse("a"),
     )
@@ -200,7 +170,7 @@ class TestTypeCheck extends FlatSpec {
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
-      	assert(result.nTypeInfo == ExplicitlyTyped(TypeT))
+      	assert(result.nTypeInfo == ExplicitlyTyped(TypeT(0)))
         //println(objectFound)
 
       	// TODO: what should we do with this?

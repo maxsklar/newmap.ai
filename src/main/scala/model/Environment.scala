@@ -162,21 +162,21 @@ object Environment {
 
 
   val Base: Environment = Environment().newCommands(Vector(
-    eCommand("Type", TypeT, TypeT),
-    eCommand("Count", TypeT, Ord(0, true)),
-    eCommand("Identifier", TypeT, IdentifierT),
+    eCommand("Type", TypeT(0), TypeT(0)),
+    eCommand("Count", TypeT(0), Ord(0, true)),
+    eCommand("Identifier", TypeT(0), IdentifierT),
     eCommand("Map", simpleFuncT(
       structTypeFromParams(
         Vector(
-          "key" -> TypeT,
+          "key" -> TypeT(0),
           "value" -> CommandTypeT
         )
       ),
-      TypeT
+      TypeT(0)
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "key" -> TypeT,
-        "value" -> TypeT
+        "key" -> TypeT(0),
+        "value" -> TypeT(0)
       )),
       expression = MapT(
         SubstitutableT("key"),
@@ -187,14 +187,14 @@ object Environment {
     )),
     eCommand("ReqMap", simpleFuncT(
       structTypeFromParams(Vector(
-        "key" -> TypeT,
-        "value" -> TypeT
+        "key" -> TypeT(0),
+        "value" -> TypeT(0)
       )),
-      TypeT
+      TypeT(0)
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "key" -> TypeT,
-        "value" -> TypeT
+        "key" -> TypeT(0),
+        "value" -> TypeT(0)
       )),
       expression = MapT(
         SubstitutableT("key"),
@@ -206,14 +206,14 @@ object Environment {
     
     eCommand("Struct", simpleFuncT(
       structTypeFromParams(Vector(
-        "fieldType" -> TypeT,
-        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT, RequireCompleteness, BasicMap)
+        "fieldType" -> TypeT(0),
+        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT(0), RequireCompleteness, BasicMap)
       )),
-      TypeT
+      TypeT(0)
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "fieldType" -> TypeT,
-        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT, RequireCompleteness, BasicMap)
+        "fieldType" -> TypeT(0),
+        "structParams" -> MapT(SubstitutableT("fieldType"), TypeT(0), RequireCompleteness, BasicMap)
       )),
       expression = StructT(
         SubstitutableT("fieldType"),
@@ -223,14 +223,14 @@ object Environment {
     // TODO: Case Commands must be added back in
     eCommand("Case", simpleFuncT(
       structTypeFromParams(Vector(
-        "casesType" -> TypeT,
-        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT, RequireCompleteness, BasicMap)
+        "casesType" -> TypeT(0),
+        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT(0), RequireCompleteness, BasicMap)
       )),
-      TypeT
+      TypeT(0)
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "casesType" -> TypeT,
-        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT, RequireCompleteness, BasicMap)
+        "casesType" -> TypeT(0),
+        "caseToType" -> MapT(SubstitutableT("casesType"), TypeT(0), RequireCompleteness, BasicMap)
       )),
       expression = CaseT(
         SubstitutableT("casesType"),
@@ -240,15 +240,15 @@ object Environment {
     eCommand("Subtype", simpleFuncT(
       //TODO: this key type and value type are annoying - replace with generics when we can!!
       structTypeFromParams(Vector(
-        "keyType" -> TypeT,
-        "valueType" -> TypeT,
+        "keyType" -> TypeT(0),
+        "valueType" -> TypeT(0),
         "simpleFunction" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, SimpleFunction)
       )),
-      TypeT // Not only is it a type, but it's a type of types. TODO: formalize this
+      TypeT(0) // Not only is it a type, but it's a type of types. TODO: formalize this
     ), LambdaInstance(
       paramStrategy = StructParams(Vector(
-        "keyType" -> TypeT,
-        "valueType" -> TypeT,
+        "keyType" -> TypeT(0),
+        "valueType" -> TypeT(0),
         "simpleFunction" -> MapT(SubstitutableT("keyType"), SubstitutableT("valueType"), CommandOutput, SimpleFunction)
       )),
       expression = Subtype(

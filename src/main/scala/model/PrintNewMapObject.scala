@@ -8,7 +8,7 @@ object PrintNewMapObject {
     case Ord(i, false) => i.toString
     case Ord(0, true) => "Count"
     case Ord(i, true) => s"Count+$i"
-    case TypeT => "Type"
+    case TypeT(0) => "Type"
     case CommandTypeT => "CommandType"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s + "~Id"

@@ -64,19 +64,26 @@ case class CaseInstance(constructor: NewMapObject, input: NewMapObject) extends 
  */
 sealed abstract class NewMapType extends NewMapObject
 
+// TODO(2022): typeDepth is a counting number, not an ordinal, so we need to make this distinction!
+
 // TODO(2022): Currently this has the power of 2*omega - is that enough?
 // Ord(3, false) is just the number 3
-// Ord(0, true) represents the set of all sounding numbers (ordinal small omega)
-case class Ord(i: Long, infinite: Boolean = false) extends NewMapType
+// Ord(0, true) represents the set of all counting numbers (ordinal small omega)
+case class Ord(i: Long = 0, infinite: Boolean = false) extends NewMapType
 
-// Type of types.. very confusing!
-case object TypeT extends NewMapType
+// Type of types.. very confusing
+// The depthOfMembers input tells us which layer we are on.
+// - Layer 0 is all of the ordinary types whose members are objects
+// - Layer 1 is all of types of layer 0
+// - Layer 2 is all of the types of layer 1, etc
+case class TypeT(depthOfMembers: Int = 0) extends NewMapType
 
 // This is a subtype of TypeT, basically a newmap object with a command structure
 // - It has an initial value
 // - It has a command type
 // - You can give it commands to change the value
 // - You can potentially have versions available.
+// TODO(2022): Could this be implemented in code? 
 case object CommandTypeT extends NewMapType
 
 
@@ -136,8 +143,6 @@ case class CaseT(casesType: NewMapType, caseToType: NewMapObject) extends NewMap
 // TODO - remove because it's now TypeParameter
 case class SubstitutableT(s: String) extends NewMapType
 
-
-
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
 // - Anything that's left at the initial value is NOT in the subtype
@@ -182,25 +187,6 @@ case class TypeParameterVariance(
 //   ObjectT
 //   Any of the type constructors when the inputs are not well founded.
 // Plus with IndexT (and eventually count) it's types all the way down!
-
-// IDEA: talk about types and sets (subtypes of the type)
-//  types can be narrowed down by their sets
-//  Type Classes will come in later!
-// RAW TYPES:
-//  -- Index/Count (increments) - each count is also an index
-//  -- IdentifierT (just unique phrases)
-//  -- maps (command = key + command for the value type)
-//  -- lambda expression
-// WHAT NEXT
-// -- Then, any subset or enum can be used as a type
-// IMPLICATIONS OF THIS
-// -- Each variable has a type, a subset, and a value
-// -- val x: TYPE = VALUE
-//  TYPE can either be an actual type or a subset (if it's a subset, the actual type is inferred)
-//  The VALUE cannot refer to an actual type, but can refer to a subset.
-//  Later on, we can create VALUEs that model the type system, and generate newmap code.
-
-// This also means that param maps are kind of a meta map - and they can be versioned as well - but in a separate domain
 
 // What about type classes?
 

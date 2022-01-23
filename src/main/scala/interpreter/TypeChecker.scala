@@ -39,8 +39,8 @@ object TypeChecker {
       }
       case CommandList(values: Vector[ParseTree]) => {
         resolveTypeInfo(expectedType, env) match {
-          case ExplicitlyTyped(MapT(IdentifierT, TypeT, completeness, featureSet)) => {
-            val mapT = MapT(IdentifierT, TypeT, completeness, featureSet)
+          case ExplicitlyTyped(MapT(IdentifierT, TypeT(0), completeness, featureSet)) => {
+            val mapT = MapT(IdentifierT, TypeT(0), completeness, featureSet)
             // TODO - do we really want to consider this a parameter list, or just treat it like another map?
             typeCheckParamsStandalone(values, env, mapT)
           }
@@ -120,8 +120,8 @@ object TypeChecker {
               }
             }
           }
-          case ExplicitlyTyped(TypeT) => {
-            typeCheckParamsStandalone(values, env, TypeT)
+          case ExplicitlyTyped(TypeT(0)) => {
+            typeCheckParamsStandalone(values, env, TypeT(0))
           }
           case ImplicitlyTyped(Vector()) => {
             Failure("CommandLists must be explicitly typed")
@@ -134,7 +134,7 @@ object TypeChecker {
       case BindingCommandItem(key, value) => {
         typeCheck(CommandList(Vector(expression)), expectedType, env)
       }
-      case LambdaParse(params, expression) if (expectedType == ExplicitlyTyped(TypeT)) => {
+      case LambdaParse(params, expression) if (expectedType == ExplicitlyTyped(TypeT(0))) => {
         for {
           inputType <- typeSpecificTypeChecker(params, env)
           newEnv <- inputType match {
@@ -158,7 +158,7 @@ object TypeChecker {
             featureSet = FullFunction
           )
 
-          NewMapObjectWithType.withTypeE(mapType, TypeT)
+          NewMapObjectWithType.withTypeE(mapType, TypeT(0))
         }
       }
       case LambdaParse(params, expression) => {
@@ -203,9 +203,9 @@ object TypeChecker {
             case ExplicitlyTyped(nType) => Success(nType)
             case ImplicitlyTyped(convs) => {
               expectedType match {
-                //case ExplicitlyTyped(TypeT) => {
+                //case ExplicitlyTyped(TypeT(0)) => {
                 //  // TODO: more cases
-                //  Success(TypeT)
+                //  Success(TypeT(0))
                 //}
                 // TODO - I don't think this is right
                 case ExplicitlyTyped(t) => Success(t)
@@ -456,7 +456,7 @@ object TypeChecker {
     val resolvedEndingType = resolveType(endingType, env)
 
     (resolvedStartingType, resolvedEndingType) match {
-      case (_, TypeT) => refersToAType(resolvedStartingType, env)
+      case (_, TypeT(0)) => refersToAType(resolvedStartingType, env)
       case (Ord(j, jInf), Ord(i, iInf)) => {
         // The indecies must match, even though you can theoretically convert a smaller index to a bigger index.
         // This conversion is not made explicit to prevent people from accessing an array or map with the wrong index value
@@ -534,9 +534,15 @@ object TypeChecker {
         }
         case _ => failMsg("B")
       }
-      case TypeT => {
+      case TypeT(i) => {
         for {
-          _ <- Evaluator.convertObjectToType(nObject, env)
+          nObjectT <- Evaluator.convertObjectToType(nObject, env)
+          resultTypeDepth = typeDepth(nObjectT, env)
+
+          _ <- Outcome.failWhen(
+            resultTypeDepth != i,
+            s"Expecting type of depth $i, but got type of depth $resultTypeDepth"
+          )
         } yield ()
       }
       case CommandTypeT => {
@@ -697,7 +703,7 @@ object TypeChecker {
             // Now we have the variable.. next step we need the type
             // TODO - we need a type check that's specific to a type
             for {
-              _ <- typeCheck(typeOfIdentifier, ExplicitlyTyped(TypeT), env)
+              _ <- typeCheck(typeOfIdentifier, ExplicitlyTyped(TypeT(0)), env)
               typeOfIdentifierAsType <- typeSpecificTypeChecker(typeOfIdentifier, env)
               expandedEnv = env.newParam(name, typeOfIdentifierAsType)
               restOfParams <- typeCheckParameterList(otherIdentifiers, expandedEnv)
@@ -707,7 +713,7 @@ object TypeChecker {
           }
           case FoundIdentifierUnknownValue => {
             for {
-              _ <- typeCheck(typeOfIdentifier, ExplicitlyTyped(TypeT), env)
+              _ <- typeCheck(typeOfIdentifier, ExplicitlyTyped(TypeT(0)), env)
               restOfParams <- typeCheckParameterList(otherIdentifiers, env)
             } yield {
               restOfParams
@@ -763,7 +769,6 @@ object TypeChecker {
    */
   def typeCheckStruct(
     parameterList: Vector[(NewMapObject, NewMapObject)],
-    //parameterList: Vector[(String, NewMapObject)],
     valueList: Vector[ParseTree],
     env: Environment
   ): Outcome[Vector[(String, NewMapType, NewMapObject)], String] = {
@@ -827,7 +832,7 @@ object TypeChecker {
     env: Environment
   ): Outcome[NewMapType, String] = {
     for {
-      tc <- typeCheck(parseTree, ExplicitlyTyped(TypeT), env)
+      tc <- typeCheck(parseTree, ExplicitlyTyped(TypeT(0)), env)
       nmt <- Evaluator.convertObjectToType(tc.nObject, env)
     } yield nmt
   }
@@ -854,7 +859,7 @@ object TypeChecker {
     env: Environment
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CaseT(_, _) => {
+      case Ord(_, _) | TypeT(_) | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CaseT(_, _) => {
         Failure("Type " + functionType + " not generally callable.")
       }
       case MapT(
@@ -893,8 +898,9 @@ object TypeChecker {
     nType: NewMapType,
     env: Environment
   ): Long = nType match {
-    case Ord(_, _) => Long.MaxValue
-    case TypeT | CommandTypeT => 1
+    case Ord(_, _) => 0
+    case TypeT(i) => i + 1
+    case CommandTypeT => 1
     case IdentifierT => 0
     case StructT(fieldType, params) => 0
     case CaseT(_, _) => 0
@@ -911,6 +917,7 @@ object TypeChecker {
           depth - 1
         }
         case Success(ImplicitlyTyped(types)) => {
+          // Should things in the environment really be implicitly typed?
           -3 // TODO: Figure out what to do here 
         }
       }

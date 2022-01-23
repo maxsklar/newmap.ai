@@ -11,7 +11,7 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) | ParameterObj(_) | SubstitutableT(_) => {
+      case Ord(_, _) | TypeT(_) | CommandTypeT | IdentifierT | IdentifierInstance(_) | ParameterObj(_) | SubstitutableT(_) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -56,7 +56,7 @@ object Evaluator {
           evalParams <- this(
             NewMapObjectWithType.withTypeE(
               params,
-              MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
+              MapT(fieldType, TypeT(0), RequireCompleteness, SimpleFunction)
             ),
             env
           )
@@ -67,7 +67,7 @@ object Evaluator {
           evalCaseToType <- this(
             NewMapObjectWithType.withTypeE(
               caseToType,
-              MapT(casesType, TypeT, RequireCompleteness, SimpleFunction)
+              MapT(casesType, TypeT(0), RequireCompleteness, SimpleFunction)
             ),
             env
           )
@@ -97,7 +97,7 @@ object Evaluator {
     nType match {
       case Ord(0, false) => Failure("Zero Type has no default value")
       case Ord(_, _) => Success(Ord(0))
-      case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      case TypeT(_) => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       case CommandTypeT => Failure("Type of Command Types has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
       case MapT(inputType, outputType, CommandOutput, _) => Success(MapInstance(Vector.empty))
@@ -350,7 +350,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) => expression
+      case Ord(_, _) | TypeT(_) | CommandTypeT | IdentifierT | IdentifierInstance(_) => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),
@@ -421,7 +421,7 @@ object Evaluator {
     env: Environment
   ): NewMapType = {
     expression match {
-      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT => expression
+      case Ord(_, _) | TypeT(_) | CommandTypeT | IdentifierT => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),
@@ -505,7 +505,7 @@ object Evaluator {
   ): Outcome[NewMapType, String] = {
     objectFound match {
       case Ord(i, inf) => Success(Ord(i, inf))
-      case TypeT => Success(TypeT)
+      case TypeT(i) => Success(TypeT(i))
       case CommandTypeT => Success(CommandTypeT)
       case IdentifierT => Success(IdentifierT)
       case SubstitutableT(s) => Success(SubstitutableT(s))

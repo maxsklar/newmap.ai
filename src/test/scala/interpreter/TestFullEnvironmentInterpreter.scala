@@ -101,7 +101,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "m",
-      TypeT,
+      TypeT(0),
       MapT(Ord(3), Ord(100), CommandOutput, BasicMap)
     )
 
@@ -131,7 +131,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     
     val correctCommand = Environment.eCommand(
       "m",
-      TypeT,
+      TypeT(0),
       MapT(Ord(3), Ord(100), CommandOutput, BasicMap)
     )
 
@@ -180,7 +180,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be considered a type in a type input" in {
     val correctCommand = Environment.eCommand(
       "testType",
-      TypeT,
+      TypeT(0),
       MapT(
         Environment.structTypeFromParams(
           Vector(
@@ -266,7 +266,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
-        TypeT,
+        TypeT(0),
         Environment.simpleFuncT(
           Environment.structTypeFromParams(Vector("a" -> Ord(3))),
           Ord(4)
