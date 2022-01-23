@@ -124,7 +124,7 @@ object Environment {
     val fieldType = {
       Subtype(
         IdentifierT,
-        MapInstance(params.map(x => IdentifierInstance(x._1) -> Index(1)))
+        MapInstance(params.map(x => IdentifierInstance(x._1) -> Ord(1)))
       )
     }
 
@@ -139,7 +139,7 @@ object Environment {
     val fieldType = {
       Subtype(
         IdentifierT,
-        MapInstance(params.map(x => IdentifierInstance(x._1) -> Index(1)))
+        MapInstance(params.map(x => IdentifierInstance(x._1) -> Ord(1)))
       )
     }
 
@@ -163,7 +163,7 @@ object Environment {
 
   val Base: Environment = Environment().newCommands(Vector(
     eCommand("Type", TypeT, TypeT),
-    eCommand("Count", TypeT, CountT),
+    eCommand("Count", TypeT, Ord(0, true)),
     eCommand("Identifier", TypeT, IdentifierT),
     eCommand("Map", simpleFuncT(
       structTypeFromParams(

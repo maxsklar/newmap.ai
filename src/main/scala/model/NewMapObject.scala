@@ -64,8 +64,10 @@ case class CaseInstance(constructor: NewMapObject, input: NewMapObject) extends 
  */
 sealed abstract class NewMapType extends NewMapObject
 
-case class Index(i: Long) extends NewMapType
-case object CountT extends NewMapType
+// TODO(2022): Currently this has the power of 2*omega - is that enough?
+// Ord(3, false) is just the number 3
+// Ord(0, true) represents the set of all sounding numbers (ordinal small omega)
+case class Ord(i: Long, infinite: Boolean = false) extends NewMapType
 
 // Type of types.. very confusing!
 case object TypeT extends NewMapType
@@ -131,7 +133,10 @@ case class StructT(fieldType: NewMapType, params: NewMapObject) extends NewMapTy
 //  MapT(casesType, TypeT, RequireCompleteness, SimpleFunction)
 case class CaseT(casesType: NewMapType, caseToType: NewMapObject) extends NewMapType
 
+// TODO - remove because it's now TypeParameter
 case class SubstitutableT(s: String) extends NewMapType
+
+
 
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
@@ -143,6 +148,25 @@ case class Subtype(
   parentType: NewMapType,
   simpleFunction: NewMapObject
 ) extends NewMapType
+
+// Figure this out!
+/*case class GenericType(
+  parameters: Vector[(String, TypeParameter)],
+  body: NewMapType
+) extends NewMapType
+
+case class TypeParameter(
+  name: String,
+  upperBounds: Vector[NewMapType] = Vector.empty,
+  lowerBounds: Vector[NewMapType] = Vector.empty,
+  variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
+  typeDepth: Int = 0 
+)
+
+case class TypeParameterVariance(
+  isCovariant: Boolean,
+  isContravariant: Boolean
+)*/
 
 
 // TODO: Type functions

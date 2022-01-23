@@ -5,8 +5,9 @@ import ai.newmap.model._
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
-    case Index(i) => i.toString
-    case CountT => "Count"
+    case Ord(i, false) => i.toString
+    case Ord(0, true) => "Count"
+    case Ord(i, true) => s"Count+$i"
     case TypeT => "Type"
     case CommandTypeT => "CommandType"
     case IdentifierT => "Identifier"

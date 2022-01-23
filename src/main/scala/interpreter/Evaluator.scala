@@ -11,7 +11,7 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     val nObject = nObjectWithType.nObject
     nObject match {
-      case Index(_) | CountT | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) | ParameterObj(_) | SubstitutableT(_) => {
+      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) | ParameterObj(_) | SubstitutableT(_) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -95,9 +95,8 @@ object Evaluator {
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
-      case Index(0) => Failure("Zero Type has no default value")
-      case Index(i) => Success(Index(0))
-      case CountT => Success(Index(0))
+      case Ord(0, false) => Failure("Zero Type has no default value")
+      case Ord(_, _) => Success(Ord(0))
       case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       case CommandTypeT => Failure("Type of Command Types has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
@@ -174,7 +173,7 @@ object Evaluator {
 
   def extractNumber(nObject: NewMapObject): Option[Long] = {
     nObject match {
-      case Index(i) => Some(i)
+      case Ord(i, false) => Some(i)
       case _ => None
     }
   }
@@ -270,7 +269,7 @@ object Evaluator {
         val id = makeRelevantSubstitutions(identifier, env)
         Success(
           AbleToApplyFunction(
-            value.find(x => IdentifierInstance(x._1) == id).map(_._2).getOrElse(Index(0))
+            value.find(x => IdentifierInstance(x._1) == id).map(_._2).getOrElse(Ord(0))
           )
         )
       }
@@ -351,7 +350,7 @@ object Evaluator {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case Index(_) | CountT | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) => expression
+      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | IdentifierInstance(_) => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),
@@ -422,7 +421,7 @@ object Evaluator {
     env: Environment
   ): NewMapType = {
     expression match {
-      case Index(_) | CountT | TypeT | CommandTypeT | IdentifierT => expression
+      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),
@@ -505,10 +504,9 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapType, String] = {
     objectFound match {
-      case Index(i) => Success(Index(i))
+      case Ord(i, inf) => Success(Ord(i, inf))
       case TypeT => Success(TypeT)
       case CommandTypeT => Success(CommandTypeT)
-      case CountT => Success(CountT)
       case IdentifierT => Success(IdentifierT)
       case SubstitutableT(s) => Success(SubstitutableT(s))
       case Subtype(parentType, func) => Success(Subtype(parentType, func))
@@ -524,7 +522,7 @@ object Evaluator {
           val fieldType = {
             Subtype(
               IdentifierT,
-              MapInstance(newParams.map(x => IdentifierInstance(x._1) -> Index(1)))
+              MapInstance(newParams.map(x => IdentifierInstance(x._1) -> Ord(1)))
             )
           }
           // PROBLEM!!!!!!! - sometimes it should be case
@@ -571,8 +569,6 @@ object Evaluator {
       case StructT(fieldType, params) => Success(StructT(fieldType, params))
       case CaseT(casesType, caseToType) => Success(CaseT(casesType, caseToType))
       case IdentifierInstance(name) => {
-        if (name == "T")
-          throw new Exception("Identifier " + name + " is not connected to a type.")
         Failure("Identifier " + name + " is not connected to a type.")
       }
       case _ => {

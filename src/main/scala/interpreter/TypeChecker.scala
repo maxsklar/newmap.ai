@@ -14,13 +14,11 @@ object TypeChecker {
     expectedType: NewMapTypeInfo,
     env: Environment
   ): Outcome[NewMapObjectWithType, String] = {
-    val expectedKeys = Environment.Base.idToObjectWithType.keys
-    val additionalKeys = env.idToObjectWithType.keys.toSet -- expectedKeys.toSet
-
     val result: Outcome[NewMapObjectWithType, String] = expression match {
-      case NaturalNumberParse(i: Long) => Success(NewMapObjectWithType.untyped(Index(i)))
+      case NaturalNumberParse(i: Long) => Success(NewMapObjectWithType.untyped(Ord(i, false)))
       case IdentifierParse(s: String, true) => Success(NewMapObjectWithType.untyped(IdentifierInstance(s)))
       case IdentifierParse(s: String, false) => {
+        // TODO: Make sure that we are getting the expected type
         env.lookup(s) match {
           case Some(objectWithType) => Success(objectWithType)
           case None => Success(NewMapObjectWithType.untyped(IdentifierInstance(s)))
@@ -221,7 +219,7 @@ object TypeChecker {
           val fieldType = {
             Subtype(
               IdentifierT,
-              MapInstance(newParamsAsObj.map(x => x._1 -> Index(1)))
+              MapInstance(newParamsAsObj.map(x => x._1 -> Ord(1, false)))
             )
           }
 
@@ -288,8 +286,9 @@ object TypeChecker {
   }
 
   def findAllKeysToMatch(nType: NewMapType): Outcome[Set[NewMapObject], String] = nType match {
-    case Index(i) => {
-      Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
+    case Ord(i, false) => {
+      // TODO: What if this is too large?
+      Success((0 until i.toInt).map(j => Ord(j.toLong, false)).toSet)
     }
     case Subtype(parentType, simpleFunction) => simpleFunction match {
       // TODO: What if values is too large? Should we make some restrictions here?
@@ -458,10 +457,10 @@ object TypeChecker {
 
     (resolvedStartingType, resolvedEndingType) match {
       case (_, TypeT) => refersToAType(resolvedStartingType, env)
-      case (Index(j), Index(i)) => {
+      case (Ord(j, jInf), Ord(i, iInf)) => {
         // The indecies must match, even though you can theoretically convert a smaller index to a bigger index.
         // This conversion is not made explicit to prevent people from accessing an array or map with the wrong index value
-        (j == i)
+        (j == i) && (jInf == iInf)
       }
       // TODO: if these mapinstances contain pattern matches, we can run into trouble
       //  - work this out further!
@@ -524,9 +523,14 @@ object TypeChecker {
     val success = Success(())
 
     resolveType(nType, env) match {
-      case Index(i) => nObject match {
-        case Index(j) => if (j < i) success else {
-          failMsg("A")
+      case Ord(i, infI) => nObject match {
+        case Ord(j, infJ) => {
+          if (j < i) {
+            if (infI || !infJ) success
+            else failMsg("A - trying to convert and infinite type to a finite one")
+          } else {
+            failMsg("A")
+          }
         }
         case _ => failMsg("B")
       }
@@ -542,10 +546,6 @@ object TypeChecker {
           default <- Evaluator.getDefaultValueOfCommandType(resultType, env)
         } yield ()
       }
-      case CountT => nObject match {
-        case Index(_) => success
-        case _ => failMsg("Only counting numbers can convert to the count type.\n")
-      } 
       case IdentifierT => nObject match {
         case IdentifierInstance(_) => success
         case _ => failMsg("D")
@@ -854,7 +854,7 @@ object TypeChecker {
     env: Environment
   ): Outcome[FunctionTypeChecked, String] = {
     functionType match {
-      case Index(_) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CountT | CaseT(_, _) => {
+      case Ord(_, _) | TypeT | CommandTypeT | IdentifierT | SubstitutableT(_) | Subtype(_, _) | CaseT(_, _) => {
         Failure("Type " + functionType + " not generally callable.")
       }
       case MapT(
@@ -893,7 +893,7 @@ object TypeChecker {
     nType: NewMapType,
     env: Environment
   ): Long = nType match {
-    case Index(_) | CountT => Long.MaxValue
+    case Ord(_, _) => Long.MaxValue
     case TypeT | CommandTypeT => 1
     case IdentifierT => 0
     case StructT(fieldType, params) => 0
@@ -902,7 +902,7 @@ object TypeChecker {
     case SubstitutableT(s: String) => {
       //TODO(2022): Return to this once generics are established. 
       // Simply return to type depth of the upper bound of s.
-      (env.typeOf(s) match {
+      env.typeOf(s) match {
         case Failure(_) => -2 // TODO: this should be an error
         case Success(ExplicitlyTyped(nType)) => {
           val depth = typeDepth(nType, env)

@@ -7,17 +7,17 @@ import ai.newmap.util.{Outcome, Success, Failure}
 class TestTypeCheck extends FlatSpec {
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {
-  	  case Success(NewMapObjectWithType(objectFound, typeInfo)) => {
-  	  	assert(typeInfo == NewMapTypeInfo.init)
-  	  	assert(objectFound == Index(4))
-  	  }
-  	  case Failure(reason) => fail(reason)
-  	}
+      case Success(NewMapObjectWithType(objectFound, typeInfo)) => {
+        assert(typeInfo == NewMapTypeInfo.init)
+        assert(objectFound == Ord(4))
+      }
+      case Failure(reason) => fail(reason)
+    }
   }
 
   "A variable" should " be interpreted correctly" in {
-  	TypeChecker(IdentifierParse("x")) match {
-  	  case Success(result) => {
+    TypeChecker(IdentifierParse("x")) match {
+      case Success(result) => {
         assert(result.nObject == IdentifierInstance("x"))
         assert(result.nTypeInfo == NewMapTypeInfo.init)
       }
@@ -217,7 +217,7 @@ class TestTypeCheck extends FlatSpec {
       case Success(envCommands) => {
         assert(envCommands.length == 1)
         val com = envCommands(0)
-        assert(com == Environment.eCommand("x",Index(1),Index(0)))
+        assert(com == Environment.eCommand("x",Ord(1),Ord(0)))
       }
       case Failure(reason) => fail(reason)
     }
@@ -227,7 +227,7 @@ class TestTypeCheck extends FlatSpec {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(FullEnvironmentCommand("x",NewMapObjectWithType.untyped(Index(10)))))
+        assert(envCommands == Vector(FullEnvironmentCommand("x",NewMapObjectWithType.untyped(Ord(10)))))
       }
       case Failure(reason) => fail(reason)
     }
