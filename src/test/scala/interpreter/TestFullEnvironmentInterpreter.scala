@@ -294,6 +294,20 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
 
+  it should "be able to infer the function type" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: 12 = 6", GeneralSuccessCheck),
+      CodeExpectation("(6: 10, 1: 3, 2: 1) x", GeneralSuccessCheck)
+    ))
+  }
+
+//
+  // Another test:
+  // val x: S = ....
+  // val y: T = (asdf) x
+  // We should be able to infer that whatever is in "asdf" is of type S -> T
+
+
   // REDO these tests when we have type inference
   "Universal identity function " should " have a valid type signature" in {
     val line = "val u: Type = (T: Type, t: T) => T"
@@ -354,9 +368,4 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val x: 2 = shorten True", GeneralSuccessCheck)
     ))
   }
-
-  // Another test:
-  // val x: S = ....
-  // val y: T = (asdf) x
-  // We should be able to infer that whatever is in "asdf" is of type S -> T
 }
