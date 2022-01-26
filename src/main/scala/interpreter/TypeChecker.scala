@@ -56,7 +56,7 @@ object TypeChecker {
 
           result <- functionTypeChecked match {
             case nAppliable: NewMapFunction => processFunctionApplication(nAppliable, application, env)
-            case _ => Failure(s"Object $functionTypeChecked not generally callable.")
+            case _ => Failure(s"Object $functionTypeChecked not generally callable. Attempt to apply $application")
           }
         } yield result
       }
@@ -241,14 +241,15 @@ object TypeChecker {
       // Check that the object is part of the required subtype if given
       // Is it possible that this will always be true given the code above?
       // Once we can verify this, maybe we can remove this code
-      _ <- expectedType match {
+      /*_ <- expectedType match {
         case Some(typeExpected) => {
           val nType = RetrieveType(nObject)
+          // TODO - there are different rules here - we probably should pass nObject to something else instead!!!
           if (isTypeConvertible(nType, typeExpected, env)) Success()
           else Failure(s"In expression $nObject expected type $typeExpected found type $nType and cannot convert")
         }
         case None => Success()
-      }
+      }*/
     } yield nObject
   }
 
@@ -324,7 +325,7 @@ object TypeChecker {
       case SubtypeT(MapInstance(values, _)) => Success(values.map(_._1).toSet)
       // TODO(2022): if simpleFunction is boolean function on a small finite parentType, we should be able to enumerate those
       // TODO(2022): this is also one of those advanced cases where we want to know if one set is a subset of another through some advanced argument (like monotonicity)
-      case SubtypeT(RangeFunc(i))  => Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
+      case SubtypeT(RangeFunc(i)) => Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
       // TODO - structs and cases
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }
@@ -412,19 +413,27 @@ object TypeChecker {
     endingType: NewMapSubtype,
     env: Environment
   ): Boolean = {
+    println(s"In isTypeConvertible $startingType -- $endingType")
     if (isPureTypeConvertible(startingType, endingType, env)) {
+      println(s"pure types were convertable $startingType -- $endingType")
+
       val doesEndtypeCoverParentType = endingType match {
         case SubtypeT(isMember) => doesFunctionCoverParentType(isMember).toOption.getOrElse(false)
         case _ => true
       }
 
       if (doesEndtypeCoverParentType) {
+        println(s"Found doesEndtypeCoverParentType for $endingType")
         true
       } else {
+        println(s"Found doesEndtypeCoverParentType:FALSE for $endingType")
+        println(s"Enumeration: ${enumerateAllValuesIfPossible(startingType)})")
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
           allValues <- enumerateAllValuesIfPossible(startingType)
+
+          _ = println(s"got all values: $allValues")
           doAllConvert <- Evaluator.allMembersOfSubtype(allValues.toVector, endingType, env)
         } yield doAllConvert
 
@@ -442,10 +451,10 @@ object TypeChecker {
     env: Environment
   ): Boolean = {
     // TODO? Check that types are of the same depth
-    val resolvedStartingType = resolveType(startingType, env)
-    val resolvedEndingType = resolveType(endingType, env)
+    val parentStartingType = RetrieveType.getParentType(startingType)
+    val parentEndingType = RetrieveType.getParentType(endingType)
 
-    (resolvedStartingType, resolvedEndingType) match {
+    (parentStartingType, parentEndingType) match {
       case (TypeT(i), TypeT(j)) => i == j
       case (CountT, CountT) => true
       case (
@@ -482,7 +491,7 @@ object TypeChecker {
       case (StructT(MapInstance(values, mi)), _) if (values.length == 1) => {
         Evaluator.convertObjectToType(values.head._2, env)
           .toOption
-          .map(x => isTypeConvertible(x, resolvedEndingType, env))
+          .map(x => isTypeConvertible(x, parentEndingType, env))
           .getOrElse(false)
       }
       case (CaseT(startingCases), CaseT(endingCases)) => {
@@ -500,7 +509,7 @@ object TypeChecker {
         false
       }
       case _ => {
-        (resolvedEndingType == resolvedStartingType)
+        (parentEndingType == parentStartingType)
       }
     }
   }

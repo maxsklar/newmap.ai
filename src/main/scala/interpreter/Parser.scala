@@ -172,7 +172,7 @@ object NewMapParser extends Parsers {
 
   private def expressionList: Parser[ParseTree] = {
     rep1(baseExpression) ^^ {
-      case exps => exps reduceRight ApplyParse
+      case exps => exps reduceLeft ApplyParse
     }
   }
 

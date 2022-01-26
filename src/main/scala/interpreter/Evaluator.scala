@@ -106,14 +106,17 @@ object Evaluator {
     nObjects: Vector[NewMapObject],
     nSubtype: NewMapSubtype,
     env: Environment
-  ): Outcome[Boolean, String] = nObjects match {
-    case nObject +: restOfObjects => {
-      for {
-        isIt <- isMemberOfSubtype(nObject, nSubtype, env)
-        result <- if (isIt) allMembersOfSubtype(restOfObjects, nSubtype, env) else Success(false)
-      } yield result
+  ): Outcome[Boolean, String] = {
+    nObjects match {
+      case nObject +: restOfObjects => {
+        for {
+          isIt <- isMemberOfSubtype(nObject, nSubtype, env)
+          _ = println(s"isIt? $isIt -- $nObject -- $nSubtype")
+          result <- if (isIt) allMembersOfSubtype(restOfObjects, nSubtype, env) else Success(false)
+        } yield result
+      }
+      case _ => Success(true)
     }
-    case _ => Success(false)
   }
 
   def getDefaultValueOfPureCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
@@ -298,6 +301,20 @@ object Evaluator {
       case (ParameterFunc(id, _, _), input) => {
         // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
         Success(UnableToApplyDueToUnknownInput)
+      }
+      case (RangeFunc(i), Index(j)) => {
+        val ix = if (j < i) 1 else 0
+        Success(AbleToApplyFunction(Index(ix)))
+      }
+      case (IsCommandFunc(i), nObject) => {
+        for {
+          nType <- Evaluator.convertObjectToType(nObject, env)
+          _ <- Outcome.failWhen(RetrieveType(nType) != TypeT(i), s"IsCommandFunc on the wrong level $i for $nType")
+        } yield {
+          val isCommand: Boolean = getDefaultValueOfCommandType(nType, env).isSuccess
+          val ix = if (isCommand) 1 else 0
+          AbleToApplyFunction(Index(i))
+        }
       }
       case _ => {
         Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
@@ -551,6 +568,7 @@ object Evaluator {
       case IdentifierInstance(name) => {
         Failure("Identifier " + name + " is not connected to a type.")
       }
+      case SubtypeT(isMember) => Success(SubtypeT(isMember))
       case _ => {
         Failure("Couldn't convert into type: " + objectFound + " -- could be unimplemented")
       }

@@ -50,6 +50,16 @@ class TestParser extends FlatSpec {
     ))
   }
 
+  it should " apply values from left to right" in {
+    val tokens = Vector(Identifier("f"), Number(5), Number(2))
+    assert(NewMapParser(tokens) == Success(
+      ApplyParse(
+        ApplyParse(IdentifierParse("f"), NaturalNumberParse(5)),
+        NaturalNumberParse(2)
+      )
+    ))
+  }
+
   "A List of tokens of a count statement " should " be parsed correctly" in {
     val tokens = List(
       Identifier("val"), 
