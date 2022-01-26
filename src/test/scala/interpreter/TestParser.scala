@@ -39,14 +39,14 @@ class TestParser extends FlatSpec {
   "Apply function " should " work for f(x)" in {
     val tokens = Vector(Identifier("f"), Enc(Paren, true), Identifier("x"), Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      ApplyParse(IdentifierParse("f"), Vector(IdentifierParse("x")))
+      ApplyParse(IdentifierParse("f"), IdentifierParse("x"))
     ))
   }
 
   it should " work for f 5" in {
     val tokens = Vector(Identifier("f"), Number(5))
     assert(NewMapParser(tokens) == Success(
-      ApplyParse(IdentifierParse("f"), Vector(NaturalNumberParse(5)))
+      ApplyParse(IdentifierParse("f"), NaturalNumberParse(5))
     ))
   }
 
@@ -103,9 +103,9 @@ class TestParser extends FlatSpec {
         FullStatementParse(ValStatement,
           IdentifierParse("a",false),
           ApplyParse(IdentifierParse("Map",false),
-            Vector(CommandList(Vector(NaturalNumberParse(3), 
+            CommandList(Vector(NaturalNumberParse(3), 
               NaturalNumberParse(100), 
-              NaturalNumberParse(0))))
+              NaturalNumberParse(0)))
           ),
           CommandList(Vector(BindingCommandItem(NaturalNumberParse(0),
             NaturalNumberParse(20)), 

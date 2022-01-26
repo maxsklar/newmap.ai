@@ -7,9 +7,8 @@ import ai.newmap.util.{Outcome, Success, Failure}
 class TestTypeCheck extends FlatSpec {
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {
-      case Success(NewMapObjectWithType(objectFound, typeInfo)) => {
-        assert(typeInfo == NewMapTypeInfo.init)
-        assert(objectFound == Ord(4))
+      case Success(objectFound) => {
+        assert(objectFound == Index(4))
       }
       case Failure(reason) => fail(reason)
     }
@@ -18,8 +17,7 @@ class TestTypeCheck extends FlatSpec {
   "A variable" should " be interpreted correctly" in {
     TypeChecker(IdentifierParse("x")) match {
       case Success(result) => {
-        assert(result.nObject == IdentifierInstance("x"))
-        assert(result.nTypeInfo == NewMapTypeInfo.init)
+        assert(result == IdentifierInstance("x"))
       }
   	  case Failure(reason) => fail(reason)
   	}
@@ -27,9 +25,8 @@ class TestTypeCheck extends FlatSpec {
 
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
-  	  case Success(result) => {
-  	  	assert(result.nTypeInfo == ExplicitlyTyped(TypeT(0)))
-  	  	assert(result.nObject == TypeT(0))
+  	  case Success(nObject) => {
+  	  	assert(nObject == TypeT(0))
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -38,8 +35,7 @@ class TestTypeCheck extends FlatSpec {
   it should " be interpreted as an identifier if forced" in {
     TypeChecker(IdentifierParse("Type", true)) match {
       case Success(result) => {
-        assert(result.nObject == IdentifierInstance("Type"))
-        assert(result.nTypeInfo == NewMapTypeInfo.init)
+        assert(result == IdentifierInstance("Type"))
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -54,9 +50,7 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(result) => {
-        ()
-      }
+      case Success(result) => ()
       case Failure(reason) => fail(reason)
     }
   } 
@@ -71,16 +65,9 @@ class TestTypeCheck extends FlatSpec {
     )
 
     TypeChecker(expression) match {
-      case Success(result) => {
-        result.nTypeInfo match {
-          case ImplicitlyTyped(_) => fail(result + " should be explicit")
-          case _ => ()
-        }
-
+      case Success(result) => ()
         // TODO: check these are right
-        //println(typeFound)
         //println(objectFound)
-      }
       case Failure(reason) => fail(reason)
     }
   }
@@ -136,10 +123,7 @@ class TestTypeCheck extends FlatSpec {
 
     TypeChecker(expression) match {
       case Success(result) => {
-        result.nTypeInfo match {
-          case ImplicitlyTyped(_) => fail("Should not be allowed but was")
-          case _ => fail("Should not be allowed but was")
-        }
+        fail("Should not be allowed but was")
       }
       case Failure(reason) => ()
     }
@@ -163,14 +147,15 @@ class TestTypeCheck extends FlatSpec {
   "A boolean map " should " be interpreted correctly" in {
   	val booleanMap = ApplyParse(
       IdentifierParse("Map"),
-      Vector(CommandList(Vector(
+      CommandList(Vector(
         BindingCommandItem(IdentifierParse("key"), NaturalNumberParse(2)),
         BindingCommandItem(IdentifierParse("value"), NaturalNumberParse(2))
-    ))))
+      ))
+    )
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
-      	assert(result.nTypeInfo == ExplicitlyTyped(TypeT(0)))
+      	assert(RetrieveType(result) == TypeT(0))
         //println(objectFound)
 
       	// TODO: what should we do with this?
@@ -187,7 +172,7 @@ class TestTypeCheck extends FlatSpec {
       case Success(envCommands) => {
         assert(envCommands.length == 1)
         val com = envCommands(0)
-        assert(com == Environment.eCommand("x",Ord(1),Ord(0)))
+        assert(com == Environment.eCommand("x",Index(0)))
       }
       case Failure(reason) => fail(reason)
     }
@@ -197,7 +182,7 @@ class TestTypeCheck extends FlatSpec {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(FullEnvironmentCommand("x",NewMapObjectWithType.untyped(Ord(10)))))
+        assert(envCommands == Vector(FullEnvironmentCommand("x", Index(10))))
       }
       case Failure(reason) => fail(reason)
     }
@@ -218,9 +203,9 @@ class TestTypeCheck extends FlatSpec {
       )),
       ApplyParse(
         IdentifierParse("f"),
-        Vector(CommandList(Vector(
+        CommandList(Vector(
           BindingCommandItem(IdentifierParse("input"), IdentifierParse("x"))
-        )))
+        ))
       )
     )
 

@@ -172,11 +172,7 @@ object NewMapParser extends Parsers {
 
   private def expressionList: Parser[ParseTree] = {
     rep1(baseExpression) ^^ {
-      case exps => {
-        // TODO - make this type safe
-        if (exps.length > 1) ApplyParse(exps(0), exps.drop(1).toVector)
-        else exps(0)
-      }
+      case exps => exps reduceRight ApplyParse
     }
   }
 

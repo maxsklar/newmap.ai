@@ -7,44 +7,60 @@ sealed abstract class NewMapObject {
   override def toString = PrintNewMapObject(this)
 }
 
+// These objects accept inputs as well as outputs
+sealed abstract class NewMapFunction extends NewMapObject
+
 case class IdentifierInstance(s: String) extends NewMapObject
 
+case class Index(i: Long) extends NewMapObject
+
+// Idea: create a MapInstance object that only has values and does not extend NewMapObject
+// - Then, combine it with other fields in other objects to create what we want
 case class MapInstance(
-  values: Vector[(NewMapObject, NewMapObject)]
-) extends NewMapObject
+  values: Vector[(NewMapObject, NewMapObject)],
+  mapType: MapT
+) extends NewMapFunction
 
 // There are several different ways items can be passed into a lambda expression
 sealed abstract class LambdaParamStrategy
 
 // The parameter type is a struct, and the name of the parameters is how the values are called
-case class StructParams(params: Vector[(String, NewMapType)]) extends LambdaParamStrategy
+case class StructParams(params: Vector[(String, NewMapSubtype)]) extends LambdaParamStrategy
 
 // The parameter is named by an identifier
-case class IdentifierParam(name: String, nType: NewMapType) extends LambdaParamStrategy
-
-// The parameter is pushed onto an input stack
-case class InputStackParam(nType: NewMapType) extends LambdaParamStrategy
+case class IdentifierParam(name: String, nType: NewMapSubtype) extends LambdaParamStrategy
 
 case class LambdaInstance(
   paramStrategy: LambdaParamStrategy,
   expression: NewMapObject
-) extends NewMapObject
+) extends NewMapFunction
 
 case class ApplyFunction(
-  func: NewMapObject,
+  func: NewMapFunction,
   input: NewMapObject
 ) extends NewMapObject
 
 // This is an object that we don't know the value of yet. It'll be passed in later.
-case class ParameterObj(name: String) extends NewMapObject
+case class ParameterObj(name: String, nType: NewMapSubtype) extends NewMapObject
+
+// TODO Might need more information in here -- like Completeness or featureset... same as MapInstance??
+case class ParameterFunc(name: String, inputType: NewMapSubtype, outputType: NewMapSubtype) extends NewMapFunction
+
+// This function takes a count and returns true if that count is strictly less than i
+case class RangeFunc(i: Long) extends NewMapFunction
+
+// This takes as input a member of TypeT(depth) and returns true if it's a member
+//  of the command typeclass (which means it has a default value and an update function)
+// TODO: making this a basic class is temporary for now
+case class IsCommandFunc(depth: Long = 0) extends NewMapFunction
 
 // This one is a little different/complex because each object has a unique type as defined by the struct
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
 // TODO(2022): the first value should be "NewMapObject" instead of string, but this might hurt the
 //  type-checker/evaluator for now - change soon!
-case class StructInstance(value: Vector[(String, NewMapObject)]) extends NewMapObject
+case class StructInstance(value: Vector[(String, NewMapObject)], structType: StructT) extends NewMapObject
 
-case class CaseInstance(constructor: NewMapObject, input: NewMapObject) extends NewMapObject
+case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject
 
 // The type inputs a case class and outputs a type - so for each case it creates a function to that type
 // Generally of type Case(params) => T
@@ -62,30 +78,17 @@ case class CaseInstance(constructor: NewMapObject, input: NewMapObject) extends 
  * The types in the NewMap Language
  * This is actually a subset of the Objects, and there are functions below that convert between the 2
  */
-sealed abstract class NewMapType extends NewMapObject
+sealed abstract class NewMapSubtype extends NewMapObject
+sealed abstract class NewMapType extends NewMapSubtype
 
-// TODO(2022): typeDepth is a counting number, not an ordinal, so we need to make this distinction!
-
-// TODO(2022): Currently this has the power of 2*omega - is that enough?
-// Ord(3, false) is just the number 3
-// Ord(0, true) represents the set of all counting numbers (ordinal small omega)
-case class Ord(i: Long = 0, infinite: Boolean = false) extends NewMapType
+case object CountT extends NewMapType
 
 // Type of types.. very confusing
 // The depthOfMembers input tells us which layer we are on.
 // - Layer 0 is all of the ordinary types whose members are objects
 // - Layer 1 is all of types of layer 0
 // - Layer 2 is all of the types of layer 1, etc
-case class TypeT(depthOfMembers: Int = 0) extends NewMapType
-
-// This is a subtype of TypeT, basically a newmap object with a command structure
-// - It has an initial value
-// - It has a command type
-// - You can give it commands to change the value
-// - You can potentially have versions available.
-// TODO(2022): Could this be implemented in code? 
-case object CommandTypeT extends NewMapType
-
+case class TypeT(depthOfMembers: Long = 0) extends NewMapType
 
 case object IdentifierT extends NewMapType
 
@@ -108,8 +111,8 @@ case object IdentifierT extends NewMapType
  * - commandOutput means that the output types must all be command types, which means they start at an initial value.
  */
 case class MapT(
-  inputType: NewMapType,
-  outputType: NewMapType,
+  inputType: NewMapSubtype,
+  outputType: NewMapSubtype,
   completeness: MapCompleteness,
   featureSet: MapFeatureSet
 ) extends NewMapType
@@ -124,35 +127,29 @@ object SimpleFunction extends MapFeatureSet
 object FullFunction extends MapFeatureSet
 
 
-// TODO: these should actually be connected to NewMapObjects which are of type
-//  MapT(TypeT, Count, CommandOutput, BasicMap)
-//case class StructT(params: Vector[(String, NewMapObject)]) extends NewMapType
-
 // Params should be connected to a NewMapObject which are of type
 //  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
 // They might also be a paramObj, to be filled in later
 // TODO(2022): once generics are introduced, fieldType might be unneccesary
-case class StructT(fieldType: NewMapType, params: NewMapObject) extends NewMapType
+//case class StructT(fieldType: NewMapSubtype, params: NewMapObject) extends NewMapType
 // TODO: What about simpler product types (no identifiers) based on MapT(TypeT, Count, CommandOutput, BasicMap)
 
-// casesType: a type which specifies which cases are available
-// caseToType: should be connected to a NewMapObject of type
-//  MapT(casesType, TypeT, RequireCompleteness, SimpleFunction)
-case class CaseT(casesType: NewMapType, caseToType: NewMapObject) extends NewMapType
+// Params is a map from the fields of the struct to the Types (all the same level)
+case class StructT(params: NewMapFunction) extends NewMapType
 
-// TODO - remove because it's now TypeParameter
-case class SubstitutableT(s: String) extends NewMapType
+// cases: input type is the case constructors, output type is the field types per constructor
+case class CaseT(cases: NewMapFunction) extends NewMapType
+
+case class SubstitutableT(s: String, nType: NewMapSubtype) extends NewMapType
 
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
 // - Anything that's left at the initial value is NOT in the subtype
 // For example, if the simple function is a Map from 10 to 2, and it reads (2: 1, 3: 1, 5: 1, 7: 1),
 //  then the values 2, 3, 5, and 7 are considered part of this new type; the rest are not
-// TODO(2022): Change once simpleFunction is required to be type checked already.
-case class Subtype(
-  parentType: NewMapType,
-  simpleFunction: NewMapObject
-) extends NewMapType
+case class SubtypeT(
+  isMember: NewMapFunction
+) extends NewMapSubtype
 
 // Figure this out!
 /*case class GenericType(
@@ -173,27 +170,14 @@ case class TypeParameterVariance(
   isContravariant: Boolean
 )*/
 
+object NewMapO {
+  
+  def rangeT(i: Long): NewMapSubtype = SubtypeT(RangeFunc(i))
 
-// TODO: Type functions
-
-// TODO: Examine Well-foundedness
-// Concrete Types: IndexT, IdentifierT
-//   MapT when the inputs are well founded
-//   StructT when the inputs are well founded
-//   LambdaT when the inputs are well founded
-//   SubstitutableT when the inputs are well founded
-// Type Classes
-//   TypeT
-//   ObjectT
-//   Any of the type constructors when the inputs are not well founded.
-// Plus with IndexT (and eventually count) it's types all the way down!
-
-// What about type classes?
-
-// Idea: Concrete Types should be specifiable as objects
-//   Then type classes or abstract types??
-
-// TODO: enumerated types
-// TODO: other kinds of maps
-// TODO: Callable Type?? (includes lambda and map)
-
+  // This is a subtype of TypeT, basically a newmap object with a command structure
+  // - It has an initial value
+  // - It has a command type
+  // - You can give it commands to change the value
+  // - You can potentially have versions available.
+  def commandT(i: Long): NewMapSubtype = SubtypeT(IsCommandFunc(i))
+}

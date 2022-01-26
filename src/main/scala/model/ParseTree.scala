@@ -22,7 +22,7 @@ case class CommandList(
 
 case class ApplyParse(
   function: ParseTree,
-  applications: Vector[ParseTree]
+  input: ParseTree
 ) extends ParseTree
 
 case class LambdaParse(
