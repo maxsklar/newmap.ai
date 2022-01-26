@@ -112,7 +112,7 @@ class TestTypeCheck extends FlatSpec {
     }
   }
 
-  "An ordinal type " should " not allow subtypes" in {
+  "An index type " should " not allow subtypes" in {
     val expression = LambdaParse(
       CommandList(Vector(
         BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(100)),

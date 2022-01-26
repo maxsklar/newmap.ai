@@ -216,4 +216,20 @@ class TestParser extends FlatSpec {
       LambdaParse(LambdaParse(NaturalNumberParse(1), NaturalNumberParse(2)), NaturalNumberParse(3))
     ))
   }
+
+  "An expression with a field access " should " work" in {
+    val tokens = Vector(
+      Identifier("Object"),
+      Period(),
+      Identifier("getId"),
+      Colon(),
+      Number(5)
+    )
+    assert(NewMapParser(tokens) == Success(
+      BindingCommandItem(
+        FieldAccessParse(IdentifierParse("Object"), IdentifierParse("getId")),
+        NaturalNumberParse(5)
+      )
+    ))
+  }
 }

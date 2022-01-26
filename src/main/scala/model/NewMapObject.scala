@@ -40,6 +40,11 @@ case class ApplyFunction(
   input: NewMapObject
 ) extends NewMapObject
 
+case class AccessField(
+  struct: NewMapObject, // Todo - struct this is either a struct instance, or a case type
+  input: NewMapObject // Note - input must be literal and free of parameters (might be able to do this with scala's type systen)
+) extends NewMapObject
+
 // This is an object that we don't know the value of yet. It'll be passed in later.
 case class ParameterObj(name: String, nType: NewMapSubtype) extends NewMapObject
 
@@ -58,6 +63,8 @@ case class IsCommandFunc(depth: Long = 0) extends NewMapFunction
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
 // TODO(2022): the first value should be "NewMapObject" instead of string, but this might hurt the
 //  type-checker/evaluator for now - change soon!
+// TODO - revive this version!!
+//case class StructInstance(value: Vector[(NewMapObject, NewMapObject)], structType: StructT) extends NewMapObject
 case class StructInstance(value: Vector[(String, NewMapObject)], structType: StructT) extends NewMapObject
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject

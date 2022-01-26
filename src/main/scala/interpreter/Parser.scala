@@ -67,8 +67,14 @@ object NewMapParser extends Parsers {
     }})
   }
 
+  private def period: Parser[BinaryOpParse] = {
+    accept("period", { case Lexer.Period() => {
+      PeriodBinaryOpParse()
+    }})
+  }
+
   private def binaryOpParse: Parser[BinaryOpParse] = {
-    comma | colon | arrow
+    period | comma | colon | arrow
   }
 
   private def expressionListWithOperations: Parser[ParseTree] = {
@@ -81,17 +87,21 @@ object NewMapParser extends Parsers {
           case (symbol ~ exp) => (symbol, exp)
         }).toVector
 
-        // Precedence of operations is, highest to lowest: Colon, Comma, Arrow
+        // Precedence of operations is, highest to lowest: Period, Colon, Comma, Arrow
         // Arrow associates to the right, while the others associate to the left
 
         // TODO - this binding code is confusing. It's just order of operations, should be
         //  possible to rewrite
 
-        val (s1, o1) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, first) => {
+        val (s1, o1) = bindBinaryOpParse(startingExp, o0, PeriodBinaryOpParse(), (a, b, first) => {
+          FieldAccessParse(a, b)
+        })
+
+        val (s2, o2) = bindBinaryOpParse(s1, o1, ColonBinaryOpParse(), (a, b, first) => {
           BindingCommandItem(a, b)
         })
 
-        val (s2, o2) = bindBinaryOpParse(s1, o1, CommaBinaryOpParse(), (a, b, first) => {
+        val (s3, o3) = bindBinaryOpParse(s2, o2, CommaBinaryOpParse(), (a, b, first) => {
           a match {
             case CommandList(commands) => CommandList(commands :+ b)
             case _ => CommandList(Vector(a, b))
@@ -105,15 +115,15 @@ object NewMapParser extends Parsers {
           }
         }
 
-        val (s3, o3) = bindBinaryOpParse(s2, o2, ArrowBinaryOpParse(), (a, b, first) => {
+        val (s4, o4) = bindBinaryOpParse(s3, o3, ArrowBinaryOpParse(), (a, b, first) => {
           bindArrow(a, b, first)
         })
 
-        if (o3.nonEmpty) {
+        if (o4.nonEmpty) {
           println("Warning: the parse is dropping stuff: " + o3)
         }
 
-        s3
+        s4
       }
     }
   }

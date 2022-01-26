@@ -43,6 +43,9 @@ object RetrieveType {
       MapT(inputType, outputType, RequireCompleteness, BasicMap)
     }
     case ApplyFunction(func, input) => getParentType(retrieveOutputTypeFromFunction(func))
+    case AccessField(_, _) => {
+      throw new Exception("Field access retrieve type must be implemented!!")
+    }
     case ParameterObj(_, nType) => getParentType(nType)
     case ParameterFunc(_, inputT, outputT) => MapT(inputT, outputT, RequireCompleteness, SimpleFunction)
     case IsCommandFunc(i) => MapT(TypeT(i), NewMapO.rangeT(2), CommandOutput, SimpleFunction)
@@ -110,5 +113,11 @@ object RetrieveType {
       }
     case t: NewMapType => t
     }
+  }
+
+  def isTermClosedLiteral(nObject: NewMapObject): Boolean = {
+    // Check that there are no parameters or weird functions in here.
+    // TODO: Implement
+    true
   }
 }

@@ -114,4 +114,18 @@ class TestLexer extends FlatSpec {
       Number(6)
     )))
   }
+
+  "A struct field call " should " be lexed correctly" in {
+    val code = "val a: 12 = date.getMonth"
+    assert(Lexer(code) == Success(List(
+      Identifier("val"),
+      Identifier("a"),
+      Colon(),
+      Number(12),
+      Equals(),
+      Identifier("date"),
+      Period(),
+      Identifier("getMonth")
+    )))
+  }
 }

@@ -60,6 +60,33 @@ object TypeChecker {
           }
         } yield result
       }
+      case FieldAccessParse(struct, field) => {
+        for {
+          // TODO - build a specialize typeCheck where you expect a struct?
+          typeCheckedStruct <- typeCheck(struct, None, env)
+
+          structParams <- typeCheckedStruct match {
+            case StructInstance(value, StructT(params)) => Success(params)
+            case CaseT(cases) => {
+              Failure("case type constructor access unimplemented: $typeCheckedField for $cases")
+            }
+            case _ => {
+              Failure(s"Attempting to access field object $typeCheckedStruct which is not a struct instance")
+            }
+          }
+
+          fieldsT = RetrieveType.retrieveInputTypeFromFunction(structParams)
+
+          typeCheckedField <- typeCheck(field, Some(fieldsT), env)
+
+          _ <- Outcome.failWhen(
+            !RetrieveType.isTermClosedLiteral(typeCheckedField),
+            s"When accessing the value of a struct, the field must not have any unbound variables or non-basic functions. This field is $typeCheckedField"
+          )
+
+          resultingType <- Evaluator.quickApplyFunctionAttempt(structParams, typeCheckedField, env)
+        } yield AccessField(typeCheckedStruct, typeCheckedField)
+      }
       case CommandList(values: Vector[ParseTree]) => {
         expectedType.map(resolveType(_, env)) match {
           case Some(MapT(IdentifierT, TypeT(0), completeness, featureSet)) => {
@@ -707,6 +734,7 @@ object TypeChecker {
   }
 
   // In this case, we want the object to be a type, so we return that type
+  // Note that we want to result EVALUATED - otherwise we don't actually know if it's a type
   // TODO - this repeats a lot of stuff - perhaps combine this with something else?
   // TODO(2022): This is it's own class!
   def typeSpecificTypeChecker(
@@ -727,7 +755,8 @@ object TypeChecker {
 
     for {
       tc <- typeCheckOfType
-      nmt <- Evaluator.convertObjectToType(tc, env)
+      evaluatedTc <- Evaluator(tc, env)
+      nmt <- Evaluator.convertObjectToType(evaluatedTc, env)
     } yield nmt
   }
 

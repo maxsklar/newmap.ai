@@ -25,6 +25,11 @@ case class ApplyParse(
   input: ParseTree
 ) extends ParseTree
 
+case class FieldAccessParse(
+  struct: ParseTree,
+  field: ParseTree
+) extends ParseTree
+
 case class LambdaParse(
   params: ParseTree,
   expression: ParseTree
@@ -62,3 +67,4 @@ sealed abstract class BinaryOpParse
 case class CommaBinaryOpParse() extends BinaryOpParse
 case class ColonBinaryOpParse() extends BinaryOpParse
 case class ArrowBinaryOpParse() extends BinaryOpParse
+case class PeriodBinaryOpParse() extends BinaryOpParse

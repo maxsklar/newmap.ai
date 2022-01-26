@@ -170,7 +170,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be callable " in {
+  it should " allow its fields to be accessed " in {
     val interp = new EnvironmentInterpreter()
     val correctCommand = Environment.eCommand(
       "q",
@@ -180,7 +180,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
       CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val q: 3 = s b", SuccessCheck(correctCommand))
+      CodeExpectation("val q: 3 = s.b", SuccessCheck(correctCommand))
     ))
   }
 

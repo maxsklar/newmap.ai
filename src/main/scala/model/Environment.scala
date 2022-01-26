@@ -153,11 +153,11 @@ object Environment {
     eCommand("Map", LambdaInstance(
       paramStrategy = StructParams(Vector(
         "key" -> TypeT(0),
-        "value" -> TypeT(0)
+        "value" -> NewMapO.commandT(0)
       )),
       expression = MapT(
         SubstitutableT("key", TypeT(0)),
-        SubstitutableT("value", TypeT(0)),
+        SubstitutableT("value", NewMapO.commandT(0)),
         CommandOutput,
         BasicMap
       )

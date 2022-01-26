@@ -48,6 +48,12 @@ object Evaluator {
           }
         } yield result
       }
+      case AccessField(struct, field) => {
+        for {
+          evalStruct <- this(struct, env)
+          result <- accessFieldAttempt(evalStruct, field, env)
+        } yield result
+      }
       // TODO: pass through eval function type
       case StructT(params) => {
         Success(StructT(params))
@@ -220,6 +226,26 @@ object Evaluator {
     case _ => Success(Vector.empty)
   }
 
+  def accessFieldAttempt(
+    struct: NewMapObject, // TODO - this should be a subtype
+    field: NewMapObject,
+    env: Environment
+  ): Outcome[NewMapObject, String] = {
+    struct match {
+      case StructInstance(value: Vector[(String, NewMapObject)], structT) => {
+        // TODO - formalize these - search for everywhere in the code we search a map, and put it in its own function
+        // Also edit when struct instance values are Vector[(NewMapObject, NewMapObject)]
+        val resultOption = value.find(x => IdentifierInstance(x._1) == field).map(_._2)
+
+        resultOption match {
+          case Some(result) => Success(result)
+          case None => Failure(s"Unable to access field $field from struct $struct")
+        }
+      }
+      case _ => Failure(s"Unable to access fields from $struct because it is not a struct")
+    }
+  }
+
   sealed abstract class ApplyFunctionAttemptResult
   case class AbleToApplyFunction(nObject: NewMapObject) extends ApplyFunctionAttemptResult
   case object UnableToApplyDueToUnknownInput extends ApplyFunctionAttemptResult
@@ -286,18 +312,6 @@ object Evaluator {
           }
         }
       }
-      /*
-      // TODO(2022)
-      We can not longer apply this here, structs will have their own field getter "."
-      case (StructInstance(value: Vector[(String, NewMapObject)], _), identifier) => {
-        val id = makeRelevantSubstitutions(identifier, env)
-        val resultOption = value.find(x => IdentifierInstance(x._1) == id).map(_._2)
-
-        resultOption match {
-          case Some(result) => Success(AbleToApplyFunction(result))
-          case None => Success(NoMatchForInputInFunction)
-        }
-      }*/
       case (ParameterFunc(id, _, _), input) => {
         // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
         Success(UnableToApplyDueToUnknownInput)
@@ -312,8 +326,7 @@ object Evaluator {
           _ <- Outcome.failWhen(RetrieveType(nType) != TypeT(i), s"IsCommandFunc on the wrong level $i for $nType")
         } yield {
           val isCommand: Boolean = getDefaultValueOfCommandType(nType, env).isSuccess
-          val ix = if (isCommand) 1 else 0
-          AbleToApplyFunction(Index(i))
+          AbleToApplyFunction(Index(if (isCommand) 1 else 0))
         }
       }
       case _ => {
@@ -410,6 +423,12 @@ object Evaluator {
           makeRelevantSubstitutions(input, env)
         )
       }
+      case AccessField(struct, field) => {
+        AccessField(
+          makeRelevantSubstitutions(struct, env),
+          makeRelevantSubstitutions(field, env)
+        )
+      }
       case ParameterObj(name, _) => {
         env.lookup(name) match {
           case Some(obj) => obj
@@ -446,10 +465,27 @@ object Evaluator {
       LambdaInstance(params, newExpression)
     }
     case ParameterFunc(name, _, _) => {
-      env.lookup(name) match {
-        case Some(obj) => obj.asInstanceOf[NewMapFunction]
+      val nObjectOpt = env.lookup(name)
+      nObjectOpt match {
         case None => expression
+        case Some(nObject) => {
+          castToNewMapFunction(nObject) match {
+            case Success(result) => result
+            case Failure(s) => {
+              // TODO - this shouldn't be possible.. can we prevent this line from being needed?
+              throw new Exception(s)
+            }
+          }
+        }
       }
+    }
+  }
+
+  def castToNewMapFunction(nObject: NewMapObject): Outcome[NewMapFunction, String] = {
+    nObject match {
+      case nFunction: NewMapFunction => Success(nFunction)
+      case ParameterObj(name, MapT(inputT, outputT, _, _)) => Success(ParameterFunc(name, inputT, outputT))
+      case _ => Failure(s"Couldn't cast object to function: $nObject")
     }
   }
 
@@ -486,7 +522,10 @@ object Evaluator {
         env.lookup(s) match {
           case Some(obj) => {
             // TODO(2022): This is unsafe! Separate out types in the environment and then it'll be safe again
-            Evaluator.convertObjectToType(obj, env).toOption.get
+            Evaluator.convertObjectToType(obj, env).toOption match {
+              case Some(t) => t
+              case None => throw new Exception(s"Unable to cast to type: $obj")
+            }
           }
           case None => expression
         }
@@ -562,7 +601,9 @@ object Evaluator {
         // (maybe write a test to prove that it isn't a then remove)
         Success(SubstitutableT(name, nType))
       }
-      case ApplyFunction(func, input) => Failure(s"Expression $func($input) is not a type - perhaps if it is applied")
+      case ApplyFunction(func, input) => {
+        Failure(s"Expression $func($input) is not a type - perhaps if it is evaluated")
+      }
       case StructT(params) => Success(StructT(params))
       case CaseT(cases) => Success(CaseT(cases))
       case IdentifierInstance(name) => {
