@@ -182,7 +182,7 @@ class TestTypeCheck extends FlatSpec {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(FullEnvironmentCommand("x", Index(10))))
+        assert(envCommands == Vector(FullEnvironmentCommand(IdentifierInstance("x"), Index(10))))
       }
       case Failure(reason) => fail(reason)
     }
@@ -208,6 +208,13 @@ class TestTypeCheck extends FlatSpec {
         ))
       )
     )
+
+    /*
+    // val f: fSig = ((a: 3) => m a)
+
+    // (inputType: Type, outputType: Type, f: (input: InputType) => outputType, x: InputType) => f(input, x)
+
+    */
 
     TypeChecker(expression) match {
       case Success(result) => {

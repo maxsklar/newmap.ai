@@ -217,7 +217,7 @@ class TestParser extends FlatSpec {
     ))
   }
 
-  "An expression with a field access " should " work" in {
+  "Field access " should " work in an expression" in {
     val tokens = Vector(
       Identifier("Object"),
       Period(),
@@ -229,6 +229,17 @@ class TestParser extends FlatSpec {
       BindingCommandItem(
         FieldAccessParse(IdentifierParse("Object"), IdentifierParse("getId")),
         NaturalNumberParse(5)
+      )
+    ))
+  }
+
+  it should " take precedence over function application" in {
+    val tokens = Vector(Identifier("a"), Period(), Identifier("b"), Identifier("c"))
+
+    assert(NewMapParser(tokens) == Success(
+      ApplyParse(
+        FieldAccessParse(IdentifierParse("a"), IdentifierParse("b")),
+        IdentifierParse("c")
       )
     ))
   }

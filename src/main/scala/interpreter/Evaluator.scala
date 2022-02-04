@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | TypeT(_) | IsCommandFunc(_) | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | ParameterFunc(_, _, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | TypeT(_) | IsCommandFunc(_) | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -42,6 +42,8 @@ object Evaluator {
             case NoMatchForInputInFunction => {
               // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
               // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+              // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+              //  and get the default from that
               val nType = RetrieveType(nObject)
               getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType), env)
             }
@@ -62,7 +64,7 @@ object Evaluator {
       case CaseT(cases) => {
         Success(CaseT(cases))
       }
-      case StructInstance(value: Vector[(String, NewMapObject)], nType) => {
+      case StructInstance(value: Vector[(NewMapObject, NewMapObject)], nType) => {
         for {
           evalValue <- evalParameters(value, env)
         } yield StructInstance(evalValue, nType)
@@ -92,6 +94,7 @@ object Evaluator {
     } yield default
   }
 
+  // Returns true if nObject is a member of nSubtype, assuming that it's already a member of the parent type
   def isMemberOfSubtype(
     nObject: NewMapObject,
     nSubtype: NewMapSubtype,
@@ -101,6 +104,9 @@ object Evaluator {
       case SubtypeT(isMember) => {
         for {
           result <- quickApplyFunctionAttempt(isMember, nObject, env)
+
+          // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
+          //  and find a default on that!
           defaultValueOrResultType <- getDefaultValueOfPureCommandType(RetrieveType(result), env)
         } yield (result != defaultValueOrResultType)
       }
@@ -117,7 +123,6 @@ object Evaluator {
       case nObject +: restOfObjects => {
         for {
           isIt <- isMemberOfSubtype(nObject, nSubtype, env)
-          _ = println(s"isIt? $isIt -- $nObject -- $nSubtype")
           result <- if (isIt) allMembersOfSubtype(restOfObjects, nSubtype, env) else Success(false)
         } yield result
       }
@@ -154,17 +159,17 @@ object Evaluator {
   }
 
   def getDefaultValueFromStructParams(
-    params: Vector[(String, NewMapObject)],
+    params: Vector[(NewMapObject, NewMapObject)],
     env: Environment
-  ): Outcome[Vector[(String, NewMapObject)], String] = {
+  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     params match {
-      case (s, obj) +: restOfParams => {
+      case (id, obj) +: restOfParams => {
         for {
           restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
           paramType <- Evaluator.convertObjectToType(obj, env)
           paramDefault <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(paramType), env)
         } yield {
-          (s -> paramDefault) +: restOfParamsDefault
+          (id -> paramDefault) +: restOfParamsDefault
         }
       }
       case _ => Success(Vector.empty)
@@ -203,9 +208,9 @@ object Evaluator {
   }
 
   def evalParameters(
-    params: Vector[(String, NewMapObject)],
+    params: Vector[(NewMapObject, NewMapObject)],
     env: Environment
-  ): Outcome[Vector[(String, NewMapObject)], String] = params match {
+  ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = params match {
     case (k, v) +: restOfValues => {
       for {
         evalV <- this(v, env)
@@ -232,14 +237,25 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     struct match {
-      case StructInstance(value: Vector[(String, NewMapObject)], structT) => {
+      case StructInstance(value: Vector[(NewMapObject, NewMapObject)], structT) => {
         // TODO - formalize these - search for everywhere in the code we search a map, and put it in its own function
         // Also edit when struct instance values are Vector[(NewMapObject, NewMapObject)]
-        val resultOption = value.find(x => IdentifierInstance(x._1) == field).map(_._2)
+        val resultOption = value.find(x => x._1 == field).map(_._2)
 
         resultOption match {
           case Some(result) => Success(result)
           case None => Failure(s"Unable to access field $field from struct $struct")
+        }
+      }
+      case caseT@CaseT(cases) => {
+        for {
+          // TODO: do we need to do this check if the input is type checked?
+          result <- quickApplyFunctionAttempt(cases, field, env)
+        } yield {
+          LambdaInstance(
+            IdentifierParam("input", RetrieveType.retrieveInputTypeFromFunction(cases)),
+            CaseInstance(field, ParameterObj("input", RetrieveType.retrieveInputTypeFromFunction(cases)), caseT)
+          )
         }
       }
       case _ => Failure(s"Unable to access fields from $struct because it is not a struct")
@@ -254,7 +270,7 @@ object Evaluator {
   // Assume that both the function and the input have been evaluated
   // TODO: If there a way to guarantee that this will return something?
   def applyFunctionAttempt(
-    func: NewMapFunction,
+    func: NewMapObject,
     input: NewMapObject,
     env: Environment
   ): Outcome[ApplyFunctionAttemptResult, String] = {
@@ -263,14 +279,14 @@ object Evaluator {
         for {
           nType <- convertObjectToType(typeOfParam, env)
           newEnv = env.newCommand(Environment.eCommand(id, param))
-          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
+          substitutedExpression = MakeSubstitution(expression, newEnv)
           result <- this(substitutedExpression, env)
         } yield AbleToApplyFunction(result)
       }
       case (LambdaInstance(StructParams(params), expression), StructInstance(paramValues, _)) => {
         for {
           newEnv <- updateEnvironmentWithParamValues(params, paramValues, env)
-          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
+          substitutedExpression = MakeSubstitution(expression, newEnv)
           result <- this(substitutedExpression, env)
         } yield AbleToApplyFunction(result)
       }
@@ -282,13 +298,13 @@ object Evaluator {
           // TODO: there should be an enforcement of at-least-one-param-rule in the param object
           firstParam <- Outcome(params.headOption, "Tried to pass a parameter to a function that takes no parameters")
           newEnv <- updateEnvironmentWithParamValues(Vector(firstParam), Vector(firstParam._1 -> firstParamValue), env)
-          substitutedExpression = makeRelevantSubstitutions(expression, newEnv)
+          substitutedExpression = MakeSubstitution(expression, newEnv)
 
           paramErasedExpression = if (params.length == 1) {
             substitutedExpression
           } else {
             val newParams = params.drop(1).map(param => {
-              param._1 -> makeRelevantSubstitutions(param._2, newEnv)
+              param._1 -> MakeSubstitution(param._2, newEnv)
             })
 
             LambdaInstance(StructParams(newParams), substitutedExpression)
@@ -312,10 +328,6 @@ object Evaluator {
           }
         }
       }
-      case (ParameterFunc(id, _, _), input) => {
-        // TODO - in this case the function is unknown, not the input.. so the variable name is technically wrong
-        Success(UnableToApplyDueToUnknownInput)
-      }
       case (RangeFunc(i), Index(j)) => {
         val ix = if (j < i) 1 else 0
         Success(AbleToApplyFunction(Index(ix)))
@@ -329,6 +341,9 @@ object Evaluator {
           AbleToApplyFunction(Index(if (isCommand) 1 else 0))
         }
       }
+      case (AccessField(caseT@CaseT(_), field), _) => {
+        Success(AbleToApplyFunction(CaseInstance(field, input, caseT)))
+      }
       case _ => {
         Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
       }
@@ -336,7 +351,7 @@ object Evaluator {
   }
 
   def quickApplyFunctionAttempt(
-    nFunction: NewMapFunction,
+    nFunction: NewMapObject,
     nObject: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
@@ -359,7 +374,7 @@ object Evaluator {
       case (pattern, answer) +: addlPatterns => {
         val newEnvIfMatched = attemptPatternMatch(pattern, input, env)
         newEnvIfMatched match {
-          case Some(newEnv) => Success(makeRelevantSubstitutions(answer, newEnv))
+          case Some(newEnv) => Success(MakeSubstitution(answer, newEnv))
           case None => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
@@ -375,15 +390,15 @@ object Evaluator {
     // TODO: this is too basic of a pattern match!
     // - Also, do we have control over the order of patterns?
     case ParameterObj(param, _) => {
-      Some(env.newCommand(FullEnvironmentCommand(param, input)))
+      Some(env.newCommand(FullEnvironmentCommand(IdentifierInstance(param), input)))
     }
     case _ if (pattern == input) => Some(env)
     case _ => None
   }
 
   def updateEnvironmentWithParamValues(
-    paramTypes: Vector[(String, NewMapObject)],
-    paramValues: Vector[(String, NewMapObject)],
+    paramTypes: Vector[(NewMapObject, NewMapObject)],
+    paramValues: Vector[(NewMapObject, NewMapObject)],
     env: Environment
   ): Outcome[Environment, String] = {
     (paramTypes, paramValues) match {
@@ -394,10 +409,7 @@ object Evaluator {
             "Params don't agree: " + firstParamType._1 + " vs " + firstParamValue._1
           )
 
-          envCommand = Environment.eCommand(
-            firstParamType._1,
-            firstParamValue._2
-          )
+          envCommand = FullEnvironmentCommand(firstParamType._1, firstParamValue._2)
           newEnv = env.newCommand(envCommand)
 
           result <- updateEnvironmentWithParamValues(addlParamTypes, addlParamValues, newEnv)
@@ -405,134 +417,6 @@ object Evaluator {
       }
       // TODO - what if one is longer than the other
       case _ => Success(env)
-    }
-  }
-
-  // TODO(2022): Separate out types and objects again, so that we don't have to deal with all the types in here.
-  def makeRelevantSubstitutions(
-    expression: NewMapObject,
-    env: Environment
-  ): NewMapObject = {
-    expression match {
-      case nType: NewMapSubtype => makeRelevantSubstitutionsOfType(nType, env)
-      case nFunction: NewMapFunction => makeRelevantSubstitutionsOfFunction(nFunction, env)
-      case Index(_) | IdentifierInstance(_) => expression
-      case ApplyFunction(func, input) => {
-        ApplyFunction(
-          makeRelevantSubstitutionsOfFunction(func, env),
-          makeRelevantSubstitutions(input, env)
-        )
-      }
-      case AccessField(struct, field) => {
-        AccessField(
-          makeRelevantSubstitutions(struct, env),
-          makeRelevantSubstitutions(field, env)
-        )
-      }
-      case ParameterObj(name, _) => {
-        env.lookup(name) match {
-          case Some(obj) => obj
-          case None => expression
-        }
-      }
-      case StructInstance(value, nType) => {
-        StructInstance(
-          value.map(x => (x._1 -> makeRelevantSubstitutions(x._2, env))),
-          nType
-        )
-      }
-      case CaseInstance(constructor, value, caseT) => {
-        CaseInstance(constructor, makeRelevantSubstitutions(value, env), caseT)      
-      }
-    }
-  }
-
-  def makeRelevantSubstitutionsOfFunction(
-    expression: NewMapFunction,
-    env: Environment
-  ): NewMapFunction = expression match {
-    case IsCommandFunc(_) | RangeFunc(_) => expression
-    case MapInstance(values, mapT) => {
-      val newValues = for {
-        (k, v) <- values
-      } yield (makeRelevantSubstitutions(k, env) -> makeRelevantSubstitutions(v, env))
-
-      MapInstance(newValues, makeRelevantSubstitutionsOfMapT(mapT, env))
-    }
-    case LambdaInstance(params, expression) => {
-      val newEnv = includeLambdaParams(params, env)
-      val newExpression = makeRelevantSubstitutions(expression, newEnv)
-      LambdaInstance(params, newExpression)
-    }
-    case ParameterFunc(name, _, _) => {
-      val nObjectOpt = env.lookup(name)
-      nObjectOpt match {
-        case None => expression
-        case Some(nObject) => {
-          castToNewMapFunction(nObject) match {
-            case Success(result) => result
-            case Failure(s) => {
-              // TODO - this shouldn't be possible.. can we prevent this line from being needed?
-              throw new Exception(s)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  def castToNewMapFunction(nObject: NewMapObject): Outcome[NewMapFunction, String] = {
-    nObject match {
-      case nFunction: NewMapFunction => Success(nFunction)
-      case ParameterObj(name, MapT(inputT, outputT, _, _)) => Success(ParameterFunc(name, inputT, outputT))
-      case _ => Failure(s"Couldn't cast object to function: $nObject")
-    }
-  }
-
-  def makeRelevantSubstitutionsOfMapT(mapT: MapT, env: Environment): MapT = {
-    MapT(
-      makeRelevantSubstitutionsOfType(mapT.inputType, env),
-      makeRelevantSubstitutionsOfType(mapT.outputType, env),
-      mapT.completeness,
-      mapT.featureSet
-    )
-  }
-
-  def makeRelevantSubstitutionsOfType(
-    expression: NewMapSubtype,
-    env: Environment
-  ): NewMapSubtype = {
-    expression match {
-      case CountT | TypeT(_) | IdentifierT => expression
-      case MapT(inputType, outputType, completeness, featureSet) => {
-        MapT(
-          makeRelevantSubstitutionsOfType(inputType, env),
-          makeRelevantSubstitutionsOfType(outputType, env),
-          completeness,
-          featureSet
-        )
-      }
-      case StructT(values) => {
-        StructT(makeRelevantSubstitutionsOfFunction(values, env))
-      }
-      case CaseT(cases) => {
-        CaseT(makeRelevantSubstitutionsOfFunction(cases, env))
-      }
-      case SubstitutableT(s, _) => {
-        env.lookup(s) match {
-          case Some(obj) => {
-            // TODO(2022): This is unsafe! Separate out types in the environment and then it'll be safe again
-            Evaluator.convertObjectToType(obj, env).toOption match {
-              case Some(t) => t
-              case None => throw new Exception(s"Unable to cast to type: $obj")
-            }
-          }
-          case None => expression
-        }
-      }
-      case SubtypeT(isMember) => {
-        SubtypeT(makeRelevantSubstitutionsOfFunction(isMember, env))
-      }
     }
   }
 
@@ -544,12 +428,12 @@ object Evaluator {
       case StructParams(params) => {
         includeParams(params, env)
       }
-      case IdentifierParam(param, typeAsObj) => includeParams(Vector(param -> typeAsObj), env)
+      case IdentifierParam(param, typeAsObj) => includeParams(Vector(IdentifierInstance(param) -> typeAsObj), env)
     }
   }
 
   def includeParams(
-    params: Vector[(String, NewMapObject)],
+    params: Vector[(NewMapObject, NewMapObject)],
     env: Environment
   ): Environment = {
     params match {
@@ -558,9 +442,11 @@ object Evaluator {
         // - This happens when we merge the object and type representations
         val nTypeOpt = convertObjectToType(paramObj, env).toOption
 
-        val newEnv = nTypeOpt match {
-          case None => env //TODO
-          case Some(nType) => env.newParam(paramName, nType)
+        val newEnv = (nTypeOpt, paramName) match {
+          case (Some(nType), IdentifierInstance(i)) => env.newCommand(
+            FullEnvironmentCommand(paramName, ParameterObj(i, nType))
+          )
+          case _ => env //TODO
         }
         
         includeParams(addlParams, newEnv)

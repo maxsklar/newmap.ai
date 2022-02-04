@@ -159,7 +159,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "s",
       StructInstance(
-        Vector(("a", Index(0)), ("b", Index(0))),
+        Vector((IdentifierInstance("a"), Index(0)), (IdentifierInstance("b"), Index(0))),
         structType
       )
     )
@@ -181,6 +181,35 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
       CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val q: 3 = s.b", SuccessCheck(correctCommand))
+    ))
+  }
+
+  it should " allow its fields to be accessed in expresions that can be evaluated to literals " in {
+    val interp = new EnvironmentInterpreter()
+    val correctCommand = Environment.eCommand(
+      "q",
+      Index(1)
+    )
+
+    testCodeScript(Vector(
+      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
+      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val fieldMap: Map(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
+      CodeExpectation("val q: 3 = s.(fieldMap(1))", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " not allow fields that cannnot be evaluated to literals " in {
+    val interp = new EnvironmentInterpreter()
+    val correctCommand = Environment.eCommand(
+      "q",
+      Index(1)
+    )
+
+    testCodeScript(Vector(
+      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
+      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val q = (x: Field) => s.x", FailureCheck)
     ))
   }
 
@@ -216,15 +245,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "x",
-      CaseInstance(IdentifierInstance("a"), rangeType(0), caseT)
+      CaseInstance(IdentifierInstance("a"), Index(0), caseT)
     )
 
     testCodeScript(Vector(
       CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
       CodeExpectation("val MyCase: Type = Case(Fields, (a: 2, b: 3))", GeneralSuccessCheck),
-      CodeExpectation("val x: MyCase = (a:0)", SuccessCheck(correctCommand)),
-      CodeExpectation("val y: MyCase = (a:0, b:1)", FailureCheck),
-      CodeExpectation("val x: MyCase = (c:0)", FailureCheck),
+      CodeExpectation("val x: MyCase = MyCase.a 0", SuccessCheck(correctCommand)),
+      CodeExpectation("val y: MyCase = MyCase.a.b", FailureCheck),
+      CodeExpectation("val x: MyCase = MyCase.c", FailureCheck),
     ))
   }
 
@@ -243,7 +272,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
       LambdaInstance(
-        StructParams(Vector("a" -> rangeType(3))),
+        StructParams(Vector(IdentifierInstance("a") -> rangeType(3))),
         ApplyFunction(
           MapInstance(
             Vector(Index(0) -> Index(2), Index(1) -> Index(3), Index(2) -> Index(1)),

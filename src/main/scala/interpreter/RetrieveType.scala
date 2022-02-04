@@ -12,8 +12,12 @@ object RetrieveType {
     case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
     case MapT(inputType, outputType, completeness, featureSet) => {
-      // Does it matter if the depth of input or output type is greater?
-      TypeT(0)
+      (this(inputType), this(outputType)) match {
+        case (TypeT(i), TypeT(j)) => TypeT(i.max(j))
+        case (_, TypeT(j)) => TypeT(j)
+        case (TypeT(i), _) => TypeT(i)
+        case _ => TypeT(0)
+      }
     }
     case MapInstance(values, mapT) => mapT
     case LambdaInstance(params, expression) => {
@@ -22,14 +26,14 @@ object RetrieveType {
           val fieldType = {
             SubtypeT(
               MapInstance(
-                params.map(x => IdentifierInstance(x._1) -> Index(1)),
+                params.map(x => x._1 -> Index(1)),
                 MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
               )
             )
           }
 
           val structParams = MapInstance(
-            params.map(x => IdentifierInstance(x._1) -> x._2),
+            params.map(x => x._1 -> x._2),
             MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)
           )
 
@@ -43,18 +47,42 @@ object RetrieveType {
       MapT(inputType, outputType, RequireCompleteness, BasicMap)
     }
     case ApplyFunction(func, input) => getParentType(retrieveOutputTypeFromFunction(func))
-    case AccessField(_, _) => {
-      throw new Exception("Field access retrieve type must be implemented!!")
+    case AccessField(StructInstance(values, _), field) => {
+      // TODO: Improve!
+      values.find(v => v._1 == field).map(_._2) match {
+        case Some(value) => this(value)
+        case None => {
+          // This should happen if the field has been confirmed closed and fully evaluated
+          throw new Exception(s"Field access retrieve type is poorly implemented!! $values -- $field")
+        }
+      }
+    }
+    case AccessField(caseT@CaseT(values), field) => {
+      // TODO - I really don't like using Environment.Base here!
+      // - perhaps there should be an environment-less apply function attempt since caseT should already be literal
+      Evaluator.quickApplyFunctionAttempt(values, field, Environment.Base).toOption match {
+        case Some(value: NewMapSubtype) => MapT(value, caseT, RequireCompleteness, SimpleFunction)
+        case Some(value) => {
+          throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $value-- $field")
+        }
+        case _ => {
+          throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $field")
+        }
+      }
+    }
+    case AccessField(struct, field) => {
+      throw new Exception(s"This access of $struct with field $field is not allowed")
     }
     case ParameterObj(_, nType) => getParentType(nType)
-    case ParameterFunc(_, inputT, outputT) => MapT(inputT, outputT, RequireCompleteness, SimpleFunction)
     case IsCommandFunc(i) => MapT(TypeT(i), NewMapO.rangeT(2), CommandOutput, SimpleFunction)
     case StructT(values) => {
       // Does it matter if the depth of input or output type is greater?
+      //this(values)
       TypeT(0)
     }
     case CaseT(cases) => {
       // Does it matter if the depth of input or output type is greater?
+      //this(cases)
       TypeT(0)
     }
     case StructInstance(value, nType) => nType
@@ -62,7 +90,7 @@ object RetrieveType {
     case SubstitutableT(s, nType) => getParentType(nType)
   }
 
-  def retrieveInputTypeFromFunction(nFunction: NewMapFunction): NewMapSubtype = nFunction match {
+  def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapSubtype = nFunction match {
     case MapInstance(values, MapT(inputType, outputType, completeness, _)) => {
       inputType
     }
@@ -72,14 +100,14 @@ object RetrieveType {
           val fieldType = {
             SubtypeT(
               MapInstance(
-                params.map(x => IdentifierInstance(x._1) -> Index(1)),
+                params.map(x => x._1 -> Index(1)),
                 MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
               )
             )
           }
 
           val structParams = MapInstance(
-            params.map(x => IdentifierInstance(x._1) -> x._2),
+            params.map(x => x._1 -> x._2),
             MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)
           )
 
@@ -88,12 +116,27 @@ object RetrieveType {
         case IdentifierParam(_, nType) => nType
       }
     }
-    case ParameterFunc(s, inputType, outputType) => inputType
+    case ParameterObj(s, MapT(inputType, _, _, _)) => inputType
     case IsCommandFunc(i) => TypeT(i)
     case RangeFunc(i) => CountT
+    case AccessField(CaseT(cases), field) => {
+      // TODO - pass in environment? Have an environment-less version?
+      Evaluator.quickApplyFunctionAttempt(cases, field, Environment.Base).toOption match {
+        case Some(result) => Evaluator.convertObjectToType(result, Environment.Base).toOption match {
+          case Some(resultT) => resultT
+          case None => throw new Exception("This will be going away soon")
+        }
+        case None => {
+          throw new Exception(s"unable to find case $field in $cases")
+        }
+      }
+    }
+    case _ => {
+      throw new Exception(s"Couldn't retrieve input type from $nFunction")
+    }
   }
 
-  def retrieveOutputTypeFromFunction(nFunction: NewMapFunction): NewMapSubtype = nFunction match {
+  def retrieveOutputTypeFromFunction(nFunction: NewMapObject): NewMapSubtype = nFunction match {
     case MapInstance(values, MapT(inputType, outputType, completeness, _)) => {
       outputType
     }
@@ -101,9 +144,15 @@ object RetrieveType {
       // TODO: Work has to be done here to not break generics
       this(expression)
     }
-    case ParameterFunc(s, inputType, outputType) => outputType
+    case ParameterObj(s, MapT(_, outputType, _, _)) => outputType
     case IsCommandFunc(i) => NewMapO.rangeT(2)
     case RangeFunc(i) => NewMapO.rangeT(2)
+    case AccessField(caseT@CaseT(cases), field) => {
+      caseT
+    }
+    case _ => {
+      throw new Exception(s"Couldn't retrieve output type from $nFunction")
+    }
   }
 
   def getParentType(nType: NewMapSubtype): NewMapType = {
@@ -111,13 +160,61 @@ object RetrieveType {
       case SubtypeT(isMember) => {
         getParentType(retrieveInputTypeFromFunction(isMember))
       }
-    case t: NewMapType => t
+      case t: NewMapType => t
     }
   }
 
-  def isTermClosedLiteral(nObject: NewMapObject): Boolean = {
-    // Check that there are no parameters or weird functions in here.
-    // TODO: Implement
-    true
+  // Ensures that there are no free variables in this term
+  def isTermClosedLiteral(
+    nObject: NewMapObject,
+    knownVariables: Vector[String] = Vector.empty,
+  ): Boolean = nObject match {
+    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT(_) | RangeFunc(_) | IsCommandFunc(_) => true
+    case MapInstance(values, mapT) => {
+      values.forall(v =>
+        isTermClosedLiteral(v._1, knownVariables) &&
+        isTermClosedLiteral(v._2, knownVariables)
+      ) && isTermClosedLiteral(mapT, knownVariables)
+    }
+    case ParameterObj(name, _) => knownVariables.contains(name)
+    case LambdaInstance(StructParams(params), expression) => {
+      // TODO - change this when we start using de bruin (or other)codes for params
+      val newParams = params.flatMap(x => x._1 match {
+        case IdentifierInstance(s) => Some(s)
+        case _ => None
+      })
+      isTermClosedLiteral(expression, knownVariables ++ newParams)
+    }
+    case LambdaInstance(IdentifierParam(name, _), expression) => {
+      // TODO - change this when we start using de bruin (or other) codes for params
+      isTermClosedLiteral(expression, knownVariables :+ name)
+    }
+    case ApplyFunction(func, input) => {
+      isTermClosedLiteral(func, knownVariables) &&
+        isTermClosedLiteral(input, knownVariables)
+    }
+    case AccessField(struct, input) => {
+      // TODO: If this were the case, wouldn't this have already been evaluated?
+      isTermClosedLiteral(struct, knownVariables) &&
+        isTermClosedLiteral(input, knownVariables)
+    }
+    case StructInstance(value, structType) => {
+      value.forall(x =>
+        isTermClosedLiteral(x._2, knownVariables)
+      ) && isTermClosedLiteral(structType, knownVariables)
+    }
+    case CaseInstance(constructor, input, caseType) => {
+      isTermClosedLiteral(constructor, knownVariables) &&
+        isTermClosedLiteral(input, knownVariables) &&
+        isTermClosedLiteral(caseType, knownVariables)
+    }
+    case MapT(inputType, outputType, _, _) => {
+      isTermClosedLiteral(inputType, knownVariables) &&
+        isTermClosedLiteral(outputType, knownVariables)
+    }
+    case StructT(params) => isTermClosedLiteral(params, knownVariables)
+    case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
+    case SubstitutableT(s, _) => knownVariables.contains(s)
+    case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
   }
 }

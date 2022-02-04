@@ -54,7 +54,6 @@ object PrintNewMapObject {
     }
     case AccessField(struct, field) => s"${this(struct)}.${this(field)}"
     case ParameterObj(name, nType) => s"$name~Po"//s"$name~Po:(${this(nType)})"
-    case ParameterFunc(name, _, _) => name + "~F"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, _) => {
@@ -76,7 +75,7 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
-    case SubstitutableT(s, _) => s  + "~St"
+    case SubstitutableT(s, y) => s"$s~St~$y"
     case RangeFunc(i) => s"<$i"
   }
 

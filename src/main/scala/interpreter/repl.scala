@@ -4,6 +4,7 @@ import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 
+// TODO - create a custom shell
 object Repl {
   var envInterp = new EnvironmentInterpreter()
 

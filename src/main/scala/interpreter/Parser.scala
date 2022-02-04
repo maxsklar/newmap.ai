@@ -74,7 +74,7 @@ object NewMapParser extends Parsers {
   }
 
   private def binaryOpParse: Parser[BinaryOpParse] = {
-    period | comma | colon | arrow
+    comma | colon | arrow
   }
 
   private def expressionListWithOperations: Parser[ParseTree] = {
@@ -93,11 +93,7 @@ object NewMapParser extends Parsers {
         // TODO - this binding code is confusing. It's just order of operations, should be
         //  possible to rewrite
 
-        val (s1, o1) = bindBinaryOpParse(startingExp, o0, PeriodBinaryOpParse(), (a, b, first) => {
-          FieldAccessParse(a, b)
-        })
-
-        val (s2, o2) = bindBinaryOpParse(s1, o1, ColonBinaryOpParse(), (a, b, first) => {
+        val (s2, o2) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, first) => {
           BindingCommandItem(a, b)
         })
 
@@ -120,7 +116,7 @@ object NewMapParser extends Parsers {
         })
 
         if (o4.nonEmpty) {
-          println("Warning: the parse is dropping stuff: " + o3)
+          println("Warning: the parser is dropping stuff: " + o3)
         }
 
         s4
@@ -180,8 +176,22 @@ object NewMapParser extends Parsers {
     expressionInParens | emptyParens | naturalNumber | identifier | forcedId
   }
 
+  private def baseExpressionWithFieldAccess: Parser[ParseTree] = {
+    val pattern = rep(baseExpression ~ period) ~ baseExpression
+    pattern ^^ {
+      case startingExps ~ lastExp => {
+        val start: Vector[ParseTree] = startingExps.map(_ match {
+          case (exp ~ _) => exp
+        }).toVector
+
+        val fullExps = start :+ lastExp
+        fullExps reduceLeft FieldAccessParse
+      }
+    }
+  }
+
   private def expressionList: Parser[ParseTree] = {
-    rep1(baseExpression) ^^ {
+    rep1(baseExpressionWithFieldAccess) ^^ {
       case exps => exps reduceLeft ApplyParse
     }
   }
