@@ -49,10 +49,10 @@ case class ParameterObj(name: String, nType: NewMapSubtype) extends NewMapObject
 // This function takes a count and returns true if that count is strictly less than i
 case class RangeFunc(i: Long) extends NewMapObject
 
-// This takes as input a member of TypeT(depth) and returns true if it's a member
+// This takes as input a member of TypeT and returns true if it's a member
 //  of the command typeclass (which means it has a default value and an update function)
 // TODO: making this a basic class is temporary for now
-case class IsCommandFunc(depth: Long = 0) extends NewMapObject
+case object IsCommandFunc extends NewMapObject
 
 // This one is a little different/complex because each object has a unique type as defined by the struct
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
@@ -86,12 +86,8 @@ sealed abstract class NewMapType extends NewMapSubtype
 
 case object CountT extends NewMapType
 
-// Type of types.. very confusing
-// The depthOfMembers input tells us which layer we are on.
-// - Layer 0 is all of the ordinary types whose members are objects
-// - Layer 1 is all of types of layer 0
-// - Layer 2 is all of the types of layer 1, etc
-case class TypeT(depthOfMembers: Long = 0) extends NewMapType
+// Type of types
+case object TypeT extends NewMapType
 
 case object IdentifierT extends NewMapType
 
@@ -182,5 +178,5 @@ object NewMapO {
   // - It has a command type
   // - You can give it commands to change the value
   // - You can potentially have versions available.
-  def commandT(i: Long): NewMapSubtype = SubtypeT(IsCommandFunc(i))
+  def commandT: NewMapSubtype = SubtypeT(IsCommandFunc)
 }

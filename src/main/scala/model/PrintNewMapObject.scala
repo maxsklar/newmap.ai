@@ -7,8 +7,8 @@ object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case Index(i) => i.toString
     case CountT => "Count"
-    case TypeT(i) => s"Type[$i]"
-    case IsCommandFunc(i) => s"IsCommandFunc[$i]"
+    case TypeT => s"Type"
+    case IsCommandFunc => s"IsCommandFunc"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s + "~Id"
     case MapT(key, value, completeness, featureSet) => {

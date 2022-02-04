@@ -26,7 +26,7 @@ class TestTypeCheck extends FlatSpec {
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
   	  case Success(nObject) => {
-  	  	assert(nObject == TypeT(0))
+  	  	assert(nObject == TypeT)
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -155,7 +155,7 @@ class TestTypeCheck extends FlatSpec {
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
-      	assert(RetrieveType(result) == TypeT(0))
+      	assert(RetrieveType(result) == TypeT)
         //println(objectFound)
 
       	// TODO: what should we do with this?

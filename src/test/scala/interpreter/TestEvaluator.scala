@@ -17,22 +17,17 @@ class TestEvaluator extends FlatSpec {
   }
 
   "isCommandFunc " should " work properly on ranges" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc(0), NewMapO.rangeT(10), Environment.Base)
+    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, NewMapO.rangeT(10), Environment.Base)
     assetFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
   "it " should " work properly on count" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc(0), CountT, Environment.Base)
+    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, CountT, Environment.Base)
     assetFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
   "it " should " work properly on TypeT, and return false" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc(1), TypeT(0), Environment.Base)
+    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, TypeT, Environment.Base)
     assetFunctionWorkedAndReturnedResult(result, Index(0))
-  }
-
-  "it " should " fail TypeT when the wrong level is produced" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc(1), TypeT(0), Environment.Base)
-    assert(result.isFailure)
   }
 }

@@ -124,7 +124,7 @@ object Environment {
       params.map(x => IdentifierInstance(x._1) -> x._2)
     }
 
-    StructT(MapInstance(paramsToObject, MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)))
+    StructT(MapInstance(paramsToObject, MapT(fieldType, TypeT, RequireCompleteness, BasicMap)))
   }
 
   def caseTypeFromParams(params: Vector[(String, NewMapSubtype)]) = {
@@ -141,7 +141,7 @@ object Environment {
       params.map(x => IdentifierInstance(x._1) -> x._2)
     }
 
-    CaseT(MapInstance(paramsToObject, MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)))
+    CaseT(MapInstance(paramsToObject, MapT(fieldType, TypeT, RequireCompleteness, BasicMap)))
   }
 
   // For Debugging
@@ -158,29 +158,29 @@ object Environment {
 
 
   val Base: Environment = Environment().newCommands(Vector(
-    eCommand("Type", TypeT(0)),
+    eCommand("Type", TypeT),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
     eCommand("Map", LambdaInstance(
       paramStrategy = StructParams(Vector(
-        i("key") -> TypeT(0),
-        i("value") -> NewMapO.commandT(0)
+        i("key") -> TypeT,
+        i("value") -> NewMapO.commandT
       )),
       expression = MapT(
-        SubstitutableT("key", TypeT(0)),
-        SubstitutableT("value", NewMapO.commandT(0)),
+        SubstitutableT("key", TypeT),
+        SubstitutableT("value", NewMapO.commandT),
         CommandOutput,
         BasicMap
       )
     )),
     eCommand("ReqMap", LambdaInstance(
       paramStrategy = StructParams(Vector(
-        i("key") -> TypeT(0),
-        i("value") -> TypeT(0)
+        i("key") -> TypeT,
+        i("value") -> TypeT
       )),
       expression = MapT(
-        SubstitutableT("key", TypeT(0)),
-        SubstitutableT("value", TypeT(0)),
+        SubstitutableT("key", TypeT),
+        SubstitutableT("value", TypeT),
         RequireCompleteness,
         SimpleFunction
       )
@@ -188,15 +188,15 @@ object Environment {
     
     eCommand("Struct", LambdaInstance(
       paramStrategy = StructParams(Vector(
-        i("fieldType") -> TypeT(0),
-        i("structParams") -> MapT(SubstitutableT("fieldType", TypeT(0)), TypeT(0), RequireCompleteness, BasicMap)
+        i("fieldType") -> TypeT,
+        i("structParams") -> MapT(SubstitutableT("fieldType", TypeT), TypeT, RequireCompleteness, BasicMap)
       )),
       expression = StructT(
         ParameterObj(
           "structParams",
           MapT(
-            SubstitutableT("fieldType", TypeT(0)),
-            TypeT(0),
+            SubstitutableT("fieldType", TypeT),
+            TypeT,
             RequireCompleteness,
             SimpleFunction
           )
@@ -206,15 +206,15 @@ object Environment {
     // TODO: Case Commands must be added back in
     eCommand("Case", LambdaInstance(
       paramStrategy = StructParams(Vector(
-        i("casesType") -> TypeT(0),
-        i("cases") -> MapT(SubstitutableT("casesType", TypeT(0)), TypeT(0), RequireCompleteness, BasicMap)
+        i("casesType") -> TypeT,
+        i("cases") -> MapT(SubstitutableT("casesType", TypeT), TypeT, RequireCompleteness, BasicMap)
       )),
       expression = CaseT(
         ParameterObj(
           "cases",
           MapT(
-            SubstitutableT("cases", TypeT(0)),
-            TypeT(0),
+            SubstitutableT("cases", TypeT),
+            TypeT,
             RequireCompleteness,
             SimpleFunction
           )
@@ -223,16 +223,16 @@ object Environment {
     )),
     eCommand("Subtype", LambdaInstance(
       paramStrategy = StructParams(Vector(
-        i("keyType") -> TypeT(0),
-        i("valueType") -> TypeT(0),
-        i("simpleFunction") -> MapT(SubstitutableT("keyType", TypeT(0)), SubstitutableT("valueType", TypeT(0)), CommandOutput, SimpleFunction)
+        i("keyType") -> TypeT,
+        i("valueType") -> TypeT,
+        i("simpleFunction") -> MapT(SubstitutableT("keyType", TypeT), SubstitutableT("valueType", TypeT), CommandOutput, SimpleFunction)
       )),
       expression = SubtypeT(
         ParameterObj(
           "simpleFunction",
           MapT(
-            SubstitutableT("keyType", TypeT(0)),
-            SubstitutableT("valueType", TypeT(0)),
+            SubstitutableT("keyType", TypeT),
+            SubstitutableT("valueType", TypeT),
             RequireCompleteness,
             SimpleFunction
           )

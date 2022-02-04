@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | TypeT(_) | IsCommandFunc(_) | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | TypeT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -133,7 +133,7 @@ object Evaluator {
   def getDefaultValueOfPureCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
-      case TypeT(_) => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       case IdentifierT => Failure("Type of Identifiers has no default value")
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         Success(MapInstance(Vector.empty, mapT))
@@ -274,6 +274,9 @@ object Evaluator {
     input: NewMapObject,
     env: Environment
   ): Outcome[ApplyFunctionAttemptResult, String] = {
+    // TODO - is there a way to know if the input has already been evaluated as much as possible
+    //Evaluate(input, env)
+    
     (func, input) match {
       case (LambdaInstance(IdentifierParam(id, typeOfParam), expression), param) => {
         for {
@@ -332,10 +335,9 @@ object Evaluator {
         val ix = if (j < i) 1 else 0
         Success(AbleToApplyFunction(Index(ix)))
       }
-      case (IsCommandFunc(i), nObject) => {
+      case (IsCommandFunc, nObject) => {
         for {
           nType <- Evaluator.convertObjectToType(nObject, env)
-          _ <- Outcome.failWhen(RetrieveType(nType) != TypeT(i), s"IsCommandFunc on the wrong level $i for $nType")
         } yield {
           val isCommand: Boolean = getDefaultValueOfCommandType(nType, env).isSuccess
           AbleToApplyFunction(Index(if (isCommand) 1 else 0))
@@ -350,6 +352,7 @@ object Evaluator {
     }
   }
 
+  // Make sure that nObject has been fully evaluated!
   def quickApplyFunctionAttempt(
     nFunction: NewMapObject,
     nObject: NewMapObject,
@@ -464,8 +467,8 @@ object Evaluator {
     objectFound match {
       case Index(i) => Failure("Can't convert index to type") // Try to convert it to a subtype of Count?
       case CountT => Success(CountT)
-      case TypeT(i) => Success(TypeT(i))
-      case IsCommandFunc(_) => Failure("Can't convert IsCommandFunc to type")
+      case TypeT => Success(TypeT)
+      case IsCommandFunc => Failure("Can't convert IsCommandFunc to type")
       case IdentifierT => Success(IdentifierT)
       case SubstitutableT(s, nType) => Success(SubstitutableT(s, nType))
       case MapT(inputType, outputType, completeness, featureSet) => {

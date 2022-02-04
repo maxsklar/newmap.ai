@@ -194,7 +194,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
       CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val fieldMap: Map(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
+      CodeExpectation("val fieldMap: ReqMap(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
       CodeExpectation("val q: 3 = s.(fieldMap(1))", GeneralSuccessCheck)
     ))
   }

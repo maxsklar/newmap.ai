@@ -40,7 +40,7 @@ object MakeSubstitution {
       case CaseInstance(constructor, value, caseT) => {
         CaseInstance(constructor, this(value, env), caseT)      
       }
-      case IsCommandFunc(_) | RangeFunc(_) => expression
+      case IsCommandFunc | RangeFunc(_) => expression
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values
@@ -68,7 +68,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapSubtype = {
     expression match {
-      case CountT | TypeT(_) | IdentifierT => expression
+      case CountT | TypeT | IdentifierT => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),

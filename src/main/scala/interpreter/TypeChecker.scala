@@ -27,7 +27,7 @@ object TypeChecker {
                 val proposedObject = Index(i)
                 checkProposedObjectInSubtype(proposedObject, expType, env)
               }
-              case TypeT(0) => {
+              case TypeT => {
                 val proposedObject = NewMapO.rangeT(i)
                 checkProposedObjectInSubtype(proposedObject, expType, env)
               }
@@ -54,9 +54,11 @@ object TypeChecker {
             env
           )
 
+          inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked)
+
           inputValue <- typeCheck(
             input,
-            Some(RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked)),
+            Some(inputType),
             env
           )
         } yield ApplyFunction(functionTypeChecked, inputValue)
@@ -137,7 +139,7 @@ object TypeChecker {
       case BindingCommandItem(key, value) => {
         typeCheck(CommandList(Vector(expression)), expectedType, env)
       }
-      case LambdaParse(params, expression) if (expectedType == Some(TypeT(_))) => {
+      case LambdaParse(params, expression) if (expectedType == Some(TypeT)) => {
         for {
           inputType <- typeSpecificTypeChecker(params, env)
           newEnv <- inputType match {
@@ -225,11 +227,7 @@ object TypeChecker {
       // Is it possible that this will always be true given the code above?
       // Once we can verify this, maybe we can remove this code
       nObjectConverted <- expectedType match {
-        case Some(typeExpected) => attemptToConvertParentType(
-          nObject,
-          RetrieveType.getParentType(typeExpected),
-          env
-        )
+        case Some(typeExpected) => attemptToConvertToType(nObject, typeExpected, env)
         case None => Success(nObject)
       }
     } yield nObjectConverted
@@ -389,15 +387,21 @@ object TypeChecker {
   // Try to convert an object to having a new type
   // - Fail when the conversion is not possible
   // - If the object already has that type, then just return itself
-  def attemptToConvertParentType(
+  def attemptToConvertToType(
     nObject: NewMapObject,
-    requestedType: NewMapType,
+    requestedType: NewMapSubtype,
     env: Environment
   ): Outcome[NewMapObject, String] = {
     val nType = RetrieveType(nObject)
-    if ((nType != requestedType) && !isPureTypeConvertible(nType, requestedType, env)) {
-      // Incorporate is isPureTypeConvertible here!!
-      Failure(s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType.")
+
+    if (nType != requestedType) {
+      for {
+        isConvertible <- isPureTypeConvertible(nObject, requestedType, env)
+        _ <- Outcome.failWhen(
+          !isConvertible,
+          s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
+        )
+      } yield nObject
     } else {
       Success(nObject)
     }
@@ -410,44 +414,68 @@ object TypeChecker {
     startingType: NewMapSubtype,
     endingType: NewMapSubtype,
     env: Environment
-  ): Boolean = {
-    if (isPureTypeConvertible(
-      RetrieveType.getParentType(startingType),
-      RetrieveType.getParentType(endingType),
-      env
-    )) {
+  ): Outcome[Boolean, String] = {
+    for {
+      pureTypeConvertible <- isPureTypeConvertible(
+        RetrieveType.getParentType(startingType),
+        RetrieveType.getParentType(endingType),
+        env
+      )
+
+      _ <- Outcome.failWhen(!pureTypeConvertible, s"Non-convertible pure types from $startingType to $endingType")
+    } yield {
       val doesEndtypeCoverParentType = endingType match {
         case SubtypeT(isMember) => doesFunctionCoverParentType(isMember).toOption.getOrElse(false)
         case _ => true
       }
 
-      if (doesEndtypeCoverParentType) {
-        true
-      } else {
+      doesEndtypeCoverParentType || {
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
           allValues <- enumerateAllValuesIfPossible(startingType)
-
-          _ = println(s"got all values: $allValues")
           doAllConvert <- Evaluator.allMembersOfSubtype(allValues.toVector, endingType, env)
         } yield doAllConvert
 
         allConvertedOutcome.toOption.getOrElse(false)
       }
-    } else false
+    }
   }
 
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
   // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
   def isPureTypeConvertible(
-    startingType: NewMapType,
-    endingType: NewMapType,
+    startingObject: NewMapObject,
+    endingType: NewMapSubtype,
     env: Environment
-  ): Boolean = {
+  ): Outcome[Boolean, String] = {
+    val startingType = RetrieveType(startingObject)
+
     (startingType, endingType) match {
-      case _ if (startingType == endingType) => true
+      case _ if (startingType == endingType) => Success(true)
+      case (_, SubtypeT(isMember)) => {
+        
+        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
+
+        for {
+          // 1: Check if startingObject is convertible to the inputType of isMember
+          convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)
+
+          // If not evaluated, we can't check for membership
+          // TODO: What if this is a complex function?
+          // - Solution: only evaluate it if its a simplefunction..
+          //   if it's a complex function, leave it alone, but don't compile, and have a good error
+          //   message about it saying that we can't check for the subtype because we won't run your
+          //   function (which could be some crazy infinite loop or fibonacci crap)
+          // Instead.. the function itself should have guarantees
+          evaluatedObject <- Evaluator(convertedObject, env)
+
+          // 2: See if it's actually a member of the subtype
+          isMemberOfSubtype <- Evaluator.isMemberOfSubtype(evaluatedObject, endingType, env)
+          _ <- Outcome.failWhen(!isMemberOfSubtype, s"Object $evaluatedObject not a member of subtype $endingType")
+        } yield true
+      }
       case (
         MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
         MapT(endingInputType, endingOutputType, endingCompleteness, endingFeatureSet)
@@ -474,10 +502,12 @@ object TypeChecker {
 
         // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
         // Eventually, we'll have to implement covariance in generic types
-        inputTypesConvertible &&
+        Success(
+          inputTypesConvertible &&
           outputTypesConvertible &&
           isFeatureSetConvertible &&
           isMapCompletenessConvertible
+        )
       }
       case(
         StructT(startingParams),
@@ -493,9 +523,10 @@ object TypeChecker {
       case (StructT(mi@MapInstance(values, _)), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env).toOption
-        } yield isTypeConvertible(singularOutputT, endingType, env)
-      }.getOrElse(false)
+          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
+          isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
+        } yield isConvertible
+      }
       case (CaseT(startingCases), CaseT(endingCases)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
@@ -510,20 +541,21 @@ object TypeChecker {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env).toOption
-        } yield isTypeConvertible(singularOutputT, endingType, env)
-      }.getOrElse(false)
-      case _ => false
+          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
+          isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
+        } yield isConvertible
+      }
+      case _ => Success(false)
     }
   }
 
   // If this function only allows one input, then return the output for that input
-  def outputIfFunctionHasSingularInput(nFunction: NewMapObject): Option[NewMapObject] = {
+  def outputIfFunctionHasSingularInput(nFunction: NewMapObject): Outcome[NewMapObject, String] = {
     nFunction match {
       case MapInstance(values, _) if (values.length == 1) => {
-        values.headOption.map(_._2)
+        Success(values.head._2)
       }
-      case _ => None 
+      case _ => Failure("Function did not have singular input")
     }
   }
 
@@ -597,7 +629,7 @@ object TypeChecker {
           }
           case FoundIdentifierUnknownValue => {
             for {
-              _ <- typeCheck(typeOfIdentifier, Some(TypeT(0)), env)
+              _ <- typeCheck(typeOfIdentifier, Some(TypeT), env)
               restOfParams <- typeCheckParameterList(otherIdentifiers, env)
             } yield {
               restOfParams
@@ -640,7 +672,7 @@ object TypeChecker {
       )
     }
 
-    MapInstance(paramsAsObjects, MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap))
+    MapInstance(paramsAsObjects, MapT(fieldType, TypeT, RequireCompleteness, BasicMap))
   }
 
   // Assume that params is already type checked
@@ -728,24 +760,16 @@ object TypeChecker {
     parseTree: ParseTree,
     env: Environment
   ): Outcome[NewMapSubtype, String] = {
-    // Try looking for a couple of levels of types
-    // TODO: need to do this in a principled way!
-    // var x: Type = ...
-    // should be abolished in favor of
-    // type x = ...
-    // - and then a level can be specified as well if not 0
-
-    val typeCheckOfType = typeCheck(parseTree, Some(TypeT(0)), env) match {
-      case Success(nObject) => Success(nObject)
-      case _ => typeCheck(parseTree, Some(TypeT(1)), env)
-    }
-
     for {
-      tc <- typeCheckOfType
+      tc <- typeCheck(parseTree, Some(TypeT), env)
       evaluatedTc <- Evaluator(tc, env)
       nmt <- Evaluator.convertObjectToType(evaluatedTc, env)
     } yield nmt
   }
+
+  /*
+(key~Id: Type, value~Id: Subtype(IsCommandFunc)) => Map(key~St~Type, value~St~Subtype(IsCommandFunc))-ai.newmap.model.CommandOutput$@568609ab-ai.newmap.model.BasicMap$@63ddcd93 StructInstance(key~Id: Identifier, value~Id: Type)
+  */
 
   def apply(
     expression: ParseTree

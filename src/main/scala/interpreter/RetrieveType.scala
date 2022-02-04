@@ -5,20 +5,13 @@ import ai.newmap.model._
 object RetrieveType {
   def apply(nObject: NewMapObject): NewMapType = nObject match {
     case Index(_) => CountT
-    case CountT => TypeT(0)
-    case TypeT(i) => TypeT(i + 1)
-    case IdentifierT => TypeT(0)
+    case CountT => TypeT
+    case TypeT => TypeT
+    case IdentifierT => TypeT
     case IdentifierInstance(s) => IdentifierT
     case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
-    case MapT(inputType, outputType, completeness, featureSet) => {
-      (this(inputType), this(outputType)) match {
-        case (TypeT(i), TypeT(j)) => TypeT(i.max(j))
-        case (_, TypeT(j)) => TypeT(j)
-        case (TypeT(i), _) => TypeT(i)
-        case _ => TypeT(0)
-      }
-    }
+    case MapT(inputType, outputType, completeness, featureSet) => TypeT
     case MapInstance(values, mapT) => mapT
     case LambdaInstance(params, expression) => {
       val inputType = params match {
@@ -34,7 +27,7 @@ object RetrieveType {
 
           val structParams = MapInstance(
             params.map(x => x._1 -> x._2),
-            MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)
+            MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
           )
 
           StructT(structParams)
@@ -74,17 +67,9 @@ object RetrieveType {
       throw new Exception(s"This access of $struct with field $field is not allowed")
     }
     case ParameterObj(_, nType) => getParentType(nType)
-    case IsCommandFunc(i) => MapT(TypeT(i), NewMapO.rangeT(2), CommandOutput, SimpleFunction)
-    case StructT(values) => {
-      // Does it matter if the depth of input or output type is greater?
-      //this(values)
-      TypeT(0)
-    }
-    case CaseT(cases) => {
-      // Does it matter if the depth of input or output type is greater?
-      //this(cases)
-      TypeT(0)
-    }
+    case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
+    case StructT(values) => TypeT
+    case CaseT(cases) => TypeT
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
     case SubstitutableT(s, nType) => getParentType(nType)
@@ -108,7 +93,7 @@ object RetrieveType {
 
           val structParams = MapInstance(
             params.map(x => x._1 -> x._2),
-            MapT(fieldType, TypeT(0), RequireCompleteness, BasicMap)
+            MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
           )
 
           StructT(structParams)
@@ -117,7 +102,7 @@ object RetrieveType {
       }
     }
     case ParameterObj(s, MapT(inputType, _, _, _)) => inputType
-    case IsCommandFunc(i) => TypeT(i)
+    case IsCommandFunc => TypeT
     case RangeFunc(i) => CountT
     case AccessField(CaseT(cases), field) => {
       // TODO - pass in environment? Have an environment-less version?
@@ -145,7 +130,7 @@ object RetrieveType {
       this(expression)
     }
     case ParameterObj(s, MapT(_, outputType, _, _)) => outputType
-    case IsCommandFunc(i) => NewMapO.rangeT(2)
+    case IsCommandFunc => NewMapO.rangeT(2)
     case RangeFunc(i) => NewMapO.rangeT(2)
     case AccessField(caseT@CaseT(cases), field) => {
       caseT
@@ -169,7 +154,7 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT(_) | RangeFunc(_) | IsCommandFunc(_) => true
+    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | RangeFunc(_) | IsCommandFunc => true
     case MapInstance(values, mapT) => {
       values.forall(v =>
         isTermClosedLiteral(v._1, knownVariables) &&
