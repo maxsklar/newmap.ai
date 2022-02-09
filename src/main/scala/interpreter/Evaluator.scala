@@ -85,49 +85,13 @@ object Evaluator {
     for {
       default <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nSubtype), env)
 
-      isMember <- isMemberOfSubtype(default, nSubtype, env)
+      isMember <- SubtypeUtils.isMemberOfSubtype(default, nSubtype, env)
 
       _ <- Outcome.failWhen(
         !isMember,
         s"Result default value $default is not in the subtype"
       )
     } yield default
-  }
-
-  // Returns true if nObject is a member of nSubtype, assuming that it's already a member of the parent type
-  def isMemberOfSubtype(
-    nObject: NewMapObject,
-    nSubtype: NewMapSubtype,
-    env: Environment
-  ): Outcome[Boolean, String] = {
-    nSubtype match {
-      case SubtypeT(isMember) => {
-        for {
-          result <- quickApplyFunctionAttempt(isMember, nObject, env)
-
-          // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
-          //  and find a default on that!
-          defaultValueOrResultType <- getDefaultValueOfPureCommandType(RetrieveType(result), env)
-        } yield (result != defaultValueOrResultType)
-      }
-      case nType: NewMapType => Success(true)
-    }
-  }
-
-  def allMembersOfSubtype(
-    nObjects: Vector[NewMapObject],
-    nSubtype: NewMapSubtype,
-    env: Environment
-  ): Outcome[Boolean, String] = {
-    nObjects match {
-      case nObject +: restOfObjects => {
-        for {
-          isIt <- isMemberOfSubtype(nObject, nSubtype, env)
-          result <- if (isIt) allMembersOfSubtype(restOfObjects, nSubtype, env) else Success(false)
-        } yield result
-      }
-      case _ => Success(true)
-    }
   }
 
   def getDefaultValueOfPureCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
@@ -347,7 +311,7 @@ object Evaluator {
         Success(AbleToApplyFunction(CaseInstance(field, input, caseT)))
       }
       case _ => {
-        Failure("Not implemented: apply function\nCallable: " + func + "\nInput:" + input)
+        Failure(s"Not implemented: apply function\nCallable: $func\nInput: $input")
       }
     }
   }

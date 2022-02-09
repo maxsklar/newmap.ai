@@ -161,7 +161,6 @@ case class TypeParameter(
   upperBounds: Vector[NewMapType] = Vector.empty,
   lowerBounds: Vector[NewMapType] = Vector.empty,
   variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
-  typeDepth: Int = 0 
 )
 
 case class TypeParameterVariance(

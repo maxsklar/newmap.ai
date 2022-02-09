@@ -53,7 +53,7 @@ object PrintNewMapObject {
       this(func) + " " + this(input)
     }
     case AccessField(struct, field) => s"${this(struct)}.${this(field)}"
-    case ParameterObj(name, nType) => s"$name~Po"//s"$name~Po:(${this(nType)})"
+    case ParameterObj(name, nType) => s"$name~Po:(${this(nType)})"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, _) => {

@@ -74,6 +74,7 @@ class EnvironmentInterpreter() {
 }
 
 object EnvironmentInterpreter {
+  // TODO(2022): REDO ALL OF THESE COMMAND TYPES!
   val initialCommands: Vector[String] = Vector(
     "val MutableDescriptor: Type = Struct(versionType: (Count => Type), init: (versionType 0), commandType: Type, update: ((version: Count, current: versionType version, command: commandType) => versionType (increment version)))",
     "val CounterV: MutableDescriptor = (versionType: ((n: Count) => Count), init: 0, commandType: Struct(), update: ((version: Count, current: versionType version, command: commandType) => increment current))",
