@@ -166,6 +166,7 @@ object Environment {
     eCommand("Type", TypeT),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
+    eCommand("Increment", IncrementFunc),
     eCommand("Map", LambdaInstance(
       paramStrategy = StructParams(Vector(
         i("key") -> TypeT,

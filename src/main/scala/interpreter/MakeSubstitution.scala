@@ -40,7 +40,7 @@ object MakeSubstitution {
       case CaseInstance(constructor, value, caseT) => {
         CaseInstance(constructor, this(value, env), caseT)      
       }
-      case IsCommandFunc | RangeFunc(_) => expression
+      case IsCommandFunc | RangeFunc(_) | IncrementFunc => expression
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values

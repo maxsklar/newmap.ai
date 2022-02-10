@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -316,6 +316,7 @@ object Evaluator {
           AbleToApplyFunction(Index(if (isCommand) 1 else 0))
         }
       }
+      case (IncrementFunc, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
       case (AccessField(caseT@CaseT(_), field), _) => {
         Success(AbleToApplyFunction(CaseInstance(field, input, caseT)))
       }

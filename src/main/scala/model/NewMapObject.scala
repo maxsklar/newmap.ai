@@ -28,6 +28,7 @@ case class StructParams(params: Vector[(NewMapObject, NewMapSubtype)]) extends L
 // The parameter is named by an identifier
 case class IdentifierParam(name: String, nType: NewMapSubtype) extends LambdaParamStrategy
 
+// Perhaps redo this - rebrand as a special case of mapInstance! (crazy idea)
 case class LambdaInstance(
   paramStrategy: LambdaParamStrategy,
   expression: NewMapObject
@@ -53,6 +54,9 @@ case class RangeFunc(i: Long) extends NewMapObject
 //  of the command typeclass (which means it has a default value and an update function)
 // TODO: making this a basic class is temporary for now
 case object IsCommandFunc extends NewMapObject
+
+// A basic function to increment a count
+case object IncrementFunc extends NewMapObject
 
 // This one is a little different/complex because each object has a unique type as defined by the struct
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!

@@ -404,4 +404,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val x: 2 = shorten True", GeneralSuccessCheck)
     ))
   }
+
+  "The increment function " should " work on index numbers" in {
+    testCodeScript(Vector(
+      CodeExpectation(
+        "val x = Increment 5",
+        SuccessCheck(Environment.eCommand("x", Index(6)))
+      )
+    ))
+  }
+
+  it should " fail on other things" in {
+    CodeExpectation("Increment Type", FailureCheck)
+    CodeExpectation("Increment (1: 4, 2: 5)", FailureCheck)
+  }
 }

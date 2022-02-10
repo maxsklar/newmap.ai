@@ -10,6 +10,7 @@ object PrintNewMapObject {
     case TypeT => s"Type"
     case AnyT => s"Any"
     case IsCommandFunc => s"IsCommandFunc"
+    case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s + "~Id"
     case MapT(key, value, completeness, featureSet) => {
