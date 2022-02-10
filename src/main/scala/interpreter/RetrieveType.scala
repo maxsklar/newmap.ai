@@ -3,15 +3,13 @@ package ai.newmap.interpreter
 import ai.newmap.model._
 
 object RetrieveType {
-  def apply(nObject: NewMapObject): NewMapType = nObject match {
+  // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
+  def apply(nObject: NewMapObject): NewMapSubtype = nObject match {
     case Index(_) => CountT
-    case CountT => TypeT
-    case TypeT => TypeT
-    case IdentifierT => TypeT
+    case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
     case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
-    case MapT(inputType, outputType, completeness, featureSet) => TypeT
     case MapInstance(values, mapT) => mapT
     case LambdaInstance(params, expression) => {
       val inputType = params match {
@@ -35,11 +33,12 @@ object RetrieveType {
         case IdentifierParam(_, nType) => nType
       }
 
+      // TODO - this should take a new environment
       val outputType = this(expression)
 
       MapT(inputType, outputType, RequireCompleteness, BasicMap)
     }
-    case ApplyFunction(func, input) => getParentType(retrieveOutputTypeFromFunction(func))
+    case ApplyFunction(func, input) => retrieveOutputTypeFromFunction(func)
     case AccessField(StructInstance(values, _), field) => {
       // TODO: Improve!
       values.find(v => v._1 == field).map(_._2) match {
@@ -66,13 +65,11 @@ object RetrieveType {
     case AccessField(struct, field) => {
       throw new Exception(s"This access of $struct with field $field is not allowed")
     }
-    case ParameterObj(_, nType) => getParentType(nType)
+    case ParameterObj(_, nType) => nType
     case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
-    case StructT(values) => TypeT
-    case CaseT(cases) => TypeT
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
-    case SubstitutableT(s, nType) => getParentType(nType)
+    case SubstitutableT(s, nType) => nType
   }
 
   def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapSubtype = nFunction match {
@@ -154,7 +151,7 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | RangeFunc(_) | IsCommandFunc => true
+    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IsCommandFunc => true
     case MapInstance(values, mapT) => {
       values.forall(v =>
         isTermClosedLiteral(v._1, knownVariables) &&

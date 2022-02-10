@@ -68,7 +68,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapSubtype = {
     expression match {
-      case CountT | TypeT | IdentifierT => expression
+      case CountT | TypeT | AnyT | IdentifierT => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           makeRelevantSubstitutionsOfType(inputType, env),

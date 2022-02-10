@@ -110,6 +110,10 @@ object Environment {
     MapT(inputType, outputType, RequireCompleteness, BasicMap)
   }
 
+  def fullFuncT(inputType: NewMapSubtype, outputType: NewMapSubtype): NewMapSubtype = {
+    MapT(inputType, outputType, RequireCompleteness, FullFunction)
+  }
+
   def structTypeFromParams(params: Vector[(String, NewMapSubtype)]) = {
     val fieldType = {
       SubtypeT(
@@ -158,6 +162,7 @@ object Environment {
 
 
   val Base: Environment = Environment().newCommands(Vector(
+    eCommand("Any", AnyT),
     eCommand("Type", TypeT),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),

@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | TypeT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -98,6 +98,7 @@ object Evaluator {
     nType match {
       case CountT => Success(Index(0))
       case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      case AnyT => Failure("The \"any\" Type has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         Success(MapInstance(Vector.empty, mapT))
@@ -254,6 +255,14 @@ object Evaluator {
         for {
           newEnv <- updateEnvironmentWithParamValues(params, paramValues, env)
           substitutedExpression = MakeSubstitution(expression, newEnv)
+          result <- this(substitutedExpression, env)
+        } yield AbleToApplyFunction(result)
+      }
+      case (LambdaInstance(StructParams(params), expression), param) if (params.length == 1) => {
+        val (id, nType) = params.head
+        val newEnv = env.newCommand(FullEnvironmentCommand(id, param))
+        val substitutedExpression = MakeSubstitution(expression, newEnv)
+        for {
           result <- this(substitutedExpression, env)
         } yield AbleToApplyFunction(result)
       }
@@ -423,7 +432,7 @@ object Evaluator {
   }
 
   // Converts a New Map Object (that is convertible to type Type) into the corresponding NewMapSubtype object
-  // TODO(2022): Move this to its own file (or possibly remove entirely!)
+  // TODO(2022): This can be removed entirely when we stop relying on scala's type system and start relying on newmap
   def convertObjectToType(
     objectFound: NewMapObject,
     env: Environment
@@ -432,6 +441,7 @@ object Evaluator {
       case Index(i) => Failure("Can't convert index to type") // Try to convert it to a subtype of Count?
       case CountT => Success(CountT)
       case TypeT => Success(TypeT)
+      case AnyT => Success(AnyT)
       case IsCommandFunc => Failure("Can't convert IsCommandFunc to type")
       case IdentifierT => Success(IdentifierT)
       case SubstitutableT(s, nType) => Success(SubstitutableT(s, nType))

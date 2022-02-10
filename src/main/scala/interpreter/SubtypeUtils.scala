@@ -68,7 +68,7 @@ object SubtypeUtils {
 
     if (nType != requestedType) {
       for {
-        isConvertible <- isPureTypeConvertible(nObject, requestedType, env)
+        isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
         _ <- Outcome.failWhen(
           !isConvertible,
           s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
@@ -88,8 +88,8 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Boolean, String] = {
     for {
-      pureTypeConvertible <- isPureTypeConvertible(
-        ParameterObj("_", startingType), // TODO - this is an awkward solution!
+      pureTypeConvertible <- isObjectConvertibleToType(
+        ParameterObj("_", startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
         RetrieveType.getParentType(endingType),
         env
       )
@@ -102,7 +102,16 @@ object SubtypeUtils {
           // Check that the function doesn't return the default value for any input
           doMapValuesCoverType(values, inputType).toOption.getOrElse(false)
         }
-        case _ => true
+        case SubtypeT(LambdaInstance(_, _)) => {
+          //TODO - we can check to determine if this is always true
+          false
+        }
+        case SubtypeT(IsCommandFunc) => false
+        case SubtypeT(RangeFunc(_)) => false
+        case _ => {
+          // TODO: Is this appropriate - shouldn't it be false
+          true
+        }
       }
 
       doesEndtypeCoverParentType || {
@@ -121,7 +130,7 @@ object SubtypeUtils {
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
   // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
-  def isPureTypeConvertible(
+  def isObjectConvertibleToType(
     startingObject: NewMapObject,
     endingType: NewMapSubtype,
     env: Environment
@@ -130,6 +139,7 @@ object SubtypeUtils {
 
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(true)
+      case (_, AnyT) => Success(true)
       case (_, SubtypeT(isMember)) => {
         
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
@@ -203,6 +213,13 @@ object SubtypeUtils {
           isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
         } yield isConvertible
       }
+      case (_, StructT(mi@MapInstance(values, _))) if (values.length == 1) => {
+        for {
+          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
+          isConvertible <- isObjectConvertibleToType(startingObject, singularOutputT, env)
+        } yield isConvertible
+      }
       case (CaseT(startingCases), CaseT(endingCases)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
@@ -219,6 +236,14 @@ object SubtypeUtils {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
           isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
+        } yield isConvertible
+      }
+      case (_, CaseT(mi@MapInstance(values, _))) if (values.length == 1) => {
+        //Check to see if this is a singleton case, if so, see if that's convertible into the other
+        for {
+          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
+          isConvertible <- isObjectConvertibleToType(startingObject, singularOutputT, env)
         } yield isConvertible
       }
       case _ => Success(false)
@@ -243,21 +268,30 @@ object SubtypeUtils {
   ): Outcome[Boolean, String] = {
     // TODO: if nObject is a parameter, we may still be able to confirm that it's in the subtype if the
     // type of it is convertible
+    // TODO: We should distinguish between a closed literal - for which we can call quickApplyFunctionAttempt - and non-closed literals
 
-    (nSubtype, nObject) match {
-      case (SubtypeT(isMember), ParameterObj(name, subtype)) => {
-        isTypeConvertible(subtype, nSubtype, env)
-      }
-      case (SubtypeT(isMember), _) => {
-        for {
-          result <- Evaluator.quickApplyFunctionAttempt(isMember, nObject, env)
+    val apparentTypeOfObject = RetrieveType(nObject)
 
-          // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
-          //  and find a default on that!
-          defaultValueOrResultType <- Evaluator.getDefaultValueOfPureCommandType(RetrieveType(result), env)
-        } yield (result != defaultValueOrResultType)
+    isTypeConvertible(apparentTypeOfObject, nSubtype, env) match {
+      case Success(true) => {
+        // Note: This is a shortcut, but not always true
+        // - Can we redo isTypeConvertible so it acts purely as a shortcut (maybe a version that doesn't call isPureTypeConvertible)
+        Success(true)
       }
-      case (nType: NewMapType, _) => Success(true)
+      case _ => nSubtype match {
+        case SubtypeT(isMember) => {
+          for {
+            result <- Evaluator.quickApplyFunctionAttempt(isMember, nObject, env)
+
+            // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
+            //  and find a default on that!
+            defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType(result), env)
+          } yield (result != defaultValueOrResultType)
+        }
+        case (nType: NewMapType) => {
+          Success(true)
+        }
+      }
     }
   }
 

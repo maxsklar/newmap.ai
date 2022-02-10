@@ -22,16 +22,16 @@ object TypeChecker {
       case NaturalNumberParse(i: Long) => {
         expectedType match {
           case Some(expType) => {
+            // TODO: this is so awkard! Fix
             RetrieveType.getParentType(expType) match {
-              case CountT => {
-                val proposedObject = Index(i)
-                SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expType, env)
-              }
               case TypeT => {
                 val proposedObject = NewMapO.rangeT(i)
                 SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expType, env)
               }
-              case _ => Failure(s"Can't turn number $i into type $expType")
+              case _ => {
+                val proposedObject = Index(i)
+                SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expType, env)
+              }
             }
           }
           case None => Success(Index(i))
@@ -162,6 +162,10 @@ object TypeChecker {
             }
           }
           case None => {
+            // Steps to implement this:
+            // type check all the elements of the map
+            // Find a common type. DONT use Any - they should be in the same construction
+            // Build a ReqMap from this
             Failure("CommandLists must be explicitly typed")
           }
           case _ => {
@@ -217,6 +221,8 @@ object TypeChecker {
                   }
                 }
                 case _ => {
+                  // TODO - implement
+                  //Vector(IdentifierInstance(id) -> ??)
                   Failure("Lambda Expression is untyped, and this is not implemented yet.")
                 }
               }
@@ -515,7 +521,7 @@ object TypeChecker {
             Failure("Ids don't match: " + paramId + " --- " + valueId)
           }
           case None => {
-            Failure("Id note found for " + paramId)
+            Failure("Id not found for " + paramId)
           }
         }
       }      

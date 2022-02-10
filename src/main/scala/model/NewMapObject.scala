@@ -87,7 +87,11 @@ sealed abstract class NewMapType extends NewMapSubtype
 case object CountT extends NewMapType
 
 // Type of types
+// TODO - eventually, we will replace this with an IsType function
+//  that will be a subtype of type object
 case object TypeT extends NewMapType
+
+case object AnyT extends NewMapType
 
 case object IdentifierT extends NewMapType
 

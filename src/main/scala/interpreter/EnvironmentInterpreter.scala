@@ -40,6 +40,7 @@ class EnvironmentInterpreter() {
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
+        ":parse [Expression]\tPrint how [Expression] is parsed and type checked" ++
         ":exit | :quit\tExit this repl\n" ++
         ":help\tPrint this help message\n"
       )
