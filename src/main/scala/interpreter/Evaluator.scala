@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | IdentifierPattern(_, _) | ParameterObj(_, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | IdentifierPattern(_, _) | ParameterObj(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -45,7 +45,7 @@ object Evaluator {
               // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
               //  and get the default from that
               val nType = RetrieveType(nObject)
-              getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType), env)
+              getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType))
             }
           }
         } yield result
@@ -81,9 +81,9 @@ object Evaluator {
     }
   }
 
-  def getDefaultValueOfCommandType(nSubtype: NewMapSubtype, env: Environment): Outcome[NewMapObject, String] = {
+  def getDefaultValueOfCommandType(nSubtype: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     for {
-      default <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nSubtype), env)
+      default <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nSubtype))
 
       isMember <- SubtypeUtils.isMemberOfSubtype(default, nSubtype, env)
 
@@ -94,7 +94,7 @@ object Evaluator {
     } yield default
   }
 
-  def getDefaultValueOfPureCommandType(nType: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
+  def getDefaultValueOfPureCommandType(nType: NewMapObject): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
       case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
@@ -106,9 +106,8 @@ object Evaluator {
       case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
       case structT@StructT(params) => {
         for {
-          parameterList <- TypeChecker.structParamsIntoParameterList(params, env)
-          paramsT <- TypeChecker.convertParamsObjectToType(parameterList, env)
-          defaultValue <- getDefaultValueFromStructParams(paramsT, env)
+          parameterList <- TypeChecker.structParamsIntoParameterList(params)
+          defaultValue <- getDefaultValueFromStructParams(parameterList)
         } yield {
           StructInstance(defaultValue, structT)
         }
@@ -119,20 +118,20 @@ object Evaluator {
         // - casesToType(casesType.default) is a type that must have a default case
         Failure("Case Types do not have a default value")
       }
-      case SubstitutableT(s, _) => Failure("No default case for subsitutableT " + s)
+      case _ => {
+        Failure(s"$nType is not a pure command type, error in type checker")
+      }
     }
   }
 
   def getDefaultValueFromStructParams(
-    params: Vector[(NewMapObject, NewMapObject)],
-    env: Environment
+    params: Vector[(NewMapObject, NewMapObject)]
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     params match {
       case (id, obj) +: restOfParams => {
         for {
-          restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
-          paramType <- Evaluator.convertObjectToType(obj, env)
-          paramDefault <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(paramType), env)
+          restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams)
+          paramDefault <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(obj))
         } yield {
           (id -> paramDefault) +: restOfParamsDefault
         }
@@ -152,8 +151,8 @@ object Evaluator {
 
         // TODO: I'm not sure if this is the best place to be altering the Environment
         // Could the env be altered here when it shouldn't be??
-        newEnv = (extractIdentifier(evalK), convertObjectToType(evalV, env)) match {
-          case (Some(s), Success(t)) => env.newParam(s, t)
+        newEnv = extractIdentifier(evalK) match {
+          case Some(s) => env.newParam(s, evalV)
           case _ => env
         }
 
@@ -180,14 +179,9 @@ object Evaluator {
       for {
         evalV <- this(v, env)
 
-        // V Should be a type
-        //evalVType <- Evaluator.convertObjectToType(evalV, env)
+        // TODO: investigate whether we should do something like this
+        //newEnv = env.newCommand(FullEnvironmentCommand(k, evalV))
 
-        // TODO: maybe we can get rid of this entirely!
-        //newEnv = env.newCommand(FullEnvironmentCommand(k, evalVType))
-
-        //*********** PROBLEM
-        //evalRest <- evalParameters(restOfValues, newEnv)
         evalRest <- evalParameters(restOfValues, env)
       } yield {
         (k -> evalV) +: evalRest
@@ -243,11 +237,11 @@ object Evaluator {
     //Evaluate(input, env)
     
     (func, input) match {
-      case (LambdaInstance(IdentifierParam(id, typeOfParam), expression), param) => {
+      case (LambdaInstance(IdentifierParam(id, nType), expression), param) => {
+        val newEnv = env.newCommand(Environment.eCommand(id, param))
+        val substitutedExpression = MakeSubstitution(expression, newEnv)
+
         for {
-          nType <- convertObjectToType(typeOfParam, env)
-          newEnv = env.newCommand(Environment.eCommand(id, param))
-          substitutedExpression = MakeSubstitution(expression, newEnv)
           result <- this(substitutedExpression, env)
         } yield AbleToApplyFunction(result)
       }
@@ -309,12 +303,8 @@ object Evaluator {
         Success(AbleToApplyFunction(Index(ix)))
       }
       case (IsCommandFunc, nObject) => {
-        for {
-          nType <- Evaluator.convertObjectToType(nObject, env)
-        } yield {
-          val isCommand: Boolean = getDefaultValueOfCommandType(nType, env).isSuccess
-          AbleToApplyFunction(Index(if (isCommand) 1 else 0))
-        }
+        val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
+        Success(AbleToApplyFunction(Index(if (isCommand) 1 else 0)))
       }
       case (IncrementFunc, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
       case (AccessField(caseT@CaseT(_), field), _) => {
@@ -414,13 +404,9 @@ object Evaluator {
     env: Environment
   ): Environment = {
     params match {
-      case (paramName, paramObj) +: addlParams => {
-        // TODO: fix unsafe object to type conversion
-        // - This happens when we merge the object and type representations
-        val nTypeOpt = convertObjectToType(paramObj, env).toOption
-
-        val newEnv = (nTypeOpt, paramName) match {
-          case (Some(nType), IdentifierInstance(i)) => env.newCommand(
+      case (paramName, nType) +: addlParams => {
+        val newEnv = paramName match {
+          case IdentifierInstance(i) => env.newCommand(
             FullEnvironmentCommand(paramName, ParameterObj(i, nType))
           )
           case _ => env //TODO
@@ -429,77 +415,6 @@ object Evaluator {
         includeParams(addlParams, newEnv)
       }
       case _ => env
-    }
-  }
-
-  // Converts a New Map Object (that is convertible to type Type) into the corresponding NewMapSubtype object
-  // TODO(2022): This can be removed entirely when we stop relying on scala's type system and start relying on newmap
-  def convertObjectToType(
-    objectFound: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapSubtype, String] = {
-    objectFound match {
-      case Index(i) => Failure("Can't convert index to type") // Try to convert it to a subtype of Count?
-      case CountT => Success(CountT)
-      case TypeT => Success(TypeT)
-      case AnyT => Success(AnyT)
-      case IsCommandFunc => Failure("Can't convert IsCommandFunc to type")
-      case IdentifierT => Success(IdentifierT)
-      case SubstitutableT(s, nType) => Success(SubstitutableT(s, nType))
-      case MapT(inputType, outputType, completeness, featureSet) => {
-        Success(MapT(inputType, outputType, completeness, featureSet))
-      }
-      case mi@MapInstance(values, _) => {
-        // TODO - require an explicit conversion here? Maybe this should be left to struct type
-        for {
-          // TODO - is the convertMapInstanceStructToParams appropriate for cases?
-          newParams <- convertMapInstanceStructToParams(values, env)
-        } yield {
-          // Should we be doing this?
-          // PROBLEM!!!!!!! - sometimes it should be case
-          StructT(mi)
-        }
-      }
-      case ParameterObj(name, nType) => {
-        // TODO: Should this even be allowed?
-        // (maybe write a test to prove that it isn't a then remove)
-        Success(SubstitutableT(name, nType))
-      }
-      case ApplyFunction(func, input) => {
-        Failure(s"Expression $func($input) is not a type - perhaps if it is evaluated")
-      }
-      case StructT(params) => Success(StructT(params))
-      case CaseT(cases) => Success(CaseT(cases))
-      case IdentifierInstance(name) => {
-        Failure("Identifier " + name + " is not connected to a type.")
-      }
-      case SubtypeT(isMember) => Success(SubtypeT(isMember))
-      case _ => {
-        Failure("Couldn't convert into type: " + objectFound + " -- could be unimplemented")
-      }
-    }
-  }
-
-  def convertMapInstanceStructToParams(
-    values: Vector[(NewMapObject, NewMapObject)],
-    env: Environment
-  ): Outcome[Vector[(String, NewMapSubtype)], String] = {
-    values match {
-      case (key, value) +: restOfValues => key match {
-        case IdentifierInstance(s) => {
-          for {
-            valueType <- convertObjectToType(value, env)
-            restOfParams <- convertMapInstanceStructToParams(restOfValues, env.newParam(s, valueType))
-          } yield {
-            (s -> valueType) +: restOfParams
-          }
-        }
-        // TODO - what if the key substitutes to an identifier?? Better Logic on that
-        case _ => Failure("Key must be identifier: " + key)
-      }
-      case _ => {
-        Success(Vector.empty)
-      }
     }
   }
 }

@@ -78,7 +78,6 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
-    case SubstitutableT(s, y) => s"$s~St~$y"
     case RangeFunc(i) => s"<$i"
   }
 

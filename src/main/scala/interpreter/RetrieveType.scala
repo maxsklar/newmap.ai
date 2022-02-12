@@ -5,7 +5,7 @@ import ai.newmap.model._
 object RetrieveType {
   // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
   // TODO - Accept environment
-  def apply(nObject: NewMapObject): NewMapSubtype = nObject match {
+  def apply(nObject: NewMapObject): NewMapObject = nObject match {
     case Index(_) => CountT
     case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
@@ -55,11 +55,9 @@ object RetrieveType {
     case AccessField(caseT@CaseT(values), field) => {
       // TODO - I really don't like using Environment.Base here!
       // - perhaps there should be an environment-less apply function attempt since caseT should already be literal
+      // - Hold off on fixing this, because in the future, the apply function might not require this!
       Evaluator.quickApplyFunctionAttempt(values, field, Environment.Base).toOption match {
-        case Some(value: NewMapSubtype) => MapT(value, caseT, RequireCompleteness, SimpleFunction)
-        case Some(value) => {
-          throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $value-- $field")
-        }
+        case Some(value) => MapT(value, caseT, RequireCompleteness, SimpleFunction)
         case _ => {
           throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $field")
         }
@@ -72,29 +70,28 @@ object RetrieveType {
     case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
-    case SubstitutableT(s, nType) => nType
   }
 
-  def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapSubtype = {
+  def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapObject = {
     RetrieveType(nFunction) match {
       case MapT(inputType, _, _, _) => inputType
       case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
     }
   }
 
-  def retrieveOutputTypeFromFunction(nFunction: NewMapObject): NewMapSubtype = {
+  def retrieveOutputTypeFromFunction(nFunction: NewMapObject): NewMapObject = {
     RetrieveType(nFunction) match {
       case MapT(_, outputType, _, _) => outputType
       case _ => throw new Exception(s"Couldn't retrieve output type from $nFunction")
     }
   }
 
-  def getParentType(nType: NewMapSubtype): NewMapType = {
+  def getParentType(nType: NewMapObject): NewMapObject = {
     nType match {
       case SubtypeT(isMember) => {
         getParentType(retrieveInputTypeFromFunction(isMember))
       }
-      case t: NewMapType => t
+      case t => t
     }
   }
 
@@ -149,7 +146,6 @@ object RetrieveType {
     }
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
-    case SubstitutableT(s, _) => knownVariables.contains(s)
     case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
   }
 }

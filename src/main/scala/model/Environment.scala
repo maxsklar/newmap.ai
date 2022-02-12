@@ -30,7 +30,7 @@ case class Environment(
 ) {
   def typeOf(
     identifier: String
-  ): Outcome[NewMapSubtype, String] = {
+  ): Outcome[NewMapObject, String] = {
     lookup(identifier) match {
       case Some(obj) => Success(RetrieveType(obj))
       case None => Failure(s"Failed to lookup identifier $identifier")
@@ -85,12 +85,12 @@ case class Environment(
     env
   }
 
-  // TODO: perhaps this should take NewMapObject
-  def newParam(id: String, nType: NewMapSubtype): Environment = {
+  // TODO - should we ensure that nType is actually a type?
+  def newParam(id: String, nType: NewMapObject): Environment = {
     newCommand(Environment.paramToEnvCommand((id, nType)))
   }
 
-  def newParams(xs: Vector[(NewMapObject, NewMapSubtype)]) = {
+  def newParams(xs: Vector[(NewMapObject, NewMapObject)]) = {
     // TODO: deal with this issue better
     val paramsWithString = xs.map(x => x match {
       case (IdentifierInstance(s), t) => Some((s, t))
@@ -106,15 +106,15 @@ object Environment {
     FullEnvironmentCommand(IdentifierInstance(id), nObject)
   }
 
-  def simpleFuncT(inputType: NewMapSubtype, outputType: NewMapSubtype): NewMapSubtype = {
+  def simpleFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
     MapT(inputType, outputType, RequireCompleteness, BasicMap)
   }
 
-  def fullFuncT(inputType: NewMapSubtype, outputType: NewMapSubtype): NewMapSubtype = {
+  def fullFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
     MapT(inputType, outputType, RequireCompleteness, FullFunction)
   }
 
-  def structTypeFromParams(params: Vector[(String, NewMapSubtype)]) = {
+  def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val fieldType = {
       SubtypeT(
         MapInstance(
@@ -131,7 +131,7 @@ object Environment {
     StructT(MapInstance(paramsToObject, MapT(fieldType, TypeT, RequireCompleteness, BasicMap)))
   }
 
-  def caseTypeFromParams(params: Vector[(String, NewMapSubtype)]) = {
+  def caseTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val fieldType = {
       SubtypeT(
         MapInstance(
@@ -173,8 +173,8 @@ object Environment {
         i("value") -> NewMapO.commandT
       )),
       expression = MapT(
-        SubstitutableT("key", TypeT),
-        SubstitutableT("value", NewMapO.commandT),
+        ParameterObj("key", TypeT),
+        ParameterObj("value", NewMapO.commandT),
         CommandOutput,
         BasicMap
       )
@@ -185,8 +185,8 @@ object Environment {
         i("value") -> TypeT
       )),
       expression = MapT(
-        SubstitutableT("key", TypeT),
-        SubstitutableT("value", TypeT),
+        ParameterObj("key", TypeT),
+        ParameterObj("value", TypeT),
         RequireCompleteness,
         SimpleFunction
       )
@@ -195,13 +195,13 @@ object Environment {
     eCommand("Struct", LambdaInstance(
       paramStrategy = StructParams(Vector(
         i("fieldType") -> TypeT,
-        i("structParams") -> MapT(SubstitutableT("fieldType", TypeT), TypeT, RequireCompleteness, BasicMap)
+        i("structParams") -> MapT(ParameterObj("fieldType", TypeT), TypeT, RequireCompleteness, BasicMap)
       )),
       expression = StructT(
         ParameterObj(
           "structParams",
           MapT(
-            SubstitutableT("fieldType", TypeT),
+            ParameterObj("fieldType", TypeT),
             TypeT,
             RequireCompleteness,
             SimpleFunction
@@ -213,13 +213,13 @@ object Environment {
     eCommand("Case", LambdaInstance(
       paramStrategy = StructParams(Vector(
         i("casesType") -> TypeT,
-        i("cases") -> MapT(SubstitutableT("casesType", TypeT), TypeT, RequireCompleteness, BasicMap)
+        i("cases") -> MapT(ParameterObj("casesType", TypeT), TypeT, RequireCompleteness, BasicMap)
       )),
       expression = CaseT(
         ParameterObj(
           "cases",
           MapT(
-            SubstitutableT("cases", TypeT),
+            ParameterObj("cases", TypeT),
             TypeT,
             RequireCompleteness,
             SimpleFunction
@@ -231,14 +231,14 @@ object Environment {
       paramStrategy = StructParams(Vector(
         i("keyType") -> TypeT,
         i("valueType") -> TypeT,
-        i("simpleFunction") -> MapT(SubstitutableT("keyType", TypeT), SubstitutableT("valueType", TypeT), CommandOutput, SimpleFunction)
+        i("simpleFunction") -> MapT(ParameterObj("keyType", TypeT), ParameterObj("valueType", TypeT), CommandOutput, SimpleFunction)
       )),
       expression = SubtypeT(
         ParameterObj(
           "simpleFunction",
           MapT(
-            SubstitutableT("keyType", TypeT),
-            SubstitutableT("valueType", TypeT),
+            ParameterObj("keyType", TypeT),
+            ParameterObj("valueType", TypeT),
             RequireCompleteness,
             SimpleFunction
           )
@@ -247,8 +247,7 @@ object Environment {
     ))
   ))
   
-  def paramToEnvCommand(x: (String, NewMapSubtype)): EnvironmentCommand = {
+  def paramToEnvCommand(x: (String, NewMapObject)): EnvironmentCommand = {
     eCommand(x._1, ParameterObj(x._1, x._2))
   }
 }
-

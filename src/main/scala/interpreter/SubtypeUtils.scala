@@ -8,7 +8,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object SubtypeUtils {
   def checkProposedObjectInSubtype(
     proposedObject: NewMapObject,
-    expectedType: NewMapSubtype,
+    expectedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
     for {
@@ -21,8 +21,7 @@ object SubtypeUtils {
   // For Maps, we want to know that the default value is never used
   def doMapValuesCoverType(
     values: Vector[(NewMapObject, NewMapObject)],
-    nType: NewMapSubtype,
-    env: Environment
+    nType: NewMapObject
   ): Outcome[Boolean, String] = {
     val keys = values.map(_._1).toSet
 
@@ -36,14 +35,14 @@ object SubtypeUtils {
     if (genericPatternExists) Success(true)
     else {
       for {
-        keysToMatch <- enumerateAllValuesIfPossible(nType, env)
+        keysToMatch <- enumerateAllValuesIfPossible(nType)
       } yield {
         (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
       }
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapSubtype, env: Environment): Outcome[Set[NewMapObject], String] = {
+  def enumerateAllValuesIfPossible(nType: NewMapObject): Outcome[Set[NewMapObject], String] = {
     nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
@@ -57,8 +56,7 @@ object SubtypeUtils {
         // ALSO - we should have a better way to deal with all these singular value checks
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
-          result <- enumerateAllValuesIfPossible(singularOutputT, env)
+          result <- enumerateAllValuesIfPossible(singularOutput)
         } yield result
       }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
@@ -71,7 +69,7 @@ object SubtypeUtils {
   // - If the object already has that type, then just return itself
   def attemptToConvertToType(
     nObject: NewMapObject,
-    requestedType: NewMapSubtype,
+    requestedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
     val nType = RetrieveType(nObject)
@@ -93,8 +91,8 @@ object SubtypeUtils {
   // - For example, if the endingType excludes only a finite amount of objects, then we can check
   //    to make sure that all of those are not in startingType
   def isTypeConvertible(
-    startingType: NewMapSubtype,
-    endingType: NewMapSubtype,
+    startingType: NewMapObject,
+    endingType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     for {
@@ -110,7 +108,7 @@ object SubtypeUtils {
         case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, BasicMap))) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
           // Check that the function doesn't return the default value for any input
-          doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
+          doMapValuesCoverType(values, inputType).toOption.getOrElse(false)
         }
         case SubtypeT(LambdaInstance(_, _)) => {
           //TODO - we can check to determine if this is always true
@@ -128,7 +126,7 @@ object SubtypeUtils {
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
-          allValues <- enumerateAllValuesIfPossible(startingType, env)
+          allValues <- enumerateAllValuesIfPossible(startingType)
           doAllConvert <- allMembersOfSubtype(allValues.toVector, endingType, env)
         } yield doAllConvert
 
@@ -142,7 +140,7 @@ object SubtypeUtils {
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
   def isObjectConvertibleToType(
     startingObject: NewMapObject,
-    endingType: NewMapSubtype,
+    endingType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     val startingType = RetrieveType(startingObject)
@@ -219,15 +217,13 @@ object SubtypeUtils {
       case (StructT(mi@MapInstance(values, _)), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
-          isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
+          isConvertible <- isTypeConvertible(singularOutput, endingType, env)
         } yield isConvertible
       }
       case (_, StructT(mi@MapInstance(values, _))) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
-          isConvertible <- isObjectConvertibleToType(startingObject, singularOutputT, env)
+          isConvertible <- isObjectConvertibleToType(startingObject, singularOutput, env)
         } yield isConvertible
       }
       case (CaseT(startingCases), CaseT(endingCases)) => {
@@ -244,16 +240,14 @@ object SubtypeUtils {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
-          isConvertible <- isTypeConvertible(singularOutputT, endingType, env)
+          isConvertible <- isTypeConvertible(singularOutput, endingType, env)
         } yield isConvertible
       }
       case (_, CaseT(mi@MapInstance(values, _))) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
-          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
-          isConvertible <- isObjectConvertibleToType(startingObject, singularOutputT, env)
+          isConvertible <- isObjectConvertibleToType(startingObject, singularOutput, env)
         } yield isConvertible
       }
       case (SubtypeT(isMember), _) => {
@@ -278,7 +272,7 @@ object SubtypeUtils {
   // Returns true if nObject is a member of nSubtype, assuming that it's already a member of the parent type
   def isMemberOfSubtype(
     nObject: NewMapObject,
-    nSubtype: NewMapSubtype,
+    nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     // TODO: if nObject is a parameter, we may still be able to confirm that it's in the subtype if the
@@ -303,7 +297,8 @@ object SubtypeUtils {
             defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType(result), env)
           } yield (result != defaultValueOrResultType)
         }
-        case (nType: NewMapType) => {
+        case _ => {
+          // We already called isTypeConvertible above, so we know this works
           Success(true)
         }
       }
@@ -312,7 +307,7 @@ object SubtypeUtils {
 
   def allMembersOfSubtype(
     nObjects: Vector[NewMapObject],
-    nSubtype: NewMapSubtype,
+    nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     nObjects match {
