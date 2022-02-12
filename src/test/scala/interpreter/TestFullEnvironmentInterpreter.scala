@@ -209,7 +209,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
       CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val q = (x: Field) => s.x", FailureCheck)
+      CodeExpectation("val q: Field => 3 = (x: s.x)", FailureCheck)
     ))
   }
 
@@ -271,8 +271,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
-      LambdaInstance(
-        StructParams(Vector(IdentifierInstance("a") -> rangeType(3))),
+      MapInstance(Vector(
+        IdentifierPattern("a", rangeType(3)) ->
         ApplyFunction(
           MapInstance(
             Vector(Index(0) -> Index(2), Index(1) -> Index(3), Index(2) -> Index(1)),
@@ -280,7 +280,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           ),
           ParameterObj("a", rangeType(3))
         )
-      )
+      ), MapT(rangeType(3), rangeType(4), RequireCompleteness, FullFunction))
     )
 
     val correctCommandUseFunc = Environment.eCommand(
@@ -298,36 +298,21 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       Index(2)
     )
 
-    //val fSig~Id: Type = [\(Struct MI:(a~Id: Subtype(<3)): Subtype(<4)])" did not equal 
-    //val fSig~Id: Type = [SpecialMap(Struct MI:(a~Id: Subtype(<3)), Subtype(<4), ai.newmap.model.RequireCompleteness$@2d7c457a, ai.newmap.model.BasicMap$@3e0b79e8])
-
     testCodeScript(Vector(
-      CodeExpectation("val fSig: Type = ((a: 3) => 4)", SuccessCheck(Environment.eCommand(
+      CodeExpectation("val fSig: Type = (3 => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
-        Environment.fullFuncT(
-          Environment.structTypeFromParams(Vector("a" -> rangeType(3))),
-          rangeType(4)
-        )
+        Environment.fullFuncT(rangeType(3), rangeType(4))
       ))),
       CodeExpectation("val m: Map(3, 4) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
-      CodeExpectation("val f: fSig = ((a: 3) => m a)", SuccessCheck(correctCommandCreateFunc)),
-      CodeExpectation("val result: 4 = f (a: 1)", SuccessCheck(correctCommandUseFunc)),
+      CodeExpectation("val f: fSig = (a: m a)", SuccessCheck(correctCommandCreateFunc)),
+      CodeExpectation("val result: 4 = f 1", SuccessCheck(correctCommandUseFunc)),
       CodeExpectation("val resultSimple: 4 = f 2", SuccessCheck(correctCommandUseSimpleFunc)),
       CodeExpectation("val resultParen: 4 = f(0)", SuccessCheck(correctCommandUseParenFunc))
     ))
   }
 
-  it should "be able to take arbitrary types as inputs" in {
-    testCodeScript(Vector(
-      CodeExpectation("val fSig: Type = (3 => 4)", GeneralSuccessCheck),
-      CodeExpectation("val m: Map(3, 4) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
-      CodeExpectation("val f: fSig = (a => m a)", GeneralSuccessCheck),
-      CodeExpectation("val resultSimple: 4 = f 2", GeneralSuccessCheck),
-    ))
-  }
-
   it should "be creatable without a type given" in {
-    val line = "val f = t => t"
+    val line = "val f = (t: t)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
 
@@ -352,13 +337,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be creatable" in {
-    val line = "val id: Any => Any = (x => x)"
+    val line = "val id: Any => Any = (x: x)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
 
   it should " be usable" in {
     testCodeScript(Vector(
-      CodeExpectation("val id: (Any => Any) = t => t", GeneralSuccessCheck),
+      CodeExpectation("val id: (Any => Any) = (t: t)", GeneralSuccessCheck),
       CodeExpectation("id ~hi", GeneralSuccessCheck),
       CodeExpectation("id 5", GeneralSuccessCheck),
     ))

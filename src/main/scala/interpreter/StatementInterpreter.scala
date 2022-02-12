@@ -16,8 +16,8 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          typeAsType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
-          tc <- TypeChecker.typeCheck(objExpression, Some(typeAsType), env)
+          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
+          tc <- TypeChecker.typeCheck(objExpression, Some(nType), env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
           Vector(FullEnvironmentCommand(IdentifierInstance(id.s), evaluatedObject))

@@ -205,6 +205,9 @@ object TypeChecker {
           )
         }
       }
+      /*case LambdaParse(params, expression) => {
+        throw new Exception("This should not happen!")
+      }*/
       // TODO: Remove this case, because lambda parse is now always going to refer to a type
       case LambdaParse(params, expression) => {
 

@@ -341,7 +341,7 @@ object Evaluator {
       case (pattern, answer) +: addlPatterns => {
         val newEnvIfMatched = attemptPatternMatch(pattern, input, env)
         newEnvIfMatched match {
-          case Some(newEnv) => Success(MakeSubstitution(answer, newEnv))
+          case Some(newEnv) => this(MakeSubstitution(answer, newEnv), env)
           case None => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
