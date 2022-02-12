@@ -10,7 +10,7 @@ object Evaluator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | ParameterObj(_, _) | SubstitutableT(_, _) => {
+      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IdentifierT | IdentifierInstance(_) | IdentifierPattern(_, _) | ParameterObj(_, _) | SubstitutableT(_, _) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -366,7 +366,7 @@ object Evaluator {
   ): Option[Environment] = pattern match {
     // TODO: this is too basic of a pattern match!
     // - Also, do we have control over the order of patterns?
-    case ParameterObj(param, _) => {
+    case IdentifierPattern(param, _) => {
       Some(env.newCommand(FullEnvironmentCommand(IdentifierInstance(param), input)))
     }
     case _ if (pattern == input) => Some(env)

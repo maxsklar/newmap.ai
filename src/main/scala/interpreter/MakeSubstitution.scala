@@ -12,7 +12,7 @@ object MakeSubstitution {
   ): NewMapObject = {
     expression match {
       case nType: NewMapSubtype => makeRelevantSubstitutionsOfType(nType, env)
-      case Index(_) | IdentifierInstance(_) => expression
+      case Index(_) | IdentifierInstance(_) | IdentifierPattern(_, _) => expression
       case ApplyFunction(func, input) => {
         ApplyFunction(
           this(func, env),

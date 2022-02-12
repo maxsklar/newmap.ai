@@ -21,28 +21,29 @@ object SubtypeUtils {
   // For Maps, we want to know that the default value is never used
   def doMapValuesCoverType(
     values: Vector[(NewMapObject, NewMapObject)],
-    nType: NewMapSubtype
+    nType: NewMapSubtype,
+    env: Environment
   ): Outcome[Boolean, String] = {
     val keys = values.map(_._1).toSet
 
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     val genericPatternExists = keys.exists(key => key match {
-      case ParameterObj(_, _) => true
+      case IdentifierPattern(_, _) => true
       case _ => false
     })
 
     if (genericPatternExists) Success(true)
     else {
       for {
-        keysToMatch <- enumerateAllValuesIfPossible(nType)
+        keysToMatch <- enumerateAllValuesIfPossible(nType, env)
       } yield {
         (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
       }
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapSubtype): Outcome[Set[NewMapObject], String] = {
+  def enumerateAllValuesIfPossible(nType: NewMapSubtype, env: Environment): Outcome[Set[NewMapObject], String] = {
     nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
@@ -51,6 +52,15 @@ object SubtypeUtils {
       // TODO(2022): this is also one of those advanced cases where we want to know if one set is a subset of another through some advanced argument (like monotonicity)
       case SubtypeT(RangeFunc(i)) => Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
       // TODO - structs and cases
+      case StructT(mi@MapInstance(values, _)) if (values.length == 1) => {
+        // TODO: we may also be able to enumerate all values if the length > 1 !
+        // ALSO - we should have a better way to deal with all these singular value checks
+        for {
+          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutputT <- Evaluator.convertObjectToType(singularOutput, env)
+          result <- enumerateAllValuesIfPossible(singularOutputT, env)
+        } yield result
+      }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }
   }
@@ -100,7 +110,7 @@ object SubtypeUtils {
         case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, BasicMap))) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
           // Check that the function doesn't return the default value for any input
-          doMapValuesCoverType(values, inputType).toOption.getOrElse(false)
+          doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
         }
         case SubtypeT(LambdaInstance(_, _)) => {
           //TODO - we can check to determine if this is always true
@@ -118,7 +128,7 @@ object SubtypeUtils {
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
-          allValues <- enumerateAllValuesIfPossible(startingType)
+          allValues <- enumerateAllValuesIfPossible(startingType, env)
           doAllConvert <- allMembersOfSubtype(allValues.toVector, endingType, env)
         } yield doAllConvert
 

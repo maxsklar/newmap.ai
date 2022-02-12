@@ -9,6 +9,7 @@ object RetrieveType {
     case Index(_) => CountT
     case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
+    case IdentifierPattern(_, nType) => nType
     case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
@@ -110,6 +111,7 @@ object RetrieveType {
       ) && isTermClosedLiteral(mapT, knownVariables)
     }
     case ParameterObj(name, _) => knownVariables.contains(name)
+    case IdentifierPattern(_, _) => false
     case LambdaInstance(StructParams(params), expression) => {
       // TODO - change this when we start using de bruin (or other)codes for params
       val newParams = params.flatMap(x => x._1 match {

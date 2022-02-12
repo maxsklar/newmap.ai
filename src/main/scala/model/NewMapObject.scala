@@ -34,7 +34,7 @@ case class IdentifierParam(name: String, nType: NewMapSubtype) extends LambdaPar
 //case class AsTypePattern(pattern: NewMapObject, nType: NewMapSubtype) extends NewMapObject
 
 // Different from a hard identifier, this establishes variable in a pattern match
-//case class IdentifierPattern(name: String) extends NewMapObject
+case class IdentifierPattern(name: String, nType: NewMapSubtype) extends NewMapObject
 
 
 // Perhaps redo this - rebrand as a special case of mapInstance! (crazy idea)
@@ -77,15 +77,6 @@ case object IncrementFunc extends NewMapObject
 case class StructInstance(value: Vector[(NewMapObject, NewMapObject)], structType: StructT) extends NewMapObject
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject
-
-// The type inputs a case class and outputs a type - so for each case it creates a function to that type
-// Generally of type Case(params) => T
-//case class MatchInstance(
-//  patterns: NewMapObject // This must be of type MapType(C, T, default)
-  // Where C: the case type that this refers to
-  // T: the output type
-  // default: the "else" clause
-//)
 
 // Basic Function Section
 // These are pre-defined functions, their types are in comment
