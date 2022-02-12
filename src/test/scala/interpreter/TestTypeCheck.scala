@@ -14,13 +14,20 @@ class TestTypeCheck extends FlatSpec {
     }
   }
 
-  "A variable" should " be interpreted correctly" in {
-    TypeChecker(IdentifierParse("x")) match {
+  "A variable" should " be interpreted correctly is forced as an identifier" in {
+    TypeChecker(IdentifierParse("x", true)) match {
       case Success(result) => {
         assert(result == IdentifierInstance("x"))
       }
   	  case Failure(reason) => fail(reason)
   	}
+  }
+
+  it should " fail if it's an unbound identifier identifier" in {
+    TypeChecker(IdentifierParse("x", false)) match {
+      case Success(result) => fail("Failed to detect unbound identifier x")
+      case Failure(reason) => ()
+    }
   }
 
   "A keyword " should " be interpreted as that keyword" in {

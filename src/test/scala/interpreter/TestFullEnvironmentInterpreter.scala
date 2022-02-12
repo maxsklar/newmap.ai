@@ -359,7 +359,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be usable" in {
     testCodeScript(Vector(
       CodeExpectation("val id: (Any => Any) = t => t", GeneralSuccessCheck),
-      CodeExpectation("id hi", GeneralSuccessCheck),
+      CodeExpectation("id ~hi", GeneralSuccessCheck),
       CodeExpectation("id 5", GeneralSuccessCheck),
     ))
   }

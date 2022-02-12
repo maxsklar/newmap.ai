@@ -11,8 +11,8 @@ case class IdentifierInstance(s: String) extends NewMapObject
 
 case class Index(i: Long) extends NewMapObject
 
-// Idea: create a MapInstance object that only has values and does not extend NewMapObject
-// - Then, combine it with other fields in other objects to create what we want
+// Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
+//  we should be able to just give values and not keys if we provide the whole thing
 case class MapInstance(
   values: Vector[(NewMapObject, NewMapObject)],
   mapType: MapT
@@ -23,10 +23,19 @@ sealed abstract class LambdaParamStrategy
 
 // The parameter type is a struct, and the name of the parameters is how the values are called
 // The input NewMapObject values must be closed and evaluated
+// TODO - remove with patterns
 case class StructParams(params: Vector[(NewMapObject, NewMapSubtype)]) extends LambdaParamStrategy
 
 // The parameter is named by an identifier
+// TODO - remove with patterns
 case class IdentifierParam(name: String, nType: NewMapSubtype) extends LambdaParamStrategy
+
+// When mattern matching, we want to have a case where we want to know if this pattern equals this type
+//case class AsTypePattern(pattern: NewMapObject, nType: NewMapSubtype) extends NewMapObject
+
+// Different from a hard identifier, this establishes variable in a pattern match
+//case class IdentifierPattern(name: String) extends NewMapObject
+
 
 // Perhaps redo this - rebrand as a special case of mapInstance! (crazy idea)
 case class LambdaInstance(

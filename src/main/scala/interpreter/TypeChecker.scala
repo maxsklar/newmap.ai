@@ -23,6 +23,7 @@ object TypeChecker {
         expectedType match {
           case Some(expType) => {
             // TODO: this is so awkard! Fix
+            // - perhaps when NewMapType == NewMapObject, we can combine the 2 concepts
             RetrieveType.getParentType(expType) match {
               case TypeT => {
                 val proposedObject = NewMapO.rangeT(i)
@@ -39,10 +40,15 @@ object TypeChecker {
       }
       case IdentifierParse(s: String, true) => Success(IdentifierInstance(s))
       case IdentifierParse(s: String, false) => {
-        // TODO: Make sure that we are getting the expected type
-        env.lookup(s) match {
+        val expectingAnIdentifier = {
+          expectedType.exists(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env).toOption.getOrElse(false))
+        }
+
+        if (expectingAnIdentifier) {
+          Success(IdentifierInstance(s))
+        } else env.lookup(s) match {
           case Some(nObject) => Success(nObject)
-          case None => Success(IdentifierInstance(s))
+          case None => Failure(s"Identifier $s is unknown $expectedType --- ${expectedType.map(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env))}")
         }
       }
       case ApplyParse(startingFunction: ParseTree, input: ParseTree) => {

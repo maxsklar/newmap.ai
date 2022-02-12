@@ -246,6 +246,11 @@ object SubtypeUtils {
           isConvertible <- isObjectConvertibleToType(startingObject, singularOutputT, env)
         } yield isConvertible
       }
+      case (SubtypeT(isMember), _) => {
+        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
+        
+        isTypeConvertible(subtypeInputType, endingType, env)
+      }
       case _ => Success(false)
     }
   }
