@@ -17,6 +17,19 @@ object SubtypeUtils {
     } yield proposedObject
   }
 
+  /*
+
+  In genericPatternExists -- look for a struct that matches all its fields!
+
+Vector(
+  (
+    StructInstance(
+      a~Id: a~Ip:(Subtype(<5)),
+      b~Id: b~Ip:(\(Subtype(<5): Subtype(<10)))
+    ),
+    b~Po:(\(Subtype(<5): Subtype(<10))) a~Po:(Subtype(<5))))
+  */
+
   // For ReqMaps, we need to ensure that all of the values are accounted for.
   // For Maps, we want to know that the default value is never used
   def doMapValuesCoverType(
@@ -27,18 +40,27 @@ object SubtypeUtils {
 
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
-    val genericPatternExists = keys.exists(key => key match {
-      case IdentifierPattern(_, _) => true
-      case _ => false
-    })
+    // - In the future, we want to know if the keys as a group have all the patterns to cover the type
+    val genericPatternExists = keys.exists(isGenericPattern(_))
 
-    if (genericPatternExists) Success(true)
+    if (genericPatternExists) {
+      Success(true)
+    }
     else {
       for {
         keysToMatch <- enumerateAllValuesIfPossible(nType)
       } yield {
         (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
       }
+    }
+  }
+
+  // Returns true if the object is a pattern that will match everything in the type
+  def isGenericPattern(pattern: NewMapObject): Boolean = {
+    pattern match {
+      case IdentifierPattern(_, _) => true
+      case StructInstance(values, _) if (values.map(_._2).forall(isGenericPattern(_))) => true
+      case _ => false
     }
   }
 
@@ -180,8 +202,10 @@ object SubtypeUtils {
           case FullFunction => (endingFeatureSet == FullFunction)
         }
 
-        // TODO: We may be able to convert between different completeness types, but add this as needed
-        val isMapCompletenessConvertible = (startingCompleteness == endingCompleteness)
+        // TODO: This is not entirely true
+        // I think we can convert these (so long as the feature set is compatible) - but conversion from
+        //  CommandOutput might require adding a default pattern
+        val isMapCompletenessConvertible = true
 
         val inputTypesConvertible = {
           //isTypeConvertible(endingInputType, startingInputType, env)

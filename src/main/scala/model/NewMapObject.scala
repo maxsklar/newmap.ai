@@ -69,10 +69,8 @@ case object IncrementFunc extends NewMapObject
 
 // This one is a little different/complex because each object has a unique type as defined by the struct
 // TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
-// TODO(2022): the first value should be "NewMapObject" instead of string, but this might hurt the
-//  type-checker/evaluator for now - change soon!
-// TODO - revive this version!!
-//case class StructInstance(value: Vector[(NewMapObject, NewMapObject)], structType: StructT) extends NewMapObject
+// - That could cause problems because maps don't have to be finite
+// - Then again, an infinite struct could open up possibilities!!
 // The input NewMapObject values must be closed and evaluated
 case class StructInstance(value: Vector[(NewMapObject, NewMapObject)], structType: StructT) extends NewMapObject
 

@@ -53,7 +53,13 @@ object TypeChecker {
           Success(IdentifierPattern(s, nType))
         } else env.lookup(s) match {
           case Some(nObject) => Success(nObject)
-          case None => Failure(s"Identifier $s is unknown $expectedType --- ${expectedType.map(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env))}")
+          case None => {
+            /*if (s == "a") {
+              println(s"Identifier $s is unknown $expectedType")
+              throw new Exception()
+            }*/
+            Failure(s"Identifier $s is unknown $expectedType --- ${expectedType.map(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env))}")
+          }
         }
       }
       case ApplyParse(startingFunction: ParseTree, input: ParseTree) => {
@@ -131,7 +137,7 @@ object TypeChecker {
           case Some(StructT(params)) => {
             for {
               parameterList <- structParamsIntoParameterList(params)
-              result <- typeCheckStruct(parameterList, values, env)
+              result <- typeCheckStruct(parameterList, values, env, inPattern)
             } yield {
               StructInstance(result, StructT(params))
             }
@@ -274,6 +280,14 @@ object TypeChecker {
       // Check that the object is part of the required subtype if given
       // Is it possible that this will always be true given the code above?
       // Once we can verify this, maybe we can remove this code
+
+      /*_ = if (expectedType == Some(TypeT)) {
+        println("\nAbout to call attempt to convert to type")
+        println(s"Original parsed expression: $expression")
+        println(s"Resulting Object: $nObject")
+        println(s"Expected Type: $expectedType")
+      }*/
+
       nObjectConverted <- expectedType match {
         case Some(typeExpected) => SubtypeUtils.attemptToConvertToType(nObject, typeExpected, env)
         case None => Success(nObject)
@@ -490,7 +504,8 @@ object TypeChecker {
   def typeCheckStruct(
     parameterList: Vector[(NewMapObject, NewMapObject)],
     valueList: Vector[ParseTree],
-    env: Environment
+    env: Environment,
+    inPattern: Boolean
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
@@ -502,13 +517,13 @@ object TypeChecker {
         valueIdOpt match {
           case Some(valueId) if (paramId == valueId) => {
             for {
-              tc <- typeCheck(valueObject, Some(typeOfIdentifier), env)
+              tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
 
               substObj = MakeSubstitution(tc, env)
 
               envCommand = FullEnvironmentCommand(paramId, substObj)
               newEnv = env.newCommand(envCommand)
-              result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
+              result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv, inPattern)
             } yield {
               (paramId, substObj) +: result
             }
@@ -524,11 +539,11 @@ object TypeChecker {
       case (((IdentifierInstance(paramId), typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
         for {
-          tc <- typeCheck(valueObject, Some(typeOfIdentifier), env)
+          tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
           substObj = MakeSubstitution(tc, env)
           envCommand = Environment.eCommand(paramId, substObj)
           newEnv = env.newCommand(envCommand)
-          result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv)
+          result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv, inPattern)
         } yield {
           (IdentifierInstance(paramId), substObj) +: result
         }

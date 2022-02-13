@@ -237,6 +237,7 @@ object Evaluator {
     //Evaluate(input, env)
     
     (func, input) match {
+      case (_, ParameterObj(s, _)) => Success(UnableToApplyDueToUnknownInput)
       case (LambdaInstance(IdentifierParam(id, nType), expression), param) => {
         val newEnv = env.newCommand(Environment.eCommand(id, param))
         val substitutedExpression = MakeSubstitution(expression, newEnv)
@@ -339,10 +340,13 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
-        val newEnvIfMatched = attemptPatternMatch(pattern, input, env)
-        newEnvIfMatched match {
-          case Some(newEnv) => this(MakeSubstitution(answer, newEnv), env)
-          case None => attemptPatternMatchInOrder(addlPatterns, input, env)
+        val newEnvCommandsIfMatched = attemptPatternMatch(pattern, input, env)
+        newEnvCommandsIfMatched match {
+          case Success(envCommands) => {
+            val newEnv = env.newCommands(envCommands)
+            this(MakeSubstitution(answer, newEnv), env)
+          }
+          case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
       case _ => Failure(s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there")
@@ -353,14 +357,39 @@ object Evaluator {
     pattern: NewMapObject,
     input: NewMapObject,
     env: Environment
-  ): Option[Environment] = pattern match {
-    // TODO: this is too basic of a pattern match!
-    // - Also, do we have control over the order of patterns?
-    case IdentifierPattern(param, _) => {
-      Some(env.newCommand(FullEnvironmentCommand(IdentifierInstance(param), input)))
+  ): Outcome[Vector[FullEnvironmentCommand], String] = {
+    // TODO: this is too basic of a pattern match! Fill in the gaps
+    pattern match {
+      
+      case IdentifierPattern(param, _) => {
+        Success(Vector(FullEnvironmentCommand(IdentifierInstance(param), input)))
+      }
+      case StructInstance(values, _) => patternMatchOnStruct(values, input, env)
+      case _ if (pattern == input) => Success(Vector.empty)
+      case _ => Failure("Failed Pattern Match")
     }
-    case _ if (pattern == input) => Some(env)
-    case _ => None
+  }
+
+  def patternMatchOnStruct(
+    structPattern: Vector[(NewMapObject, NewMapObject)],
+    input: NewMapObject,
+    env: Environment
+  ): Outcome[Vector[FullEnvironmentCommand], String] = {
+    structPattern match {
+      case (firstField, firstPattern) +: restOfPattern => {
+        for {
+          result <- accessFieldAttempt(input, firstField, env)
+          envCommands <- attemptPatternMatch(firstPattern, result, env)
+
+          newEnv = env.newCommands(envCommands)
+
+          restOfEnvCommands <- patternMatchOnStruct(restOfPattern, input, newEnv)
+        } yield {
+          envCommands ++ restOfEnvCommands
+        }
+      }
+      case _ => Success(Vector.empty) // No patterns to match
+    }
   }
 
   def updateEnvironmentWithParamValues(

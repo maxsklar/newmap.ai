@@ -160,6 +160,53 @@ object Environment {
 
   def i(s: String): NewMapObject = IdentifierInstance(s)
 
+  // Somewhat complex for now, but this is how a pattern/function definition is built up!
+  // In code, this should be done somewhat automatically
+  def buildDefinitionWithParameters(
+    inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
+    expression: NewMapObject 
+  ): NewMapObject = {
+    val Fields = MapInstance(
+      inputs.map(x => i(x._1) -> Index(1)),
+      MapT(IdentifierT, NewMapO.rangeT(2), RequireCompleteness, SimpleFunction)
+    )
+
+    val structT = StructT(
+      MapInstance(
+        inputs.map(x => i(x._1) -> x._2),
+        MapT(Fields, TypeT, RequireCompleteness, SimpleFunction)
+      )
+    )
+
+    val structI = StructInstance(
+      inputs.map(x => IdentifierInstance(x._1) -> IdentifierPattern(x._1, x._2)),
+      structT
+    )
+
+    MapInstance(
+      values = Vector(structI -> expression),
+      mapType = MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
+    )
+  }
+
+  MapInstance(
+    values = Vector(
+      STRUCT_PATTERN -> (
+        StructT(
+          ParameterObj(
+            "structParams",
+            MapT(
+              ParameterObj("fieldType", TypeT),
+              TypeT,
+              RequireCompleteness,
+              SimpleFunction
+            )
+          )
+        )
+      )
+    ),
+    mapType = MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
+  )
 
   val Base: Environment = Environment().newCommands(Vector(
     eCommand("Any", AnyT),
@@ -167,31 +214,24 @@ object Environment {
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
     eCommand("Increment", IncrementFunc),
-    eCommand("Map", LambdaInstance(
-      paramStrategy = StructParams(Vector(
-        i("key") -> TypeT,
-        i("value") -> NewMapO.commandT
-      )),
-      expression = MapT(
+    eCommand("Map", buildDefinitionWithParameters(
+      Vector("key" -> TypeT, "value" -> NewMapO.commandT),
+      MapT(
         ParameterObj("key", TypeT),
         ParameterObj("value", NewMapO.commandT),
         CommandOutput,
         BasicMap
       )
     )),
-    eCommand("ReqMap", LambdaInstance(
-      paramStrategy = StructParams(Vector(
-        i("key") -> TypeT,
-        i("value") -> TypeT
-      )),
-      expression = MapT(
+    eCommand("ReqMap", buildDefinitionWithParameters(
+      Vector("key" -> TypeT, "value" -> TypeT),
+      MapT(
         ParameterObj("key", TypeT),
         ParameterObj("value", TypeT),
         RequireCompleteness,
         SimpleFunction
       )
     )),
-    
     eCommand("Struct", LambdaInstance(
       paramStrategy = StructParams(Vector(
         i("fieldType") -> TypeT,

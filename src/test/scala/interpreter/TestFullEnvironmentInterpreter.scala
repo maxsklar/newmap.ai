@@ -311,12 +311,21 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should "be creatable without a type given" in {
+  it should " work with a struct input" in {
+    testCodeScript(Vector(
+      CodeExpectation("val fSig: Type = (a: 5, b: (5 => 10)) => 10", GeneralSuccessCheck),
+      CodeExpectation("val f: fSig = ((a, b): b a)", GeneralSuccessCheck),
+      CodeExpectation("val m: Map(5, 10) = (0: 0, 1: 2, 2: 4, 3: 6, 4: 8)", GeneralSuccessCheck),
+      CodeExpectation("f (1, m)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2))))
+    ))
+  }
+
+  it should " be creatable without a type given" in {
     val line = "val f = (t: t)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
 
-  it should "be able to infer the function type" in {
+  it should " be able to infer the function type" in {
     testCodeScript(Vector(
       CodeExpectation("val x: 12 = 6", GeneralSuccessCheck),
       CodeExpectation("(6: 10, 1: 3, 2: 1) x", GeneralSuccessCheck)
