@@ -37,6 +37,7 @@ class EnvironmentInterpreter() {
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
       }
+      case ":uuid" => CommandPrintSomething(java.util.UUID.randomUUID.toString)
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
@@ -77,10 +78,7 @@ class EnvironmentInterpreter() {
 object EnvironmentInterpreter {
   // TODO(2022): REDO ALL OF THESE COMMAND TYPES!
   val initialCommands: Vector[String] = Vector(
-    "val MutableDescriptor: Type = Struct(versionType: (Count => Type), init: (versionType 0), commandType: Type, update: ((version: Count, current: versionType version, command: commandType) => versionType (increment version)))",
-    "val CounterV: MutableDescriptor = (versionType: ((n: Count) => Count), init: 0, commandType: Struct(), update: ((version: Count, current: versionType version, command: commandType) => increment current))",
-    "val StackV: ((T: Type, default: T) => MutableDescriptor) = (T: Type, default: T) => (versionType: ((n: Count) => T), init: default, commandType: T, update: ((version: Count, current: versionType version, command: commandType) => command))",
-    "val SequenceV: ((T: Type, default: T) => MutableDescriptor) = (T: Type, default: T) => (versionType: ((n: Count) => Map n T default), init: (), commandType: T, update: ((version: Count, current: versionType version, command: commandType) => appendSeq version commandType default current command))",
-    "val MapV: ((keyType: Type, valueType: Type, default: valueType) => MutableDescriptor) = (keyType: Type, valueType: Type, default: valueType) => (versionType: ((n: Count) => Map keyType valueType default), init: (), commandType: Map keyType valueType default, update: ((version: Count, current: versionType version, command: commandType) => appendMap keyType valueType default current command))"
+    "val Byte: Type = 8 => 2",
+    "val Char: Type = 16 => 2"
   )
 }

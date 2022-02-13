@@ -189,25 +189,6 @@ object Environment {
     )
   }
 
-  MapInstance(
-    values = Vector(
-      STRUCT_PATTERN -> (
-        StructT(
-          ParameterObj(
-            "structParams",
-            MapT(
-              ParameterObj("fieldType", TypeT),
-              TypeT,
-              RequireCompleteness,
-              SimpleFunction
-            )
-          )
-        )
-      )
-    ),
-    mapType = MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
-  )
-
   val Base: Environment = Environment().newCommands(Vector(
     eCommand("Any", AnyT),
     eCommand("Type", TypeT),

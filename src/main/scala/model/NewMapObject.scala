@@ -151,6 +151,22 @@ case class SubtypeT(
   isMember: NewMapObject
 ) extends NewMapObject
 
+// This is a custom type of nodes that are unique
+/*case class CustomT(
+  uuid: String,
+  ordered: Boolean,
+  items: Vector[NewMapObject] // could there be uuids in here? Any other possibilities 
+)*/
+
+//def uuid = java.util.UUID.randomUUID.toString
+
+
+/*case class MutableObject(
+  version: Long,
+  nCurrent: NewMapObject,
+  nType: NewMapObject // This is in IsCommandFunc = true
+) extends NewMapObject*/
+
 // Figure this out!
 /*case class GenericType(
   parameters: Vector[(String, TypeParameter)],
@@ -179,4 +195,13 @@ object NewMapO {
   // - You can give it commands to change the value
   // - You can potentially have versions available.
   def commandT: NewMapObject = SubtypeT(IsCommandFunc)
+
+  // For now, store a sequence as a map
+  // TODO - this will get more efficient later on!
+  def smallFiniteSequence(items: Vector[NewMapObject], nType: NewMapObject): NewMapObject = {
+    MapInstance(
+      items.zipWithIndex.map(x => Index(x._2) -> x._1),
+      MapT(rangeT(items.length), nType, RequireCompleteness, BasicMap)
+    )
+  }
 }
