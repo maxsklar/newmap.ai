@@ -119,7 +119,7 @@ object Environment {
       SubtypeT(
         MapInstance(
           params.map(x => IdentifierInstance(x._1) -> Index(1)),
-          MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
+          MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
         )
       )
     }
@@ -136,7 +136,7 @@ object Environment {
       SubtypeT(
         MapInstance(
           params.map(x => IdentifierInstance(x._1) -> Index(1)),
-          MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
+          MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
         )
       )
     }
@@ -166,10 +166,10 @@ object Environment {
     inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
     expression: NewMapObject 
   ): NewMapObject = {
-    val Fields = MapInstance(
+    val Fields = SubtypeT(MapInstance(
       inputs.map(x => i(x._1) -> Index(1)),
-      MapT(IdentifierT, NewMapO.rangeT(2), RequireCompleteness, SimpleFunction)
-    )
+      MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
+    ))
 
     val structT = StructT(
       MapInstance(
@@ -214,10 +214,10 @@ object Environment {
       )
     )),
     eCommand("Struct", LambdaInstance(
-      paramStrategy = StructParams(Vector(
+      params = Vector(
         i("fieldType") -> TypeT,
         i("structParams") -> MapT(ParameterObj("fieldType", TypeT), TypeT, RequireCompleteness, BasicMap)
-      )),
+      ),
       expression = StructT(
         ParameterObj(
           "structParams",
@@ -230,12 +230,11 @@ object Environment {
         )
       )
     )),
-    // TODO: Case Commands must be added back in
     eCommand("Case", LambdaInstance(
-      paramStrategy = StructParams(Vector(
+      params = Vector(
         i("casesType") -> TypeT,
         i("cases") -> MapT(ParameterObj("casesType", TypeT), TypeT, RequireCompleteness, BasicMap)
-      )),
+      ),
       expression = CaseT(
         ParameterObj(
           "cases",
@@ -249,11 +248,11 @@ object Environment {
       )
     )),
     eCommand("Subtype", LambdaInstance(
-      paramStrategy = StructParams(Vector(
+      params = Vector(
         i("keyType") -> TypeT,
         i("valueType") -> TypeT,
         i("simpleFunction") -> MapT(ParameterObj("keyType", TypeT), ParameterObj("valueType", TypeT), CommandOutput, SimpleFunction)
-      )),
+      ),
       expression = SubtypeT(
         ParameterObj(
           "simpleFunction",

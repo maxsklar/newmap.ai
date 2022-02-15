@@ -54,10 +54,6 @@ object TypeChecker {
         } else env.lookup(s) match {
           case Some(nObject) => Success(nObject)
           case None => {
-            /*if (s == "a") {
-              println(s"Identifier $s is unknown $expectedType")
-              throw new Exception()
-            }*/
             Failure(s"Identifier $s is unknown $expectedType --- ${expectedType.map(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env))}")
           }
         }
@@ -137,7 +133,13 @@ object TypeChecker {
           case Some(StructT(params)) => {
             for {
               parameterList <- structParamsIntoParameterList(params)
-              result <- typeCheckStruct(parameterList, values, env, inPattern)
+              result <- typeCheckStruct(
+                parameterList,
+                RetrieveType.retrieveInputTypeFromFunction(params),
+                values,
+                env,
+                inPattern
+              )
             } yield {
               StructInstance(result, StructT(params))
             }
@@ -267,7 +269,7 @@ object TypeChecker {
             )
           }
           
-          LambdaInstance(StructParams(newParams), tc),
+          LambdaInstance(newParams, tc),
         }
       }
     }
@@ -503,49 +505,50 @@ object TypeChecker {
    */
   def typeCheckStruct(
     parameterList: Vector[(NewMapObject, NewMapObject)],
+    nTypeForStructFieldName: NewMapObject,
     valueList: Vector[ParseTree],
     env: Environment,
     inPattern: Boolean
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
-        val valueIdOpt = checkForIdentifier(valueIdentifier, env) match {
-          case FoundIdentifier(name) => Some(IdentifierInstance(name))
-          case _ => None
-        }
+        for {
+          valueId <- typeCheck(valueIdentifier, Some(nTypeForStructFieldName), env, inPattern)
 
-        valueIdOpt match {
-          case Some(valueId) if (paramId == valueId) => {
-            for {
-              tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
+          _ <- Outcome.failWhen(paramId != valueId, s"Ids don't match: $paramId --- $valueId")
 
-              substObj = MakeSubstitution(tc, env)
+          tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
+          substObj = MakeSubstitution(tc, env)
 
-              envCommand = FullEnvironmentCommand(paramId, substObj)
-              newEnv = env.newCommand(envCommand)
-              result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv, inPattern)
-            } yield {
-              (paramId, substObj) +: result
+          newEnv = paramId match {
+            case IdentifierInstance(s) => {
+              env.newCommand(FullEnvironmentCommand(paramId, substObj))
             }
+            case _ => env
           }
-          case Some(valueId) => {
-            Failure("Ids don't match: " + paramId + " --- " + valueId)
-          }
-          case None => {
-            Failure("Id not found for " + paramId)
-          }
+
+          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, newEnv, inPattern)
+        } yield {
+          (paramId, substObj) +: result
         }
       }      
-      case (((IdentifierInstance(paramId), typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
         for {
           tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
+          
           substObj = MakeSubstitution(tc, env)
-          envCommand = Environment.eCommand(paramId, substObj)
-          newEnv = env.newCommand(envCommand)
-          result <- typeCheckStruct(restOfParamList, restOfValueList, newEnv, inPattern)
+
+          newEnv = paramId match {
+            case IdentifierInstance(s) => {
+              env.newCommand(FullEnvironmentCommand(paramId, substObj))
+            }
+            case _ => env
+          }
+
+          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, newEnv, inPattern)
         } yield {
-          (IdentifierInstance(paramId), substObj) +: result
+          (paramId, substObj) +: result
         }
       }
       case _ => {

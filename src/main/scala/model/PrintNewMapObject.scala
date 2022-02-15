@@ -27,23 +27,16 @@ object PrintNewMapObject {
         }  
       }
     }
-    case MapInstance(values, MapT(_, _, _, featureSet)) => s"MI:${mapToString(values)}"
-    case LambdaInstance(lambdaParams, expression) => {
+    case MapInstance(values, mapT) => s"MI:${mapToString(values)}~${this(mapT)}"
+    case LambdaInstance(params, expression) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("(")
       var bindings: Vector[String] = Vector.empty
 
-      lambdaParams match {
-        case StructParams(params) => {
-          for {
-            (k, v) <- params
-          } {
-            bindings :+= k + ": " + this(v)
-          }
-        }
-        case IdentifierParam(name, typeAsObj) => {
-          bindings :+= name + ": " + this(typeAsObj)
-        }
+      for {
+        (k, v) <- params
+      } {
+        bindings :+= k + ": " + this(v)
       }
 
       sb.append(bindings.mkString(", "))
@@ -59,7 +52,7 @@ object PrintNewMapObject {
     case IdentifierPattern(name, nType) => s"$name~Ip:(${this(nType)})"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
-    case StructInstance(value, _) => {
+    case StructInstance(value, structT) => {
       val sb: StringBuilder = new StringBuilder()
       sb.append("StructInstance(")
       var bindings: Vector[String] = Vector.empty

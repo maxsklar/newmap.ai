@@ -22,12 +22,12 @@ object Evaluator {
           evalValues <- evalMapInstanceVals(values, env)
         } yield mi.copy(values = evalValues)
       }
-      case LambdaInstance(lambdaParams, expression) => {
-        val newEnv = includeLambdaParams(lambdaParams, env)
+      case LambdaInstance(params, expression) => {
+        val newEnv = includeParams(params, env)
         for {
           evalExpression <- this(expression, newEnv)
         } yield {
-          LambdaInstance(lambdaParams, evalExpression)
+          LambdaInstance(params, evalExpression)
         }
       }
       case ApplyFunction(func, input) => {
@@ -148,27 +148,12 @@ object Evaluator {
       for {
         evalK <- this(k, env)
         evalV <- this(v, env)
-
-        // TODO: I'm not sure if this is the best place to be altering the Environment
-        // Could the env be altered here when it shouldn't be??
-        newEnv = extractIdentifier(evalK) match {
-          case Some(s) => env.newParam(s, evalV)
-          case _ => env
-        }
-
-        evalRest <- evalMapInstanceVals(restOfValues, newEnv)
+        evalRest <- evalMapInstanceVals(restOfValues, env)
       } yield {
         (evalK -> evalV) +: evalRest
       }
     }
     case _ => Success(Vector.empty)
-  }
-
-  def extractIdentifier(nObject: NewMapObject): Option[String] = {
-    nObject match {
-      case IdentifierInstance(s) => Some(s)
-      case _ => None 
-    }
   }
 
   def evalParameters(
@@ -211,9 +196,18 @@ object Evaluator {
           // TODO: do we need to do this check if the input is type checked?
           result <- quickApplyFunctionAttempt(cases, field, env)
         } yield {
-          LambdaInstance(
-            IdentifierParam("input", RetrieveType.retrieveInputTypeFromFunction(cases)),
-            CaseInstance(field, ParameterObj("input", RetrieveType.retrieveInputTypeFromFunction(cases)), caseT)
+          val caseInputType = RetrieveType.retrieveInputTypeFromFunction(cases)
+
+          MapInstance(
+            Vector(
+              IdentifierPattern("input", result) ->
+                CaseInstance(
+                  field,
+                  ParameterObj("input", result),
+                  caseT
+                )
+            ),
+            MapT(result, caseT, RequireCompleteness, SimpleFunction)
           )
         }
       }
@@ -238,22 +232,14 @@ object Evaluator {
     
     (func, input) match {
       case (_, ParameterObj(s, _)) => Success(UnableToApplyDueToUnknownInput)
-      case (LambdaInstance(IdentifierParam(id, nType), expression), param) => {
-        val newEnv = env.newCommand(Environment.eCommand(id, param))
-        val substitutedExpression = MakeSubstitution(expression, newEnv)
-
-        for {
-          result <- this(substitutedExpression, env)
-        } yield AbleToApplyFunction(result)
-      }
-      case (LambdaInstance(StructParams(params), expression), StructInstance(paramValues, _)) => {
+      case (LambdaInstance(params, expression), StructInstance(paramValues, _)) => {
         for {
           newEnv <- updateEnvironmentWithParamValues(params, paramValues, env)
           substitutedExpression = MakeSubstitution(expression, newEnv)
           result <- this(substitutedExpression, env)
         } yield AbleToApplyFunction(result)
       }
-      case (LambdaInstance(StructParams(params), expression), param) if (params.length == 1) => {
+      case (LambdaInstance(params, expression), param) if (params.length == 1) => {
         val (id, nType) = params.head
         val newEnv = env.newCommand(FullEnvironmentCommand(id, param))
         val substitutedExpression = MakeSubstitution(expression, newEnv)
@@ -262,7 +248,7 @@ object Evaluator {
         } yield AbleToApplyFunction(result)
       }
       //TODO(2022): Can this be removed?
-      /*case (LambdaInstance(StructParams(params), expression), firstParamValue) => {
+      /*case (LambdaInstance(params, expression), firstParamValue) => {
         // This is the case where the function accepts a Struct as input (multiple parameters),
         // And we are only passing in the first parameter to the function
         for {
@@ -278,7 +264,7 @@ object Evaluator {
               param._1 -> MakeSubstitution(param._2, newEnv)
             })
 
-            LambdaInstance(StructParams(newParams), substitutedExpression)
+            LambdaInstance(newParams, substitutedExpression)
           }
 
           result <- this(NewMapObjectWithType.untyped(paramErasedExpression), env)
@@ -413,18 +399,6 @@ object Evaluator {
       }
       // TODO - what if one is longer than the other
       case _ => Success(env)
-    }
-  }
-
-  def includeLambdaParams(
-    lambdaParams: LambdaParamStrategy,
-    env: Environment
-  ): Environment = {
-    lambdaParams match {
-      case StructParams(params) => {
-        includeParams(params, env)
-      }
-      case IdentifierParam(param, typeAsObj) => includeParams(Vector(IdentifierInstance(param) -> typeAsObj), env)
     }
   }
 

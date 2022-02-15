@@ -18,18 +18,6 @@ case class MapInstance(
   mapType: MapT
 ) extends NewMapObject
 
-// There are several different ways items can be passed into a lambda expression
-sealed abstract class LambdaParamStrategy
-
-// The parameter type is a struct, and the name of the parameters is how the values are called
-// The input NewMapObject values must be closed and evaluated
-// TODO - remove with patterns
-case class StructParams(params: Vector[(NewMapObject, NewMapObject)]) extends LambdaParamStrategy
-
-// The parameter is named by an identifier
-// TODO - remove with patterns
-case class IdentifierParam(name: String, nType: NewMapObject) extends LambdaParamStrategy
-
 // When mattern matching, we want to have a case where we want to know if this pattern equals this type
 //case class AsTypePattern(pattern: NewMapObject, nType: NewMapObject) extends NewMapObject
 
@@ -38,8 +26,9 @@ case class IdentifierPattern(name: String, nType: NewMapObject) extends NewMapOb
 
 
 // Perhaps redo this - rebrand as a special case of mapInstance! (crazy idea)
+// The input NewMapObject values must be closed and evaluated
 case class LambdaInstance(
-  paramStrategy: LambdaParamStrategy,
+  params: Vector[(NewMapObject, NewMapObject)],
   expression: NewMapObject
 ) extends NewMapObject
 

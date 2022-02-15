@@ -15,26 +15,22 @@ object RetrieveType {
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
     case MapInstance(values, mapT) => mapT
     case LambdaInstance(params, expression) => {
-      val inputType = params match {
-        case StructParams(params) => {
-          val fieldType = {
-            SubtypeT(
-              MapInstance(
-                params.map(x => x._1 -> Index(1)),
-                MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
-              )
-            )
-          }
-
-          val structParams = MapInstance(
-            params.map(x => x._1 -> x._2),
-            MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
+      val fieldType = {
+        SubtypeT(
+          MapInstance(
+            params.map(x => x._1 -> Index(1)),
+            MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
           )
-
-          StructT(structParams)
-        }
-        case IdentifierParam(_, nType) => nType
+        )
       }
+
+      val structParams = MapInstance(
+        params.map(x => x._1 -> x._2),
+        MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
+      )
+
+
+      val inputType = StructT(structParams)
 
       // TODO - this should take a new environment
       val outputType = this(expression)
@@ -109,17 +105,13 @@ object RetrieveType {
     }
     case ParameterObj(name, _) => knownVariables.contains(name)
     case IdentifierPattern(_, _) => false
-    case LambdaInstance(StructParams(params), expression) => {
+    case LambdaInstance(params, expression) => {
       // TODO - change this when we start using de bruin (or other)codes for params
       val newParams = params.flatMap(x => x._1 match {
         case IdentifierInstance(s) => Some(s)
         case _ => None
       })
       isTermClosedLiteral(expression, knownVariables ++ newParams)
-    }
-    case LambdaInstance(IdentifierParam(name, _), expression) => {
-      // TODO - change this when we start using de bruin (or other) codes for params
-      isTermClosedLiteral(expression, knownVariables :+ name)
     }
     case ApplyFunction(func, input) => {
       isTermClosedLiteral(func, knownVariables) &&

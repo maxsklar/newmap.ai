@@ -236,6 +236,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be creatable with numerical indecies" in {
+    testCodeScript(Vector(
+      CodeExpectation("val s: Struct(2, (0: Type, 1: 10)) = (Count, 6)", GeneralSuccessCheck)
+    ))
+  }
+
   "A Map to a non-command type " should " not be creatable" in {
     testLineFails("val m: Map (Identifier, Type) = (a: 6)")
   }

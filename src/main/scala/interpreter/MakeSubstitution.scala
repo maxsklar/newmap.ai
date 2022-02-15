@@ -72,7 +72,7 @@ object MakeSubstitution {
       }
       case LambdaInstance(params, expression) => {
         // TODO - any way to remove reliance on the evaluator?
-        val newEnv = Evaluator.includeLambdaParams(params, env)
+        val newEnv = Evaluator.includeParams(params, env)
         val newExpression = this(expression, newEnv)
         LambdaInstance(params, newExpression)
       }
