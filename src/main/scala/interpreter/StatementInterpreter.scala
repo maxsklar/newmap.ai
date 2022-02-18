@@ -17,7 +17,7 @@ object StatementInterpreter {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
           nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
-          tc <- TypeChecker.typeCheck(objExpression, Some(nType), env)
+          tc <- TypeChecker.typeCheck(objExpression, nType, env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
           Vector(FullEnvironmentCommand(IdentifierInstance(id.s), evaluatedObject))
@@ -25,7 +25,7 @@ object StatementInterpreter {
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
-          tc <- TypeChecker.typeCheck(objExpression, None, env)
+          tc <- TypeChecker.typeCheck(objExpression, AnyT, env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
           Vector(FullEnvironmentCommand(IdentifierInstance(id.s), evaluatedObject))
@@ -33,7 +33,7 @@ object StatementInterpreter {
       }
       case ExpressionOnlyStatementParse(exp) => {
         for {
-          tc <- TypeChecker.typeCheck(exp, None, env)
+          tc <- TypeChecker.typeCheck(exp, AnyT, env)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
           Vector(ExpOnlyEnvironmentCommand(evaluatedObject))

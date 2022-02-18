@@ -112,6 +112,7 @@ case class MapT(
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
 object CommandOutput extends MapCompleteness
+object SubtypeInput extends MapCompleteness
 
 sealed abstract class MapFeatureSet
 object BasicMap extends MapFeatureSet

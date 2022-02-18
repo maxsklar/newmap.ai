@@ -13,7 +13,7 @@ object TypeChecker {
    */
   def typeCheck(
     expression: ParseTree,
-    expectedType: Option[NewMapObject],
+    expectedType: NewMapObject,
     env: Environment,
     inPattern: Boolean = false
   ): Outcome[NewMapObject, String] = {
@@ -22,64 +22,50 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     val result = expression match {
       case NaturalNumberParse(i: Long) => {
-        expectedType match {
-          case Some(expType) => {
-            // TODO: this is so awkard! Fix
-            // - perhaps we can combine the 2 concepts
-            RetrieveType.getParentType(expType) match {
-              case TypeT => {
-                val proposedObject = NewMapO.rangeT(i)
-                SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expType, env)
-              }
-              case _ => {
-                val proposedObject = Index(i)
-                SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expType, env)
-              }
-            }
+        // TODO: this is so awkard! Fix
+        // - perhaps we can combine the 2 concepts
+        RetrieveType.getParentType(expectedType) match {
+          case TypeT => {
+            val proposedObject = NewMapO.rangeT(i)
+            SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expectedType, env)
           }
-          case None => Success(Index(i))
+          case _ => {
+            val proposedObject = Index(i)
+            SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expectedType, env)
+          }
         }
       }
       case IdentifierParse(s: String, true) => Success(IdentifierInstance(s))
       case IdentifierParse(s: String, false) => {
         val expectingAnIdentifier = {
-          expectedType.exists(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env).toOption.getOrElse(false))
+          SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
         }
 
         if (expectingAnIdentifier) {
           Success(IdentifierInstance(s))
         } else if (inPattern) {
-          val nType = expectedType.getOrElse(AnyT)
-          Success(IdentifierPattern(s, nType))
+          Success(IdentifierPattern(s, expectedType))
         } else env.lookup(s) match {
           case Some(nObject) => Success(nObject)
           case None => {
-            Failure(s"Identifier $s is unknown $expectedType --- ${expectedType.map(expType => SubtypeUtils.isTypeConvertible(expType, IdentifierT, env))}")
+            Failure(s"Identifier $s is unknown $expectedType --- ${SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env)}")
           }
         }
       }
       case ApplyParse(startingFunction: ParseTree, input: ParseTree) => {
         for {
           // TODO: create a typeCheckFunction to handle this specifically
-          functionTypeChecked <- typeCheck(
-            startingFunction,
-            None,
-            env
-          )
+          functionTypeChecked <- typeCheck(startingFunction, AnyT, env)
 
           inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked)
 
-          inputValue <- typeCheck(
-            input,
-            Some(inputType),
-            env
-          )
+          inputValue <- typeCheck(input, inputType, env)
         } yield ApplyFunction(functionTypeChecked, inputValue)
       }
       case FieldAccessParse(struct, field) => {
         for {
           // TODO - build a specialize typeCheck where you expect a struct?
-          typeCheckedStruct <- typeCheck(struct, None, env)
+          typeCheckedStruct <- typeCheck(struct, AnyT, env)
 
           structParams <- typeCheckedStruct match {
             case StructInstance(value, StructT(params)) => Success(params)
@@ -91,7 +77,7 @@ object TypeChecker {
 
           fieldsT = RetrieveType.retrieveInputTypeFromFunction(structParams)
 
-          typeCheckedField <- typeCheck(field, Some(fieldsT), env)
+          typeCheckedField <- typeCheck(field, fieldsT, env)
           
           _ <- Outcome.failWhen(
             !RetrieveType.isTermClosedLiteral(typeCheckedField),
@@ -106,12 +92,10 @@ object TypeChecker {
         } yield AccessField(typeCheckedStruct, evaluatedField)
       }
       case CommandList(values: Vector[ParseTree]) => {
-        expectedType.map(e => {
-          // TODO - looks like we need this for now.. investigate why
-          val substType = MakeSubstitution(e, env)
-          RetrieveType.getParentType(substType)
-        }) match {
-          case Some(mapT@MapT(keyTypeT, valueT, completeness, featureSet)) => {
+        // TODO - looks like we need this for now.. investigate why
+        val substType = MakeSubstitution(expectedType, env)
+        RetrieveType.getParentType(substType) match {
+          case mapT@MapT(keyTypeT, valueT, completeness, featureSet) => {
             for {
               mapValues <- typeCheckLiteralMap(values, mapT, env)
 
@@ -130,7 +114,7 @@ object TypeChecker {
               MapInstance(mapValues, mapT)
             }
           }
-          case Some(StructT(params)) => {
+          case StructT(params) => {
             for {
               parameterList <- structParamsIntoParameterList(params)
               result <- typeCheckStruct(
@@ -144,37 +128,19 @@ object TypeChecker {
               StructInstance(result, StructT(params))
             }
           }
-          case Some(TypeT) => {
+          case TypeT => {
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // TODO - can this be simplified by combining with the MapT section above?
 
-            // Note: This will not be the final type, which will be a subset of identifiers, and
-            //  a RequireCompleteness. However, since we don't know this subset now,
-            //  passing this into typeCheckLiteralMap will make it ignore the fact that not all
-            //  identifiers are accounted for
-            val mapT = MapT(IdentifierT, TypeT, CommandOutput, BasicMap)
+            val mapT = MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
 
             for {
               mapValues <- typeCheckLiteralMap(values, mapT, env)
             } yield {
-              val fieldType = {
-                SubtypeT(
-                  MapInstance(
-                    mapValues.map(x => x._1 -> Index(1)),
-                    MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
-                  )
-                )
-              }
-
-              StructT(
-                MapInstance(
-                  mapValues,
-                  MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
-                )
-              )
+              StructT(MapInstance(mapValues, mapT))
             }
           }
-          case None => {
+          case AnyT => {
             // Steps to implement this:
             // type check all the elements of the map
             // Find a common type. DONT use Any - they should be in the same construction
@@ -187,9 +153,18 @@ object TypeChecker {
         }
       }
       case BindingCommandItem(key, value) => {
-        typeCheck(CommandList(Vector(expression)), expectedType, env)
+        if (inPattern) {
+          // Value is a type requirement and key is a pattern
+          for {
+            typeRequirement <- typeSpecificTypeChecker(value, env, inPattern)
+            result <- typeCheck(key, typeRequirement, env, inPattern)
+          } yield result
+        } else {
+          // TODO - do we need this?
+          typeCheck(CommandList(Vector(expression)), expectedType, env)
+        }
       }
-      case LambdaParse(params, expression) if (expectedType == Some(TypeT)) => {
+      case LambdaParse(params, expression) if (expectedType == TypeT) => {
         for {
           inputType <- typeSpecificTypeChecker(params, env)
           newEnv <- inputType match {
@@ -205,10 +180,11 @@ object TypeChecker {
 
           outputType <- typeSpecificTypeChecker(expression, newEnv)
         } yield {
+          // TODO - how do we indicate completeness and featureSet in the LambdaParse Symbol?
           MapT(
             inputType,
             outputType,
-            completeness = RequireCompleteness,
+            completeness = RequireCompleteness, 
             featureSet = FullFunction
           )
         }
@@ -230,7 +206,7 @@ object TypeChecker {
             case BindingCommandItem(key, value) => typeCheckParameterList(Vector(params), env)
             case IdentifierParse(id, _) => {
               expectedType match {
-                case Some(MapT(inputT, outputType, completeness, featureSet)) => {
+                case MapT(inputT, outputType, completeness, featureSet) => {
                   for {
                     _ <- Outcome.failWhen(featureSet == BasicMap, ErrorMessageForBasicMap)
                   } yield {
@@ -249,28 +225,17 @@ object TypeChecker {
           }
 
           // Calculate the expected output type of the expression
-          expectedExpressionTypeOpt <- expectedType match {
-            case Some(MapT(inputType, outputT, completeness, featureSet)) => {
+          expectedExpressionType <- expectedType match {
+            case MapT(inputType, outputT, completeness, featureSet) => {
               for {
                 _ <- Outcome.failWhen(featureSet == BasicMap, ErrorMessageForBasicMap)
-              } yield Some(outputT)
+              } yield outputT
             }
-            case _ => Success(None)
+            case _ => Success(AnyT)
           }
 
-          tc <- typeCheck(expression, expectedExpressionTypeOpt, env.newParams(newParams))
-        } yield {
-          val fieldType = {
-            SubtypeT(
-              MapInstance(
-                newParams.map(x => x._1 -> Index(1)),
-                MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
-              )
-            )
-          }
-          
-          LambdaInstance(newParams, tc),
-        }
+          tc <- typeCheck(expression, expectedExpressionType, env.newParams(newParams))
+        } yield LambdaInstance(newParams, tc)
       }
     }
 
@@ -283,17 +248,14 @@ object TypeChecker {
       // Is it possible that this will always be true given the code above?
       // Once we can verify this, maybe we can remove this code
 
-      /*_ = if (expectedType == Some(TypeT)) {
+      /*_ = if (nObject == Index(0) || nObject == Index(1) || nObject == Index(2)) {
         println("\nAbout to call attempt to convert to type")
         println(s"Original parsed expression: $expression")
         println(s"Resulting Object: $nObject")
         println(s"Expected Type: $expectedType")
       }*/
 
-      nObjectConverted <- expectedType match {
-        case Some(typeExpected) => SubtypeUtils.attemptToConvertToType(nObject, typeExpected, env)
-        case None => Success(nObject)
-      }
+      nObjectConverted <- SubtypeUtils.attemptToConvertToType(nObject, expectedType, env)
     } yield nObjectConverted
   }
 
@@ -314,7 +276,7 @@ object TypeChecker {
           resultKey <- typeCheckWithPatternMatching(k, keyType, env, patternMatchingAllowed)
           objectFoundKey = resultKey.typeCheckResult
 
-          objectFoundValue <- typeCheck(v, Some(valueType), resultKey.newEnvironment)
+          objectFoundValue <- typeCheck(v, valueType, resultKey.newEnvironment)
 
           restOfMap <- typeCheckLiteralMap(restOfValues, mapT, env)
         } yield {
@@ -340,7 +302,7 @@ object TypeChecker {
     patternMatchingAllowed: Boolean
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     for {
-      tc <- typeCheck(expression, Some(expectedType), env, inPattern = patternMatchingAllowed)
+      tc <- typeCheck(expression, expectedType, env, inPattern = patternMatchingAllowed)
 
     } yield {
       val paramObjVector = findPatternsAndTurnIntoParameters(tc)
@@ -446,7 +408,7 @@ object TypeChecker {
           }
           case FoundIdentifierUnknownValue => {
             for {
-              _ <- typeCheck(typeOfIdentifier, Some(TypeT), env)
+              _ <- typeCheck(typeOfIdentifier, TypeT, env)
               restOfParams <- typeCheckParameterList(otherIdentifiers, env)
             } yield {
               restOfParams
@@ -459,31 +421,6 @@ object TypeChecker {
       }
       case _ => Success(Vector.empty)
     }
-  }
-
-  def typeCheckParamsStandalone(
-    parameterList: Vector[ParseTree],
-    env: Environment,
-    expectedType: NewMapObject
-  ): Outcome[NewMapObject, String] = for {
-    newParams <- typeCheckParameterList(parameterList, env)
-  } yield {
-    paramsToObject(newParams)
-  }
-
-  def paramsToObject(
-    params: Vector[(NewMapObject, NewMapObject)]
-  ): MapInstance = {
-    val fieldType = {
-      SubtypeT(
-        MapInstance(
-          params.map(x => x._1 -> Index(1)),
-          MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
-        )
-      )
-    }
-
-    MapInstance(params, MapT(fieldType, TypeT, RequireCompleteness, BasicMap))
   }
 
   // Assume that params is already type checked
@@ -500,8 +437,8 @@ object TypeChecker {
 
   /*
    * We want to ensure that the struct was created correctly
-   * TODO(2022): This should no longer be the struct checking function because it manipulates the environment
-   * - We use this feature, though, so we need to wait until it's separated out
+   * TODO(2022): Maybe this should no longer be the struct checking function because it manipulates the environment?
+   * - Rethink how all that works. We use this feature
    */
   def typeCheckStruct(
     parameterList: Vector[(NewMapObject, NewMapObject)],
@@ -511,13 +448,13 @@ object TypeChecker {
     inPattern: Boolean
   ): Outcome[Vector[(NewMapObject, NewMapObject)], String] = {
     (parameterList, valueList) match {
-      case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) if (!inPattern) => {
         for {
-          valueId <- typeCheck(valueIdentifier, Some(nTypeForStructFieldName), env, inPattern)
+          valueId <- typeCheck(valueIdentifier, nTypeForStructFieldName, env, inPattern)
 
           _ <- Outcome.failWhen(paramId != valueId, s"Ids don't match: $paramId --- $valueId")
 
-          tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
+          tc <- typeCheck(valueObject, typeOfIdentifier, env, inPattern)
           substObj = MakeSubstitution(tc, env)
 
           newEnv = paramId match {
@@ -531,11 +468,12 @@ object TypeChecker {
         } yield {
           (paramId, substObj) +: result
         }
-      }      
+      }
       case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
+        //println(s"*** In here $valueObject -- $typeOfIdentifier -- $inPattern -- $typeOfIdentifier")
         for {
-          tc <- typeCheck(valueObject, Some(typeOfIdentifier), env, inPattern)
+          tc <- typeCheck(valueObject, typeOfIdentifier, env, inPattern)
           
           substObj = MakeSubstitution(tc, env)
 
@@ -567,10 +505,11 @@ object TypeChecker {
   // Note that we want to result EVALUATED - otherwise we don't actually know if it's a type
   def typeSpecificTypeChecker(
     parseTree: ParseTree,
-    env: Environment
+    env: Environment,
+    inPattern: Boolean = false
   ): Outcome[NewMapObject, String] = {
     for {
-      tc <- typeCheck(parseTree, Some(TypeT), env)
+      tc <- typeCheck(parseTree, TypeT, env, inPattern)
       evaluatedTc <- Evaluator(tc, env)
     } yield evaluatedTc
   }
@@ -578,6 +517,6 @@ object TypeChecker {
   def apply(
     expression: ParseTree
   ): Outcome[NewMapObject, String] = {
-    typeCheck(expression, None, Environment.Base)
+    typeCheck(expression, AnyT, Environment.Base)
   }
 }

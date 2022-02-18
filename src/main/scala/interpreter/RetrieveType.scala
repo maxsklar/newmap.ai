@@ -69,9 +69,21 @@ object RetrieveType {
   }
 
   def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapObject = {
-    RetrieveType(nFunction) match {
-      case MapT(inputType, _, _, _) => inputType
-      case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
+    // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
+    nFunction match {
+      case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
+        SubtypeT(
+          MapInstance(
+            values.map(x => x._1 -> Index(1)),
+            MapT(inputType, NewMapO.rangeT(2), CommandOutput, features)
+          )
+        )
+      }
+     case _ => RetrieveType(nFunction) match {
+     // Once lambdaInstance is eliminated, these lines get easier to write!
+        case MapT(inputType, _, _, _) => inputType
+        case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
+      }
     }
   }
 

@@ -83,7 +83,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A static map " should " be creatable" in {
-    val code = "val m: Map (key: 3, value: 100) = (0: 20, 1: 43, 2: 67)"
+    val code = "val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)"
 
     val correctCommand = Environment.eCommand(
       "m",
@@ -101,7 +101,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be creatable as a type" in {
-    val code = "val m: Type = Map (key: 3, value: 100)"
+    val code = "val m: Type = Map (3, 100)"
 
     val correctCommand = Environment.eCommand(
       "m",
@@ -114,7 +114,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be applyable to a key" in {
     val correctCommand = Environment.eCommand("result", Index(43))
     testCodeScript(Vector(
-      CodeExpectation("val m: Map (key: 3, value: 100) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
+      CodeExpectation("val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
     ))
   }
@@ -123,22 +123,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand("result", Index(0))
 
     testCodeScript(Vector(
-      CodeExpectation("val m: Map (key: 3, value: 100) = (0: 20, 2: 67)", GeneralSuccessCheck),
+      CodeExpectation("val m: Map (3, 100) = (0: 20, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
     ))
   }
 
-  it should " be creatable without explicit parameters" in {
-    // This is the first use of automatic param interpolation
-    val code = "val m: Type = Map (3, 100)"
-    
-    val correctCommand = Environment.eCommand(
-      "m",
-      MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
-    )
-
-    testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
-  }
 
   it should " be creatable as a type object pair" in {
     val code = "val m: Map(3, 100) = (0: 10, 2: 3)"
@@ -165,8 +154,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:0)", SuccessCheck(correctCommand))
+      CodeExpectation("val s: Struct(Identifier, (a: 2, b: 3)) = (a:0, b:0)", SuccessCheck(correctCommand))
     ))
   }
 
@@ -230,9 +218,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val testType: Type = Map (key: Struct(Fields, (a: 3, b: 3)), value: 100)", SuccessCheck(correctCommand))
+      CodeExpectation("val s: Struct(Identifier, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val testType: Type = Map (key: Struct(Identifier, (a: 3, b: 3)), value: 100)", SuccessCheck(correctCommand))
     ))
   }
 
@@ -255,8 +242,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val MyCase: Type = Case(Fields, (a: 2, b: 3))", GeneralSuccessCheck),
+      CodeExpectation("val MyCase: Type = Case(Identifier, (a: 2, b: 3))", GeneralSuccessCheck),
       CodeExpectation("val x: MyCase = MyCase.a 0", SuccessCheck(correctCommand)),
       CodeExpectation("val y: MyCase = MyCase.a.b", FailureCheck),
       CodeExpectation("val x: MyCase = MyCase.c", FailureCheck),
@@ -386,6 +372,57 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
       CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2))))
     ))
+  }
+
+  // This test exists because of a bug which got this wrong
+  // TODO: I think the solution to this is avoiding variable capture
+  it should " be able to handle a nested ReqMap properly" in {
+    val expectedResult = MapT(
+      rangeType(2),
+      MapT(
+        rangeType(4),
+        CountT,
+        RequireCompleteness,
+        SimpleFunction
+      ),
+      RequireCompleteness,
+      SimpleFunction
+    )
+
+    testCodeScript(Vector(
+      CodeExpectation(
+        "ReqMap(2, ReqMap(4, Count))",
+        SuccessCheck(ExpOnlyEnvironmentCommand(expectedResult))
+      )
+    ))
+  }
+
+  "SubMaps " should " work" in testCodeScript(Vector(
+    CodeExpectation("val m: SubMap(8, 2) = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
+    CodeExpectation("m 0", GeneralSuccessCheck),
+    CodeExpectation("m 0", GeneralSuccessCheck),
+    CodeExpectation("m 4", GeneralSuccessCheck),
+    CodeExpectation("m 2", FailureCheck)
+  ))
+
+  "A struct pattern " should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("val m1: ReqMap(4, Count) = (0: 100, 1: 101, 2: 102, 3: 103)", GeneralSuccessCheck),
+      CodeExpectation("val m2: ReqMap(4, Count) = (0: 200, 1: 201, 2: 202, 3: 203)", GeneralSuccessCheck),
+      CodeExpectation("val ifStatement: ReqMap(2, ReqMap(4, Count)) = (0: m1, 1: m2)", GeneralSuccessCheck),
+
+      // TODO - clean up by building a shortcut
+      /*CodeExpectation("val f: Struct(2, (0: 4, 1: 2)) => Count = (first: 4, second: 2): ifStatement second first", GeneralSuccessCheck),
+      CodeExpectation("f(0, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(100)))),
+      CodeExpectation("f(1, 2)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(202))))*/
+
+      // Note - use the version above once variable capture is avoided!
+      CodeExpectation("val f: Struct(2, (0: 4, 1: 2)) => Count = (first: 4, second: 2): m1 first", GeneralSuccessCheck),
+      CodeExpectation("f(0, 1)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(100)))),
+      CodeExpectation("f(2, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(102))))
+    ))
+
+    //583
   }
 
   "A Subset Type " should "work" in {

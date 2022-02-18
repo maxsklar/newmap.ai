@@ -127,7 +127,7 @@ Vector(
       _ <- Outcome.failWhen(!pureTypeConvertible, s"Non-convertible pure types from $startingType to $endingType")
     } yield {
       val doesEndtypeCoverParentType = endingType match {
-        case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, BasicMap))) => {
+        case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
           // Check that the function doesn't return the default value for any input
           doMapValuesCoverType(values, inputType).toOption.getOrElse(false)
@@ -171,7 +171,6 @@ Vector(
       case _ if (startingType == endingType) => Success(true)
       case (_, AnyT) => Success(true)
       case (_, SubtypeT(isMember)) => {
-        
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
 
         for {
