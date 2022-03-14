@@ -1,5 +1,7 @@
 package ai.newmap.model
 
+import java.util.UUID
+
 /*
  * The objects in the NewMap Language
  */
@@ -11,26 +13,38 @@ case class IdentifierInstance(s: String) extends NewMapObject
 
 case class Index(i: Long) extends NewMapObject
 
+sealed abstract class NewMapPattern
+
 // Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
 //  we should be able to just give values and not keys if we provide the whole thing
 case class MapInstance(
-  values: Vector[(NewMapObject, NewMapObject)],
+  values: Vector[(NewMapPattern, NewMapObject)],
   mapType: MapT
 ) extends NewMapObject
 
-// When mattern matching, we want to have a case where we want to know if this pattern equals this type
-//case class AsTypePattern(pattern: NewMapObject, nType: NewMapObject) extends NewMapObject
+case class ObjectPattern(
+  nObject: NewMapObject
+) extends NewMapPattern
 
-// Different from a hard identifier, this establishes variable in a pattern match
-case class IdentifierPattern(name: String, nType: NewMapObject) extends NewMapObject
+case class TypePattern(
+  name: String,
+  nType: NewMapObject
+) extends NewMapPattern
 
+case class StructPattern(
+  params: Vector[NewMapPattern]
+) extends NewMapPattern
 
-// Perhaps redo this - rebrand as a special case of mapInstance! (crazy idea)
-// The input NewMapObject values must be closed and evaluated
-case class LambdaInstance(
-  params: Vector[(NewMapObject, NewMapObject)],
-  expression: NewMapObject
-) extends NewMapObject
+// TODO - obviously we need to work out patterns a bit more
+case class MapTPattern(
+  inputType: NewMapPattern,
+  outputType: NewMapPattern,
+  featureSet: Option[MapFeatureSet]
+) extends NewMapPattern
+
+case class MapPattern(
+  mapTPattern: MapTPattern
+) extends NewMapPattern
 
 case class ApplyFunction(
   func: NewMapObject,
@@ -42,8 +56,13 @@ case class AccessField(
   input: NewMapObject // Note - input must be literal and free of parameters (might be able to do this with scala's type systen)
 ) extends NewMapObject
 
-// This is an object that we don't know the value of yet. It'll be passed in later.
-case class ParameterObj(name: String, nType: NewMapObject) extends NewMapObject
+// This is an object that stands for something else in the environment
+// Very important so that we don't repeat code
+// TODO - perhaps in the future, every NewMapObject will actually be a pointer to a hash table, and these will be irrelevant
+case class ParamId(name: String) extends NewMapObject
+
+// This is a parameter that is a standin
+case class ParameterObj(uuid: UUID, nType: NewMapObject) extends NewMapObject
 
 // This function takes a count and returns true if that count is strictly less than i
 case class RangeFunc(i: Long) extends NewMapObject
@@ -53,6 +72,9 @@ case class RangeFunc(i: Long) extends NewMapObject
 // TODO: making this a basic class is temporary for now
 case object IsCommandFunc extends NewMapObject
 
+// Temporary for now, this should be buildable as a map pattern in the future
+case object IsSimpleFunction extends NewMapObject
+
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
 
@@ -61,7 +83,7 @@ case object IncrementFunc extends NewMapObject
 // - That could cause problems because maps don't have to be finite
 // - Then again, an infinite struct could open up possibilities!!
 // The input NewMapObject values must be closed and evaluated
-case class StructInstance(value: Vector[(NewMapObject, NewMapObject)], structType: StructT) extends NewMapObject
+case class StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structType: StructT) extends NewMapObject
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject
 
@@ -186,11 +208,16 @@ object NewMapO {
   // - You can potentially have versions available.
   def commandT: NewMapObject = SubtypeT(IsCommandFunc)
 
+  // This is a subtype of any, and will match every map that is a simple function (or basicMap)
+  // - This will be replaced once we get Map Type patterns working properly
+  // - Created for now to get Subtype working properly, so that we can move on
+  def simpleFunctionT: NewMapObject = SubtypeT(IsSimpleFunction)
+
   // For now, store a sequence as a map
   // TODO - this will get more efficient later on!
   def smallFiniteSequence(items: Vector[NewMapObject], nType: NewMapObject): NewMapObject = {
     MapInstance(
-      items.zipWithIndex.map(x => Index(x._2) -> x._1),
+      items.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> x._1),
       MapT(rangeT(items.length), nType, RequireCompleteness, BasicMap)
     )
   }

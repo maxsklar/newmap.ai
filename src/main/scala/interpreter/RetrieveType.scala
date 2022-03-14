@@ -1,50 +1,26 @@
 package ai.newmap.interpreter
 
 import ai.newmap.model._
+import ai.newmap.util.{Outcome, Success, Failure}
 
 object RetrieveType {
   // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
-  // TODO - Accept environment
-  def apply(nObject: NewMapObject): NewMapObject = nObject match {
+  def apply(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case Index(_) => CountT
     case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
-    case IdentifierPattern(_, nType) => nType
     case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
-    case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember))
+    case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case MapInstance(values, mapT) => mapT
-    case LambdaInstance(params, expression) => {
-      val fieldType = {
-        SubtypeT(
-          MapInstance(
-            params.map(x => x._1 -> Index(1)),
-            MapT(IdentifierT, NewMapO.rangeT(2), CommandOutput, BasicMap)
-          )
-        )
-      }
-
-      val structParams = MapInstance(
-        params.map(x => x._1 -> x._2),
-        MapT(fieldType, TypeT, RequireCompleteness, BasicMap)
-      )
-
-
-      val inputType = StructT(structParams)
-
-      // TODO - this should take a new environment
-      val outputType = this(expression)
-
-      MapT(inputType, outputType, RequireCompleteness, BasicMap)
-    }
-    case ApplyFunction(func, input) => retrieveOutputTypeFromFunction(func)
-    case AccessField(StructInstance(values, _), field) => {
-      // TODO: Improve!
-      values.find(v => v._1 == field).map(_._2) match {
-        case Some(value) => this(value)
-        case None => {
-          // This should happen if the field has been confirmed closed and fully evaluated
-          throw new Exception(s"Field access retrieve type is poorly implemented!! $values -- $field")
+    case ApplyFunction(func, input) => retrieveOutputTypeFromFunction(func, env)
+    case AccessField(StructInstance(_, StructT(params)), field) => {
+      // Field should be evaluated automatically (not allowed to have a ParameterObj in there - must be closed literal)
+      // TODO - do we need to evaluate the params first - or will it be evaluated already?
+      Evaluator.quickApplyFunctionAttempt(params, field, env) match {
+        case Success(value) => value
+        case Failure(s) => {
+          throw new Exception(s"Field access retrieve type is poorly implemented!! $params -- $field -- $s")
         }
       }
     }
@@ -62,13 +38,16 @@ object RetrieveType {
     case AccessField(struct, field) => {
       throw new Exception(s"This access of $struct with field $field is not allowed")
     }
+    // TODO - unsafe get!!
+    case ParamId(name) => this(env.lookup(name).get, env)
     case ParameterObj(_, nType) => nType
     case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
+    case IsSimpleFunction => MapT(AnyT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
   }
 
-  def retrieveInputTypeFromFunction(nFunction: NewMapObject): NewMapObject = {
+  def retrieveInputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
     // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
     nFunction match {
       case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
@@ -79,7 +58,7 @@ object RetrieveType {
           )
         )
       }
-     case _ => RetrieveType(nFunction) match {
+     case _ => RetrieveType(nFunction, env) match {
      // Once lambdaInstance is eliminated, these lines get easier to write!
         case MapT(inputType, _, _, _) => inputType
         case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
@@ -87,17 +66,17 @@ object RetrieveType {
     }
   }
 
-  def retrieveOutputTypeFromFunction(nFunction: NewMapObject): NewMapObject = {
-    RetrieveType(nFunction) match {
+  def retrieveOutputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
+    RetrieveType(nFunction, env) match {
       case MapT(_, outputType, _, _) => outputType
       case _ => throw new Exception(s"Couldn't retrieve output type from $nFunction")
     }
   }
 
-  def getParentType(nType: NewMapObject): NewMapObject = {
+  def getParentType(nType: NewMapObject, env: Environment): NewMapObject = {
     nType match {
       case SubtypeT(isMember) => {
-        getParentType(retrieveInputTypeFromFunction(isMember))
+        getParentType(retrieveInputTypeFromFunction(isMember, env), env)
       }
       case t => t
     }
@@ -108,23 +87,12 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IncrementFunc | IsCommandFunc => true
+    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IncrementFunc | IsCommandFunc | IsSimpleFunction => true
     case MapInstance(values, mapT) => {
-      values.forall(v =>
-        isTermClosedLiteral(v._1, knownVariables) &&
-        isTermClosedLiteral(v._2, knownVariables)
-      ) && isTermClosedLiteral(mapT, knownVariables)
+      isMapValuesClosed(values, knownVariables) && isTermClosedLiteral(mapT, knownVariables)
     }
-    case ParameterObj(name, _) => knownVariables.contains(name)
-    case IdentifierPattern(_, _) => false
-    case LambdaInstance(params, expression) => {
-      // TODO - change this when we start using de bruin (or other)codes for params
-      val newParams = params.flatMap(x => x._1 match {
-        case IdentifierInstance(s) => Some(s)
-        case _ => None
-      })
-      isTermClosedLiteral(expression, knownVariables ++ newParams)
-    }
+    case ParamId(name) => knownVariables.contains(name)
+    case ParameterObj(_, _) => false
     case ApplyFunction(func, input) => {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
@@ -151,5 +119,54 @@ object RetrieveType {
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
+  }
+
+  def isMapValuesClosed(
+    mapValues: Vector[(NewMapPattern, NewMapObject)],
+    knownVariables: Vector[String]
+  ): Boolean = {
+    mapValues match {
+      case (pattern, expression) +: restOfMapValues => {
+        isPatternClosedLiteral(pattern, knownVariables) match {
+          case Success(newKnownVariables) => isTermClosedLiteral(expression, knownVariables ++ newKnownVariables)
+          case Failure(_) => false
+        }
+      }
+      case _ => true
+    }
+  }
+
+  def isPatternClosedLiteral(
+    nPattern: NewMapPattern,
+    knownVariables: Vector[String] = Vector.empty,
+  ): Outcome[Vector[String], String] = nPattern match {
+    case ObjectPattern(o) => {
+      if (isTermClosedLiteral(o, knownVariables)) Success(Vector.empty)
+      else Failure(s"term not closed: $o")
+    }
+    case TypePattern(name, nType) => {
+      if (isTermClosedLiteral(nType)) Success(Vector(name))
+      else Failure(s"type not closed $nType")
+    }
+    case StructPattern(params) => {
+      params match {
+        case param +: restOfParams => {
+          for {
+            newKnownVariables <- isPatternClosedLiteral(param)
+            restOfKnownVariables <- isPatternClosedLiteral(StructPattern(params), newKnownVariables)
+          } yield {
+            newKnownVariables ++ restOfKnownVariables
+          }
+        }
+        case _ => Success(Vector.empty)
+      }
+    }
+    case MapTPattern(input, output, featureSet) => {
+      // TODO: Implement
+      Failure("Unimplemented")
+    }
+    case MapPattern(mapTPattern) => {
+      isPatternClosedLiteral(mapTPattern, knownVariables)
+    }
   }
 }

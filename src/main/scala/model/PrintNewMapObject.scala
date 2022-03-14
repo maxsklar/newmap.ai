@@ -10,6 +10,7 @@ object PrintNewMapObject {
     case TypeT => s"Type"
     case AnyT => s"Any"
     case IsCommandFunc => s"IsCommandFunc"
+    case IsSimpleFunction => s"IsSimpleFunction"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s + "~Id"
@@ -28,28 +29,12 @@ object PrintNewMapObject {
       }
     }
     case MapInstance(values, mapT) => s"MI:${mapToString(values)}~${this(mapT)}"
-    case LambdaInstance(params, expression) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("(")
-      var bindings: Vector[String] = Vector.empty
-
-      for {
-        (k, v) <- params
-      } {
-        bindings :+= k + ": " + this(v)
-      }
-
-      sb.append(bindings.mkString(", "))
-      sb.append(") => ")
-      sb.append(this(expression))
-      sb.toString
-    }
     case ApplyFunction(func, input) => {
       this(func) + " " + this(input)
     }
     case AccessField(struct, field) => s"${this(struct)}.${this(field)}"
-    case ParameterObj(name, nType) => s"$name~Po:(${this(nType)})"
-    case IdentifierPattern(name, nType) => s"$name~Ip:(${this(nType)})"
+    case ParamId(name) => s"$name~pi"
+    case ParameterObj(uuid, nType) => s"$uuid~Po:(${this(nType)})"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, structT) => {
@@ -75,10 +60,10 @@ object PrintNewMapObject {
   }
 
   def printParams(params: Vector[(String, NewMapObject)]): String = {
-    mapToString(params.map(x => IdentifierInstance(x._1) -> x._2))
+    mapToString(params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> x._2))
   }
 
-  def mapToString(values: Vector[(NewMapObject, NewMapObject)]): String = {
+  def mapToString(values: Vector[(NewMapPattern, NewMapObject)]): String = {
     val sb: StringBuilder = new StringBuilder()
     sb.append("(")
 
@@ -86,11 +71,19 @@ object PrintNewMapObject {
     for {
       (k, v) <- values
     } {
-      bindings :+= this(k) + ": " + this(v)
+      bindings :+= patternToString(k) + ": " + this(v)
     }
     sb.append(bindings.mkString(", "))
 
     sb.append(")")
     sb.toString
+  }
+
+  def patternToString(nPattern: NewMapPattern): String = nPattern match {
+    case ObjectPattern(nObject) => this(nObject)
+    case TypePattern(name, nType) => s"$name: ${this(nType)}"
+    case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
+    case MapTPattern(input, output, featureSet) => s"MapTPattern($input, $output, $featureSet)"
+    case MapPattern(mapTPattern) => s"MapPattern(${patternToString(mapTPattern)})"
   }
 }

@@ -17,31 +17,24 @@ object SubtypeUtils {
     } yield proposedObject
   }
 
-  /*
-
-  In genericPatternExists -- look for a struct that matches all its fields!
-
-Vector(
-  (
-    StructInstance(
-      a~Id: a~Ip:(Subtype(<5)),
-      b~Id: b~Ip:(\(Subtype(<5): Subtype(<10)))
-    ),
-    b~Po:(\(Subtype(<5): Subtype(<10))) a~Po:(Subtype(<5))))
-  */
-
   // For ReqMaps, we need to ensure that all of the values are accounted for.
   // For Maps, we want to know that the default value is never used
   def doMapValuesCoverType(
-    values: Vector[(NewMapObject, NewMapObject)],
-    nType: NewMapObject
+    values: Vector[(NewMapPattern, NewMapObject)],
+    nType: NewMapObject,
+    env: Environment
   ): Outcome[Boolean, String] = {
     val keys = values.map(_._1).toSet
+
+    val objectKeys = values.flatMap(v => v._1 match {
+      case ObjectPattern(o) => Some(o)
+      case _ => None
+    }).toSet
 
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
-    val genericPatternExists = keys.exists(isGenericPattern(_))
+    val genericPatternExists = keys.exists(k => isGenericPattern(k, nType, env))
 
     if (genericPatternExists) {
       Success(true)
@@ -50,17 +43,36 @@ Vector(
       for {
         keysToMatch <- enumerateAllValuesIfPossible(nType)
       } yield {
-        (keysToMatch -- keys).isEmpty && (keys -- keysToMatch).isEmpty
+        (keysToMatch -- objectKeys).isEmpty && (objectKeys -- keysToMatch).isEmpty
       }
     }
   }
 
   // Returns true if the object is a pattern that will match everything in the type
-  def isGenericPattern(pattern: NewMapObject): Boolean = {
+  def isGenericPattern(pattern: NewMapPattern, nType: NewMapObject, env: Environment): Boolean = {
     pattern match {
-      case IdentifierPattern(_, _) => true
-      case StructInstance(values, _) if (values.map(_._2).forall(isGenericPattern(_))) => true
-      case _ => false
+      case ObjectPattern(_) => false
+      case TypePattern(_, subtype) => isTypeConvertible(nType, subtype, env).toOption.getOrElse(false)
+      case StructPattern(patterns)  => {
+        nType match {
+          // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
+          // - That would require isGenericPattern to match an nType that's a NewMapPattern, not just a NewMapObject
+          case StructT(MapInstance(params, MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
+            (patterns, params.map(_._2)).zipped.toVector.forall(x => {
+              isGenericPattern(x._1, x._2, env)
+            })
+          }
+          case _ => false 
+        }
+      }
+      case MapTPattern(inputPattern, outputPattern, featureSetOption) => {
+        false
+        // TODO - implement this!
+      }
+      case MapPattern(mapTPattern) => {
+        false
+        // TODO - implement this!
+      }
     }
   }
 
@@ -68,7 +80,7 @@ Vector(
     nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case SubtypeT(MapInstance(values, _)) => Success(values.map(_._1).toSet)
+      case SubtypeT(MapInstance(values, _)) => enumerateMapKeys(values.map(_._1))
       // TODO(2022): if simpleFunction is boolean function on a small finite parentType, we should be able to enumerate those
       // TODO(2022): this is also one of those advanced cases where we want to know if one set is a subset of another through some advanced argument (like monotonicity)
       case SubtypeT(RangeFunc(i)) => Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
@@ -85,6 +97,21 @@ Vector(
     }
   }
 
+  def enumerateMapKeys(values: Vector[NewMapPattern]): Outcome[Set[NewMapObject], String] = {
+    values match {
+      case value +: additionalValues => {
+        value match {
+          case ObjectPattern(o) => {
+            for {
+              addlValues <- enumerateMapKeys(additionalValues)
+            } yield addlValues + o
+          }
+          case _ => Failure(s"Found non-ObjectPattern: $value")
+        }
+      }
+      case _ => Success(Set.empty) 
+    }
+  }
 
   // Try to convert an object to having a new type
   // - Fail when the conversion is not possible
@@ -94,7 +121,7 @@ Vector(
     requestedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    val nType = RetrieveType(nObject)
+    val nType = RetrieveType(nObject, env)
 
     if (nType != requestedType) {
       for {
@@ -119,8 +146,8 @@ Vector(
   ): Outcome[Boolean, String] = {
     for {
       pureTypeConvertible <- isObjectConvertibleToType(
-        ParameterObj("_", startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
-        RetrieveType.getParentType(endingType),
+        ParameterObj(java.util.UUID.randomUUID, startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
+        RetrieveType.getParentType(endingType, env),
         env
       )
 
@@ -130,13 +157,10 @@ Vector(
         case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
           // Check that the function doesn't return the default value for any input
-          doMapValuesCoverType(values, inputType).toOption.getOrElse(false)
-        }
-        case SubtypeT(LambdaInstance(_, _)) => {
-          //TODO - we can check to determine if this is always true
-          false
+          doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
         }
         case SubtypeT(IsCommandFunc) => false
+        case SubtypeT(IsSimpleFunction) => false
         case SubtypeT(RangeFunc(_)) => false
         case _ => {
           // TODO: Is this appropriate - shouldn't it be false
@@ -165,13 +189,13 @@ Vector(
     endingType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    val startingType = RetrieveType(startingObject)
+    val startingType = RetrieveType(startingObject, env)
 
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(true)
       case (_, AnyT) => Success(true)
       case (_, SubtypeT(isMember)) => {
-        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
+        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember, env)
 
         for {
           // 1: Check if startingObject is convertible to the inputType of isMember
@@ -195,12 +219,6 @@ Vector(
         MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
         MapT(endingInputType, endingOutputType, endingCompleteness, endingFeatureSet)
       ) => {
-        val isFeatureSetConvertible = startingFeatureSet match {
-          case BasicMap => true
-          case SimpleFunction => (endingFeatureSet != BasicMap)
-          case FullFunction => (endingFeatureSet == FullFunction)
-        }
-
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
         //  CommandOutput might require adding a default pattern
@@ -222,7 +240,7 @@ Vector(
         Success(
           inputTypesConvertible &&
           outputTypesConvertible &&
-          isFeatureSetConvertible &&
+          isFeatureSetConvertible(startingFeatureSet, endingFeatureSet) &&
           isMapCompletenessConvertible
         )
       }
@@ -231,8 +249,8 @@ Vector(
         StructT(endingParams)
       ) => {
         isTypeConvertible(
-          RetrieveType.retrieveInputTypeFromFunction(startingParams),
-          RetrieveType.retrieveInputTypeFromFunction(endingParams),
+          RetrieveType.retrieveInputTypeFromFunction(startingParams, env),
+          RetrieveType.retrieveInputTypeFromFunction(endingParams, env),
           env
         )
         // TODO: The outputs have to agree as well
@@ -253,8 +271,8 @@ Vector(
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
         isTypeConvertible(
-          RetrieveType.retrieveInputTypeFromFunction(endingCases),
-          RetrieveType.retrieveInputTypeFromFunction(startingCases),
+          RetrieveType.retrieveInputTypeFromFunction(endingCases, env),
+          RetrieveType.retrieveInputTypeFromFunction(startingCases, env),
           env
         )
         // TODO: The outputs have to agree as well
@@ -274,12 +292,21 @@ Vector(
         } yield isConvertible
       }
       case (SubtypeT(isMember), _) => {
-        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember)
+        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember, env)
         
         isTypeConvertible(subtypeInputType, endingType, env)
       }
       case _ => Success(false)
     }
+  }
+
+  def isFeatureSetConvertible(
+    startingFeatureSet: MapFeatureSet,
+    endingFeatureSet: MapFeatureSet
+  ) = startingFeatureSet match {
+    case BasicMap => true
+    case SimpleFunction => (endingFeatureSet != BasicMap)
+    case FullFunction => (endingFeatureSet == FullFunction)
   }
 
   // If this function only allows one input, then return the output for that input
@@ -302,7 +329,7 @@ Vector(
     // type of it is convertible
     // TODO: We should distinguish between a closed literal - for which we can call quickApplyFunctionAttempt - and non-closed literals
 
-    val apparentTypeOfObject = RetrieveType(nObject)
+    val apparentTypeOfObject = RetrieveType(nObject, env)
 
     isTypeConvertible(apparentTypeOfObject, nSubtype, env) match {
       case Success(true) => {
@@ -317,7 +344,7 @@ Vector(
 
             // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
             //  and find a default on that!
-            defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType(result), env)
+            defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType(result, env), env)
           } yield (result != defaultValueOrResultType)
         }
         case _ => {

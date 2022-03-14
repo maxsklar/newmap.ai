@@ -89,9 +89,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       MapInstance(
         Vector(
-          Index(0) -> Index(20),
-          Index(1) -> Index(43),
-          Index(2) -> Index(67)
+          ObjectPattern(Index(0)) -> Index(20),
+          ObjectPattern(Index(1)) -> Index(43),
+          ObjectPattern(Index(2)) -> Index(67)
         ),
         MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
       )
@@ -135,7 +135,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "m",
       MapInstance(
-        Vector(Index(0) -> Index(10), Index(2) -> Index(3)),
+        Vector(ObjectPattern(Index(0)) -> Index(10), ObjectPattern(Index(2)) -> Index(3)),
         MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
       )
     )
@@ -148,13 +148,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "s",
       StructInstance(
-        Vector((IdentifierInstance("a"), Index(0)), (IdentifierInstance("b"), Index(0))),
+        Vector((ObjectPattern(IdentifierInstance("a")), Index(0)), (ObjectPattern(IdentifierInstance("b")), Index(0))),
         structType
       )
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val s: Struct(Identifier, (a: 2, b: 3)) = (a:0, b:0)", SuccessCheck(correctCommand))
+      CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:0)", SuccessCheck(correctCommand))
     ))
   }
 
@@ -166,8 +166,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val q: 3 = s.b", SuccessCheck(correctCommand))
     ))
   }
@@ -180,8 +179,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val fieldMap: ReqMap(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
       CodeExpectation("val q: 3 = s.(fieldMap(1))", GeneralSuccessCheck)
     ))
@@ -195,8 +193,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val Fields: Type = Subtype(Identifier, 2, (a: 1, b: 1))", GeneralSuccessCheck),
-      CodeExpectation("val s: Struct(Fields, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
+      CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val q: Field => 3 = (x: s.x)", FailureCheck)
     ))
   }
@@ -218,14 +215,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val s: Struct(Identifier, (a: 2, b: 3)) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val testType: Type = Map (key: Struct(Identifier, (a: 3, b: 3)), value: 100)", SuccessCheck(correctCommand))
+      CodeExpectation("val testType: Type = Map (Struct(a: 3, b: 3), 100)", SuccessCheck(correctCommand))
     ))
   }
 
   it should " be creatable with numerical indecies" in {
     testCodeScript(Vector(
-      CodeExpectation("val s: Struct(2, (0: Type, 1: 10)) = (Count, 6)", GeneralSuccessCheck)
+      CodeExpectation("val s: CStruct(0: Type, 1: 10) = (Count, 6)", GeneralSuccessCheck)
     ))
   }
 
@@ -242,7 +238,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val MyCase: Type = Case(Identifier, (a: 2, b: 3))", GeneralSuccessCheck),
+      CodeExpectation("val MyCase: Type = Case (a: 2, b: 3)", GeneralSuccessCheck),
       CodeExpectation("val x: MyCase = MyCase.a 0", SuccessCheck(correctCommand)),
       CodeExpectation("val y: MyCase = MyCase.a.b", FailureCheck),
       CodeExpectation("val x: MyCase = MyCase.c", FailureCheck),
@@ -264,13 +260,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
       MapInstance(Vector(
-        IdentifierPattern("a", rangeType(3)) ->
+        TypePattern("a", rangeType(3)) ->
         ApplyFunction(
           MapInstance(
-            Vector(Index(0) -> Index(2), Index(1) -> Index(3), Index(2) -> Index(1)),
+            Vector(ObjectPattern(Index(0)) -> Index(2), ObjectPattern(Index(1)) -> Index(3), ObjectPattern(Index(2)) -> Index(1)),
             MapT(rangeType(3), rangeType(4), CommandOutput, BasicMap)
           ),
-          ParameterObj("a", rangeType(3))
+          ParamId("a")
         )
       ), MapT(rangeType(3), rangeType(4), RequireCompleteness, FullFunction))
     )
@@ -345,8 +341,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be usable" in {
     testCodeScript(Vector(
       CodeExpectation("val id: (Any => Any) = (t: t)", GeneralSuccessCheck),
-      CodeExpectation("id ~hi", GeneralSuccessCheck),
-      CodeExpectation("id 5", GeneralSuccessCheck),
+      CodeExpectation("id ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("hi")))),
+      CodeExpectation("id 5", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
     ))
   }
 
@@ -412,13 +408,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val ifStatement: ReqMap(2, ReqMap(4, Count)) = (0: m1, 1: m2)", GeneralSuccessCheck),
 
       // TODO - clean up by building a shortcut
-      /*CodeExpectation("val f: Struct(2, (0: 4, 1: 2)) => Count = (first: 4, second: 2): ifStatement second first", GeneralSuccessCheck),
+      CodeExpectation("val f: CStruct(0: 4, 1: 2) => Count = ((first, second): ifStatement second first)", GeneralSuccessCheck),
       CodeExpectation("f(0, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(100)))),
-      CodeExpectation("f(1, 2)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(202))))*/
-
-      // Note - use the version above once variable capture is avoided!
-      CodeExpectation("val f: Struct(2, (0: 4, 1: 2)) => Count = (first: 4, second: 2): m1 first", GeneralSuccessCheck),
-      CodeExpectation("f(0, 1)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(100)))),
+      CodeExpectation("f(1, 1)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(201)))),
       CodeExpectation("f(2, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(102))))
     ))
 
@@ -428,7 +420,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A Subset Type " should "work" in {
     testCodeScript(Vector(
       CodeExpectation("val underlyingMap: Map(8, 2) = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
-      CodeExpectation("val x: Type = Subtype(8, 2, underlyingMap)", GeneralSuccessCheck),
+      CodeExpectation("val x: Type = Subtype(underlyingMap)", GeneralSuccessCheck),
       CodeExpectation("val y: x = 1", GeneralSuccessCheck),
       CodeExpectation("val y: x = 6", FailureCheck)
     ))
@@ -436,7 +428,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " have functions made from them" in {
     testCodeScript(Vector(
-      CodeExpectation("val Bool: Type = Subtype(Identifier, 2, (True: 1, False: 1))", GeneralSuccessCheck),
+      // TODO: should be able to call Subtype(True: 1, False: 1) directly - but that requires generics
+      CodeExpectation("val BoolMap: Map(Identifier, 2) = (True: 1, False: 1)", GeneralSuccessCheck),      
+      CodeExpectation("val Bool: Type = Subtype(BoolMap)", GeneralSuccessCheck),
       CodeExpectation("val shorten: Map(Bool, 2) = (True: 1, False: 0)", GeneralSuccessCheck),
       CodeExpectation("val x: 2 = shorten True", GeneralSuccessCheck)
     ))

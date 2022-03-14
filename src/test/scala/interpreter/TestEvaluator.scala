@@ -30,4 +30,27 @@ class TestEvaluator extends FlatSpec {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, TypeT, Environment.Base)
     assetFunctionWorkedAndReturnedResult(result, Index(0))
   }
+
+  // TODO: remove this when IsSimpleFunction is eliminated
+  "IsSimpleFunction" should "work properly" in {
+    assetFunctionWorkedAndReturnedResult(
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, TypeT, Environment.Base),
+      Index(0)
+    )
+
+    assetFunctionWorkedAndReturnedResult(
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, SimpleFunction)), Environment.Base),
+      Index(1)
+    )
+
+    assetFunctionWorkedAndReturnedResult(
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, BasicMap)), Environment.Base),
+      Index(1)
+    )
+
+    assetFunctionWorkedAndReturnedResult(
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, FullFunction)), Environment.Base),
+      Index(0)
+    )
+  }
 }

@@ -48,12 +48,10 @@ class TestTypeCheck extends FlatSpec {
   	}
   }
 
-  "A simple lambda expression " should " work" in {
+  "A simple function expression " should " work" in {
     val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("x"), NaturalNumberParse(12))
-      )),
-      IdentifierParse("x")
+      NaturalNumberParse(12),
+      NaturalNumberParse(100)
     )
 
     TypeChecker(expression) match {
@@ -61,23 +59,6 @@ class TestTypeCheck extends FlatSpec {
       case Failure(reason) => fail(reason)
     }
   } 
-
-  "If x is declared as a type, y " should " be able to be declared as type x" in {
-    val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type")),
-        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x"))
-      )),
-      IdentifierParse("y"),
-    )
-
-    TypeChecker(expression) match {
-      case Success(result) => ()
-        // TODO: check these are right
-        //println(objectFound)
-      case Failure(reason) => fail(reason)
-    }
-  }
 
   it should " fail when the order is reversed" in {
     val expression = LambdaParse(
@@ -138,10 +119,8 @@ class TestTypeCheck extends FlatSpec {
 
   "The zero type " should " be recognized as a type even though no object exists" in {
     val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(0))
-      )),
-      IdentifierParse("a"),
+      NaturalNumberParse(0),
+      NaturalNumberParse(4)
     )
 
     TypeChecker(expression) match {
@@ -159,7 +138,7 @@ class TestTypeCheck extends FlatSpec {
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
-      	assert(RetrieveType(result) == TypeT)
+      	assert(RetrieveType(result, Environment.Base) == TypeT)
         //println(objectFound)
 
       	// TODO: what should we do with this?
@@ -186,47 +165,9 @@ class TestTypeCheck extends FlatSpec {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
     StatementInterpreter(statement, Environment.Base) match {
       case Success(envCommands) => {
-        assert(envCommands == Vector(FullEnvironmentCommand(IdentifierInstance("x"), Index(10))))
+        assert(envCommands == Vector(FullEnvironmentCommand("x", Index(10))))
       }
       case Failure(reason) => fail(reason)
-    }
-  }
-
-  "Applying a Function in a lambda " should " work if the types are right" in {
-    val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("inputType"), IdentifierParse("Type")),
-        BindingCommandItem(IdentifierParse("outputType"), IdentifierParse("Type")),
-        BindingCommandItem(IdentifierParse("f"), LambdaParse(
-          CommandList(Vector(
-            BindingCommandItem(IdentifierParse("input"), IdentifierParse("inputType"))
-          )),
-          IdentifierParse("outputType")
-        )),
-        BindingCommandItem(IdentifierParse("x"), IdentifierParse("inputType"))
-      )),
-      ApplyParse(
-        IdentifierParse("f"),
-        CommandList(Vector(
-          BindingCommandItem(IdentifierParse("input"), IdentifierParse("x"))
-        ))
-      )
-    )
-
-    /*
-    // val f: fSig = ((a: 3) => m a)
-
-    // (inputType: Type, outputType: Type, f: (input: InputType) => outputType, x: InputType) => f(input, x)
-
-    */
-
-    TypeChecker(expression) match {
-      case Success(result) => {
-        ()
-      }
-      case Failure(reason) => {
-        fail(reason)
-      }
     }
   }
 }
