@@ -80,6 +80,24 @@ class TestParser extends FlatSpec {
     )
   }
 
+  "A new versioned object " should " be parsed correctly" in {
+    val tokens = List(
+      Identifier("ver"),
+      Identifier("x"),
+      Equals(),
+      Identifier("new"),
+      Identifier("Count")
+    )
+    assert(NewMapParser.statementParse(tokens) ==
+      Success(
+        NewVersionedStatementParse(
+          IdentifierParse("x", false),
+          IdentifierParse("Count", false)
+        )
+      )
+    )
+  }
+
   "A List of tokens of map statement " should " be parsed correctly" in {
     val tokens = List(
       Identifier("val"), 

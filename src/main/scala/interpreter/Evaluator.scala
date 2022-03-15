@@ -117,6 +117,38 @@ object Evaluator {
     }
   }
 
+  def getCommandInputOfPureCommandType(nType: NewMapObject): Outcome[NewMapObject, String] = {
+    nType match {
+      case CountT => Success(NewMapO.rangeT(1))
+      case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
+        for {
+          outputCommandT <- getCommandInputOfPureCommandType(outputType)
+        } yield {
+          StructT(
+            MapInstance(
+              Vector(ObjectPattern(Index(0)) -> inputType, ObjectPattern(Index(1)) -> outputCommandT),
+              MapT(
+                NewMapO.rangeT(2),
+                TypeT,
+                RequireCompleteness,
+                BasicMap
+              )
+            )
+          )
+        }
+      }
+      case structT@StructT(params) => {
+        Failure("Structs as commands haven't been implemented yet")
+      }
+      case CaseT(cases) => {
+        Failure("Cases as commands haven't been implemented yet")
+      }
+      case _ => {
+        Failure(s"$nType is not a command type, error in type checker")
+      }
+    }
+  }
+
   def getDefaultValueFromStructParams(
     params: Vector[(NewMapPattern, NewMapObject)],
     env: Environment
@@ -302,6 +334,7 @@ object Evaluator {
       }
       case (IsCommandFunc, nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
+
         Success(AbleToApplyFunction(Index(if (isCommand) 1 else 0)))
       }
       case (IsSimpleFunction, nObject) => {

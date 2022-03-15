@@ -176,6 +176,7 @@ object Environment {
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
     eCommand("Increment", IncrementFunc),
+    eCommand("IsCommand", IsCommandFunc),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
       MapT(ParamId("key"), ParamId("value"), CommandOutput, BasicMap)

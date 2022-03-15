@@ -64,11 +64,13 @@ object TypeChecker {
           // TODO - build a specialize typeCheck where you expect a struct?
           typeCheckedStruct <- typeCheck(struct, AnyT, env)
 
-          structParams <- typeCheckedStruct match {
+          evaluatedStruct <- Evaluator(typeCheckedStruct, env)
+
+          structParams <- evaluatedStruct match {
             case StructInstance(value, StructT(params)) => Success(params)
             case CaseT(cases) => Success(cases)
             case _ => {
-              Failure(s"Attempting to access field object $typeCheckedStruct which is not a struct instance")
+              Failure(s"Attempting to access field object $evaluatedStruct which is not a struct instance")
             }
           }
 

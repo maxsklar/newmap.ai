@@ -245,14 +245,23 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  // TODO: Test an option case
-  /*"A case " should " be created and instantiated" in {
+  "A generic option case " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("val Option: (Type => Type) = (t => Case (None: 1, Some: t))", GeneralSuccessCheck),
+      CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
-      CodeExpectation("val x: maybeSix = (None: 0)", GeneralSuccessCheck),
-      CodeExpectation("val y: maybeSix = (Some: 1)", GeneralSuccessCheck),
-      CodeExpectation("val z: maybeSix = (None: 3)", FailureCheck),
+      CodeExpectation("val x: maybeSix = maybeSix.None 0", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = maybeSix.Some 1", GeneralSuccessCheck),
+      CodeExpectation("val z: maybeSix = maybeSix.None 3", FailureCheck),
+    ))
+  }
+
+  // TODO: Return to this when there is better tooling!
+  /*"A generic option case " should " be callable without naming it" in {
+    testCodeScript(Vector(
+      CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
+      CodeExpectation("val x: Option Count = (Option Count).None 0", GeneralSuccessCheck),
+      CodeExpectation("val y: Option Count = (Option Count).Some 20", GeneralSuccessCheck),
+      CodeExpectation("val z: Option Count = (Option Count).None 3", FailureCheck),
     ))
   }*/
 
@@ -371,7 +380,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   // This test exists because of a bug which got this wrong
-  // TODO: I think the solution to this is avoiding variable capture
+  // The solution to this was avoiding variable capture
   it should " be able to handle a nested ReqMap properly" in {
     val expectedResult = MapT(
       rangeType(2),
