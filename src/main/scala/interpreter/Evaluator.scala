@@ -8,7 +8,7 @@ object Evaluator {
   def apply(
     nObject: NewMapObject,
     env: Environment,
-    keepVersioning: Boolean = false
+    keepVersioning: Boolean = false // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
       case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
@@ -294,22 +294,6 @@ object Evaluator {
         eParams <- evalPatterns(params, env)
       } yield StructPattern(eParams)
     }
-    case MapTPattern(input, output, featureSet) => {
-      for {
-        inputResult <- evalPattern(input, env)
-        outputResult <- evalPattern(output, env)
-      } yield {
-        MapTPattern(inputResult, outputResult, featureSet)
-      }
-    }
-    case MapPattern(MapTPattern(input, output, featureSet)) => {
-      for {
-        inputResult <- evalPattern(input, env)
-        outputResult <- evalPattern(output, env)
-      } yield {
-        MapPattern(MapTPattern(inputResult, outputResult, featureSet))
-      }
-    }
   }
 
   def evalPatterns(
@@ -525,33 +509,6 @@ object Evaluator {
       case (ObjectPattern(oPattern), _) if (oPattern == input) => {
         Success(Map.empty)
       }
-      case (
-        MapTPattern(inputPattern, outputPattern, featureSetPattern),
-        MapT(inputType, outputType, _, featureSet)
-      ) => {
-        for {
-          inputParams <- attemptPatternMatch(inputPattern, inputType, env)
-          outputParams <- attemptPatternMatch(outputPattern, outputType, env)
-
-          featureMatch = featureSetPattern match {
-            case None => true
-            case Some(f) => SubtypeUtils.isFeatureSetConvertible(featureSet, f)
-          }
-
-          _ <- Outcome.failWhen(
-            !featureMatch,
-            s"Feature Sets don't match: $featureSet to ${featureSetPattern.get}"
-          )
-        } yield {
-          inputParams ++ outputParams
-        }
-      }
-      case (
-        MapPattern(mapTPattern),
-        MapInstance(_, mapT)
-      ) => {
-        attemptPatternMatch(mapTPattern, mapT, env)
-      }
       case _ => Failure("Failed Pattern Match")
     }
   }
@@ -585,11 +542,76 @@ object Evaluator {
       }
       case _ => Vector.empty
     }
-    case MapTPattern(input, output, featureSet) => {
-      newParametersFromPattern(input) ++ newParametersFromPattern(output)
+  }
+
+  // This function removes versioning and returns a constant value - the current value
+  def getCurrentConstantValue(nObject: NewMapObject): NewMapObject = {
+    nObject match {
+      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+        nObject
+      }
+      case MapT(inputType, outputType, completeness, featureSet) => {
+        MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
+      }
+      case mi@MapInstance(values, MapT(inputType, outputType, completeness, featureSet)) => {
+        MapInstance(
+          constifyMapInstanceVals(values),
+          MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
+        )
+      }
+      case ApplyFunction(func, input) => {
+        ApplyFunction(getCurrentConstantValue(func), getCurrentConstantValue(input))
+      }
+      case AccessField(struct, field) => {
+        AccessField(getCurrentConstantValue(struct), getCurrentConstantValue(field))
+      }
+      case StructT(params) => {
+        StructT(getCurrentConstantValue(params))
+      }
+      case CaseT(cases) => {
+        CaseT(getCurrentConstantValue(cases))
+      }
+      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], StructT(params)) => {
+        StructInstance(
+          constifyMapInstanceVals(value),
+          StructT(getCurrentConstantValue(params))
+        )
+      }
+      case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, CaseT(cases)) => {
+        CaseInstance(
+          getCurrentConstantValue(constructor),
+          getCurrentConstantValue(input),
+          CaseT(getCurrentConstantValue(cases))
+        )
+      }
+      case SubtypeT(func) => {
+        SubtypeT(getCurrentConstantValue(func))
+      }
+      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
+        getCurrentConstantValue(currentState)
+      }
+      case BranchedVersionedObject(vo, base, changeLog) => {
+        getCurrentConstantValue(vo)
+      }
     }
-    case MapPattern(mapTPattern) => {
-      newParametersFromPattern(mapTPattern)
+  }
+
+
+  def constifyMapInstanceVals(
+    values: Vector[(NewMapPattern, NewMapObject)]
+  ): Vector[(NewMapPattern, NewMapObject)] = {
+    for {
+      value <- values
+    } yield {
+      constifyPattern(value._1) -> getCurrentConstantValue(value._2)
+    }
+  }
+
+  def constifyPattern(pattern: NewMapPattern): NewMapPattern = {
+    pattern match {
+      case ObjectPattern(obj) => ObjectPattern(getCurrentConstantValue(obj))
+      case TypePattern(name, nType) => TypePattern(name, getCurrentConstantValue(nType))
+      case StructPattern(params) => StructPattern(params.map(constifyPattern(_)))
     }
   }
 }

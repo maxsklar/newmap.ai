@@ -174,12 +174,5 @@ object RetrieveType {
         case _ => Success(Vector.empty)
       }
     }
-    case MapTPattern(input, output, featureSet) => {
-      // TODO: Implement
-      Failure("Unimplemented")
-    }
-    case MapPattern(mapTPattern) => {
-      isPatternClosedLiteral(mapTPattern, knownVariables)
-    }
   }
 }

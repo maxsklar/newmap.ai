@@ -65,14 +65,6 @@ object SubtypeUtils {
           case _ => false 
         }
       }
-      case MapTPattern(inputPattern, outputPattern, featureSetOption) => {
-        false
-        // TODO - implement this!
-      }
-      case MapPattern(mapTPattern) => {
-        false
-        // TODO - implement this!
-      }
     }
   }
 
@@ -121,14 +113,15 @@ object SubtypeUtils {
     requestedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    val nType = RetrieveType(nObject, env)
+    val constNObject = Evaluator.getCurrentConstantValue(nObject)
+    val nType = RetrieveType(constNObject, env)
 
     if (nType != requestedType) {
       for {
-        isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
+        isConvertible <- isObjectConvertibleToType(constNObject, requestedType, env)
         _ <- Outcome.failWhen(
           !isConvertible,
-          s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
+          s"Cannot convert because type of $constNObject: $nType doesn't match expected parent type $requestedType."
         )
       } yield nObject
     } else {

@@ -35,17 +35,6 @@ case class StructPattern(
   params: Vector[NewMapPattern]
 ) extends NewMapPattern
 
-// TODO - obviously we need to work out patterns a bit more
-case class MapTPattern(
-  inputType: NewMapPattern,
-  outputType: NewMapPattern,
-  featureSet: Option[MapFeatureSet]
-) extends NewMapPattern
-
-case class MapPattern(
-  mapTPattern: MapTPattern
-) extends NewMapPattern
-
 case class ApplyFunction(
   func: NewMapObject,
   input: NewMapObject

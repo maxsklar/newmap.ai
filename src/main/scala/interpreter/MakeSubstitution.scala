@@ -105,19 +105,5 @@ object MakeSubstitution {
     case StructPattern(params) => {
       StructPattern(params.map(param => substPattern(param, parameters, env)))
     }
-    case MapTPattern(input, output, featureSet) => {
-      MapTPattern(
-        substPattern(input, parameters, env),
-        substPattern(output, parameters, env),
-        featureSet
-      )
-    }
-    case MapPattern(MapTPattern(input, output, featureSet)) => {
-      MapPattern(MapTPattern(
-        substPattern(input, parameters, env),
-        substPattern(output, parameters, env),
-        featureSet
-      ))
-    }
   }
 }

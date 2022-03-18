@@ -90,7 +90,5 @@ object PrintNewMapObject {
     case ObjectPattern(nObject) => this(nObject)
     case TypePattern(name, nType) => s"$name: ${this(nType)}"
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
-    case MapTPattern(input, output, featureSet) => s"MapTPattern($input, $output, $featureSet)"
-    case MapPattern(mapTPattern) => s"MapPattern(${patternToString(mapTPattern)})"
   }
 }
