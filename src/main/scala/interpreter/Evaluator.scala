@@ -7,10 +7,11 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object Evaluator {
   def apply(
     nObject: NewMapObject,
-    env: Environment
+    env: Environment,
+    keepVersioning: Boolean = false
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -32,14 +33,6 @@ object Evaluator {
           result <- applicationAttempt match {
             case AbleToApplyFunction(nObject) => Success(nObject)
             case UnableToApplyDueToUnknownInput => Success(ApplyFunction(func, evalInput))
-            case NoMatchForInputInFunction => {
-              // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-              // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-              // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-              //  and get the default from that
-              val nType = RetrieveType(nObject, env)
-              getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType, env), env)
-            }
           }
         } yield result
       }
@@ -70,6 +63,29 @@ object Evaluator {
       case SubtypeT(func) => {
         // Is this correct?
         Success(SubtypeT(func))
+      }
+      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
+        // TODO - do we actually need to do any evaluating on these?
+        // - in other words, are versioned objects required to be fully evaluated?
+        if (keepVersioning) {
+          for {
+            evalCurrentState <- this(currentState, env)
+            evalCommandType <- this(commandType, env)
+          } yield VersionedObject(currentState, commandType, versionNumber)
+        } else {
+          for {
+            evalCurrentState <- this(currentState, env)
+          } yield evalCurrentState
+        }
+      }
+      case BranchedVersionedObject(vo, base, changeLog) => {
+        if (keepVersioning) {
+          Success(BranchedVersionedObject(vo, base, changeLog))
+        } else {
+          for {
+            evalVo <- this(vo, env, keepVersioning = false)
+          } yield evalVo
+        }
       }
     }
   }
@@ -117,12 +133,15 @@ object Evaluator {
     }
   }
 
-  def getCommandInputOfPureCommandType(nType: NewMapObject): Outcome[NewMapObject, String] = {
+  def getCommandInputOfPureCommandType(
+    nType: NewMapObject,
+    current: NewMapObject
+  ): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(NewMapO.rangeT(1))
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
-          outputCommandT <- getCommandInputOfPureCommandType(outputType)
+          outputCommandT <- getCommandInputOfPureCommandType(outputType, current)
         } yield {
           StructT(
             MapInstance(
@@ -147,6 +166,75 @@ object Evaluator {
         Failure(s"$nType is not a command type, error in type checker")
       }
     }
+  }
+
+  def updateVersionedO(
+    nType: NewMapObject,
+    current: NewMapObject,
+    command: NewMapObject,
+    env: Environment
+  ): Outcome[NewMapObject, String] = {
+    nType match {
+      case CountT => {
+        quickApplyFunctionAttempt(IncrementFunc, current, env)
+      }
+      case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
+        for {
+          input <- accessFieldAttempt(command, Index(0), env)
+          commandForInput <- accessFieldAttempt(command, Index(1), env)
+
+          currentResultForInput <- quickApplyFunctionAttempt(current, input, env)
+
+          newResultForInput <- updateVersionedO(outputType, currentResultForInput, commandForInput, env)
+
+          mapValues <- current match {
+            case MapInstance(values, _) => Success(values)
+            case _ => Failure("Couldn't get map values from $current")
+          }
+
+          newMapValues = (ObjectPattern(input) -> newResultForInput) +: mapValues.filter(x => x._1 != ObjectPattern(input))
+        } yield {
+          MapInstance(newMapValues, mapT)
+        }
+      }
+      case structT@StructT(params) => {
+        Failure("Structs as commands haven't been implemented yet")
+      }
+      case CaseT(cases) => {
+        Failure("Cases as commands haven't been implemented yet")
+      }
+      case _ => {
+        Failure(s"$nType is not a command type, error in type checker")
+      }
+    }
+  }
+
+  def lookupVersionedObject(
+    id: String,
+    env: Environment
+  ): Outcome[VersionedObject, String] = {
+    for {
+      versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
+
+      versionedO <- versionedObject match {
+        case vo@VersionedObject(currentState, commandType, versionNumber) => Success(vo)
+        case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
+      }
+    } yield versionedO
+  }
+
+  def updateVersionedObject(
+    id: String,
+    command: NewMapObject,
+    env: Environment
+  ): Outcome[VersionedObject, String] = {
+    for {
+      versionedO <- lookupVersionedObject(id, env)
+      newState <- updateVersionedO(versionedO.commandType, versionedO.currentState, command, env)
+    } yield {
+      VersionedObject(newState, versionedO.commandType, versionedO.versionNumber + 1)
+    }
+    
   }
 
   def getDefaultValueFromStructParams(
@@ -299,7 +387,6 @@ object Evaluator {
   sealed abstract class ApplyFunctionAttemptResult
   case class AbleToApplyFunction(nObject: NewMapObject) extends ApplyFunctionAttemptResult
   case object UnableToApplyDueToUnknownInput extends ApplyFunctionAttemptResult
-  case object NoMatchForInputInFunction extends ApplyFunctionAttemptResult
 
   // Assume that both the function and the input have been evaluated
   // TODO: If there a way to guarantee that this will return something?
@@ -316,17 +403,29 @@ object Evaluator {
       case (MapInstance(values, _), key) => {
         for {
           evaluatedKey <- this(key, env)
-        } yield {
-          key match {
-            case ParamId(s) => UnableToApplyDueToUnknownInput
+
+          keyMatchResult <- key match {
+            case ParamId(s) => Success(UnableToApplyDueToUnknownInput)
             case _ => {
               attemptPatternMatchInOrder(values, evaluatedKey, env) match {
-                case Success(result) => AbleToApplyFunction(result)
-                case Failure(_) => NoMatchForInputInFunction
+                case Success(result) => Success(AbleToApplyFunction(result))
+                case Failure(_) => {
+                  // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+                  // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+                  // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+                  //  and get the default from that
+                  val nType = RetrieveType.retrieveOutputTypeFromFunction(func, env)
+                  
+                  for {
+                    initValue <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType, env), env)
+                  } yield {
+                    AbleToApplyFunction(initValue)
+                  }
+                }
               }
             }
           }
-        }
+        } yield keyMatchResult
       }
       case (RangeFunc(i), Index(j)) => {
         val ix = if (j < i) 1 else 0
@@ -337,6 +436,13 @@ object Evaluator {
 
         Success(AbleToApplyFunction(Index(if (isCommand) 1 else 0)))
       }
+      case (IsVersionedFunc, nObject) => Success(AbleToApplyFunction(
+        nObject match {
+          case VersionedObject(_, _, _) => Index(1)
+          case BranchedVersionedObject(_, _, _) => Index(1)
+          case _ => Index(0)
+        }
+      ))
       case (IsSimpleFunction, nObject) => {
         nObject match {
           case MapInstance(_, MapT(_, _, CommandOutput, features)) => {
@@ -370,7 +476,7 @@ object Evaluator {
 
       result <- attempt match {
         case AbleToApplyFunction(result: NewMapObject) => Success(result)
-        case _ => Failure(s"Unable to apply $nObject to function $nFunction")
+        case _ => Failure(s"Unable to apply $nObject to function $nFunction ---- $attempt")
       }
     } yield result
   }

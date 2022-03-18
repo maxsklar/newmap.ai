@@ -56,7 +56,7 @@ object MakeSubstitution {
       case CaseInstance(constructor, value, CaseT(c)) => {
         CaseInstance(constructor, this(value, parameters, env), CaseT(this(c, parameters, env)))
       }
-      case IsCommandFunc | IsSimpleFunction | RangeFunc(_) | IncrementFunc => expression
+      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | RangeFunc(_) | IncrementFunc => expression
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values
@@ -76,6 +76,20 @@ object MakeSubstitution {
             mapT.completeness,
             mapT.featureSet
           )
+        )
+      }
+      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
+        VersionedObject(
+          this(currentState, parameters, env),
+          this(commandType, parameters, env),
+          versionNumber
+        )
+      }
+      case BranchedVersionedObject(vo: NewMapObject, base: NewMapObject, changeLog: Vector[NewMapObject]) => {
+        BranchedVersionedObject(
+          this(vo, parameters, env),
+          this(base, parameters, env),
+          changeLog.map(c => this(c, parameters, env))
         )
       }
     }

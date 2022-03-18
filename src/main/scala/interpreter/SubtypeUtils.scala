@@ -161,6 +161,7 @@ object SubtypeUtils {
         }
         case SubtypeT(IsCommandFunc) => false
         case SubtypeT(IsSimpleFunction) => false
+        case SubtypeT(IsVersionedFunc) => false
         case SubtypeT(RangeFunc(_)) => false
         case _ => {
           // TODO: Is this appropriate - shouldn't it be false
@@ -204,11 +205,11 @@ object SubtypeUtils {
           // If not evaluated, we can't check for membership
           // TODO: What if this is a complex function?
           // - Solution: only evaluate it if its a simplefunction..
-          //   if it's a complex function, leave it alone, but don't compile, and have a good error
+          //   if it's a complex function, leave it alone, and have a good error
           //   message about it saying that we can't check for the subtype because we won't run your
-          //   function (which could be some crazy infinite loop or fibonacci crap)
+          //   function (which could be some crazy infinite loop or fibonacci explosion crap)
           // Instead.. the function itself should have guarantees
-          evaluatedObject <- Evaluator(convertedObject, env)
+          evaluatedObject <- Evaluator(convertedObject, env, keepVersioning = true)
 
           // 2: See if it's actually a member of the subtype
           isMemberOfSubtype <- isMemberOfSubtype(evaluatedObject, endingType, env)

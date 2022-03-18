@@ -19,7 +19,7 @@ object Repl {
           if (s == ":exit") {
             continue = false
           } else {
-            println(s)
+            if (s.length > 0) println(s)
           }
         }
         case Failure(s) => println("Error:\n" + s)

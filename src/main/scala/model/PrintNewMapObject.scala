@@ -11,12 +11,13 @@ object PrintNewMapObject {
     case AnyT => s"Any"
     case IsCommandFunc => s"IsCommandFunc"
     case IsSimpleFunction => s"IsSimpleFunction"
+    case IsVersionedFunc => s"IsVersionedFunc"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s + "~Id"
     case MapT(key, value, completeness, featureSet) => {
       (completeness, featureSet) match {
-        case (CommandOutput, BasicMap) => "Map(" + this(key) + ", " + this(value) + ")-" + completeness + "-" + featureSet
+        case (CommandOutput, BasicMap) => "Map(" + this(key) + ", " + this(value) + ")"
         case (RequireCompleteness, SimpleFunction) => "ReqMap(" + this(key) + ", " + this(value) + ")"
         case (RequireCompleteness, FullFunction) => {
           // TODO(2022): Change the way lambda input works so that it's more like Map
@@ -57,6 +58,12 @@ object PrintNewMapObject {
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
     case RangeFunc(i) => s"<$i"
+    case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, v: Long) => {
+      this(currentState) + s"v$v"
+    }
+    case BranchedVersionedObject(vo: NewMapObject, base: NewMapObject, changeLog: Vector[NewMapObject]) => {
+      this(vo)
+    }
   }
 
   def printParams(params: Vector[(String, NewMapObject)]): String = {

@@ -212,6 +212,30 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def forkedVersionedStatement: Parser[ForkedVersionedStatementParse] = {
+    Lexer.Identifier("ver") ~ identifier ~ Lexer.Equals() ~ Lexer.Identifier("fork") ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ _ ~ _ ~ exp => {
+        ForkedVersionedStatementParse(id, exp)
+      }
+    }
+  }
+
+  private def applyCommand: Parser[ApplyCommandStatementParse] = {
+    Lexer.Identifier("update") ~ identifier ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ exp => {
+        ApplyCommandStatementParse(id, exp)
+      }
+    }
+  }
+
+  private def applyCommands: Parser[ApplyCommandsStatementParse] = {
+    Lexer.Identifier("updates") ~ identifier ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ exp => {
+        ApplyCommandsStatementParse(id, exp)
+      }
+    }
+  }
+
   private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
     Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
@@ -244,7 +268,7 @@ object NewMapParser extends Parsers {
     tokens: Seq[Lexer.Token]
   ): Outcome[EnvStatementParse, String] = {
     val reader = new TokenReader(tokens)
-    val program = phrase(fullStatement | newVersionedStatement | inferredTypeStatement | expOnlyStatmentParse)
+    val program = phrase(fullStatement | newVersionedStatement | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
 
     program(reader) match {
       case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

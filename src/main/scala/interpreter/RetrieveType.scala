@@ -43,8 +43,13 @@ object RetrieveType {
     case ParameterObj(_, nType) => nType
     case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
+    case IsVersionedFunc => MapT(AnyT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
+    case VersionedObject(_, commandType: NewMapObject, _) => {
+      commandType
+    }
+    case BranchedVersionedObject(vo, _, _) => this(vo, env)
   }
 
   def retrieveInputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
@@ -87,7 +92,7 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IncrementFunc | IsCommandFunc | IsSimpleFunction => true
+    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsSimpleFunction => true
     case MapInstance(values, mapT) => {
       isMapValuesClosed(values, knownVariables) && isTermClosedLiteral(mapT, knownVariables)
     }
@@ -119,6 +124,14 @@ object RetrieveType {
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
+    case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, _) => {
+      isTermClosedLiteral(currentState, knownVariables) &&
+        isTermClosedLiteral(commandType, knownVariables)
+    }
+    case BranchedVersionedObject(vo, base, changeLog) => {
+      // Do we need to check changeLog?
+      isTermClosedLiteral(vo, knownVariables) && isTermClosedLiteral(base)
+    }
   }
 
   def isMapValuesClosed(

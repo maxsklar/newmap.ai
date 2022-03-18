@@ -17,7 +17,6 @@ object Lexer extends RegexParsers {
   case class Arrow() extends Token
   case class Period() extends Token
 
-
   override def skipWhitespace = true
   override val whiteSpace = "[ \t\r\f]+".r
 

@@ -59,6 +59,21 @@ case class NewVersionedStatementParse(
   expression: ParseTree // Must represent the versioned type
 ) extends EnvStatementParse
 
+case class ForkedVersionedStatementParse(
+  identifier: IdentifierParse,
+  expression: ParseTree // Must represent a versioned object
+) extends EnvStatementParse
+
+case class ApplyCommandStatementParse(
+  identifier: IdentifierParse,
+  expression: ParseTree // Represents the command to apply
+) extends EnvStatementParse
+
+case class ApplyCommandsStatementParse(
+  identifier: IdentifierParse,
+  expression: ParseTree // Represents a list of commands to apply
+) extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
 

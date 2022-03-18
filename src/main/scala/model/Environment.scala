@@ -2,7 +2,7 @@ package ai.newmap.model
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
-import ai.newmap.interpreter._ //TODO: Remove this dependence
+import ai.newmap.interpreter._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 sealed abstract class EnvironmentCommand
@@ -16,7 +16,26 @@ case class FullEnvironmentCommand(
     //s"val $id: ${nType} = ${nObject}"
 
     // TODO include type(as above) using environment
-    s"val $id = ${nObject}"
+
+    // TODO - should be different if a versioned object
+    nObject match {
+      case VersionedObject(state, nType, 0) => {
+        "" //s"ver $id = new ${nType}"
+      }
+      case VersionedObject(state, nType, version) => {
+        s"ver $id = ${state}; ver=$version"
+      }
+      case _ => s"val $id = ${nObject}"
+    }
+  }
+}
+
+case class ApplyIndividualCommand(
+  id: String,
+  nObject: NewMapObject
+) extends EnvironmentCommand {
+  override def toString: String = {
+    "" //s"update $id $nObject"
   }
 }
 
@@ -64,6 +83,10 @@ case class Environment(
       command match {
         case FullEnvironmentCommand(s, nObject) => {
           idToObject + (s -> nObject)
+        }
+        case ApplyIndividualCommand(s, nObject) => {
+          val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
+          idToObject + (s -> result)
         }
         case ParameterEnvironmentCommand(s, nType) => {
           val uuid = java.util.UUID.randomUUID

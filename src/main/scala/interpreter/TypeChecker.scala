@@ -459,6 +459,18 @@ object TypeChecker {
     } yield evaluatedTc
   }
 
+  def applyCommandTypeChecker(
+    id: String,
+    commandParseTree: ParseTree,
+    env: Environment
+  ): Outcome[NewMapObject, String] = {
+    for {
+      versionedO <- Evaluator.lookupVersionedObject(id, env)
+      inputT <- Evaluator.getCommandInputOfPureCommandType(versionedO.commandType, versionedO.currentState)
+      result <- typeCheck(commandParseTree, inputT, env)
+    } yield result
+  }
+
   def apply(
     expression: ParseTree
   ): Outcome[NewMapObject, String] = {

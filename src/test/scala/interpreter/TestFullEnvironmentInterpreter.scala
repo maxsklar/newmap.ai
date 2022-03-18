@@ -458,4 +458,83 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     CodeExpectation("Increment Type", FailureCheck)
     CodeExpectation("Increment (1: 4, 2: 5)", FailureCheck)
   }
+
+  "Versioned Objects " should " be initialized and updated for Count" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
+    ))
+  }
+
+  it should " be initialized and updated for Map" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver m = new Map(Identifier, Count)", GeneralSuccessCheck),
+      CodeExpectation("update m (hello, 0)", GeneralSuccessCheck),
+      CodeExpectation("update m (world, 0)", GeneralSuccessCheck),
+      CodeExpectation("update m (world, 0)", GeneralSuccessCheck),
+      CodeExpectation("m hello", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
+      CodeExpectation("m world", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2)))),
+      CodeExpectation("m yo", SuccessCheck(ExpOnlyEnvironmentCommand(Index(0))))
+    ))
+  }
+
+  it should " be convertable to values and stop updating" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("val x: Count = n ", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
+      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
+    ))
+  }
+
+  it should " be forked correctly" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("ver nForked = fork n", GeneralSuccessCheck),
+      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
+      CodeExpectation("nForked", SuccessCheck(ExpOnlyEnvironmentCommand(Index(8))))
+    ))
+  }
+
+  it should " fail when forked off a non-versioned object" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Count = 10", GeneralSuccessCheck),
+      CodeExpectation("ver n = fork x", FailureCheck)
+    ))
+  }
+
+  it should " be branched correctly" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("ver nBranched = branch n", GeneralSuccessCheck),
+      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
+      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
+      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
+      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
+      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
+      CodeExpectation("nBranched", SuccessCheck(ExpOnlyEnvironmentCommand(Index(8))))
+    ))
+  }
 }

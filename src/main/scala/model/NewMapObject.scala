@@ -75,6 +75,8 @@ case object IsCommandFunc extends NewMapObject
 // Temporary for now, this should be buildable as a map pattern in the future
 case object IsSimpleFunction extends NewMapObject
 
+case object IsVersionedFunc extends NewMapObject
+
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
 
@@ -163,6 +165,18 @@ case class SubtypeT(
   isMember: NewMapObject
 ) extends NewMapObject
 
+case class VersionedObject(
+  currentState: NewMapObject,
+  commandType: NewMapObject,
+  versionNumber: Long
+) extends NewMapObject
+
+case class BranchedVersionedObject(
+  versionedObject: NewMapObject,
+  base: NewMapObject,
+  changeLog: Vector[NewMapObject]
+) extends NewMapObject
+
 // This is a custom type of nodes that are unique
 /*case class CustomT(
   uuid: String,
@@ -212,6 +226,8 @@ object NewMapO {
   // - This will be replaced once we get Map Type patterns working properly
   // - Created for now to get Subtype working properly, so that we can move on
   def simpleFunctionT: NewMapObject = SubtypeT(IsSimpleFunction)
+
+  def versionedT: NewMapObject = SubtypeT(IsVersionedFunc)
 
   // For now, store a sequence as a map
   // TODO - this will get more efficient later on!
