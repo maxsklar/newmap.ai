@@ -25,8 +25,6 @@ case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 
 
 class TestFullEnvironmentInterpreter extends FlatSpec {
-  def rangeType(i: Long): SubtypeT = SubtypeT(RangeFunc(i))
-
   /**
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 
@@ -89,11 +87,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       MapInstance(
         Vector(
-          ObjectPattern(Index(0)) -> Index(20),
-          ObjectPattern(Index(1)) -> Index(43),
-          ObjectPattern(Index(2)) -> Index(67)
+          ObjectPattern(IndexValue(0, 3)) -> IndexValue(20, 100),
+          ObjectPattern(IndexValue(1, 3)) -> IndexValue(43, 100),
+          ObjectPattern(IndexValue(2, 3)) -> IndexValue(67, 100)
         ),
-        MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
+        MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
     )
 
@@ -105,14 +103,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "m",
-      MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
+      MapT(Index(3), Index(100), CommandOutput, BasicMap)
     )
 
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
   }
 
   it should " be applyable to a key" in {
-    val correctCommand = Environment.eCommand("result", Index(43))
+    val correctCommand = Environment.eCommand("result", IndexValue(43, 100))
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
@@ -120,7 +118,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key not specified and use the default" in {
-    val correctCommand = Environment.eCommand("result", Index(0))
+    val correctCommand = Environment.eCommand("result", IndexValue(0, 100))
 
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 2: 67)", GeneralSuccessCheck),
@@ -135,8 +133,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "m",
       MapInstance(
-        Vector(ObjectPattern(Index(0)) -> Index(10), ObjectPattern(Index(2)) -> Index(3)),
-        MapT(rangeType(3), rangeType(100), CommandOutput, BasicMap)
+        Vector(ObjectPattern(IndexValue(0, 3)) -> IndexValue(10, 100), ObjectPattern(IndexValue(2, 3)) -> IndexValue(3, 100)),
+        MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
     )
 
@@ -144,11 +142,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A struct " should " be created" in {
-    val structType = Environment.structTypeFromParams(Vector(("a",rangeType(2)), ("b",rangeType(3))))
+    val structType = Environment.structTypeFromParams(Vector(("a",Index(2)), ("b",Index(3))))
     val correctCommand = Environment.eCommand(
       "s",
       StructInstance(
-        Vector((ObjectPattern(IdentifierInstance("a")), Index(0)), (ObjectPattern(IdentifierInstance("b")), Index(0))),
+        Vector((ObjectPattern(IdentifierInstance("a")), IndexValue(0, 2)), (ObjectPattern(IdentifierInstance("b")), IndexValue(0, 3))),
         structType
       )
     )
@@ -159,10 +157,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " allow its fields to be accessed " in {
-    val interp = new EnvironmentInterpreter()
     val correctCommand = Environment.eCommand(
       "q",
-      Index(1)
+      IndexValue(1, 3)
     )
 
     testCodeScript(Vector(
@@ -172,12 +169,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " allow its fields to be accessed in expresions that can be evaluated to literals " in {
-    val interp = new EnvironmentInterpreter()
-    val correctCommand = Environment.eCommand(
-      "q",
-      Index(1)
-    )
-
     testCodeScript(Vector(
       CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val fieldMap: ReqMap(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
@@ -204,11 +195,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       MapT(
         Environment.structTypeFromParams(
           Vector(
-            "a" -> rangeType(3),
-            "b" -> rangeType(3)
+            "a" -> Index(3),
+            "b" -> Index(3)
           )
         ),
-        rangeType(100),
+        Index(100),
         CommandOutput,
         BasicMap
       )
@@ -230,11 +221,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A case " should " be created and instantiated" in {
-    val caseT = Environment.caseTypeFromParams(Vector(("a",rangeType(2)), ("b",rangeType(3))))
+    val caseT = Environment.caseTypeFromParams(Vector(("a",Index(2)), ("b",Index(3))))
 
     val correctCommand = Environment.eCommand(
       "x",
-      CaseInstance(IdentifierInstance("a"), Index(0), caseT)
+      CaseInstance(IdentifierInstance("a"), IndexValue(0, 2), caseT)
     )
 
     testCodeScript(Vector(
@@ -269,36 +260,36 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
       MapInstance(Vector(
-        TypePattern("a", rangeType(3)) ->
+        TypePattern("a", Index(3)) ->
         ApplyFunction(
           MapInstance(
-            Vector(ObjectPattern(Index(0)) -> Index(2), ObjectPattern(Index(1)) -> Index(3), ObjectPattern(Index(2)) -> Index(1)),
-            MapT(rangeType(3), rangeType(4), CommandOutput, BasicMap)
+            Vector(ObjectPattern(IndexValue(0, 3)) -> IndexValue(2, 4), ObjectPattern(IndexValue(1, 3)) -> IndexValue(3, 4), ObjectPattern(IndexValue(2, 3)) -> IndexValue(1, 4)),
+            MapT(Index(3), Index(4), CommandOutput, BasicMap)
           ),
           ParamId("a")
         )
-      ), MapT(rangeType(3), rangeType(4), RequireCompleteness, FullFunction))
+      ), MapT(Index(3), Index(4), RequireCompleteness, FullFunction))
     )
 
     val correctCommandUseFunc = Environment.eCommand(
       "result",
-      Index(3)
+      IndexValue(3, 4)
     )
 
     val correctCommandUseSimpleFunc = Environment.eCommand(
       "resultSimple",
-      Index(1)
+      IndexValue(1, 4)
     )
 
     val correctCommandUseParenFunc = Environment.eCommand(
       "resultParen",
-      Index(2)
+      IndexValue(2, 4)
     )
 
     testCodeScript(Vector(
       CodeExpectation("val fSig: Type = (3 => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
-        Environment.fullFuncT(rangeType(3), rangeType(4))
+        Environment.fullFuncT(Index(3), Index(4))
       ))),
       CodeExpectation("val m: Map(3, 4) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = (a: m a)", SuccessCheck(correctCommandCreateFunc)),
@@ -313,7 +304,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val fSig: Type = (a: 5, b: (5 => 10)) => 10", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = ((a, b): b a)", GeneralSuccessCheck),
       CodeExpectation("val m: Map(5, 10) = (0: 0, 1: 2, 2: 4, 3: 6, 4: 8)", GeneralSuccessCheck),
-      CodeExpectation("f (1, m)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2))))
+      CodeExpectation("f (1, m)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, 10))))
     ))
   }
 
@@ -373,9 +364,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be able to handle the most basic pattern matching" in {
     testCodeScript(Vector(
       CodeExpectation("val x: ReqMap(4, 4) = (0: 3, t: t)", GeneralSuccessCheck),
-      CodeExpectation("x 0", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
-      CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
-      CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2))))
+      CodeExpectation("x 0", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, 4)))),
+      CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, 4)))),
+      CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, 4))))
     ))
   }
 
@@ -383,9 +374,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   // The solution to this was avoiding variable capture
   it should " be able to handle a nested ReqMap properly" in {
     val expectedResult = MapT(
-      rangeType(2),
+      Index(2),
       MapT(
-        rangeType(4),
+        Index(4),
         CountT,
         RequireCompleteness,
         SimpleFunction
@@ -405,7 +396,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "SubMaps " should " work" in testCodeScript(Vector(
     CodeExpectation("val m: SubMap(8, 2) = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
     CodeExpectation("m 0", GeneralSuccessCheck),
-    CodeExpectation("m 0", GeneralSuccessCheck),
+    CodeExpectation("m 1", GeneralSuccessCheck),
     CodeExpectation("m 4", GeneralSuccessCheck),
     CodeExpectation("m 2", FailureCheck)
   ))
@@ -422,8 +413,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("f(1, 1)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(201)))),
       CodeExpectation("f(2, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(102))))
     ))
-
-    //583
   }
 
   "A Subset Type " should "work" in {

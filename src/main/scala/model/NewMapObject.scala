@@ -11,8 +11,6 @@ sealed abstract class NewMapObject {
 
 case class IdentifierInstance(s: String) extends NewMapObject
 
-case class Index(i: Long) extends NewMapObject
-
 sealed abstract class NewMapPattern
 
 // Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
@@ -53,9 +51,6 @@ case class ParamId(name: String) extends NewMapObject
 // This is a parameter that is a standin
 case class ParameterObj(uuid: UUID, nType: NewMapObject) extends NewMapObject
 
-// This function takes a count and returns true if that count is strictly less than i
-case class RangeFunc(i: Long) extends NewMapObject
-
 // This takes as input a member of TypeT and returns true if it's a member
 //  of the command typeclass (which means it has a default value and an update function)
 // TODO: making this a basic class is temporary for now
@@ -85,8 +80,12 @@ case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType
  * The types in the NewMap Language
  * This is actually a subset of the Objects
  */
-
 case object CountT extends NewMapObject
+
+case class Index(i: Long) extends NewMapObject
+
+// This is actually not a type!
+case class IndexValue(i: Long, n: Long) extends NewMapObject
 
 // Type of types
 // TODO - eventually, we will replace this with an IsType function
@@ -201,9 +200,6 @@ case class TypeParameterVariance(
 )*/
 
 object NewMapO {
-  
-  def rangeT(i: Long): NewMapObject = SubtypeT(RangeFunc(i))
-
   // This is a subtype of TypeT, basically a newmap object with a command structure
   // - It has an initial value
   // - It has a command type
@@ -221,9 +217,10 @@ object NewMapO {
   // For now, store a sequence as a map
   // TODO - this will get more efficient later on!
   def smallFiniteSequence(items: Vector[NewMapObject], nType: NewMapObject): NewMapObject = {
+    val index = Index(items.length)
     MapInstance(
-      items.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> x._1),
-      MapT(rangeT(items.length), nType, RequireCompleteness, BasicMap)
+      items.zipWithIndex.map(x => ObjectPattern(IndexValue(x._2, items.length)) -> x._1),
+      MapT(index, nType, RequireCompleteness, BasicMap)
     )
   }
 }

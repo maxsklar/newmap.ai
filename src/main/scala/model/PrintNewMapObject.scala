@@ -6,6 +6,7 @@ import ai.newmap.model._
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case Index(i) => i.toString
+    case IndexValue(i, n) => i.toString + "\\" + n.toString
     case CountT => "Count"
     case TypeT => s"Type"
     case AnyT => s"Any"
@@ -57,7 +58,6 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
-    case RangeFunc(i) => s"<$i"
     case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, v: Long) => {
       this(currentState) + s"v$v"
     }

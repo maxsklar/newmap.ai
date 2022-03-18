@@ -6,17 +6,6 @@ import ai.newmap.util.{Outcome, Success, Failure}
 // Handles checking if two subtypes are comparable to one another
 // and whether an object can be converted to a different type
 object SubtypeUtils {
-  def checkProposedObjectInSubtype(
-    proposedObject: NewMapObject,
-    expectedType: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapObject, String] = {
-    for {
-      isMember <- isMemberOfSubtype(proposedObject, expectedType, env)
-      _ <- Outcome.failWhen(!isMember, s"Proposed object $proposedObject is not in subtype $expectedType")
-    } yield proposedObject
-  }
-
   // For ReqMaps, we need to ensure that all of the values are accounted for.
   // For Maps, we want to know that the default value is never used
   def doMapValuesCoverType(
@@ -75,7 +64,6 @@ object SubtypeUtils {
       case SubtypeT(MapInstance(values, _)) => enumerateMapKeys(values.map(_._1))
       // TODO(2022): if simpleFunction is boolean function on a small finite parentType, we should be able to enumerate those
       // TODO(2022): this is also one of those advanced cases where we want to know if one set is a subset of another through some advanced argument (like monotonicity)
-      case SubtypeT(RangeFunc(i)) => Success((0 until i.toInt).map(j => Index(j.toLong)).toSet)
       // TODO - structs and cases
       case StructT(mi@MapInstance(values, _)) if (values.length == 1) => {
         // TODO: we may also be able to enumerate all values if the length > 1 !
@@ -84,6 +72,9 @@ object SubtypeUtils {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           result <- enumerateAllValuesIfPossible(singularOutput)
         } yield result
+      }
+      case Index(i) => {
+        Success((0 until i.toInt).map(j => IndexValue(j.toLong, i)).toSet)
       }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }
@@ -113,7 +104,9 @@ object SubtypeUtils {
     requestedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    val constNObject = Evaluator.getCurrentConstantValue(nObject)
+    // TODO - what to do with this?
+    //val constNObject = Evaluator.getCurrentConstantValue(nObject)
+    val constNObject = nObject
     val nType = RetrieveType(constNObject, env)
 
     if (nType != requestedType) {
@@ -126,6 +119,21 @@ object SubtypeUtils {
       } yield nObject
     } else {
       Success(nObject)
+    }
+  }
+
+  def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
+    case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
+      // TODO: Extend this to see if pattering matching in basic function covers the full type
+      // Check that the function doesn't return the default value for any input
+      doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
+    }
+    case SubtypeT(IsCommandFunc) => false
+    case SubtypeT(IsSimpleFunction) => false
+    case SubtypeT(IsVersionedFunc) => false
+    case _ => {
+      // TODO: Is this appropriate - shouldn't it be false
+      true
     }
   }
 
@@ -146,23 +154,12 @@ object SubtypeUtils {
 
       _ <- Outcome.failWhen(!pureTypeConvertible, s"Non-convertible pure types from $startingType to $endingType")
     } yield {
-      val doesEndtypeCoverParentType = endingType match {
-        case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
-          // TODO: Extend this to see if pattering matching in basic function covers the full type
-          // Check that the function doesn't return the default value for any input
-          doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
-        }
-        case SubtypeT(IsCommandFunc) => false
-        case SubtypeT(IsSimpleFunction) => false
-        case SubtypeT(IsVersionedFunc) => false
-        case SubtypeT(RangeFunc(_)) => false
-        case _ => {
-          // TODO: Is this appropriate - shouldn't it be false
-          true
-        }
-      }
+      val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
+      val doesStarttypeCoverParentType = doesTypeCoverParentType(startingType, env)
 
-      doesEndtypeCoverParentType || {
+      /// starting typecover parent type
+
+      doesEndtypeCoverParentType || (!doesStarttypeCoverParentType && {
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
@@ -171,7 +168,7 @@ object SubtypeUtils {
         } yield doAllConvert
 
         allConvertedOutcome.toOption.getOrElse(false)
-      }
+      })
     }
   }
 
@@ -188,6 +185,7 @@ object SubtypeUtils {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(true)
       case (_, AnyT) => Success(true)
+      case (CountT, TypeT) => Success(true)
       case (_, SubtypeT(isMember)) => {
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(isMember, env)
 

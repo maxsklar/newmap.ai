@@ -11,7 +11,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IdentifierInstance(_) => expression
+      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IndexValue(_, _) | IdentifierInstance(_) => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           this(inputType, parameters, env),
@@ -56,7 +56,7 @@ object MakeSubstitution {
       case CaseInstance(constructor, value, CaseT(c)) => {
         CaseInstance(constructor, this(value, parameters, env), CaseT(this(c, parameters, env)))
       }
-      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | RangeFunc(_) | IncrementFunc => expression
+      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IncrementFunc => expression
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values

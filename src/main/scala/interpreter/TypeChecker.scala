@@ -20,17 +20,13 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     val result = expression match {
       case NaturalNumberParse(i: Long) => {
-        // TODO: this is so awkard! Fix
-        // - perhaps we can combine the 2 concepts
         RetrieveType.getParentType(expectedType, env) match {
-          case TypeT => {
-            val proposedObject = NewMapO.rangeT(i)
-            SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expectedType, env)
+          case Index(j) => {
+            if (j <= i) {
+              Failure(s"Proposed index $i is too large for type $j")
+            } else Success(IndexValue(i, j))
           }
-          case _ => {
-            val proposedObject = Index(i)
-            SubtypeUtils.checkProposedObjectInSubtype(proposedObject, expectedType, env)
-          }
+          case _ => Success(Index(i))
         }
       }
       case IdentifierParse(s: String, true) => Success(IdentifierInstance(s))

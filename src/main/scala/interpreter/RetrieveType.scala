@@ -7,9 +7,9 @@ object RetrieveType {
   // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
   def apply(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case Index(_) => CountT
+    case IndexValue(_, i) => Index(i)
     case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
-    case RangeFunc(i) => MapT(CountT, NewMapO.rangeT(2), CommandOutput, BasicMap)
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case MapInstance(values, mapT) => mapT
@@ -41,9 +41,9 @@ object RetrieveType {
     // TODO - unsafe get!!
     case ParamId(name) => this(env.lookup(name).get, env)
     case ParameterObj(_, nType) => nType
-    case IsCommandFunc => MapT(TypeT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
-    case IsSimpleFunction => MapT(AnyT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
-    case IsVersionedFunc => MapT(AnyT, NewMapO.rangeT(2), CommandOutput, SimpleFunction)
+    case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+    case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+    case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
     case VersionedObject(_, commandType: NewMapObject, _) => {
@@ -59,7 +59,7 @@ object RetrieveType {
         SubtypeT(
           MapInstance(
             values.map(x => x._1 -> Index(1)),
-            MapT(inputType, NewMapO.rangeT(2), CommandOutput, features)
+            MapT(inputType, Index(2), CommandOutput, features)
           )
         )
       }
@@ -92,7 +92,7 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IdentifierT | CountT | TypeT | AnyT | RangeFunc(_) | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsSimpleFunction => true
+    case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsSimpleFunction => true
     case MapInstance(values, mapT) => {
       isMapValuesClosed(values, knownVariables) && isTermClosedLiteral(mapT, knownVariables)
     }

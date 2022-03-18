@@ -17,7 +17,7 @@ class TestEvaluator extends FlatSpec {
   }
 
   "isCommandFunc " should " work properly on ranges" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, NewMapO.rangeT(10), Environment.Base)
+    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, Index(10), Environment.Base)
     assetFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
@@ -39,17 +39,17 @@ class TestEvaluator extends FlatSpec {
     )
 
     assetFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, SimpleFunction)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, SimpleFunction)), Environment.Base),
       Index(1)
     )
 
     assetFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, BasicMap)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, BasicMap)), Environment.Base),
       Index(1)
     )
 
     assetFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(NewMapO.rangeT(10), NewMapO.rangeT(10), CommandOutput, FullFunction)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, FullFunction)), Environment.Base),
       Index(0)
     )
   }

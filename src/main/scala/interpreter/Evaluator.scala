@@ -11,7 +11,7 @@ object Evaluator {
     keepVersioning: Boolean = false // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -106,6 +106,7 @@ object Evaluator {
   def getDefaultValueOfPureCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
+      case Index(i) if i > 0 => Success(IndexValue(0, i))
       case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       case AnyT => Failure("The \"any\" Type has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
@@ -138,7 +139,7 @@ object Evaluator {
     current: NewMapObject
   ): Outcome[NewMapObject, String] = {
     nType match {
-      case CountT => Success(NewMapO.rangeT(1))
+      case CountT => Success(Index(1))
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
           outputCommandT <- getCommandInputOfPureCommandType(outputType, current)
@@ -147,7 +148,7 @@ object Evaluator {
             MapInstance(
               Vector(ObjectPattern(Index(0)) -> inputType, ObjectPattern(Index(1)) -> outputCommandT),
               MapT(
-                NewMapO.rangeT(2),
+                Index(2),
                 TypeT,
                 RequireCompleteness,
                 BasicMap
@@ -411,10 +412,6 @@ object Evaluator {
           }
         } yield keyMatchResult
       }
-      case (RangeFunc(i), Index(j)) => {
-        val ix = if (j < i) 1 else 0
-        Success(AbleToApplyFunction(Index(ix)))
-      }
       case (IsCommandFunc, nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
 
@@ -547,7 +544,7 @@ object Evaluator {
   // This function removes versioning and returns a constant value - the current value
   def getCurrentConstantValue(nObject: NewMapObject): NewMapObject = {
     nObject match {
-      case CountT | Index(_) | RangeFunc(_) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         nObject
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
