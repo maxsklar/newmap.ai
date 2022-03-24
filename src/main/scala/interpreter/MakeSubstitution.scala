@@ -20,6 +20,9 @@ object MakeSubstitution {
           featureSet
         )
       }
+      case SequenceT(nType) => {
+        SequenceT(this(nType, parameters, env))
+      }
       case StructT(values) => {
         StructT(this(values, parameters, env))
       }
@@ -47,14 +50,14 @@ object MakeSubstitution {
           case None => expression
         }
       }
-      case StructInstance(value, StructT(p)) => {
+      case StructInstance(value, structT) => {
         StructInstance(
           value.map(x => (x._1 -> this(x._2, parameters, env))),
-          StructT(this(p, parameters, env))
+          structT
         )
       }
-      case CaseInstance(constructor, value, CaseT(c)) => {
-        CaseInstance(constructor, this(value, parameters, env), CaseT(this(c, parameters, env)))
+      case CaseInstance(constructor, value, caseT) => {
+        CaseInstance(constructor, this(value, parameters, env), caseT)
       }
       case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IncrementFunc => expression
       case MapInstance(values, mapT) => {
@@ -70,26 +73,21 @@ object MakeSubstitution {
 
         MapInstance(
           newValues,
-          MapT(
-            this(mapT.inputType, parameters, env),
-            this(mapT.outputType, parameters, env),
-            mapT.completeness,
-            mapT.featureSet
-          )
+          mapT
         )
+      }
+      case SequenceInstance(values, seqT) => {
+        val newValues = for {
+          value <- values
+        } yield MakeSubstitution(value, parameters, env)
+
+        SequenceInstance(newValues, seqT)
       }
       case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
         VersionedObject(
           this(currentState, parameters, env),
           this(commandType, parameters, env),
           versionNumber
-        )
-      }
-      case BranchedVersionedObject(vo: NewMapObject, base: NewMapObject, changeLog: Vector[NewMapObject]) => {
-        BranchedVersionedObject(
-          this(vo, parameters, env),
-          this(base, parameters, env),
-          changeLog.map(c => this(c, parameters, env))
         )
       }
     }

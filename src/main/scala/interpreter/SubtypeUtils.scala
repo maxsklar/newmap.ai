@@ -74,7 +74,7 @@ object SubtypeUtils {
         } yield result
       }
       case Index(i) => {
-        Success((0 until i.toInt).map(j => IndexValue(j.toLong, i)).toSet)
+        Success((0 until i.toInt).map(j => IndexValue(j.toLong, Index(i))).toSet)
       }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }

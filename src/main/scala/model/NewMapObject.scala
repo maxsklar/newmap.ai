@@ -73,6 +73,12 @@ case class StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structTy
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject
 
+// Note that this should eventually be turned into a ReqMap(Index(n), output)
+// But because we don't know "n" we can make this its own type for now
+case class SequenceT(underlyingType: NewMapObject) extends NewMapObject
+
+case class SequenceInstance(seq: Vector[NewMapObject], sequenceT: SequenceT) extends NewMapObject
+
 // Basic Function Section
 // These are pre-defined functions, their types are in comment
 
@@ -85,7 +91,7 @@ case object CountT extends NewMapObject
 case class Index(i: Long) extends NewMapObject
 
 // This is actually not a type!
-case class IndexValue(i: Long, n: Long) extends NewMapObject
+case class IndexValue(i: Long, fromType: NewMapObject) extends NewMapObject
 
 // Type of types
 // TODO - eventually, we will replace this with an IsType function
@@ -153,40 +159,17 @@ case class SubtypeT(
   isMember: NewMapObject
 ) extends NewMapObject
 
+// The versionNumber and uuid uniquely define this versioned object within any environment
+// (of course different environments might have updated the object differently)
 case class VersionedObject(
   currentState: NewMapObject,
   commandType: NewMapObject,
   versionNumber: Long
 ) extends NewMapObject
 
-case class BranchedVersionedObject(
-  versionedObject: NewMapObject,
-  base: NewMapObject,
-  changeLog: Vector[NewMapObject]
-) extends NewMapObject
+//def uuid = java.util.UUID.randomUUID
 
-// This is a custom type of nodes that are unique
-/*case class CustomT(
-  uuid: String,
-  ordered: Boolean,
-  items: Vector[NewMapObject] // could there be uuids in here? Any other possibilities 
-)*/
-
-//def uuid = java.util.UUID.randomUUID.toString
-
-
-/*case class MutableObject(
-  version: Long,
-  nCurrent: NewMapObject,
-  nType: NewMapObject // This is in IsCommandFunc = true
-) extends NewMapObject*/
-
-// Figure this out!
-/*case class GenericType(
-  parameters: Vector[(String, TypeParameter)],
-  body: NewMapObject
-) extends NewMapObject
-
+/*
 case class TypeParameter(
   name: String,
   upperBounds: Vector[NewMapObject] = Vector.empty,
@@ -214,13 +197,7 @@ object NewMapO {
 
   def versionedT: NewMapObject = SubtypeT(IsVersionedFunc)
 
-  // For now, store a sequence as a map
-  // TODO - this will get more efficient later on!
-  def smallFiniteSequence(items: Vector[NewMapObject], nType: NewMapObject): NewMapObject = {
-    val index = Index(items.length)
-    MapInstance(
-      items.zipWithIndex.map(x => ObjectPattern(IndexValue(x._2, items.length)) -> x._1),
-      MapT(index, nType, RequireCompleteness, BasicMap)
-    )
-  }
+  def emptyStruct: NewMapObject = StructT(
+    MapInstance(Vector.empty, MapT(Index(0), Index(0), RequireCompleteness, BasicMap))
+  )
 }

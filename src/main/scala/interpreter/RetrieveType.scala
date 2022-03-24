@@ -7,12 +7,13 @@ object RetrieveType {
   // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
   def apply(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case Index(_) => CountT
-    case IndexValue(_, i) => Index(i)
-    case CountT | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
+    case IndexValue(_, indexT) => indexT 
+    case CountT | SequenceT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case MapInstance(values, mapT) => mapT
+    case SequenceInstance(values, seqT) => seqT
     case ApplyFunction(func, input) => retrieveOutputTypeFromFunction(func, env)
     case AccessField(StructInstance(_, StructT(params)), field) => {
       // Field should be evaluated automatically (not allowed to have a ParameterObj in there - must be closed literal)
@@ -35,6 +36,9 @@ object RetrieveType {
         }
       }
     }
+    case AccessField(VersionedObject(current, _, _), field) => {
+      this(AccessField(current, field), env)
+    }
     case AccessField(struct, field) => {
       throw new Exception(s"This access of $struct with field $field is not allowed")
     }
@@ -49,12 +53,14 @@ object RetrieveType {
     case VersionedObject(_, commandType: NewMapObject, _) => {
       commandType
     }
-    case BranchedVersionedObject(vo, _, _) => this(vo, env)
   }
 
   def retrieveInputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
     // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
     nFunction match {
+      case VersionedObject(currentState, _, _) => {
+        retrieveInputTypeFromFunction(currentState, env)
+      }
       case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
         SubtypeT(
           MapInstance(
@@ -63,8 +69,12 @@ object RetrieveType {
           )
         )
       }
-     case _ => RetrieveType(nFunction, env) match {
-     // Once lambdaInstance is eliminated, these lines get easier to write!
+      case SequenceInstance(values, seqT) => {
+        // TODO: Sequences shouldn't merely be based on indecies, each sequence should have it's own input tag
+        Index(values.length)
+      }
+      case _ => RetrieveType(nFunction, env) match {
+      // Once lambdaInstance is eliminated, these lines get easier to write!
         case MapT(inputType, _, _, _) => inputType
         case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
       }
@@ -74,6 +84,7 @@ object RetrieveType {
   def retrieveOutputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
     RetrieveType(nFunction, env) match {
       case MapT(_, outputType, _, _) => outputType
+      case SequenceT(nType) => nType
       case _ => throw new Exception(s"Couldn't retrieve output type from $nFunction")
     }
   }
@@ -94,7 +105,10 @@ object RetrieveType {
   ): Boolean = nObject match {
     case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsSimpleFunction => true
     case MapInstance(values, mapT) => {
-      isMapValuesClosed(values, knownVariables) && isTermClosedLiteral(mapT, knownVariables)
+      isMapValuesClosed(values, knownVariables)
+    }
+    case SequenceInstance(values, seqT) => {
+      values.forall(value => isTermClosedLiteral(value, knownVariables))
     }
     case ParamId(name) => knownVariables.contains(name)
     case ParameterObj(_, _) => false
@@ -110,16 +124,18 @@ object RetrieveType {
     case StructInstance(value, structType) => {
       value.forall(x =>
         isTermClosedLiteral(x._2, knownVariables)
-      ) && isTermClosedLiteral(structType, knownVariables)
+      )
     }
     case CaseInstance(constructor, input, caseType) => {
       isTermClosedLiteral(constructor, knownVariables) &&
-        isTermClosedLiteral(input, knownVariables) &&
-        isTermClosedLiteral(caseType, knownVariables)
+        isTermClosedLiteral(input, knownVariables)
     }
     case MapT(inputType, outputType, _, _) => {
       isTermClosedLiteral(inputType, knownVariables) &&
         isTermClosedLiteral(outputType, knownVariables)
+    }
+    case SequenceT(nType) => {
+      isTermClosedLiteral(nType, knownVariables)
     }
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
@@ -127,10 +143,6 @@ object RetrieveType {
     case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, _) => {
       isTermClosedLiteral(currentState, knownVariables) &&
         isTermClosedLiteral(commandType, knownVariables)
-    }
-    case BranchedVersionedObject(vo, base, changeLog) => {
-      // Do we need to check changeLog?
-      isTermClosedLiteral(vo, knownVariables) && isTermClosedLiteral(base)
     }
   }
 

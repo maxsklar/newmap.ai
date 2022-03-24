@@ -87,9 +87,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       MapInstance(
         Vector(
-          ObjectPattern(IndexValue(0, 3)) -> IndexValue(20, 100),
-          ObjectPattern(IndexValue(1, 3)) -> IndexValue(43, 100),
-          ObjectPattern(IndexValue(2, 3)) -> IndexValue(67, 100)
+          ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(20, Index(100)),
+          ObjectPattern(IndexValue(1, Index(3))) -> IndexValue(43, Index(100)),
+          ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(67, Index(100))
         ),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
@@ -110,7 +110,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key" in {
-    val correctCommand = Environment.eCommand("result", IndexValue(43, 100))
+    val correctCommand = Environment.eCommand("result", IndexValue(43, Index(100)))
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
@@ -118,7 +118,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key not specified and use the default" in {
-    val correctCommand = Environment.eCommand("result", IndexValue(0, 100))
+    val correctCommand = Environment.eCommand("result", IndexValue(0, Index(100)))
 
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 2: 67)", GeneralSuccessCheck),
@@ -133,7 +133,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "m",
       MapInstance(
-        Vector(ObjectPattern(IndexValue(0, 3)) -> IndexValue(10, 100), ObjectPattern(IndexValue(2, 3)) -> IndexValue(3, 100)),
+        Vector(ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(10, Index(100)), ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(3, Index(100))),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
     )
@@ -146,7 +146,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "s",
       StructInstance(
-        Vector((ObjectPattern(IdentifierInstance("a")), IndexValue(0, 2)), (ObjectPattern(IdentifierInstance("b")), IndexValue(0, 3))),
+        Vector((ObjectPattern(IdentifierInstance("a")), IndexValue(0, Index(2))), (ObjectPattern(IdentifierInstance("b")), IndexValue(0, Index(3)))),
         structType
       )
     )
@@ -159,7 +159,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " allow its fields to be accessed " in {
     val correctCommand = Environment.eCommand(
       "q",
-      IndexValue(1, 3)
+      IndexValue(1, Index(3))
     )
 
     testCodeScript(Vector(
@@ -217,7 +217,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A Map to a non-command type " should " not be creatable" in {
-    testLineFails("val m: Map (Identifier, Type) = (a: 6)")
+    testLineFails("val m: Map (10, Identifier) = (6: a)")
   }
 
   "A case " should " be created and instantiated" in {
@@ -225,7 +225,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "x",
-      CaseInstance(IdentifierInstance("a"), IndexValue(0, 2), caseT)
+      CaseInstance(IdentifierInstance("a"), IndexValue(0, Index(2)), caseT)
     )
 
     testCodeScript(Vector(
@@ -263,7 +263,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
         TypePattern("a", Index(3)) ->
         ApplyFunction(
           MapInstance(
-            Vector(ObjectPattern(IndexValue(0, 3)) -> IndexValue(2, 4), ObjectPattern(IndexValue(1, 3)) -> IndexValue(3, 4), ObjectPattern(IndexValue(2, 3)) -> IndexValue(1, 4)),
+            Vector(ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(2, Index(4)), ObjectPattern(IndexValue(1, Index(3))) -> IndexValue(3, Index(4)), ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(1, Index(4))),
             MapT(Index(3), Index(4), CommandOutput, BasicMap)
           ),
           ParamId("a")
@@ -273,17 +273,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommandUseFunc = Environment.eCommand(
       "result",
-      IndexValue(3, 4)
+      IndexValue(3, Index(4))
     )
 
     val correctCommandUseSimpleFunc = Environment.eCommand(
       "resultSimple",
-      IndexValue(1, 4)
+      IndexValue(1, Index(4))
     )
 
     val correctCommandUseParenFunc = Environment.eCommand(
       "resultParen",
-      IndexValue(2, 4)
+      IndexValue(2, Index(4))
     )
 
     testCodeScript(Vector(
@@ -304,7 +304,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val fSig: Type = (a: 5, b: (5 => 10)) => 10", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = ((a, b): b a)", GeneralSuccessCheck),
       CodeExpectation("val m: Map(5, 10) = (0: 0, 1: 2, 2: 4, 3: 6, 4: 8)", GeneralSuccessCheck),
-      CodeExpectation("f (1, m)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, 10))))
+      CodeExpectation("f (1, m)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(10)))))
     ))
   }
 
@@ -364,9 +364,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be able to handle the most basic pattern matching" in {
     testCodeScript(Vector(
       CodeExpectation("val x: ReqMap(4, 4) = (0: 3, t: t)", GeneralSuccessCheck),
-      CodeExpectation("x 0", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, 4)))),
-      CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, 4)))),
-      CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, 4))))
+      CodeExpectation("x 0", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, Index(4))))),
+      CodeExpectation("x 3", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(3, Index(4))))),
+      CodeExpectation("x 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(4)))))
     ))
   }
 
@@ -451,9 +451,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Versioned Objects " should " be initialized and updated for Count" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
     ))
   }
@@ -461,9 +461,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be initialized and updated for Map" in {
     testCodeScript(Vector(
       CodeExpectation("ver m = new Map(Identifier, Count)", GeneralSuccessCheck),
-      CodeExpectation("update m (hello, 0)", GeneralSuccessCheck),
-      CodeExpectation("update m (world, 0)", GeneralSuccessCheck),
-      CodeExpectation("update m (world, 0)", GeneralSuccessCheck),
+      CodeExpectation("update m (hello, ())", GeneralSuccessCheck),
+      CodeExpectation("update m (world, ())", GeneralSuccessCheck),
+      CodeExpectation("update m (world, ())", GeneralSuccessCheck),
       CodeExpectation("m hello", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
       CodeExpectation("m world", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2)))),
       CodeExpectation("m yo", SuccessCheck(ExpOnlyEnvironmentCommand(Index(0))))
@@ -473,10 +473,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be convertable to values and stop updating" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("val x: Count = n ", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
     ))
@@ -485,17 +485,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be forked correctly" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("ver nForked = fork n", GeneralSuccessCheck),
-      CodeExpectation("update nForked 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update nForked 0", GeneralSuccessCheck),
-      CodeExpectation("update nForked 0", GeneralSuccessCheck),
-      CodeExpectation("update nForked 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update nForked 0", GeneralSuccessCheck),
+      CodeExpectation("update nForked ()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update nForked ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked ()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update nForked ()", GeneralSuccessCheck),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
       CodeExpectation("nForked", SuccessCheck(ExpOnlyEnvironmentCommand(Index(8))))
     ))
@@ -508,22 +508,151 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be branched correctly" in {
+  "Defining Bool as a Case " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("ver nBranched = branch n", GeneralSuccessCheck),
-      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
-      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
-      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
-      CodeExpectation("update n 0", GeneralSuccessCheck),
-      CodeExpectation("update nBranched 0", GeneralSuccessCheck),
-      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
-      CodeExpectation("nBranched", SuccessCheck(ExpOnlyEnvironmentCommand(Index(8))))
+      CodeExpectation("ver Bool = new Type", GeneralSuccessCheck),
+      CodeExpectation("update Bool (False, ())", GeneralSuccessCheck),
+      CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
+      CodeExpectation("Bool.True ()", GeneralSuccessCheck),
+      CodeExpectation("Bool.False ()", GeneralSuccessCheck)
     ))
   }
+
+  /**
+  TODOS:
+
+  Step 3: Make sure we can deal with ReqMap(n, T) where n is an expanding COUNT!!
+  - Deal with other types of ReqMaps later
+
+  SEQUENCE
+  (Defines a new count automatically)
+  (Also keeps a reqmap updated)
+
+  1) Define a new count
+  2) Define a new sequence based off that count
+  3) The update function for the count also needs to be updated - another field must be added!!
+  4) The field can be numbered, but also perhaps named with the identifier for the new sequence
+
+  # IDEA: Partial update
+  (update, but some reqmaps do not get updated)
+
+  ver n = new Count
+  ver M = new ReqMap(n, Identifier)
+
+  // If this is done alone, then we alert that this is not possible because M must be updates as well
+  update n()
+
+  // If this is done alone, then we alert that this is not possible because n must be updated as well
+  update M (Append hello)
+
+  So we need a compound command:
+  update n()
+  update M (append hello)
+
+  How to define a compound update?
+  update (n(), m (append hello))
+  --> maybe this is ok?
+
+  // Single version
+  ver M = new Sequence(Identifier)
+  update M (append hello)
+  
+  How does this work with sequence?
+  Sequence(T) initializes as ReqMap(new Count, T) = ()
+  And the type overall is ReqMap(n, Type) where n is a value in this new count.
+  update function is (Case(append: T))
+
+  TAKAWAY: MAYBE UPDATE CANNOT BE THOUGHT OF AS A PURELY FUNCTIONAL THING
+
+  What does update do?
+  1) Calls the update function on current to get the next value
+  2) What is the update function also wants to update other values? Then it's not purely functional?
+  HMM
+
+
+  So now we need the ability to add to a struct
+   (should be easy)
+  And the ability to add to a case
+   (also easy)
+  BUT - what happens when we want to make those sequences too? I think that should work.
+
+  
+
+  How to deal with ReqMap(n, T)
+  (because that's what a case will be)
+  - required item, what happens when n expands!!
+  - Start by requiring reqmap to have non-versioned items
+  - Then also allow the key to be a count
+  
+  Commands on a ReqMap:
+  - Replace key/value
+  - Add key/value (when adding a key, requires update ti key type)
+  - Swap key order (later)
+
+  Step ?: Add uuid values to versioned types and to each of their different versions
+  - Only needed if we're saving these things??
+  */
+
+
+
+  /* Canonical way to define boolean type */
+  /*
+  ver Bool = new Type
+  update Bool case False
+  update Bool case True
+  
+
+  More about DataType:
+  Starts with Case()
+  The inputs are keys, n
+  This means there is 1 ReqMap:
+    ReqMap(n, Identifier)
+  (It also should preserve equality)
+
+  Then theres a ReqMap(n, Type) which gives an input type
+  - The input type could be anything
+  - Starts out as unit
+    - Maybe new Struct (where you can add a field)
+
+  How does Bool get saved?
+  - Just have direct names as entries (makes storing these things less dependant on uuid choice)
+  - It's stored in a standard "prelude" document that everything should be based upon
+  - True and False constructors also stored in the prelude.
+
+
+  Are reqmaps really fields? How do we tell the difference?
+  - Maybe a ReqMap is the val version, Field is the 
+
+  Equality preserving Maps.. can these exist?
+  -> First there needs to be an equality function (a == b)
+  -> Can equality function this be built?
+     - First, a and b must have the same construction type (So how do we define that)
+     - Then, equality for cases and structs are easy
+     - Equality for basic maps is clear
+     - No need to go further yet!
+  -> How do we know if a map preserves equality?
+     - Write this function ad-hoc
+
+  Equals function (a == b) requires some form of generics?
+  UGHH!!!
+  We can skip this for now?
+
+
+  */
+
+  /*"Var statements" should " work correctly" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      // I'm making this a  failure because n should be  made current
+      CodeExpectation("val m: ReqMap(n, 5) = (4, 2)", FailureCheck),
+      // This is a  success because m is now based on n
+      CodeExpectation("ver m: ReqMap(n, 5) = (4, 2)", GeneralSuccessCheck),
+      // This is a failure because you can't update n without updating m
+      CodeExpectation("update n()", FailureCheck),
+      // This is the correct way to update n
+      CodeExpectation("update n() with (m 3)", GeneralSuccessCheck),
+    ))
+  }*/
 }

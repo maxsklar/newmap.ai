@@ -54,9 +54,13 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
+// Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
-  idToObject: ListMap[String, NewMapObject] = ListMap.empty
+  idToObject: ListMap[String, NewMapObject] = ListMap.empty,
+
+  // keep track of all the reqmaps from mutable types, because these must change over time
+  reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty
 ) {
   def lookup(identifier: String): Option[NewMapObject] = {
     idToObject.get(identifier)
@@ -200,6 +204,10 @@ object Environment {
     eCommand("Identifier", IdentifierT),
     eCommand("Increment", IncrementFunc),
     eCommand("IsCommand", IsCommandFunc),
+    eCommand("Sequence", MapInstance(
+      values = Vector(TypePattern("key", TypeT) -> SequenceT(ParamId("key"))),
+      mapType = MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
+    )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
       MapT(ParamId("key"), ParamId("value"), CommandOutput, BasicMap)

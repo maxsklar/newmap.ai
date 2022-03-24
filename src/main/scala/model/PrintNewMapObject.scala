@@ -2,6 +2,7 @@ package ai.newmap.model
 
 import scala.collection.mutable.StringBuilder
 import ai.newmap.model._
+import java.util.UUID
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
@@ -31,6 +32,8 @@ object PrintNewMapObject {
       }
     }
     case MapInstance(values, mapT) => s"MI:${mapToString(values)}~${this(mapT)}"
+    case SequenceT(nType) => s"Sequence(${this(nType)})"
+    case SequenceInstance(values, _) => "[" + values.map(this(_)).mkString(", ") + "]"
     case ApplyFunction(func, input) => {
       this(func) + " " + this(input)
     }
@@ -60,9 +63,6 @@ object PrintNewMapObject {
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
     case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, v: Long) => {
       this(currentState) + s"v$v"
-    }
-    case BranchedVersionedObject(vo: NewMapObject, base: NewMapObject, changeLog: Vector[NewMapObject]) => {
-      this(vo)
     }
   }
 

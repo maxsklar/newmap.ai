@@ -2,6 +2,7 @@ package ai.newmap.interpreter
 
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
+import java.util.UUID
 
 // Evaluates an expression that's already been type checked
 object Evaluator {
@@ -18,10 +19,19 @@ object Evaluator {
         // Should I evaluate here?
         Success(nObject)
       }
+      case SequenceT(nType) => {
+        // Should I evaluate here?
+        Success(nObject)
+      }
       case mi@MapInstance(values, mapT) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
         } yield mi.copy(values = evalValues)
+      }
+      case si@SequenceInstance(values, seqT) => {
+        for {
+          evalValues <- evalSeqInstanceVals(values, env)
+        } yield SequenceInstance(evalValues, seqT)
       }
       case ApplyFunction(func, input) => {
         for {
@@ -78,15 +88,6 @@ object Evaluator {
           } yield evalCurrentState
         }
       }
-      case BranchedVersionedObject(vo, base, changeLog) => {
-        if (keepVersioning) {
-          Success(BranchedVersionedObject(vo, base, changeLog))
-        } else {
-          for {
-            evalVo <- this(vo, env, keepVersioning = false)
-          } yield evalVo
-        }
-      }
     }
   }
 
@@ -106,8 +107,23 @@ object Evaluator {
   def getDefaultValueOfPureCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
-      case Index(i) if i > 0 => Success(IndexValue(0, i))
-      case TypeT => Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      case seqT@SequenceT(nType) => Success(SequenceInstance(Vector.empty, seqT))
+      case Index(i) if i > 0 => Success(IndexValue(0, Index(i)))
+      case TypeT => {
+        // Maybe there should be a type of cases specifically
+        Success(CaseT(
+          MapInstance(
+            Vector.empty,
+            MapT(
+              IdentifierT, //VersionedObject(Index(0), CountT, 0),
+              TypeT,
+              RequireCompleteness,
+              BasicMap
+            )
+          )
+        ))
+        //Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+      }
       case AnyT => Failure("The \"any\" Type has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
@@ -139,7 +155,9 @@ object Evaluator {
     current: NewMapObject
   ): Outcome[NewMapObject, String] = {
     nType match {
-      case CountT => Success(Index(1))
+      case CountT => Success(
+        NewMapO.emptyStruct
+      )
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
           outputCommandT <- getCommandInputOfPureCommandType(outputType, current)
@@ -155,6 +173,27 @@ object Evaluator {
               )
             )
           )
+        }
+      }
+      case SequenceT(nType) => Success(nType)
+      case TypeT => {
+        current match {
+          case CaseT(MapInstance(_, MapT(inputType, outputType, _, _))) => {
+            Success(
+              StructT(
+                MapInstance(
+                  Vector(ObjectPattern(Index(0)) -> inputType, ObjectPattern(Index(1)) -> TypeT),
+                  MapT(
+                    Index(2),
+                    TypeT,
+                    RequireCompleteness,
+                    BasicMap
+                  )
+                )
+              )
+            )
+          }
+          case _ => Success(Index(0))
         }
       }
       case structT@StructT(params) => {
@@ -190,12 +229,39 @@ object Evaluator {
 
           mapValues <- current match {
             case MapInstance(values, _) => Success(values)
-            case _ => Failure("Couldn't get map values from $current")
+            case _ => Failure(s"Couldn't get map values from $current")
           }
 
           newMapValues = (ObjectPattern(input) -> newResultForInput) +: mapValues.filter(x => x._1 != ObjectPattern(input))
         } yield {
           MapInstance(newMapValues, mapT)
+        }
+      }
+      case seqT@SequenceT(nType) => {
+        for {
+          seqValues <- current match {
+            case SequenceInstance(values, seqT) => Success(values)
+            case _ => Failure(s"Couldn't get seq values from $current")
+          }
+        } yield SequenceInstance(seqValues :+ command, seqT)
+      }
+      case TypeT => {
+        current match {
+          case CaseT(MapInstance(values, mapT)) => {
+            // General map, adding a case
+            for {
+              newCaseName <- accessFieldAttempt(command, Index(0), env)
+              newCaseInputType <- accessFieldAttempt(command, Index(1), env)
+
+
+              newMapValues = (ObjectPattern(newCaseName) -> newCaseInputType) +: values.filter(x => x._1 != ObjectPattern(newCaseName))
+            } yield {
+              CaseT(MapInstance(newMapValues, mapT))
+            }
+          }
+          case _ => {
+            Failure("Cannot expand type $current")
+          }
         }
       }
       case structT@StructT(params) => {
@@ -218,7 +284,7 @@ object Evaluator {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
       versionedO <- versionedObject match {
-        case vo@VersionedObject(currentState, commandType, versionNumber) => Success(vo)
+        case vo@VersionedObject(_, _, _) => Success(vo)
         case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
       }
     } yield versionedO
@@ -271,6 +337,21 @@ object Evaluator {
         evalRest <- evalMapInstanceVals(restOfValues, env)
       } yield {
         (evalK -> evalV) +: evalRest
+      }
+    }
+    case _ => Success(Vector.empty)
+  }
+
+  def evalSeqInstanceVals(
+    values: Vector[NewMapObject],
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = values match {
+    case v +: restOfValues => {
+      for {
+        evalV <- this(v, env)
+        evalRest <- evalSeqInstanceVals(restOfValues, env)
+      } yield {
+        evalV +: evalRest
       }
     }
     case _ => Success(Vector.empty)
@@ -412,6 +493,10 @@ object Evaluator {
           }
         } yield keyMatchResult
       }
+      // TODO: sequences should have their own indecies rather than checking values.length
+      case (SequenceInstance(values, seqT), IndexValue(i, Index(j))) if (j == values.length) => {
+        Success(AbleToApplyFunction(values(i.toInt)))
+      }
       case (IsCommandFunc, nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
 
@@ -420,7 +505,6 @@ object Evaluator {
       case (IsVersionedFunc, nObject) => Success(AbleToApplyFunction(
         nObject match {
           case VersionedObject(_, _, _) => Index(1)
-          case BranchedVersionedObject(_, _, _) => Index(1)
           case _ => Index(0)
         }
       ))
@@ -550,10 +634,17 @@ object Evaluator {
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
       }
+      case SequenceT(nType) => SequenceT(getCurrentConstantValue(nType))
       case mi@MapInstance(values, MapT(inputType, outputType, completeness, featureSet)) => {
         MapInstance(
           constifyMapInstanceVals(values),
           MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
+        )
+      }
+      case si@SequenceInstance(values, SequenceT(nType)) => {
+        SequenceInstance(
+          values.map(getCurrentConstantValue(_)),
+          SequenceT(getCurrentConstantValue(nType))
         )
       }
       case ApplyFunction(func, input) => {
@@ -584,11 +675,8 @@ object Evaluator {
       case SubtypeT(func) => {
         SubtypeT(getCurrentConstantValue(func))
       }
-      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
+      case VersionedObject(currentState: NewMapObject, _, _) => {
         getCurrentConstantValue(currentState)
-      }
-      case BranchedVersionedObject(vo, base, changeLog) => {
-        getCurrentConstantValue(vo)
       }
     }
   }

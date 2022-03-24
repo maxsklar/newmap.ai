@@ -5,7 +5,7 @@ import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestEvaluator extends FlatSpec {
-  def assetFunctionWorkedAndReturnedResult(
+  def assertFunctionWorkedAndReturnedResult(
     attempt: Outcome[Evaluator.ApplyFunctionAttemptResult, String],
     result: NewMapObject
   ): Unit = {
@@ -18,37 +18,37 @@ class TestEvaluator extends FlatSpec {
 
   "isCommandFunc " should " work properly on ranges" in {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, Index(10), Environment.Base)
-    assetFunctionWorkedAndReturnedResult(result, Index(1))
+    assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
-  "it " should " work properly on count" in {
+  it should " work properly on count" in {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, CountT, Environment.Base)
-    assetFunctionWorkedAndReturnedResult(result, Index(1))
+    assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
-  "it " should " work properly on TypeT, and return false" in {
+  it should " work properly on TypeT, and return false" in {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, TypeT, Environment.Base)
-    assetFunctionWorkedAndReturnedResult(result, Index(0))
+    assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
   // TODO: remove this when IsSimpleFunction is eliminated
   "IsSimpleFunction" should "work properly" in {
-    assetFunctionWorkedAndReturnedResult(
+    assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(IsSimpleFunction, TypeT, Environment.Base),
       Index(0)
     )
 
-    assetFunctionWorkedAndReturnedResult(
+    assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, SimpleFunction)), Environment.Base),
       Index(1)
     )
 
-    assetFunctionWorkedAndReturnedResult(
+    assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, BasicMap)), Environment.Base),
       Index(1)
     )
 
-    assetFunctionWorkedAndReturnedResult(
+    assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, FullFunction)), Environment.Base),
       Index(0)
     )

@@ -24,7 +24,7 @@ object TypeChecker {
           case Index(j) => {
             if (j <= i) {
               Failure(s"Proposed index $i is too large for type $j")
-            } else Success(IndexValue(i, j))
+            } else Success(IndexValue(i, Index(j)))
           }
           case _ => Success(Index(i))
         }
