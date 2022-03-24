@@ -4,6 +4,7 @@ import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
 import ai.newmap.interpreter._
 import ai.newmap.util.{Outcome, Success, Failure}
+import java.util.UUID
 
 sealed abstract class EnvironmentCommand
 
@@ -12,21 +13,16 @@ case class FullEnvironmentCommand(
   nObject: NewMapObject
 ) extends EnvironmentCommand {
   override def toString: String = {
-    //val nType = RetrieveType(nObject)
-    //s"val $id: ${nType} = ${nObject}"
+    s"val $id = ${nObject}"
+  }
+}
 
-    // TODO include type(as above) using environment
-
-    // TODO - should be different if a versioned object
-    nObject match {
-      case VersionedObject(state, nType, 0) => {
-        "" //s"ver $id = new ${nType}"
-      }
-      case VersionedObject(state, nType, version) => {
-        s"ver $id = ${state}; ver=$version"
-      }
-      case _ => s"val $id = ${nObject}"
-    }
+case class NewVersionedStatementCommand(
+  id: String,
+  nType: NewMapObject
+) extends EnvironmentCommand {
+  override def toString: String = {
+    s"ver $id = new ${nType}"
   }
 }
 
@@ -36,6 +32,15 @@ case class ApplyIndividualCommand(
 ) extends EnvironmentCommand {
   override def toString: String = {
     "" //s"update $id $nObject"
+  }
+}
+
+case class ForkEnvironmentCommand(
+  id: String,
+  vObject: VersionedObjectLink
+) extends EnvironmentCommand {
+  override def toString: String = {
+    s"ver $id = fork ${vObject}"
   }
 }
 
@@ -59,8 +64,11 @@ case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
   idToObject: ListMap[String, NewMapObject] = ListMap.empty,
 
+  latestVersionNumber: Map[UUID, Long] = ListMap.empty,
+  storedVersionedTypes: Map[HistoricalVersionedObjectLink, NewMapObject] = ListMap.empty,
+
   // keep track of all the reqmaps from mutable types, because these must change over time
-  reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty
+  reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty,
 ) {
   def lookup(identifier: String): Option[NewMapObject] = {
     idToObject.get(identifier)
@@ -83,27 +91,59 @@ case class Environment(
   def newCommand(command: EnvironmentCommand): Environment = {
     val newCommands = commands :+ command
 
-    val newObjectMap: ListMap[String, NewMapObject] = {
-      command match {
-        case FullEnvironmentCommand(s, nObject) => {
-          idToObject + (s -> nObject)
-        }
-        case ApplyIndividualCommand(s, nObject) => {
-          val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
-          idToObject + (s -> result)
-        }
-        case ParameterEnvironmentCommand(s, nType) => {
-          val uuid = java.util.UUID.randomUUID
-          idToObject + (s -> ParameterObj(uuid, nType))
-        }
-        case ExpOnlyEnvironmentCommand(nObject) => {
-          // TODO: save this in the result list
-          idToObject
-        }
+    command match {
+      case FullEnvironmentCommand(s, nObject) => {
+        this.copy(
+          commands = newCommands,
+          idToObject = idToObject + (s -> nObject)
+        )
+      }
+      case NewVersionedStatementCommand(s, nType) => {
+        val uuid = java.util.UUID.randomUUID
+        val initValue = Evaluator.getDefaultValueOfPureCommandType(nType, this).toOption.get
+        this.copy(
+          commands = newCommands,
+          idToObject = idToObject + (s -> VersionedObjectLink(uuid)),
+          latestVersionNumber = latestVersionNumber + (uuid -> 0L),
+          storedVersionedTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(0L, uuid) -> initValue)
+        )
+      }
+      case ApplyIndividualCommand(s, nObject) => {
+        val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
+
+        // TODO - during this, versions that are no longer in use can be destroyed
+        val newStoredVTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(result.newVersion, result.uuid) -> result.newValue)
+
+        this.copy(
+          commands = newCommands,
+          latestVersionNumber = latestVersionNumber + (result.uuid -> result.newVersion),
+          storedVersionedTypes = newStoredVTypes
+        )
+      }
+      case ForkEnvironmentCommand(s, vObject) => {
+        val uuid = java.util.UUID.randomUUID
+        val version = Evaluator.latestVersion(vObject.uuid, this).toOption.get
+        val current = Evaluator.currentState(vObject.uuid, this).toOption.get
+
+        this.copy(
+          commands = newCommands,
+          idToObject = idToObject + (s -> VersionedObjectLink(uuid)),
+          latestVersionNumber = latestVersionNumber + (uuid -> version),
+          storedVersionedTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(version, uuid) -> current)
+        )
+      }
+      case ParameterEnvironmentCommand(s, nType) => {
+        val uuid = java.util.UUID.randomUUID
+        this.copy(
+          commands = newCommands,
+          idToObject = idToObject + (s -> ParameterObj(uuid, nType))
+        )
+      }
+      case ExpOnlyEnvironmentCommand(nObject) => {
+        // TODO: save this in the result list
+        this
       }
     }
-
-    Environment(newCommands, newObjectMap)
   }
 
   def newCommands(newCommands: Vector[EnvironmentCommand]): Environment = {

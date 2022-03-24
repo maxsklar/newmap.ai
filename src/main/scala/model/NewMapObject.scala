@@ -13,6 +13,11 @@ case class IdentifierInstance(s: String) extends NewMapObject
 
 sealed abstract class NewMapPattern
 
+// IDEA
+// 1) EVERY type and map is versioned
+// 2) Versioned objects must be literal
+// 3) enforce literalness?
+
 // Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
 //  we should be able to just give values and not keys if we provide the whole thing
 case class MapInstance(
@@ -161,11 +166,19 @@ case class SubtypeT(
 
 // The versionNumber and uuid uniquely define this versioned object within any environment
 // (of course different environments might have updated the object differently)
-case class VersionedObject(
-  currentState: NewMapObject,
-  commandType: NewMapObject,
-  versionNumber: Long
+
+// This points to a historical version of a versioned object
+// It does not update, although it can be brought up to date
+case class HistoricalVersionedObjectLink(
+  versionNumber: Long,
+  uuid: UUID
 ) extends NewMapObject
+
+// This always points to the latest version of a versioned object
+case class VersionedObjectLink(
+  uuid: UUID
+) extends NewMapObject
+
 
 //def uuid = java.util.UUID.randomUUID
 

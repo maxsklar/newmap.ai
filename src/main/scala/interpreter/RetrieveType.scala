@@ -36,8 +36,11 @@ object RetrieveType {
         }
       }
     }
-    case AccessField(VersionedObject(current, _, _), field) => {
-      this(AccessField(current, field), env)
+    case AccessField(vol@VersionedObjectLink(_), field) => {
+      this(AccessField(Evaluator.getCurrentConstantValue(vol, env), field), env)
+    }
+    case AccessField(hvol@HistoricalVersionedObjectLink(_, _), field) => {
+      this(AccessField(Evaluator.getCurrentConstantValue(hvol, env), field), env)
     }
     case AccessField(struct, field) => {
       throw new Exception(s"This access of $struct with field $field is not allowed")
@@ -50,16 +53,16 @@ object RetrieveType {
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
-    case VersionedObject(_, commandType: NewMapObject, _) => {
-      commandType
+    case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+      this(Evaluator.getCurrentConstantValue(nObject, env), env)
     }
   }
 
   def retrieveInputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
     // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
     nFunction match {
-      case VersionedObject(currentState, _, _) => {
-        retrieveInputTypeFromFunction(currentState, env)
+      case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+        retrieveInputTypeFromFunction(Evaluator.getCurrentConstantValue(nFunction, env), env)
       }
       case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
         SubtypeT(
@@ -140,9 +143,9 @@ object RetrieveType {
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
-    case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, _) => {
-      isTermClosedLiteral(currentState, knownVariables) &&
-        isTermClosedLiteral(commandType, knownVariables)
+    case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+      // These are always closed literals! (I think)
+      true
     }
   }
 

@@ -61,7 +61,7 @@ case class NewVersionedStatementParse(
 
 case class ForkedVersionedStatementParse(
   identifier: IdentifierParse,
-  expression: ParseTree // Must represent a versioned object
+  expression: IdentifierParse // Must represent a versioned object
 ) extends EnvStatementParse
 
 case class ApplyCommandStatementParse(

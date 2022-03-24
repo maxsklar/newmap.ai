@@ -31,16 +31,14 @@ object StatementInterpreter {
           // - In fact, we have yet to build an actual command type checker
           initValue <- Evaluator.getDefaultValueOfCommandType(nType, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, VersionedObject(initValue, nType, 0)))
+          Vector(NewVersionedStatementCommand(id.s, nType))
         }
       }
-      case ForkedVersionedStatementParse(id, forkExpression) => {
+      case ForkedVersionedStatementParse(id, forkId) => {
         for {
-          tc <- TypeChecker.typeCheck(forkExpression, NewMapO.versionedT, env)
-
-          evaluatedObject <- Evaluator(tc, env, keepVersioning = true)
+          vObject <- Evaluator.lookupVersionedObject(forkId.s, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, tc))
+          Vector(ForkEnvironmentCommand(id.s, vObject))
         }
       }
       case ApplyCommandStatementParse(id, command) => {

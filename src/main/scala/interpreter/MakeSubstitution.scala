@@ -11,7 +11,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IndexValue(_, _) | IdentifierInstance(_) => expression
+      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IndexValue(_, _) | IdentifierInstance(_) | VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           this(inputType, parameters, env),
@@ -82,13 +82,6 @@ object MakeSubstitution {
         } yield MakeSubstitution(value, parameters, env)
 
         SequenceInstance(newValues, seqT)
-      }
-      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
-        VersionedObject(
-          this(currentState, parameters, env),
-          this(commandType, parameters, env),
-          versionNumber
-        )
       }
     }
   }

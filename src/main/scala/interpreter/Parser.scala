@@ -213,9 +213,9 @@ object NewMapParser extends Parsers {
   }
 
   private def forkedVersionedStatement: Parser[ForkedVersionedStatementParse] = {
-    Lexer.Identifier("ver") ~ identifier ~ Lexer.Equals() ~ Lexer.Identifier("fork") ~ expressionListWithOperations ^^ {
-      case _ ~ id ~ _ ~ _ ~ exp => {
-        ForkedVersionedStatementParse(id, exp)
+    Lexer.Identifier("ver") ~ identifier ~ Lexer.Equals() ~ Lexer.Identifier("fork") ~ identifier ^^ {
+      case _ ~ id ~ _ ~ _ ~ existingId => {
+        ForkedVersionedStatementParse(id, existingId)
       }
     }
   }

@@ -74,18 +74,22 @@ object Evaluator {
         // Is this correct?
         Success(SubtypeT(func))
       }
-      case VersionedObject(currentState: NewMapObject, commandType: NewMapObject, versionNumber: Long) => {
+      case vol@VersionedObjectLink(uuid: UUID) => {
         // TODO - do we actually need to do any evaluating on these?
         // - in other words, are versioned objects required to be fully evaluated?
         if (keepVersioning) {
-          for {
-            evalCurrentState <- this(currentState, env)
-            evalCommandType <- this(commandType, env)
-          } yield VersionedObject(currentState, commandType, versionNumber)
+          Success(vol)
         } else {
-          for {
-            evalCurrentState <- this(currentState, env)
-          } yield evalCurrentState
+          Success(getCurrentConstantValue(vol, env))
+        }
+      }
+      case hvol@HistoricalVersionedObjectLink(_, _) => {
+        // TODO - do we actually need to do any evaluating on these?
+        // - in other words, are versioned objects required to be fully evaluated?
+        if (keepVersioning) {
+          Success(hvol)
+        } else {
+          Success(getCurrentConstantValue(hvol, env))
         }
       }
     }
@@ -115,7 +119,7 @@ object Evaluator {
           MapInstance(
             Vector.empty,
             MapT(
-              IdentifierT, //VersionedObject(Index(0), CountT, 0),
+              IdentifierT,
               TypeT,
               RequireCompleteness,
               BasicMap
@@ -151,8 +155,7 @@ object Evaluator {
   }
 
   def getCommandInputOfPureCommandType(
-    nType: NewMapObject,
-    current: NewMapObject
+    nType: NewMapObject
   ): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(
@@ -160,7 +163,7 @@ object Evaluator {
       )
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
-          outputCommandT <- getCommandInputOfPureCommandType(outputType, current)
+          outputCommandT <- getCommandInputOfPureCommandType(outputType)
         } yield {
           StructT(
             MapInstance(
@@ -176,25 +179,21 @@ object Evaluator {
         }
       }
       case SequenceT(nType) => Success(nType)
+      // This should really be a case type instead of a typeT
       case TypeT => {
-        current match {
-          case CaseT(MapInstance(_, MapT(inputType, outputType, _, _))) => {
-            Success(
-              StructT(
-                MapInstance(
-                  Vector(ObjectPattern(Index(0)) -> inputType, ObjectPattern(Index(1)) -> TypeT),
-                  MapT(
-                    Index(2),
-                    TypeT,
-                    RequireCompleteness,
-                    BasicMap
-                  )
-                )
+        Success(
+          StructT(
+            MapInstance(
+              Vector(ObjectPattern(Index(0)) -> IdentifierT, ObjectPattern(Index(1)) -> TypeT),
+              MapT(
+                Index(2),
+                TypeT,
+                RequireCompleteness,
+                BasicMap
               )
             )
-          }
-          case _ => Success(Index(0))
-        }
+          )
+        )
       }
       case structT@StructT(params) => {
         Failure("Structs as commands haven't been implemented yet")
@@ -209,12 +208,11 @@ object Evaluator {
   }
 
   def updateVersionedO(
-    nType: NewMapObject,
     current: NewMapObject,
     command: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    nType match {
+    RetrieveType(current, env) match {
       case CountT => {
         quickApplyFunctionAttempt(IncrementFunc, current, env)
       }
@@ -225,7 +223,7 @@ object Evaluator {
 
           currentResultForInput <- quickApplyFunctionAttempt(current, input, env)
 
-          newResultForInput <- updateVersionedO(outputType, currentResultForInput, commandForInput, env)
+          newResultForInput <- updateVersionedO(currentResultForInput, commandForInput, env)
 
           mapValues <- current match {
             case MapInstance(values, _) => Success(values)
@@ -271,7 +269,7 @@ object Evaluator {
         Failure("Cases as commands haven't been implemented yet")
       }
       case _ => {
-        Failure(s"$nType is not a command type, error in type checker")
+        Failure(s"$current is not a command type, error in type checker")
       }
     }
   }
@@ -279,29 +277,54 @@ object Evaluator {
   def lookupVersionedObject(
     id: String,
     env: Environment
-  ): Outcome[VersionedObject, String] = {
+  ): Outcome[VersionedObjectLink, String] = {
     for {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
       versionedO <- versionedObject match {
-        case vo@VersionedObject(_, _, _) => Success(vo)
+        case vo@VersionedObjectLink(_) => Success(vo)
         case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
       }
     } yield versionedO
   }
 
+  def latestVersion(uuid: UUID, env: Environment): Outcome[Long, String] = {
+    env.latestVersionNumber.get(uuid) match {
+      case Some(v) => Success(v)
+      case None => Failure(s"Couldn't find version number for $uuid")
+    }
+  }
+
+  def currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String] = {
+    for {
+      v <- latestVersion(uuid, env)
+
+      currentState <- env.storedVersionedTypes.get(HistoricalVersionedObjectLink(v, uuid)) match {
+        case Some(obj) => Success(obj)
+        case None => Failure(s"Couldn't find current state of version $v number for $uuid")
+      }
+    } yield currentState
+  }
+
+  case class UpdateVersionedObjectResponse(
+    newVersion: Long,
+    uuid: UUID,
+    newValue: NewMapObject
+  )
+
   def updateVersionedObject(
     id: String,
     command: NewMapObject,
     env: Environment
-  ): Outcome[VersionedObject, String] = {
+  ): Outcome[UpdateVersionedObjectResponse, String] = {
     for {
-      versionedO <- lookupVersionedObject(id, env)
-      newState <- updateVersionedO(versionedO.commandType, versionedO.currentState, command, env)
+      versionLink <- lookupVersionedObject(id, env)
+      latestVersion <- latestVersion(versionLink.uuid, env)
+      currentState <- currentState(versionLink.uuid, env)
+      newState <- updateVersionedO(currentState, command, env)
     } yield {
-      VersionedObject(newState, versionedO.commandType, versionedO.versionNumber + 1)
+      UpdateVersionedObjectResponse(latestVersion, versionLink.uuid, newState)
     }
-    
   }
 
   def getDefaultValueFromStructParams(
@@ -504,7 +527,7 @@ object Evaluator {
       }
       case (IsVersionedFunc, nObject) => Success(AbleToApplyFunction(
         nObject match {
-          case VersionedObject(_, _, _) => Index(1)
+          case VersionedObjectLink(_) => Index(1)
           case _ => Index(0)
         }
       ))
@@ -626,77 +649,82 @@ object Evaluator {
   }
 
   // This function removes versioning and returns a constant value - the current value
-  def getCurrentConstantValue(nObject: NewMapObject): NewMapObject = {
+  def getCurrentConstantValue(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
       case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         nObject
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
-        MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
+        MapT(getCurrentConstantValue(inputType, env), getCurrentConstantValue(outputType, env), completeness, featureSet)
       }
-      case SequenceT(nType) => SequenceT(getCurrentConstantValue(nType))
+      case SequenceT(nType) => SequenceT(getCurrentConstantValue(nType, env))
       case mi@MapInstance(values, MapT(inputType, outputType, completeness, featureSet)) => {
         MapInstance(
-          constifyMapInstanceVals(values),
-          MapT(getCurrentConstantValue(inputType), getCurrentConstantValue(outputType), completeness, featureSet)
+          constifyMapInstanceVals(values, env),
+          MapT(getCurrentConstantValue(inputType, env), getCurrentConstantValue(outputType, env), completeness, featureSet)
         )
       }
       case si@SequenceInstance(values, SequenceT(nType)) => {
         SequenceInstance(
-          values.map(getCurrentConstantValue(_)),
-          SequenceT(getCurrentConstantValue(nType))
+          values.map(getCurrentConstantValue(_, env)),
+          SequenceT(getCurrentConstantValue(nType, env))
         )
       }
       case ApplyFunction(func, input) => {
-        ApplyFunction(getCurrentConstantValue(func), getCurrentConstantValue(input))
+        ApplyFunction(getCurrentConstantValue(func, env), getCurrentConstantValue(input, env))
       }
       case AccessField(struct, field) => {
-        AccessField(getCurrentConstantValue(struct), getCurrentConstantValue(field))
+        AccessField(getCurrentConstantValue(struct, env), getCurrentConstantValue(field, env))
       }
       case StructT(params) => {
-        StructT(getCurrentConstantValue(params))
+        StructT(getCurrentConstantValue(params, env))
       }
       case CaseT(cases) => {
-        CaseT(getCurrentConstantValue(cases))
+        CaseT(getCurrentConstantValue(cases, env))
       }
       case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], StructT(params)) => {
         StructInstance(
-          constifyMapInstanceVals(value),
-          StructT(getCurrentConstantValue(params))
+          constifyMapInstanceVals(value, env),
+          StructT(getCurrentConstantValue(params, env))
         )
       }
       case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, CaseT(cases)) => {
         CaseInstance(
-          getCurrentConstantValue(constructor),
-          getCurrentConstantValue(input),
-          CaseT(getCurrentConstantValue(cases))
+          getCurrentConstantValue(constructor, env),
+          getCurrentConstantValue(input, env),
+          CaseT(getCurrentConstantValue(cases, env))
         )
       }
       case SubtypeT(func) => {
-        SubtypeT(getCurrentConstantValue(func))
+        SubtypeT(getCurrentConstantValue(func, env))
       }
-      case VersionedObject(currentState: NewMapObject, _, _) => {
-        getCurrentConstantValue(currentState)
+      case VersionedObjectLink(uuid) => {
+        // TODO - make this function an outcome
+        this(currentState(uuid, env).toOption.get, env).toOption.get
+      }
+      case hvol@HistoricalVersionedObjectLink(_, _) => {
+        // TODO - what happens if this is not stored?
+        this(env.storedVersionedTypes(hvol), env).toOption.get
       }
     }
   }
 
-
   def constifyMapInstanceVals(
-    values: Vector[(NewMapPattern, NewMapObject)]
+    values: Vector[(NewMapPattern, NewMapObject)],
+    env: Environment
   ): Vector[(NewMapPattern, NewMapObject)] = {
     for {
       value <- values
     } yield {
-      constifyPattern(value._1) -> getCurrentConstantValue(value._2)
+      constifyPattern(value._1, env) -> getCurrentConstantValue(value._2, env)
     }
   }
 
-  def constifyPattern(pattern: NewMapPattern): NewMapPattern = {
+  def constifyPattern(pattern: NewMapPattern, env: Environment): NewMapPattern = {
     pattern match {
-      case ObjectPattern(obj) => ObjectPattern(getCurrentConstantValue(obj))
-      case TypePattern(name, nType) => TypePattern(name, getCurrentConstantValue(nType))
-      case StructPattern(params) => StructPattern(params.map(constifyPattern(_)))
+      case ObjectPattern(obj) => ObjectPattern(getCurrentConstantValue(obj, env))
+      case TypePattern(name, nType) => TypePattern(name, getCurrentConstantValue(nType, env))
+      case StructPattern(params) => StructPattern(params.map(constifyPattern(_, env)))
     }
   }
 }

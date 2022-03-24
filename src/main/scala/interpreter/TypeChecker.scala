@@ -461,8 +461,11 @@ object TypeChecker {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     for {
-      versionedO <- Evaluator.lookupVersionedObject(id, env)
-      inputT <- Evaluator.getCommandInputOfPureCommandType(versionedO.commandType, versionedO.currentState)
+      versionedObjectLink <- Evaluator.lookupVersionedObject(id, env)
+      constVal = Evaluator.getCurrentConstantValue(versionedObjectLink, env)
+      nType = RetrieveType(constVal, env)
+      
+      inputT <- Evaluator.getCommandInputOfPureCommandType(nType)
       result <- typeCheck(commandParseTree, inputT, env)
     } yield result
   }
