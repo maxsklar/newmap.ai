@@ -22,7 +22,7 @@ sealed abstract class NewMapPattern
 //  we should be able to just give values and not keys if we provide the whole thing
 case class MapInstance(
   values: Vector[(NewMapPattern, NewMapObject)],
-  mapType: MapT
+  mapType: NewMapObject
 ) extends NewMapObject
 
 case class ObjectPattern(
@@ -74,15 +74,15 @@ case object IncrementFunc extends NewMapObject
 // - That could cause problems because maps don't have to be finite
 // - Then again, an infinite struct could open up possibilities!!
 // The input NewMapObject values must be closed and evaluated
-case class StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structType: StructT) extends NewMapObject
+case class StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structType: NewMapObject) extends NewMapObject
 
-case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) extends NewMapObject
+case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: NewMapObject) extends NewMapObject
 
 // Note that this should eventually be turned into a ReqMap(Index(n), output)
 // But because we don't know "n" we can make this its own type for now
 case class SequenceT(underlyingType: NewMapObject) extends NewMapObject
 
-case class SequenceInstance(seq: Vector[NewMapObject], sequenceT: SequenceT) extends NewMapObject
+case class SequenceInstance(seq: Vector[NewMapObject], sequenceT: NewMapObject) extends NewMapObject
 
 // Basic Function Section
 // These are pre-defined functions, their types are in comment

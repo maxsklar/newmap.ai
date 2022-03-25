@@ -16,7 +16,7 @@ object PrintNewMapObject {
     case IsVersionedFunc => s"IsVersionedFunc"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
-    case IdentifierInstance(s) => s + "~Id"
+    case IdentifierInstance(s) => s
     case MapT(key, value, completeness, featureSet) => {
       (completeness, featureSet) match {
         case (CommandOutput, BasicMap) => "Map(" + this(key) + ", " + this(value) + ")"
@@ -31,7 +31,7 @@ object PrintNewMapObject {
         }  
       }
     }
-    case MapInstance(values, mapT) => s"MI:${mapToString(values)}~${this(mapT)}"
+    case MapInstance(values, mapT) => mapToString(values)
     case SequenceT(nType) => s"Sequence(${this(nType)})"
     case SequenceInstance(values, _) => "[" + values.map(this(_)).mkString(", ") + "]"
     case ApplyFunction(func, input) => {
@@ -56,7 +56,7 @@ object PrintNewMapObject {
       sb.toString
     }
     case CaseInstance(constructor, value, _) => {
-      constructor + " " + this(value)
+      constructor + " " + this(value) // Probably include the case here as well.
     }
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out

@@ -60,7 +60,7 @@ object TypeChecker {
           // TODO - build a specialize typeCheck where you expect a struct?
           typeCheckedStruct <- typeCheck(struct, AnyT, env)
 
-          evaluatedStruct <- Evaluator(typeCheckedStruct, env)
+          evaluatedStruct <- Evaluator(typeCheckedStruct, env, false)
 
           structParams <- evaluatedStruct match {
             case StructInstance(value, StructT(params)) => Success(params)
@@ -464,7 +464,7 @@ object TypeChecker {
       versionedObjectLink <- Evaluator.lookupVersionedObject(id, env)
       constVal = Evaluator.getCurrentConstantValue(versionedObjectLink, env)
       nType = RetrieveType(constVal, env)
-      
+
       inputT <- Evaluator.getCommandInputOfPureCommandType(nType)
       result <- typeCheck(commandParseTree, inputT, env)
     } yield result

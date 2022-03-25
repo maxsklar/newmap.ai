@@ -474,7 +474,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("val x: Count = n ", GeneralSuccessCheck),
+      CodeExpectation("val x: Count = n", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
@@ -515,6 +515,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
       CodeExpectation("Bool.True ()", GeneralSuccessCheck),
       CodeExpectation("Bool.False ()", GeneralSuccessCheck)
+    ))
+  }
+
+  "Defining a non-generic linked list " should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver ListOfCounts = new Type", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts (Nil, ())", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
+      CodeExpectation("val a: ListOfCounts = ListOfCounts.Nil()", GeneralSuccessCheck),
+      CodeExpectation("val b: ListOfCounts = ListOfCounts.Node(5, a)", GeneralSuccessCheck),
+      CodeExpectation("val c: ListOfCounts = ListOfCounts.Node(1, b)", GeneralSuccessCheck),
+      CodeExpectation("val b2: ListOfCounts = ListOfCounts.Node(3, a)", GeneralSuccessCheck)
     ))
   }
 
@@ -640,6 +652,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   */
 
+  // THIS IS from the REQMAP PRoblem
   /*"Var statements" should " work correctly" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),

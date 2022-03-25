@@ -37,15 +37,36 @@ class EnvironmentInterpreter() {
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
       }
+      case _ if (code.startsWith(":typeOf ")) => {
+        CommandPrintSomething(evaluateAndTypeOf(code.drop(8)))
+      }
       case ":uuid" => CommandPrintSomething(java.util.UUID.randomUUID.toString)
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
         ":parse [Expression]\tPrint how [Expression] is parsed and type checked" ++
+        ":typeOf [Expression]\tPrint out the type of the expression" ++
         ":exit | :quit\tExit this repl\n" ++
         ":help\tPrint this help message\n"
       )
       case _ => CommandPassThrough
+    }
+  }
+
+  private def evaluateAndTypeOf(code: String): String = {
+    val result = for {
+      tokens <- Lexer(code)
+      parseTree <- NewMapParser(tokens)
+      tc <- TypeChecker.typeCheck(parseTree, AnyT, env)
+      nObject <- Evaluator(tc, env)
+    } yield {
+      val nType = RetrieveType(nObject, env)
+      nType.toString
+    }
+
+    result match {
+      case Success(s) => s
+      case Failure(reason) => reason
     }
   }
 

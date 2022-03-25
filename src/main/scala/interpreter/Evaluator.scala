@@ -9,7 +9,7 @@ object Evaluator {
   def apply(
     nObject: NewMapObject,
     env: Environment,
-    keepVersioning: Boolean = false // TODO - can we just call getCurrentConstantValue instead of passing this in?
+    keepVersioning: Boolean = true // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
       case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
@@ -65,7 +65,7 @@ object Evaluator {
           evalValue <- evalParameters(value, env)
         } yield StructInstance(evalValue, nType)
       }
-      case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: CaseT) => {
+      case CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType) => {
         for {
           evalInput <- this(input, env)
         } yield CaseInstance(constructor, evalInput, caseType)
@@ -438,12 +438,12 @@ object Evaluator {
     field: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    struct match {
+    getCurrentConstantValue(struct, env) match {
       case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structT) => {
         attemptPatternMatchInOrder(value, field, env)
 
       }
-      case caseT@CaseT(cases) => {
+      case CaseT(cases) => {
         for {
           // TODO: do we need to do this check if the input is type checked?
           result <- quickApplyFunctionAttempt(cases, field, env)
@@ -452,9 +452,9 @@ object Evaluator {
 
           MapInstance(
             Vector(
-              TypePattern("input", result) -> CaseInstance(field, ParamId("input"), caseT)
+              TypePattern("input", result) -> CaseInstance(field, ParamId("input"), struct)
             ),
-            MapT(result, caseT, RequireCompleteness, SimpleFunction)
+            MapT(result, struct, RequireCompleteness, SimpleFunction)
           )
         }
       }
@@ -486,8 +486,10 @@ object Evaluator {
   ): Outcome[ApplyFunctionAttemptResult, String] = {
     // TODO - is there a way to know if the input has already been evaluated as much as possible
     //Evaluate(input, env)
-    
-    (func, input) match {
+    // TODO - can we make sure that we get the Current Constant Value BEFORE this is called?
+    val funcC = getCurrentConstantValue(func, env)
+    val inputC = getCurrentConstantValue(input, env)
+    (funcC, inputC) match {
       case (_, ParamId(s)) => Success(UnableToApplyDueToUnknownInput)
       case (MapInstance(values, _), key) => {
         for {
@@ -658,16 +660,16 @@ object Evaluator {
         MapT(getCurrentConstantValue(inputType, env), getCurrentConstantValue(outputType, env), completeness, featureSet)
       }
       case SequenceT(nType) => SequenceT(getCurrentConstantValue(nType, env))
-      case mi@MapInstance(values, MapT(inputType, outputType, completeness, featureSet)) => {
+      case MapInstance(values, mapT) => {
         MapInstance(
           constifyMapInstanceVals(values, env),
-          MapT(getCurrentConstantValue(inputType, env), getCurrentConstantValue(outputType, env), completeness, featureSet)
+          getCurrentConstantValue(mapT, env)
         )
       }
-      case si@SequenceInstance(values, SequenceT(nType)) => {
+      case SequenceInstance(values, seqT) => {
         SequenceInstance(
           values.map(getCurrentConstantValue(_, env)),
-          SequenceT(getCurrentConstantValue(nType, env))
+          getCurrentConstantValue(seqT, env)
         )
       }
       case ApplyFunction(func, input) => {
@@ -682,17 +684,17 @@ object Evaluator {
       case CaseT(cases) => {
         CaseT(getCurrentConstantValue(cases, env))
       }
-      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], StructT(params)) => {
+      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structT) => {
         StructInstance(
           constifyMapInstanceVals(value, env),
-          StructT(getCurrentConstantValue(params, env))
+          getCurrentConstantValue(structT, env)
         )
       }
-      case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, CaseT(cases)) => {
+      case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, caseT) => {
         CaseInstance(
           getCurrentConstantValue(constructor, env),
           getCurrentConstantValue(input, env),
-          CaseT(getCurrentConstantValue(cases, env))
+          getCurrentConstantValue(caseT, env)
         )
       }
       case SubtypeT(func) => {

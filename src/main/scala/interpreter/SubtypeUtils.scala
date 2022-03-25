@@ -104,23 +104,22 @@ object SubtypeUtils {
     requestedType: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    // TODO - what to do with this?
-    //val constNObject = Evaluator.getCurrentConstantValue(nObject)
-    val constNObject = nObject
-    val nType = RetrieveType(constNObject, env)
+    val nType = RetrieveType(nObject, env)
 
     if (nType != requestedType) {
       for {
-        isConvertible <- isObjectConvertibleToType(constNObject, requestedType, env)
+        isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
         _ <- Outcome.failWhen(
           !isConvertible,
-          s"Cannot convert because type of $constNObject: $nType doesn't match expected parent type $requestedType."
+          s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
         )
       } yield nObject
     } else {
       Success(nObject)
     }
   }
+
+  //Case (Cons~Id: Struct (head~Id: Count, tail~Id: VER[e61ed3eb-9131-46e8-8d27-fdabade5091a]), Nil~Id: Struct ())
 
   def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
     case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
@@ -200,7 +199,7 @@ object SubtypeUtils {
           //   message about it saying that we can't check for the subtype because we won't run your
           //   function (which could be some crazy infinite loop or fibonacci explosion crap)
           // Instead.. the function itself should have guarantees
-          evaluatedObject <- Evaluator(convertedObject, env, keepVersioning = true)
+          evaluatedObject <- Evaluator(convertedObject, env)
 
           // 2: See if it's actually a member of the subtype
           isMemberOfSubtype <- isMemberOfSubtype(evaluatedObject, endingType, env)

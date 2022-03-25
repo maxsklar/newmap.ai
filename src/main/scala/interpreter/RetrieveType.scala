@@ -15,35 +15,28 @@ object RetrieveType {
     case MapInstance(values, mapT) => mapT
     case SequenceInstance(values, seqT) => seqT
     case ApplyFunction(func, input) => retrieveOutputTypeFromFunction(func, env)
-    case AccessField(StructInstance(_, StructT(params)), field) => {
-      // Field should be evaluated automatically (not allowed to have a ParameterObj in there - must be closed literal)
-      // TODO - do we need to evaluate the params first - or will it be evaluated already?
-      Evaluator.quickApplyFunctionAttempt(params, field, env) match {
-        case Success(value) => value
-        case Failure(s) => {
-          throw new Exception(s"Field access retrieve type is poorly implemented!! $params -- $field -- $s")
+    case AccessField(objectWithField, field) => {
+      Evaluator.getCurrentConstantValue(objectWithField, env) match {
+        case StructInstance(_, StructT(params)) => {
+          // Field should be evaluated automatically (not allowed to have a ParameterObj in there - must be closed literal)
+          // TODO - do we need to evaluate the params first - or will it be evaluated already?
+          Evaluator.quickApplyFunctionAttempt(params, field, env) match {
+            case Success(value) => value
+            case Failure(s) => {
+              throw new Exception(s"Field access retrieve type is poorly implemented!! $params -- $field -- $s")
+            }
+          }
         }
-      }
-    }
-    case AccessField(caseT@CaseT(values), field) => {
-      // TODO - I really don't like using Environment.Base here!
-      // - perhaps there should be an environment-less apply function attempt since caseT should already be literal
-      // - Hold off on fixing this, because in the future, the apply function might not require this!
-      Evaluator.quickApplyFunctionAttempt(values, field, Environment.Base).toOption match {
-        case Some(value) => MapT(value, caseT, RequireCompleteness, SimpleFunction)
-        case _ => {
-          throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $field")
+        case CaseT(values) => {
+          Evaluator.quickApplyFunctionAttempt(values, field, env) match {
+            case Success(value) => MapT(value, objectWithField, RequireCompleteness, SimpleFunction)
+            case Failure(s) => {
+              throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $field -- $s")
+            }
+          }
         }
+        case _ => throw new Exception(s"This access of $objectWithField with field $field is not allowed")
       }
-    }
-    case AccessField(vol@VersionedObjectLink(_), field) => {
-      this(AccessField(Evaluator.getCurrentConstantValue(vol, env), field), env)
-    }
-    case AccessField(hvol@HistoricalVersionedObjectLink(_, _), field) => {
-      this(AccessField(Evaluator.getCurrentConstantValue(hvol, env), field), env)
-    }
-    case AccessField(struct, field) => {
-      throw new Exception(s"This access of $struct with field $field is not allowed")
     }
     // TODO - unsafe get!!
     case ParamId(name) => this(env.lookup(name).get, env)

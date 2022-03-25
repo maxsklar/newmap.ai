@@ -18,7 +18,7 @@ object StatementInterpreter {
         for {
           nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
           tc <- TypeChecker.typeCheck(objExpression, nType, env)
-          evaluatedObject <- Evaluator(tc, env)
+          evaluatedObject <- Evaluator(tc, env, false)
         } yield {
           Vector(FullEnvironmentCommand(id.s, evaluatedObject))
         }
@@ -62,7 +62,7 @@ object StatementInterpreter {
       case ExpressionOnlyStatementParse(exp) => {
         for {
           tc <- TypeChecker.typeCheck(exp, AnyT, env)
-          evaluatedObject <- Evaluator(tc, env)
+          evaluatedObject <- Evaluator(tc, env, false)
         } yield {
           Vector(ExpOnlyEnvironmentCommand(evaluatedObject))
         }
