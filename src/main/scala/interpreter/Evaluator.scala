@@ -42,7 +42,7 @@ object Evaluator {
 
           result <- applicationAttempt match {
             case AbleToApplyFunction(nObject) => Success(nObject)
-            case UnableToApplyDueToUnknownInput => Success(ApplyFunction(func, evalInput))
+            case UnableToApplyDueToFreeVariables => Success(ApplyFunction(func, evalInput))
           }
         } yield result
       }
@@ -74,22 +74,13 @@ object Evaluator {
         // Is this correct?
         Success(SubtypeT(func))
       }
-      case vol@VersionedObjectLink(uuid: UUID) => {
+      case vol@VersionedObjectLink(_, _) => {
         // TODO - do we actually need to do any evaluating on these?
         // - in other words, are versioned objects required to be fully evaluated?
         if (keepVersioning) {
           Success(vol)
         } else {
           Success(getCurrentConstantValue(vol, env))
-        }
-      }
-      case hvol@HistoricalVersionedObjectLink(_, _) => {
-        // TODO - do we actually need to do any evaluating on these?
-        // - in other words, are versioned objects required to be fully evaluated?
-        if (keepVersioning) {
-          Success(hvol)
-        } else {
-          Success(getCurrentConstantValue(hvol, env))
         }
       }
     }
@@ -282,7 +273,7 @@ object Evaluator {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
       versionedO <- versionedObject match {
-        case vo@VersionedObjectLink(_) => Success(vo)
+        case vo@VersionedObjectLink(_, _) => Success(vo)
         case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
       }
     } yield versionedO
@@ -299,7 +290,7 @@ object Evaluator {
     for {
       v <- latestVersion(uuid, env)
 
-      currentState <- env.storedVersionedTypes.get(HistoricalVersionedObjectLink(v, uuid)) match {
+      currentState <- env.storedVersionedTypes.get(VersionedObjectKey(v, uuid)) match {
         case Some(obj) => Success(obj)
         case None => Failure(s"Couldn't find current state of version $v number for $uuid")
       }
@@ -319,11 +310,11 @@ object Evaluator {
   ): Outcome[UpdateVersionedObjectResponse, String] = {
     for {
       versionLink <- lookupVersionedObject(id, env)
-      latestVersion <- latestVersion(versionLink.uuid, env)
-      currentState <- currentState(versionLink.uuid, env)
+      latestVersion <- latestVersion(versionLink.key.uuid, env)
+      currentState <- currentState(versionLink.key.uuid, env)
       newState <- updateVersionedO(currentState, command, env)
     } yield {
-      UpdateVersionedObjectResponse(latestVersion, versionLink.uuid, newState)
+      UpdateVersionedObjectResponse(latestVersion, versionLink.key.uuid, newState)
     }
   }
 
@@ -475,7 +466,7 @@ object Evaluator {
 
   sealed abstract class ApplyFunctionAttemptResult
   case class AbleToApplyFunction(nObject: NewMapObject) extends ApplyFunctionAttemptResult
-  case object UnableToApplyDueToUnknownInput extends ApplyFunctionAttemptResult
+  case object UnableToApplyDueToFreeVariables extends ApplyFunctionAttemptResult
 
   // Assume that both the function and the input have been evaluated
   // TODO: If there a way to guarantee that this will return something?
@@ -490,13 +481,14 @@ object Evaluator {
     val funcC = getCurrentConstantValue(func, env)
     val inputC = getCurrentConstantValue(input, env)
     (funcC, inputC) match {
-      case (_, ParamId(s)) => Success(UnableToApplyDueToUnknownInput)
+      case (_, ParamId(s)) => Success(UnableToApplyDueToFreeVariables)
+      case (ParamId(s), _) => Success(UnableToApplyDueToFreeVariables)
       case (MapInstance(values, _), key) => {
         for {
           evaluatedKey <- this(key, env)
 
           keyMatchResult <- key match {
-            case ParamId(s) => Success(UnableToApplyDueToUnknownInput)
+            case ParamId(s) => Success(UnableToApplyDueToFreeVariables)
             case _ => {
               attemptPatternMatchInOrder(values, evaluatedKey, env) match {
                 case Success(result) => Success(AbleToApplyFunction(result))
@@ -529,7 +521,7 @@ object Evaluator {
       }
       case (IsVersionedFunc, nObject) => Success(AbleToApplyFunction(
         nObject match {
-          case VersionedObjectLink(_) => Index(1)
+          case VersionedObjectLink(_, _) => Index(1)
           case _ => Index(0)
         }
       ))
@@ -700,13 +692,9 @@ object Evaluator {
       case SubtypeT(func) => {
         SubtypeT(getCurrentConstantValue(func, env))
       }
-      case VersionedObjectLink(uuid) => {
+      case VersionedObjectLink(key, status) => {
         // TODO - make this function an outcome
-        this(currentState(uuid, env).toOption.get, env).toOption.get
-      }
-      case hvol@HistoricalVersionedObjectLink(_, _) => {
-        // TODO - what happens if this is not stored?
-        this(env.storedVersionedTypes(hvol), env).toOption.get
+        this(currentState(key.uuid, env).toOption.get, env).toOption.get
       }
     }
   }

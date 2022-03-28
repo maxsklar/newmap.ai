@@ -57,7 +57,7 @@ class EnvironmentInterpreter() {
     val result = for {
       tokens <- Lexer(code)
       parseTree <- NewMapParser(tokens)
-      tc <- TypeChecker.typeCheck(parseTree, AnyT, env)
+      tc <- TypeChecker.typeCheck(parseTree, AnyT, env, FullFunction)
       nObject <- Evaluator(tc, env)
     } yield {
       val nType = RetrieveType(nObject, env)

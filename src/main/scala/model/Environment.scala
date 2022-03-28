@@ -65,7 +65,7 @@ case class Environment(
   idToObject: ListMap[String, NewMapObject] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
-  storedVersionedTypes: Map[HistoricalVersionedObjectLink, NewMapObject] = ListMap.empty,
+  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
 
   // keep track of all the reqmaps from mutable types, because these must change over time
   reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty,
@@ -101,18 +101,20 @@ case class Environment(
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
         val initValue = Evaluator.getDefaultValueOfPureCommandType(nType, this).toOption.get
+        val key = VersionedObjectKey(0L, uuid)
+
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> VersionedObjectLink(uuid)),
+          idToObject = idToObject + (s -> VersionedObjectLink(key, KeepUpToDate)),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          storedVersionedTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(0L, uuid) -> initValue)
+          storedVersionedTypes = storedVersionedTypes + (VersionedObjectKey(0L, uuid) -> initValue)
         )
       }
       case ApplyIndividualCommand(s, nObject) => {
         val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
 
         // TODO - during this, versions that are no longer in use can be destroyed
-        val newStoredVTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(result.newVersion, result.uuid) -> result.newValue)
+        val newStoredVTypes = storedVersionedTypes + (VersionedObjectKey(result.newVersion, result.uuid) -> result.newValue)
 
         this.copy(
           commands = newCommands,
@@ -122,14 +124,15 @@ case class Environment(
       }
       case ForkEnvironmentCommand(s, vObject) => {
         val uuid = java.util.UUID.randomUUID
-        val version = Evaluator.latestVersion(vObject.uuid, this).toOption.get
-        val current = Evaluator.currentState(vObject.uuid, this).toOption.get
+        val version = Evaluator.latestVersion(vObject.key.uuid, this).toOption.get
+        val current = Evaluator.currentState(vObject.key.uuid, this).toOption.get
+        val key = VersionedObjectKey(version, uuid)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> VersionedObjectLink(uuid)),
+          idToObject = idToObject + (s -> VersionedObjectLink(key, KeepUpToDate)),
           latestVersionNumber = latestVersionNumber + (uuid -> version),
-          storedVersionedTypes = storedVersionedTypes + (HistoricalVersionedObjectLink(version, uuid) -> current)
+          storedVersionedTypes = storedVersionedTypes + (key -> current)
         )
       }
       case ParameterEnvironmentCommand(s, nType) => {

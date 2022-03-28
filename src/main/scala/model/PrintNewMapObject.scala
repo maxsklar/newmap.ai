@@ -61,15 +61,12 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
-    case VersionedObjectLink(uuid: UUID) => {
+    case VersionedObjectLink(uuid, status) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
       s"VER[${uuid.toString}]"
 
       //this(currentState) + s"v$v"
-    }
-    case HistoricalVersionedObjectLink(v: Long, uuid: UUID) => {
-      s"VER[${uuid.toString}]v$v"
     }
   }
 

@@ -135,12 +135,13 @@ case class MapT(
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
 object CommandOutput extends MapCompleteness
-object SubtypeInput extends MapCompleteness
+object SubtypeInput extends MapCompleteness // Should this exist?
 
 sealed abstract class MapFeatureSet
 object BasicMap extends MapFeatureSet
-object SimpleFunction extends MapFeatureSet
-object FullFunction extends MapFeatureSet
+object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only simple operations
+object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
+object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
 
 
 // Params should be connected to a NewMapObject which are of type
@@ -167,16 +168,20 @@ case class SubtypeT(
 // The versionNumber and uuid uniquely define this versioned object within any environment
 // (of course different environments might have updated the object differently)
 
-// This points to a historical version of a versioned object
-// It does not update, although it can be brought up to date
-case class HistoricalVersionedObjectLink(
+case class VersionedObjectKey(
   versionNumber: Long,
   uuid: UUID
-) extends NewMapObject
+)
+
+sealed abstract class VersionedObjectStatus
+object KeepUpToDate extends VersionedObjectStatus
+object CurrentlyOutOfDate extends VersionedObjectStatus
+object KeepThisVersion extends VersionedObjectStatus
 
 // This always points to the latest version of a versioned object
 case class VersionedObjectLink(
-  uuid: UUID
+  key: VersionedObjectKey,
+  status: VersionedObjectStatus
 ) extends NewMapObject
 
 

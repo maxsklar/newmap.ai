@@ -16,8 +16,8 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
-          tc <- TypeChecker.typeCheck(objExpression, nType, env)
+          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env, FullFunction)
+          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
           evaluatedObject <- Evaluator(tc, env, false)
         } yield {
           Vector(FullEnvironmentCommand(id.s, evaluatedObject))
@@ -25,7 +25,7 @@ object StatementInterpreter {
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env)
+          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env, FullFunction)
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
@@ -53,7 +53,7 @@ object StatementInterpreter {
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
-          tc <- TypeChecker.typeCheck(objExpression, AnyT, env)
+          tc <- TypeChecker.typeCheck(objExpression, AnyT, env, FullFunction)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
           Vector(FullEnvironmentCommand(id.s, evaluatedObject))
@@ -61,7 +61,7 @@ object StatementInterpreter {
       }
       case ExpressionOnlyStatementParse(exp) => {
         for {
-          tc <- TypeChecker.typeCheck(exp, AnyT, env)
+          tc <- TypeChecker.typeCheck(exp, AnyT, env, FullFunction)
           evaluatedObject <- Evaluator(tc, env, false)
         } yield {
           Vector(ExpOnlyEnvironmentCommand(evaluatedObject))

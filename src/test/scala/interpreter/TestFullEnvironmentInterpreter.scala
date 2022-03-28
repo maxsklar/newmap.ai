@@ -401,6 +401,35 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     CodeExpectation("m 2", FailureCheck)
   ))
 
+  "A SimpleMap " should " be allowed to call other simple maps" in {
+    testCodeScript(Vector(
+      CodeExpectation("val m1: ReqMap(3, Identifier) = (0: Zero, 1: One, 2: Two)", GeneralSuccessCheck),
+      CodeExpectation("val m2: ReqMap(3, Identifier) = (0: Nil, (x: 3): m1 x)", GeneralSuccessCheck),
+      CodeExpectation("m2 0", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("Nil")))),
+      CodeExpectation("m2 2", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("Two"))))
+    ))
+  }
+
+  it should " not be allowed to call a full function map" in {
+    testCodeScript(Vector(
+      CodeExpectation("val m: ReqMap(Any, 2) = ((y: (Any => 2)): y 5, _: 0)", FailureCheck)
+    ))
+  }
+
+  // TODO - the same thing must be caught for a map that's being updated with commands
+  it should " disallow self referential function calls" in {
+    testCodeScript(Vector(
+      CodeExpectation("val m: ReqMap(Any, 2) = (_: 1)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, 2) = ((x: Count): 1, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, 2) = ((x: ReqMap(Any, 2)): 1, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, Any) = ((x: ReqMap(Any, Any)): x, _: 0)", GeneralSuccessCheck),
+      // Preventing Russell's paradox!
+      CodeExpectation("val m: ReqMap(Any, 2) = ((x: ReqMap(Any, 2)): x x, _: 0)", FailureCheck),
+      // This line below will create an infinite loop if evaluated!! Out simple function check will catch it
+      CodeExpectation("val m: Any => 2 = ((x: ReqMap(Any, 2)): x x, _: 0)", GeneralSuccessCheck)
+    ))
+  }
+
   "A struct pattern " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("val m1: ReqMap(4, Count) = (0: 100, 1: 101, 2: 102, 3: 103)", GeneralSuccessCheck),

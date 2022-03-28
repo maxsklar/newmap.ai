@@ -11,7 +11,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapObject = {
     expression match {
-      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IndexValue(_, _) | IdentifierInstance(_) | VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => expression
+      case CountT | TypeT | AnyT | IdentifierT | ParameterObj(_, _) | Index(_) | IndexValue(_, _) | IdentifierInstance(_) | VersionedObjectLink(_, _) => expression
       case MapT(inputType, outputType, completeness, featureSet) => {
         MapT(
           this(inputType, parameters, env),

@@ -291,12 +291,14 @@ object SubtypeUtils {
     }
   }
 
+  // I'm pretty sure that this is can be simplified with an ordering!
   def isFeatureSetConvertible(
     startingFeatureSet: MapFeatureSet,
     endingFeatureSet: MapFeatureSet
   ) = startingFeatureSet match {
     case BasicMap => true
     case SimpleFunction => (endingFeatureSet != BasicMap)
+    case WellFoundedFunction => (endingFeatureSet != BasicMap && endingFeatureSet != SimpleFunction)
     case FullFunction => (endingFeatureSet == FullFunction)
   }
 

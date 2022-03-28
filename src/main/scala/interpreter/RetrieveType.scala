@@ -46,7 +46,7 @@ object RetrieveType {
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
-    case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+    case VersionedObjectLink(_, _) => {
       this(Evaluator.getCurrentConstantValue(nObject, env), env)
     }
   }
@@ -54,7 +54,7 @@ object RetrieveType {
   def retrieveInputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
     // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
     nFunction match {
-      case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+      case VersionedObjectLink(_, _) => {
         retrieveInputTypeFromFunction(Evaluator.getCurrentConstantValue(nFunction, env), env)
       }
       case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
@@ -69,18 +69,38 @@ object RetrieveType {
         // TODO: Sequences shouldn't merely be based on indecies, each sequence should have it's own input tag
         Index(values.length)
       }
-      case _ => RetrieveType(nFunction, env) match {
-      // Once lambdaInstance is eliminated, these lines get easier to write!
-        case MapT(inputType, _, _, _) => inputType
-        case _ => throw new Exception(s"Couldn't retrieve input type from $nFunction")
+      case _ => {
+        val nType = RetrieveType(nFunction, env)
+        Evaluator(nType, env, false) match {
+          case Success(MapT(inputType, _, _, _)) => inputType
+          case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
+        }
+      }
+    }
+  }
+
+  def retrieveFeatureSetFromFunction(nFunction: NewMapObject, env: Environment): MapFeatureSet = {
+    // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
+    nFunction match {
+      case VersionedObjectLink(_, _) => {
+        retrieveFeatureSetFromFunction(Evaluator.getCurrentConstantValue(nFunction, env), env)
+      }
+      case SequenceInstance(values, seqT) => BasicMap
+      case _ => {
+        val nType = RetrieveType(nFunction, env)
+        Evaluator(nType, env, false) match {
+          case Success(MapT(_, _, _, featureSet)) => featureSet
+          case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
+        }
       }
     }
   }
 
   def retrieveOutputTypeFromFunction(nFunction: NewMapObject, env: Environment): NewMapObject = {
-    RetrieveType(nFunction, env) match {
-      case MapT(_, outputType, _, _) => outputType
-      case SequenceT(nType) => nType
+    val nType = RetrieveType(nFunction, env)
+    Evaluator(nType, env, false) match {
+      case Success(MapT(_, outputType, _, _)) => outputType
+      case Success(SequenceT(nType)) => nType
       case _ => throw new Exception(s"Couldn't retrieve output type from $nFunction")
     }
   }
@@ -136,7 +156,7 @@ object RetrieveType {
     case StructT(params) => isTermClosedLiteral(params, knownVariables)
     case CaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case SubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
-    case VersionedObjectLink(_) | HistoricalVersionedObjectLink(_, _) => {
+    case VersionedObjectLink(_, _) => {
       // These are always closed literals! (I think)
       true
     }
@@ -174,7 +194,7 @@ object RetrieveType {
         case param +: restOfParams => {
           for {
             newKnownVariables <- isPatternClosedLiteral(param)
-            restOfKnownVariables <- isPatternClosedLiteral(StructPattern(params), newKnownVariables)
+            restOfKnownVariables <- isPatternClosedLiteral(StructPattern(restOfParams), newKnownVariables)
           } yield {
             newKnownVariables ++ restOfKnownVariables
           }
