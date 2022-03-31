@@ -39,7 +39,7 @@ object TypeChecker {
         if (expectingAnIdentifier) {
           Success(IdentifierInstance(s))
         } else env.lookup(s) match {
-          case Some(ParameterObj(_, _)) => Success(ParamId(s))
+          case Some(ParameterObj(_)) => Success(ParamId(s))
           case Some(nObject) => Success(nObject)
           case None => {
             Failure(s"Identifier $s is unknown $expectedType --- ${SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env)}")

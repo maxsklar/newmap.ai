@@ -136,10 +136,9 @@ case class Environment(
         )
       }
       case ParameterEnvironmentCommand(s, nType) => {
-        val uuid = java.util.UUID.randomUUID
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> ParameterObj(uuid, nType))
+          idToObject = idToObject + (s -> ParameterObj(nType))
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {

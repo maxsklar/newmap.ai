@@ -40,7 +40,7 @@ object RetrieveType {
     }
     // TODO - unsafe get!!
     case ParamId(name) => this(env.lookup(name).get, env)
-    case ParameterObj(_, nType) => nType
+    case ParameterObj(nType) => nType
     case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
@@ -128,7 +128,7 @@ object RetrieveType {
       values.forall(value => isTermClosedLiteral(value, knownVariables))
     }
     case ParamId(name) => knownVariables.contains(name)
-    case ParameterObj(_, _) => false
+    case ParameterObj(_) => false
     case ApplyFunction(func, input) => {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
@@ -217,7 +217,7 @@ object RetrieveType {
       case MapInstance(values, mapT) => isMapConstant(values)
       case SequenceInstance(values, seqT) => values.forall(value => isTermConstant(value))
       case ParamId(name) => true
-      case ParameterObj(_, _) => true // I think this is what to do for now - because non-constants can be passed in
+      case ParameterObj(_) => true // I think this is what to do for now - because non-constants can be passed in
       case ApplyFunction(func, input) => isTermConstant(func) && isTermConstant(input)
       case AccessField(struct, input) => isTermConstant(struct) && isTermConstant(input)
       case StructInstance(value, structType) => value.forall(x => isTermConstant(x._2))

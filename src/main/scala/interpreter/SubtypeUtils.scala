@@ -209,7 +209,7 @@ object SubtypeUtils {
   ): Outcome[Boolean, String] = {
     for {
       pureTypeConvertible <- isObjectConvertibleToType(
-        ParameterObj(java.util.UUID.randomUUID, startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
+        ParameterObj(startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
         RetrieveType.getParentType(endingType, env),
         env
       )

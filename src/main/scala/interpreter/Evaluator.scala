@@ -12,7 +12,7 @@ object Evaluator {
     keepVersioning: Boolean = true // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_)=> {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -656,7 +656,7 @@ object Evaluator {
   // This function removes versioning and returns a constant value - the current value
   def getCurrentConstantValue(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_)=> {
         nObject
       }
       case MapT(inputType, outputType, completeness, featureSet) => {

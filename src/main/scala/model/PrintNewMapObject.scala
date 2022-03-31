@@ -40,7 +40,7 @@ object PrintNewMapObject {
     }
     case AccessField(struct, field) => s"${this(struct)}.${this(field)}"
     case ParamId(name) => s"$name~pi"
-    case ParameterObj(uuid, nType) => s"$uuid~Po:(${this(nType)})"
+    case ParameterObj(nType) => s"Po:(${this(nType)})"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, structT) => {

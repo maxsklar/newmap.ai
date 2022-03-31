@@ -69,7 +69,7 @@ case class AccessField(
 case class ParamId(name: String) extends NewMapObject
 
 // This is a parameter that is a standin
-case class ParameterObj(uuid: UUID, nType: NewMapObject) extends NewMapObject
+case class ParameterObj(nType: NewMapObject) extends NewMapObject
 
 // This takes as input a member of TypeT and returns true if it's a member
 //  of the command typeclass (which means it has a default value and an update function)
