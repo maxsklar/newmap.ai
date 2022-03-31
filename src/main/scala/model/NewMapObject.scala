@@ -9,14 +9,8 @@ sealed abstract class NewMapObject {
   override def toString = PrintNewMapObject(this)
 }
 
+// Todo - replace with "user defined type" in prelude
 case class IdentifierInstance(s: String) extends NewMapObject
-
-sealed abstract class NewMapPattern
-
-// IDEA
-// 1) EVERY type and map is versioned
-// 2) Versioned objects must be literal
-// 3) enforce literalness?
 
 // Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
 //  we should be able to just give values and not keys if we provide the whole thing
@@ -24,6 +18,8 @@ case class MapInstance(
   values: Vector[(NewMapPattern, NewMapObject)],
   mapType: NewMapObject
 ) extends NewMapObject
+
+sealed abstract class NewMapPattern
 
 case class ObjectPattern(
   nObject: NewMapObject
@@ -36,6 +32,11 @@ case class TypePattern(
 
 case class StructPattern(
   params: Vector[NewMapPattern]
+) extends NewMapPattern
+
+case class CasePattern(
+  constructor: NewMapObject,
+  input: NewMapPattern
 ) extends NewMapPattern
 
 case class ApplyFunction(
@@ -105,6 +106,7 @@ case object TypeT extends NewMapObject
 
 case object AnyT extends NewMapObject
 
+// Todo - replace with "user defined type" in prelude
 case object IdentifierT extends NewMapObject
 
 /* Note on maps:

@@ -390,6 +390,11 @@ object Evaluator {
         eParams <- evalPatterns(params, env)
       } yield StructPattern(eParams)
     }
+    case CasePattern(constructor, input) => {
+      for {
+        result <- evalPattern(input, env)
+      } yield CasePattern(constructor, input)
+    }
   }
 
   def evalPatterns(
@@ -607,6 +612,9 @@ object Evaluator {
       case (ObjectPattern(oPattern), _) if (oPattern == input) => {
         Success(Map.empty)
       }
+      case (CasePattern(constructorP, inputP), CaseInstance(constructor, input, _)) if (constructorP == constructor) => {
+        attemptPatternMatch(inputP, input, env)
+      }
       case _ => Failure("Failed Pattern Match")
     }
   }
@@ -639,6 +647,9 @@ object Evaluator {
         newParametersFromPattern(firstPattern) ++ newParametersFromPattern(StructPattern(otherPatterns))
       }
       case _ => Vector.empty
+    }
+    case CasePattern(constructor, input) => {
+      newParametersFromPattern(input)
     }
   }
 
@@ -715,6 +726,7 @@ object Evaluator {
       case ObjectPattern(obj) => ObjectPattern(getCurrentConstantValue(obj, env))
       case TypePattern(name, nType) => TypePattern(name, getCurrentConstantValue(nType, env))
       case StructPattern(params) => StructPattern(params.map(constifyPattern(_, env)))
+      case CasePattern(constructor, input) => CasePattern(constructor, constifyPattern(input, env))
     }
   }
 }

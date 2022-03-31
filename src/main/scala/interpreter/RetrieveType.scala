@@ -202,5 +202,8 @@ object RetrieveType {
         case _ => Success(Vector.empty)
       }
     }
+    case CasePattern(constructor, input) => {
+      isPatternClosedLiteral(input, knownVariables)
+    }
   }
 }

@@ -8,14 +8,13 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object SubtypeUtils {
   // For ReqMaps, we need to ensure that all of the values are accounted for.
   // For Maps, we want to know that the default value is never used
-  def doMapValuesCoverType(
-    values: Vector[(NewMapPattern, NewMapObject)],
+  def doPatternsCoverType(
+    keys: Vector[NewMapPattern],
     nType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    val keys = values.map(_._1).toSet
 
-    val objectKeys = values.flatMap(v => v._1 match {
+    val objectKeys = keys.flatMap(_ match {
       case ObjectPattern(o) => Some(o)
       case _ => None
     }).toSet
@@ -29,12 +28,75 @@ object SubtypeUtils {
       Success(true)
     }
     else {
-      for {
-        keysToMatch <- enumerateAllValuesIfPossible(nType)
-      } yield {
-        (keysToMatch -- objectKeys).isEmpty && (objectKeys -- keysToMatch).isEmpty
+      val piecemealCompletenessOutcome = nType match {
+        case CaseT(cases) => checkCaseComplete(keys, cases, nType, env)
+        case StructT(params) => checkStructComplete(keys, params, nType, env)
+        case _ => Success(false)
+      }
+
+      piecemealCompletenessOutcome match {
+        case Success(true) => Success(true)
+        case _ => {
+          for {
+            keysToMatch <- enumerateAllValuesIfPossible(nType)
+          } yield {
+            (keysToMatch -- objectKeys).isEmpty && (objectKeys -- keysToMatch).isEmpty
+          }
+        }
       }
     }
+  }
+
+  def checkCaseComplete(
+    keys: Vector[NewMapPattern],
+    cases: NewMapObject,
+    nType: NewMapObject,
+    env: Environment
+  ): Outcome[Boolean, String] = {
+    val caseKeys = RetrieveType.retrieveInputTypeFromFunction(cases, env)
+
+    for {
+      // For each case key, we want to make sure that this case key is completely covered
+      constructors <- enumerateAllValuesIfPossible(caseKeys)
+    } yield {
+      var returnVal = true
+
+      for {
+        constructor <- constructors
+      } yield {
+        // Look at our keys, and find the ones that are only for this case key, and save those patterns
+        val patternsWithThisConstructor = keys.flatMap(key => key match {
+          case CasePattern(constructor, pattern) => Some(pattern)
+          case ObjectPattern(CaseInstance(constructor, input, _)) => Some(ObjectPattern(input))
+          case _ => None
+        })
+
+        // Find the input type for this constructor, and make sure that all of THOSE inputs are accounted for
+        Evaluator.quickApplyFunctionAttempt(cases, constructor, env) match {
+          case Success(inputType) => {
+            doPatternsCoverType(patternsWithThisConstructor, inputType, env) match {
+              case Success(false) | Failure(_) => returnVal = false
+              case _ => ()
+            }
+          }
+          case _ => {
+            returnVal = false
+          }
+        }
+      }
+
+      returnVal
+    }
+  }
+
+  def checkStructComplete(
+    keys: Vector[NewMapPattern],
+    cases: NewMapObject,
+    nType: NewMapObject,
+    env: Environment
+  ): Outcome[Boolean, String] = {
+    // TODO: Implement
+    Success(false)
   }
 
   // Returns true if the object is a pattern that will match everything in the type
@@ -54,6 +116,7 @@ object SubtypeUtils {
           case _ => false 
         }
       }
+      case CasePattern(_, _) => false
     }
   }
 
@@ -125,7 +188,7 @@ object SubtypeUtils {
     case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
       // TODO: Extend this to see if pattering matching in basic function covers the full type
       // Check that the function doesn't return the default value for any input
-      doMapValuesCoverType(values, inputType, env).toOption.getOrElse(false)
+      doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
     }
     case SubtypeT(IsCommandFunc) => false
     case SubtypeT(IsSimpleFunction) => false
@@ -215,25 +278,17 @@ object SubtypeUtils {
         //  CommandOutput might require adding a default pattern
         val isMapCompletenessConvertible = true
 
-        val inputTypesConvertible = {
-          //isTypeConvertible(endingInputType, startingInputType, env)
-          // TODO - we're going to have some trouble with this in type land until generics come around
-          true
-        }
-        val outputTypesConvertible = {
-          // Same  
-          // isTypeConvertible(startingOutputType, endingOutputType, env)
-          true
-        }
-
-        // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
-        // Eventually, we'll have to implement covariance in generic types
-        Success(
+        for {
+          // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
+          // Eventually, we'll have to implement covariance in generic types
+          inputTypesConvertible <- isTypeConvertible(endingInputType, startingInputType, env)
+          outputTypesConvertible <- isTypeConvertible(startingOutputType, endingOutputType, env)
+        } yield {
           inputTypesConvertible &&
           outputTypesConvertible &&
           isFeatureSetConvertible(startingFeatureSet, endingFeatureSet) &&
           isMapCompletenessConvertible
-        )
+        }
       }
       case(
         StructT(startingParams),

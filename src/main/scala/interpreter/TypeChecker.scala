@@ -113,7 +113,7 @@ object TypeChecker {
               isCovered <- {
                 if (completeness != RequireCompleteness) Success(true)
                 else {
-                  SubtypeUtils.doMapValuesCoverType(mapValues, keyTypeT, env)
+                  SubtypeUtils.doPatternsCoverType(mapValues.map(_._1), keyTypeT, env)
                 }
               }
 
@@ -252,6 +252,8 @@ object TypeChecker {
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     val patternMatchingAllowed = internalFeatureSet != BasicMap
+
+    // THIS IS OUR PROBLEM, BUT IT'S NEEDED
     val parentTypeIsIdentifier = SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
 
     (expression, expectedType) match {
@@ -267,12 +269,26 @@ object TypeChecker {
           TypeCheckWithPatternMatchingResult(TypePattern(s, tc), env.newParam(s, tc))
         }
       }
-      // TODO: what if instead of BasicMap we have SimpleMap?
+      // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
       case (CommandList(values), StructT(MapInstance(structValues, MapT(_, _, _, BasicMap)))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {
           TypeCheckWithPatternMatchingResult(StructPattern(tcmp.patterns), tcmp.newEnvironment)
+        }
+      }
+      case (ApplyParse(constructorP, input), CaseT(cases)) if (patternMatchingAllowed) => {
+        val caseIndexType = RetrieveType.retrieveInputTypeFromFunction(cases, env)
+        for {
+          constructorTC <- typeCheck(constructorP, caseIndexType, env, BasicMap)
+          constructor <- Evaluator(constructorTC, env, keepVersioning = true)
+          inputTypeExpected <- Evaluator.quickApplyFunctionAttempt(cases, constructor, env)
+          result <- typeCheckWithPatternMatching(input, inputTypeExpected, env, externalFeatureSet, internalFeatureSet)
+        } yield {
+          TypeCheckWithPatternMatchingResult(
+            CasePattern(constructor, result.typeCheckResult),
+            result.newEnvironment
+          )
         }
       }
       case _ => {

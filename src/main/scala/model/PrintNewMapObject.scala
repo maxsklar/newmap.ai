@@ -92,7 +92,8 @@ object PrintNewMapObject {
 
   def patternToString(nPattern: NewMapPattern): String = nPattern match {
     case ObjectPattern(nObject) => this(nObject)
-    case TypePattern(name, nType) => s"$name: ${this(nType)}"
+    case TypePattern(name, nType) => s"($name: ${this(nType)})"
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
+    case CasePattern(constructor, input) => s"(${this(constructor)} ${patternToString(input)})"
   }
 }

@@ -96,5 +96,8 @@ object MakeSubstitution {
     case StructPattern(params) => {
       StructPattern(params.map(param => substPattern(param, parameters, env)))
     }
+    case CasePattern(constructor, input) => {
+      CasePattern(constructor, substPattern(input, parameters, env))
+    }
   }
 }

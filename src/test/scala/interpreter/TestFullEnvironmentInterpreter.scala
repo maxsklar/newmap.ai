@@ -346,6 +346,32 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Variable Substitution " should " work" in {
+    testCodeScript(Vector(
+      CodeExpectation("val id5: ReqMap(5, 5) = (t: t)", GeneralSuccessCheck),
+      CodeExpectation("val gimmeWhatIWant: ReqMap(5, ReqMap(5, 5)) = (t: (s: t))", GeneralSuccessCheck),
+      CodeExpectation("gimmeWhatIWant 2 4", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(5)))))
+    ))
+  }
+
+  it should " respect inner-scoped variables" in {
+    testCodeScript(Vector(
+      CodeExpectation("val id5: ReqMap(5, 5) = (t: t)", GeneralSuccessCheck),
+      CodeExpectation("val gimmeId5: ReqMap(Count, ReqMap(5, 5)) = (t: id5)", GeneralSuccessCheck),
+      CodeExpectation("gimmeId5 10 1", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(1, Index(5)))))
+    ))
+  }
+
+  it should " avoid variable capture" in {
+    testCodeScript(Vector(
+      // This works because the map doesn't attempt to evaluate when it is defined
+      // But it might break when it does!
+      CodeExpectation("val f: ReqMap(5, ReqMap(5, 5)) = (x: (z: x))", GeneralSuccessCheck),      
+      CodeExpectation("val g: ReqMap(5, ReqMap(5, 5)) = (z: (f z))", GeneralSuccessCheck),
+      CodeExpectation("g 1 3", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(1, Index(5)))))
+    ))
+  }
+
   "ReqMaps " should " require an input type" in {
     testCodeScript(Vector(
       CodeExpectation("val x = (0: 1, 1: 3, 4: 5)", FailureCheck)
@@ -547,6 +573,24 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "A case pattern " should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
+      // Note that x must be declares as an identifier here because otherwise it's taken as the literal identifier x
+      // TODO - we need to make sure there are some GOOD ERROR MESSAGES associated with that
+      CodeExpectation("val MyCaseTo5: SubMap(MyCase, 5) = (First x: x, Second (x: Identifier): 2)", GeneralSuccessCheck),
+      CodeExpectation("MyCaseTo5 (MyCase.First 4)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(4, Index(5))))),
+      CodeExpectation("MyCaseTo5 (MyCase.Second hello)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(5)))))
+    ))
+  }
+
+  it should " be seen to the type if all cases are accounted for" in {
+    testCodeScript(Vector(
+      CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
+      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = (First x: x, Second (x: Identifier): 2)", GeneralSuccessCheck),
+    ))
+  }
+
   "Defining a non-generic linked list " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("ver ListOfCounts = new Type", GeneralSuccessCheck),
@@ -556,6 +600,34 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val b: ListOfCounts = ListOfCounts.Node(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: ListOfCounts = ListOfCounts.Node(1, b)", GeneralSuccessCheck),
       CodeExpectation("val b2: ListOfCounts = ListOfCounts.Node(3, a)", GeneralSuccessCheck)
+    ))
+  }
+
+  "Map conversions " should " have a contravariant input type" in {
+    testCodeScript(Vector(
+      CodeExpectation("val mySubset: Map(7, 2) = (0: 1, 1:1, 4:1, 6: 1)", GeneralSuccessCheck),
+      CodeExpectation("val testInput1: ReqMap(7, Count) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val testInput2: ReqMap(Subtype(mySubset), Count) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val supertypeInputFunc: ReqMap(7, Count) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("supertypeInputFunc testInput1", GeneralSuccessCheck),
+      CodeExpectation("supertypeInputFunc testInput2", FailureCheck),
+      CodeExpectation("val subtypeInputFunc: ReqMap(Subtype(mySubset), Count) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("subtypeInputFunc testInput1", GeneralSuccessCheck),
+      CodeExpectation("subtypeInputFunc testInput2", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " have a covariant output type" in {
+    testCodeScript(Vector(
+      CodeExpectation("val mySubset: Map(7, 2) = (0: 1, 1:1, 4:1, 6: 1)", GeneralSuccessCheck),
+      CodeExpectation("val testInput1: ReqMap(Count, 7) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val testInput2: ReqMap(Count, Subtype(mySubset)) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val supertypeInputFunc: ReqMap(Count, 7) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("supertypeInputFunc testInput1", GeneralSuccessCheck),
+      CodeExpectation("supertypeInputFunc testInput2", GeneralSuccessCheck),
+      CodeExpectation("val subtypeInputFunc: ReqMap(Count, Subtype(mySubset)) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("subtypeInputFunc testInput1", FailureCheck),
+      CodeExpectation("subtypeInputFunc testInput2", GeneralSuccessCheck)
     ))
   }
 
