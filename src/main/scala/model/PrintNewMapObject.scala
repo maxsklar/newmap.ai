@@ -14,6 +14,7 @@ object PrintNewMapObject {
     case IsCommandFunc => s"IsCommandFunc"
     case IsSimpleFunction => s"IsSimpleFunction"
     case IsVersionedFunc => s"IsVersionedFunc"
+    case IsConstantFunc => s"IsConstantFunc"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s

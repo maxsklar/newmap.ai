@@ -59,7 +59,7 @@ object MakeSubstitution {
       case CaseInstance(constructor, value, caseT) => {
         CaseInstance(constructor, this(value, parameters, env), caseT)
       }
-      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IncrementFunc => expression
+      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IncrementFunc => expression
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values

@@ -12,12 +12,16 @@ object Evaluator {
     keepVersioning: Boolean = true // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
-        // Should I evaluate here?
-        Success(nObject)
+        if ((completeness == RequireCompleteness) && !RetrieveType.isTermConstant(inputType)) {
+          Failure(s"A map with RequireCompleteness cannot have an expandable input type $inputType")
+        } else {
+          // Should I evaluate here?
+          Success(nObject)
+        }
       }
       case SequenceT(nType) => {
         // Should I evaluate here?
@@ -516,6 +520,16 @@ object Evaluator {
           case _ => Index(0)
         }
       ))
+      case (IsConstantFunc, nObject) => Success(AbleToApplyFunction(
+        // TODO - I'm not sure this should even be in here -
+        //  whether a term is constant should be hidden!
+        // Oh well - let's see if we can remove in the future
+        if (RetrieveType.isTermConstant(nObject)) {
+          Index(1)
+        } else {
+          Index(0)
+        }
+      ))
       case (IsSimpleFunction, nObject) => {
         nObject match {
           case MapInstance(_, MapT(_, _, CommandOutput, features)) => {
@@ -642,7 +656,7 @@ object Evaluator {
   // This function removes versioning and returns a constant value - the current value
   def getCurrentConstantValue(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_, _)=> {
         nObject
       }
       case MapT(inputType, outputType, completeness, featureSet) => {

@@ -44,6 +44,7 @@ object RetrieveType {
     case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+    case IsConstantFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case StructInstance(value, nType) => nType
     case CaseInstance(constructor, value, nType) => nType
     case VersionedObjectLink(_, _) => {
@@ -119,7 +120,7 @@ object RetrieveType {
     nObject: NewMapObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nObject match {
-    case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsSimpleFunction => true
+    case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction => true
     case MapInstance(values, mapT) => {
       isMapValuesClosed(values, knownVariables)
     }
@@ -169,7 +170,9 @@ object RetrieveType {
     mapValues match {
       case (pattern, expression) +: restOfMapValues => {
         isPatternClosedLiteral(pattern, knownVariables) match {
-          case Success(newKnownVariables) => isTermClosedLiteral(expression, knownVariables ++ newKnownVariables)
+          case Success(newKnownVariables) => {
+            isTermClosedLiteral(expression, knownVariables ++ newKnownVariables) && isMapValuesClosed(restOfMapValues, knownVariables)
+          }
           case Failure(_) => false
         }
       }
@@ -204,6 +207,58 @@ object RetrieveType {
     }
     case CasePattern(constructor, input) => {
       isPatternClosedLiteral(input, knownVariables)
+    }
+  }
+
+  // Ensures that the term is a constant
+  def isTermConstant(nObject: NewMapObject): Boolean = {
+    nObject match {
+      case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction => true
+      case MapInstance(values, mapT) => isMapConstant(values)
+      case SequenceInstance(values, seqT) => values.forall(value => isTermConstant(value))
+      case ParamId(name) => true
+      case ParameterObj(_, _) => true // I think this is what to do for now - because non-constants can be passed in
+      case ApplyFunction(func, input) => isTermConstant(func) && isTermConstant(input)
+      case AccessField(struct, input) => isTermConstant(struct) && isTermConstant(input)
+      case StructInstance(value, structType) => value.forall(x => isTermConstant(x._2))
+      case CaseInstance(constructor, input, caseType) => isTermConstant(constructor) && isTermConstant(input)
+      case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
+      case SequenceT(nType) => isTermConstant(nType)
+      case StructT(params) => isTermConstant(params)
+      case CaseT(cases) => isTermConstant(cases)
+      case SubtypeT(isMember) => isTermConstant(isMember)
+      case VersionedObjectLink(_, status) => (status == KeepThisVersion)
+    }
+  }
+
+  def isMapConstant(
+    mapValues: Vector[(NewMapPattern, NewMapObject)]
+  ): Boolean = {
+    mapValues match {
+      case (pattern, expression) +: restOfMapValues => {
+        isPatternConstant(pattern) && isTermConstant(expression) && isMapConstant(restOfMapValues)
+      }
+      case _ => true
+    }
+  }
+
+  def isPatternConstant(nPattern: NewMapPattern): Boolean = nPattern match {
+    case ObjectPattern(o) => {
+      isTermConstant(o)
+    }
+    case TypePattern(name, nType) => {
+      isTermConstant(nType)
+    }
+    case StructPattern(params) => {
+      params match {
+        case param +: restOfParams => {
+          isPatternConstant(param) && isPatternConstant(StructPattern(restOfParams))
+        }
+        case _ => true
+      }
+    }
+    case CasePattern(constructor, input) => {
+      isPatternConstant(input)
     }
   }
 }

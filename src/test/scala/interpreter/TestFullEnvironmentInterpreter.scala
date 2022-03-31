@@ -631,6 +631,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "ReqMaps " should " not be allowed to have an updatable key type" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(n, 5) = (0: 3, 1: 4)", FailureCheck)
+    ))
+  }
+
   /**
   TODOS:
 

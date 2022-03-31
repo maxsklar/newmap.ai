@@ -9,6 +9,22 @@ sealed abstract class NewMapObject {
   override def toString = PrintNewMapObject(this)
 }
 
+/**
+ * The patterns in the NewMapLanguage
+ */
+sealed abstract class NewMapPattern
+
+/*sealed abstract class NewMapExpression
+
+case class ObjectExpression(
+  nObject: NewMapObject
+) extends NewMapExpression*/
+
+/**
+ * The expressions in the NewMapLanguage
+ */
+//sealed abstract class NewMapExpression
+
 // Todo - replace with "user defined type" in prelude
 case class IdentifierInstance(s: String) extends NewMapObject
 
@@ -18,8 +34,6 @@ case class MapInstance(
   values: Vector[(NewMapPattern, NewMapObject)],
   mapType: NewMapObject
 ) extends NewMapObject
-
-sealed abstract class NewMapPattern
 
 case class ObjectPattern(
   nObject: NewMapObject
@@ -66,6 +80,8 @@ case object IsCommandFunc extends NewMapObject
 case object IsSimpleFunction extends NewMapObject
 
 case object IsVersionedFunc extends NewMapObject
+
+case object IsConstantFunc extends NewMapObject
 
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
