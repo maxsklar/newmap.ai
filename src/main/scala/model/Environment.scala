@@ -100,7 +100,7 @@ case class Environment(
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
-        val initValue = Evaluator.getDefaultValueOfPureCommandType(nType, this).toOption.get
+        val initValue = Evaluator.getDefaultValueOfCommandType(nType, this).toOption.get
         val key = VersionedObjectKey(0L, uuid)
 
         this.copy(
@@ -220,7 +220,6 @@ object Environment {
 
   // Somewhat complex for now, but this is how a pattern/function definition is built up!
   // In code, this should be done somewhat automatically
-  // TODO - change to pure pattern matching!!
   def buildDefinitionWithParameters(
     inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
     expression: NewMapObject 

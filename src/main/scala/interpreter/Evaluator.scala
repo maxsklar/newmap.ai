@@ -86,20 +86,7 @@ object Evaluator {
     }
   }
 
-  def getDefaultValueOfCommandType(nSubtype: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
-    for {
-      default <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nSubtype, env), env)
-
-      isMember <- SubtypeUtils.isMemberOfSubtype(default, nSubtype, env)
-
-      _ <- Outcome.failWhen(
-        !isMember,
-        s"Result default value $default is not in the subtype"
-      )
-    } yield default
-  }
-
-  def getDefaultValueOfPureCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
+  def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
       case seqT@SequenceT(nType) => Success(SequenceInstance(Vector.empty, seqT))
@@ -326,7 +313,7 @@ object Evaluator {
       case (id, obj) +: restOfParams => {
         for {
           restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
-          paramDefault <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(obj, env), env)
+          paramDefault <- getDefaultValueOfCommandType(RetrieveType.getParentType(obj, env), env)
         } yield {
           (id -> paramDefault) +: restOfParamsDefault
         }
@@ -429,8 +416,9 @@ object Evaluator {
     case _ => Success(Vector.empty)
   }
 
+  // Assume that this is type checked so the field should exist in the struct
   def accessFieldAttempt(
-    struct: NewMapObject, // TODO - this should be a subtype
+    struct: NewMapObject,
     field: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
@@ -441,7 +429,6 @@ object Evaluator {
       }
       case CaseT(cases) => {
         for {
-          // TODO: do we need to do this check if the input is type checked?
           result <- quickApplyFunctionAttempt(cases, field, env)
         } yield {
           val caseInputType = RetrieveType.retrieveInputTypeFromFunction(cases, env)
@@ -474,7 +461,6 @@ object Evaluator {
   case object UnableToApplyDueToFreeVariables extends ApplyFunctionAttemptResult
 
   // Assume that both the function and the input have been evaluated
-  // TODO: If there a way to guarantee that this will return something?
   def applyFunctionAttempt(
     func: NewMapObject,
     input: NewMapObject,
@@ -505,7 +491,7 @@ object Evaluator {
                   val nType = RetrieveType.retrieveOutputTypeFromFunction(func, env)
                   
                   for {
-                    initValue <- getDefaultValueOfPureCommandType(RetrieveType.getParentType(nType, env), env)
+                    initValue <- getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
                   } yield {
                     AbleToApplyFunction(initValue)
                   }
@@ -586,6 +572,7 @@ object Evaluator {
     }
   }
 
+  // The input must be a literal input (or at least the first layer cannot be a parameter)
   def attemptPatternMatch(
     pattern: NewMapPattern,
     input: NewMapObject,
@@ -594,9 +581,6 @@ object Evaluator {
     // TODO: IMPORTANT
     // We must be able to dea with using the same variable in a pattern, like StructPattern(x, x) to
     //  denote that these are the same
-
-    // TODO: Fill in the gaps on pattern matching
-    // - Case Match needs to be done
     (pattern, input) match {
       case (StructPattern(params), StructInstance(paramValues, _)) => {
         for {
@@ -606,6 +590,8 @@ object Evaluator {
           result
         }
       }
+      // TODO - since input is going to be a literal, do we actually need to call isMemberOfSubtype, or can we
+      //  just call the function??
       case (TypePattern(name, nType), _) if SubtypeUtils.isMemberOfSubtype(input, nType, env).toOption.getOrElse(false) => {
         Success(Map(name -> input))
       }

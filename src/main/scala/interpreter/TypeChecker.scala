@@ -102,9 +102,6 @@ object TypeChecker {
         } yield AccessField(typeCheckedStruct, evaluatedField)
       }
       case CommandList(values: Vector[ParseTree]) => {
-        // TODO - looks like we need this for now.. investigate why
-        //val substType = MakeSubstitution(expectedType, env)
-        //RetrieveType.getParentType(expectedType, env) match {
         expectedType match {
           case mapT@MapT(keyTypeT, _, completeness, _) => {
             for {
@@ -142,7 +139,6 @@ object TypeChecker {
           case TypeT => {
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // TODO - can this be simplified by combining with the MapT section above?
-
             val mapT = MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
 
             for {
@@ -252,8 +248,6 @@ object TypeChecker {
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     val patternMatchingAllowed = internalFeatureSet != BasicMap
-
-    // THIS IS OUR PROBLEM, BUT IT'S NEEDED
     val parentTypeIsIdentifier = SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
 
     (expression, expectedType) match {
@@ -328,8 +322,6 @@ object TypeChecker {
 
   // Assume that params is already type checked
   // We just want to concrete list of fields
-  // TODO - we may be able to delete this!
-  // TODO - can only be turned into a list if this is a BASIC MAP
   def structParamsIntoParameterList(
     params: NewMapObject
   ): Outcome[Vector[(NewMapPattern, NewMapObject)], String] = {
@@ -341,8 +333,6 @@ object TypeChecker {
 
   /*
    * We want to ensure that the struct was created correctly
-   * TODO(2022): Maybe this should no longer be the struct checking function because it manipulates the environment?
-   * - Rethink how all that works. We use this feature
    */
   def typeCheckStruct(
     parameterList: Vector[(NewMapPattern, NewMapObject)],
