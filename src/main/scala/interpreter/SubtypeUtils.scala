@@ -207,11 +207,13 @@ object SubtypeUtils {
     endingType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
+    val uuidStr = java.util.UUID.randomUUID.toString
+
     for {
       pureTypeConvertible <- isObjectConvertibleToType(
-        ParameterObj(startingType), // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
+        ParamId(uuidStr), 
         RetrieveType.getParentType(endingType, env),
-        env
+        env.newParam(uuidStr, startingType) // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
       )
 
       _ <- Outcome.failWhen(!pureTypeConvertible, s"Non-convertible pure types from $startingType to $endingType")

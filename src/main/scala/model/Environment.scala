@@ -49,7 +49,7 @@ case class ParameterEnvironmentCommand(
   nType: NewMapObject
 ) extends EnvironmentCommand {
   override def toString: String = {
-    s"val $id: ${nType}"
+    s"parameter $id: ${nType}"
   }
 }
 
@@ -59,10 +59,23 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
+sealed abstract class EnvironmentValueStatus
+
+// This means that the identifier is bound to a specific object
+case object BoundStatus extends EnvironmentValueStatus
+
+// This means that the identifier is a parameter, with a type given
+case object ParameterStatus extends EnvironmentValueStatus
+
+case class EnvironmentValue(
+  nObject: NewMapObject,
+  status: EnvironmentValueStatus
+)
+
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
-  idToObject: ListMap[String, NewMapObject] = ListMap.empty,
+  idToObject: ListMap[String, EnvironmentValue] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
@@ -70,14 +83,17 @@ case class Environment(
   // keep track of all the reqmaps from mutable types, because these must change over time
   reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty,
 ) {
-  def lookup(identifier: String): Option[NewMapObject] = {
+  def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
   }
 
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
-    for ((id, nObject) <- idToObject) {
-      val command = FullEnvironmentCommand(id, nObject)
+    for ((id, envValue) <- idToObject) {
+      val command = envValue.status match {
+        case BoundStatus => FullEnvironmentCommand(id, envValue.nObject)
+        case ParameterStatus => ParameterEnvironmentCommand(id, envValue.nObject)
+      }
       builder.append(command.toString)
       builder.append("\n")
     }
@@ -95,17 +111,19 @@ case class Environment(
       case FullEnvironmentCommand(s, nObject) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> nObject)
+          idToObject = idToObject + (s -> EnvironmentValue(nObject, BoundStatus))
         )
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
         val initValue = Evaluator.getDefaultValueOfCommandType(nType, this).toOption.get
         val key = VersionedObjectKey(0L, uuid)
+        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val envValue = EnvironmentValue(versionedObject, BoundStatus)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> VersionedObjectLink(key, KeepUpToDate)),
+          idToObject = idToObject + (s -> envValue),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
           storedVersionedTypes = storedVersionedTypes + (VersionedObjectKey(0L, uuid) -> initValue)
         )
@@ -127,10 +145,12 @@ case class Environment(
         val version = Evaluator.latestVersion(vObject.key.uuid, this).toOption.get
         val current = Evaluator.currentState(vObject.key.uuid, this).toOption.get
         val key = VersionedObjectKey(version, uuid)
+        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val envValue = EnvironmentValue(versionedObject, BoundStatus)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> VersionedObjectLink(key, KeepUpToDate)),
+          idToObject = idToObject + (s -> envValue),
           latestVersionNumber = latestVersionNumber + (uuid -> version),
           storedVersionedTypes = storedVersionedTypes + (key -> current)
         )
@@ -138,7 +158,7 @@ case class Environment(
       case ParameterEnvironmentCommand(s, nType) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> ParameterObj(nType))
+          idToObject = idToObject + (s -> EnvironmentValue(nType, ParameterStatus))
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
@@ -207,9 +227,12 @@ object Environment {
 
   // For Debugging
   def printEnvWithoutBase(env: Environment): Unit = {
-    for ((id, nObject) <- env.idToObject) {
+    for ((id, envValue) <- env.idToObject) {
       if (!Base.idToObject.contains(id)) {
-        val command = FullEnvironmentCommand(id, nObject)
+        val command = envValue.status match {
+          case BoundStatus => FullEnvironmentCommand(id, envValue.nObject)
+          case ParameterStatus => ParameterEnvironmentCommand(id, envValue.nObject)
+        }
         println(command.toString)
       }
     }

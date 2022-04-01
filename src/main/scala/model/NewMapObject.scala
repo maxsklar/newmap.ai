@@ -68,9 +68,6 @@ case class AccessField(
 // TODO - perhaps in the future, every NewMapObject will actually be a pointer to a hash table, and these will be irrelevant
 case class ParamId(name: String) extends NewMapObject
 
-// This is a parameter that is a standin
-case class ParameterObj(nType: NewMapObject) extends NewMapObject
-
 // This takes as input a member of TypeT and returns true if it's a member
 //  of the command typeclass (which means it has a default value and an update function)
 // TODO: making this a basic class is temporary for now

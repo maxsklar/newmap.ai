@@ -18,7 +18,7 @@ object RetrieveType {
     case AccessField(objectWithField, field) => {
       Evaluator.getCurrentConstantValue(objectWithField, env) match {
         case StructInstance(_, StructT(params)) => {
-          // Field should be evaluated automatically (not allowed to have a ParameterObj in there - must be closed literal)
+          // Field should be evaluated automatically (must be closed literal)
           // TODO - do we need to evaluate the params first - or will it be evaluated already?
           Evaluator.quickApplyFunctionAttempt(params, field, env) match {
             case Success(value) => value
@@ -39,8 +39,13 @@ object RetrieveType {
       }
     }
     // TODO - unsafe get!!
-    case ParamId(name) => this(env.lookup(name).get, env)
-    case ParameterObj(nType) => nType
+    case ParamId(name) => {
+      env.lookup(name) match {
+        case None => throw new Exception(s"Attempted to retrieve type from an id that doesn't exist $name")
+        case Some(EnvironmentValue(nObject, BoundStatus)) => this(nObject, env)
+        case Some(EnvironmentValue(nObject, ParameterStatus)) => nObject
+      }
+    }
     case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
@@ -128,7 +133,6 @@ object RetrieveType {
       values.forall(value => isTermClosedLiteral(value, knownVariables))
     }
     case ParamId(name) => knownVariables.contains(name)
-    case ParameterObj(_) => false
     case ApplyFunction(func, input) => {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
@@ -217,7 +221,6 @@ object RetrieveType {
       case MapInstance(values, mapT) => isMapConstant(values)
       case SequenceInstance(values, seqT) => values.forall(value => isTermConstant(value))
       case ParamId(name) => true
-      case ParameterObj(_) => true // I think this is what to do for now - because non-constants can be passed in
       case ApplyFunction(func, input) => isTermConstant(func) && isTermConstant(input)
       case AccessField(struct, input) => isTermConstant(struct) && isTermConstant(input)
       case StructInstance(value, structType) => value.forall(x => isTermConstant(x._2))

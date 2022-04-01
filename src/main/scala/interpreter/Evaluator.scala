@@ -12,7 +12,7 @@ object Evaluator {
     keepVersioning: Boolean = true // TODO - can we just call getCurrentConstantValue instead of passing this in?
   ): Outcome[NewMapObject, String] = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) => {
         Success(nObject)
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
@@ -263,7 +263,9 @@ object Evaluator {
     for {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
-      versionedO <- versionedObject match {
+      _ <- Outcome.failWhen(versionedObject.status != BoundStatus, s"Identifier $id is a parameter, should be an object")
+
+      versionedO <- versionedObject.nObject match {
         case vo@VersionedObjectLink(_, _) => Success(vo)
         case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
       }
@@ -656,7 +658,7 @@ object Evaluator {
   // This function removes versioning and returns a constant value - the current value
   def getCurrentConstantValue(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) | ParameterObj(_)=> {
+      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) => {
         nObject
       }
       case MapT(inputType, outputType, completeness, featureSet) => {
