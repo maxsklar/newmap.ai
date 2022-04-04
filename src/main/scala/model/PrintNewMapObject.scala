@@ -19,27 +19,11 @@ object PrintNewMapObject {
     case IdentifierT => "Identifier"
     case IdentifierInstance(s) => s
     case MapT(key, value, completeness, featureSet) => {
-      (completeness, featureSet) match {
-        case (CommandOutput, BasicMap) => "Map(" + this(key) + ", " + this(value) + ")"
-        case (RequireCompleteness, SimpleFunction) => "ReqMap(" + this(key) + ", " + this(value) + ")"
-        case (RequireCompleteness, FullFunction) => {
-          // TODO(2022): Change the way lambda input works so that it's more like Map
-          "\\(" + this(key) + ": " + this(value) + ")"
-        }
-        case _ => {
-          // TODO(2022): Improve Notation so that we don't need this!
-          "SpecialMap(" + this(key) + ", " + this(value) + ", " + completeness + ", " + featureSet + ")"
-        }  
-      }
+      printMapT(this(key), this(value), completeness, featureSet)
     }
     case MapInstance(values, mapT) => mapToString(values)
     case SequenceT(nType) => s"Sequence(${this(nType)})"
-    case SequenceInstance(values, _) => "[" + values.map(this(_)).mkString(", ") + "]"
-    case ApplyFunction(func, input) => {
-      this(func) + " " + this(input)
-    }
-    case AccessField(struct, field) => s"${this(struct)}.${this(field)}"
-    case ParamId(name) => s"$name~pi"
+    case SequenceInstance(values, _) => "(" + values.map(this(_)).mkString(", ") + ")"
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, structT) => {
@@ -49,32 +33,100 @@ object PrintNewMapObject {
       for {
         (k, v) <- value
       } {
-        bindings :+= k + ": " + this(v)
+        bindings :+= k + ": " + printExpression(v)
       }
       sb.append(bindings.mkString(", "))
       sb.append(")")
       sb.toString
     }
-    case CaseInstance(constructor, value, _) => {
-      constructor + " " + this(value) // Probably include the case here as well.
+    case CaseInstance(constructor, value, caseType) => {
+      this(caseType) + "." + this(constructor) + " " + this(value) // Probably include the case here as well.
     }
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
-    case VersionedObjectLink(uuid, status) => {
+    case VersionedObjectLink(key, status) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
-      s"VER[${uuid.toString}]"
+      s"VER[${key.toString}]"
 
       //this(currentState) + s"v$v"
     }
   }
 
-  def printParams(params: Vector[(String, NewMapObject)]): String = {
-    mapToString(params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> x._2))
+  def printExpression(
+    nExpression: NewMapExpression
+  ): String = nExpression match {
+    case ObjectExpression(nObject) => this(nObject)
+    case ApplyFunction(func, input) => {
+      printExpression(func) + " " + printExpression(input)
+    }
+    case AccessField(struct, field) => s"${printExpression(struct)}.${this(field)}"
+    case ParamId(name) => s"$name~pi"
+    case BuildCase(constructor, input, caseType) => {
+      this(caseType) + "." + this(constructor) + " " + printExpression(input)
+    }
+    case BuildMapT(inputType, outputType, completeness, featureSet) => {
+      printMapT(printExpression(inputType), printExpression(outputType), completeness, featureSet)
+    }
+    case BuildSeqT(nType) => {
+      s"Sequence(${printExpression(nType)})"
+    }
+    case BuildCaseT(cases) => {
+      "Case " + printExpression(cases)
+    }
+    case BuildStructT(params) => {
+      "Struct " + printExpression(params)
+    }
+    case BuildSubtypeT(isMember) => {
+      s"Subtype(${printExpression(isMember)})"
+    }
+    case BuildMapInstance(values, mapT) => {
+      mapToString(values)
+    }
+    case BuildStructInstance(values, structT) => {
+      val sb: StringBuilder = new StringBuilder()
+      sb.append("StructInstance(")
+      var bindings: Vector[String] = Vector.empty
+      for {
+        (k, v) <- values
+      } {
+        bindings :+= k + ": " + printExpression(v)
+      }
+      sb.append(bindings.mkString(", "))
+      sb.append(")")
+      sb.toString
+    }
+    case BuildSeqInstance(values, sequenceT) => {
+      "(" + values.map(printExpression(_)).mkString(", ") + ")"
+    }
   }
 
-  def mapToString(values: Vector[(NewMapPattern, NewMapObject)]): String = {
+  def printMapT(
+    key: String,
+    value: String,
+    completeness: MapCompleteness,
+    featureSet: MapFeatureSet
+  ): String = {
+    (completeness, featureSet) match {
+      case (CommandOutput, BasicMap) => "Map(" + key + ", " + value + ")"
+      case (RequireCompleteness, SimpleFunction) => "ReqMap(" + key + ", " + value + ")"
+      case (RequireCompleteness, FullFunction) => {
+        // TODO(2022): Change the way lambda input works so that it's more like Map
+        "\\(" + key + ": " + value + ")"
+      }
+      case _ => {
+        // TODO(2022): Improve Notation so that we don't need this!
+        "SpecialMap(" + key + ", " + value + ", " + completeness + ", " + featureSet + ")"
+      }  
+    }
+  }
+
+  def printParams(params: Vector[(String, NewMapObject)]): String = {
+    mapToString(params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2)))
+  }
+
+  def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {
     val sb: StringBuilder = new StringBuilder()
     sb.append("(")
 
@@ -82,7 +134,7 @@ object PrintNewMapObject {
     for {
       (k, v) <- values
     } {
-      bindings :+= patternToString(k) + ": " + this(v)
+      bindings :+= patternToString(k) + ": " + printExpression(v)
     }
     sb.append(bindings.mkString(", "))
 

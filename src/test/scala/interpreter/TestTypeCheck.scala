@@ -8,7 +8,7 @@ class TestTypeCheck extends FlatSpec {
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {
       case Success(objectFound) => {
-        assert(objectFound == Index(4))
+        assert(objectFound == ObjectExpression(Index(4)))
       }
       case Failure(reason) => fail(reason)
     }
@@ -17,7 +17,7 @@ class TestTypeCheck extends FlatSpec {
   "A variable" should " be interpreted correctly is forced as an identifier" in {
     TypeChecker(IdentifierParse("x", true)) match {
       case Success(result) => {
-        assert(result == IdentifierInstance("x"))
+        assert(result == ObjectExpression(IdentifierInstance("x")))
       }
   	  case Failure(reason) => fail(reason)
   	}
@@ -33,7 +33,7 @@ class TestTypeCheck extends FlatSpec {
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
   	  case Success(nObject) => {
-  	  	assert(nObject == TypeT)
+  	  	assert(nObject == ObjectExpression(TypeT))
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -42,7 +42,7 @@ class TestTypeCheck extends FlatSpec {
   it should " be interpreted as an identifier if forced" in {
     TypeChecker(IdentifierParse("Type", true)) match {
       case Success(result) => {
-        assert(result == IdentifierInstance("Type"))
+        assert(result == ObjectExpression(IdentifierInstance("Type")))
   	  }
   	  case Failure(reason) => fail(reason)
   	}

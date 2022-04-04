@@ -131,11 +131,14 @@ case class Environment(
       case ApplyIndividualCommand(s, nObject) => {
         val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
 
+        val newKey = VersionedObjectKey(result.newVersion, result.uuid)
+
         // TODO - during this, versions that are no longer in use can be destroyed
-        val newStoredVTypes = storedVersionedTypes + (VersionedObjectKey(result.newVersion, result.uuid) -> result.newValue)
+        val newStoredVTypes = storedVersionedTypes + (newKey -> result.newValue)
 
         this.copy(
           commands = newCommands,
+          idToObject = idToObject + (s -> EnvironmentValue(VersionedObjectLink(newKey, KeepUpToDate), BoundStatus)),
           latestVersionNumber = latestVersionNumber + (result.uuid -> result.newVersion),
           storedVersionedTypes = newStoredVTypes
         )
@@ -201,7 +204,7 @@ object Environment {
 
   def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> x._2)
+      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2))
     }
 
     StructT(
@@ -214,7 +217,7 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> x._2)
+      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2))
     }
 
     CaseT(
@@ -244,11 +247,11 @@ object Environment {
   // In code, this should be done somewhat automatically
   def buildDefinitionWithParameters(
     inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
-    expression: NewMapObject 
+    expression: NewMapExpression 
   ): NewMapObject = {
     val structT = StructT(
       MapInstance(
-        inputs.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> x._1._2),
+        inputs.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> ObjectExpression(x._1._2)),
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
       )
     )
@@ -269,24 +272,24 @@ object Environment {
     eCommand("Increment", IncrementFunc),
     eCommand("IsCommand", IsCommandFunc),
     eCommand("Sequence", MapInstance(
-      values = Vector(TypePattern("key", TypeT) -> SequenceT(ParamId("key"))),
+      values = Vector(TypePattern("key", TypeT) -> BuildSeqT(ParamId("key"))),
       mapType = MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
-      MapT(ParamId("key"), ParamId("value"), CommandOutput, BasicMap)
+      BuildMapT(ParamId("key"), ParamId("value"), CommandOutput, BasicMap)
     )),
     eCommand("ReqMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      MapT(ParamId("key"), ParamId("value"), RequireCompleteness, SimpleFunction)
+      BuildMapT(ParamId("key"), ParamId("value"), RequireCompleteness, SimpleFunction)
     )),
     eCommand("SubMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      MapT(ParamId("key"), ParamId("value"), SubtypeInput, SimpleFunction)
+      BuildMapT(ParamId("key"), ParamId("value"), SubtypeInput, SimpleFunction)
     )),
     eCommand("Struct", MapInstance(
       values = Vector(
-        TypePattern("structParams", MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)) -> StructT(ParamId("structParams"))
+        TypePattern("structParams", MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
       ),
       mapType = MapT(
         MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
@@ -298,7 +301,7 @@ object Environment {
     // TODO: This CStruct is going to be merged with Struct.. once we take care of generics
     eCommand("CStruct", MapInstance(
       values = Vector(
-        TypePattern("structParams", MapT(CountT, TypeT, SubtypeInput, BasicMap)) -> StructT(ParamId("structParams"))
+        TypePattern("structParams", MapT(CountT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
       ),
       mapType = MapT(
         MapT(CountT, TypeT, SubtypeInput, BasicMap),
@@ -310,7 +313,7 @@ object Environment {
     // TODO: right now cases must be identifier based, expand this in the future!!
     eCommand("Case", MapInstance(
       values = Vector(
-        TypePattern("cases", MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)) -> CaseT(ParamId("cases"))
+        TypePattern("cases", MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)) -> BuildCaseT(ParamId("cases"))
       ),
       mapType = MapT(
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction),
@@ -321,7 +324,7 @@ object Environment {
     )),
     eCommand("Subtype", MapInstance(
       values = Vector(
-        TypePattern("simpleFunction", NewMapO.simpleFunctionT) -> SubtypeT(ParamId("simpleFunction"))
+        TypePattern("simpleFunction", NewMapO.simpleFunctionT) -> BuildSubtypeT(ParamId("simpleFunction"))
       ),
       mapType = MapT(
         NewMapO.simpleFunctionT,

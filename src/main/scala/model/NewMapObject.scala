@@ -9,64 +9,15 @@ sealed abstract class NewMapObject {
   override def toString = PrintNewMapObject(this)
 }
 
-/**
- * The patterns in the NewMapLanguage
- */
-sealed abstract class NewMapPattern
-
-/*sealed abstract class NewMapExpression
-
-case class ObjectExpression(
-  nObject: NewMapObject
-) extends NewMapExpression*/
-
-/**
- * The expressions in the NewMapLanguage
- */
-//sealed abstract class NewMapExpression
-
 // Todo - replace with "user defined type" in prelude
 case class IdentifierInstance(s: String) extends NewMapObject
 
 // Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
 //  we should be able to just give values and not keys if we provide the whole thing
 case class MapInstance(
-  values: Vector[(NewMapPattern, NewMapObject)],
+  values: Vector[(NewMapPattern, NewMapExpression)],
   mapType: NewMapObject
 ) extends NewMapObject
-
-case class ObjectPattern(
-  nObject: NewMapObject
-) extends NewMapPattern
-
-case class TypePattern(
-  name: String,
-  nType: NewMapObject
-) extends NewMapPattern
-
-case class StructPattern(
-  params: Vector[NewMapPattern]
-) extends NewMapPattern
-
-case class CasePattern(
-  constructor: NewMapObject,
-  input: NewMapPattern
-) extends NewMapPattern
-
-case class ApplyFunction(
-  func: NewMapObject,
-  input: NewMapObject
-) extends NewMapObject
-
-case class AccessField(
-  struct: NewMapObject, // This must be an object that has fields (StructInstance, CaseT)
-  input: NewMapObject // Note - input must be literal and free of parameters (might be able to do this with scala's type systen)
-) extends NewMapObject
-
-// This is an object that stands for something else in the environment
-// Very important so that we don't repeat code
-// TODO - perhaps in the future, every NewMapObject will actually be a pointer to a hash table, and these will be irrelevant
-case class ParamId(name: String) extends NewMapObject
 
 // This takes as input a member of TypeT and returns true if it's a member
 //  of the command typeclass (which means it has a default value and an update function)
@@ -88,7 +39,7 @@ case object IncrementFunc extends NewMapObject
 // - That could cause problems because maps don't have to be finite
 // - Then again, an infinite struct could open up possibilities!!
 // The input NewMapObject values must be closed and evaluated
-case class StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structType: NewMapObject) extends NewMapObject
+case class StructInstance(value: Vector[(NewMapPattern, NewMapExpression)], structType: NewMapObject) extends NewMapObject
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: NewMapObject) extends NewMapObject
 
@@ -150,7 +101,7 @@ case class MapT(
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
 object CommandOutput extends MapCompleteness
-object SubtypeInput extends MapCompleteness // Should this exist?
+object SubtypeInput extends MapCompleteness // TODO - remove this when the ReqMap rules are in place!
 
 sealed abstract class MapFeatureSet
 object BasicMap extends MapFeatureSet

@@ -6,12 +6,11 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestEvaluator extends FlatSpec {
   def assertFunctionWorkedAndReturnedResult(
-    attempt: Outcome[Evaluator.ApplyFunctionAttemptResult, String],
+    attempt: Outcome[NewMapObject, String],
     result: NewMapObject
   ): Unit = {
     attempt match {
-      case Success(Evaluator.AbleToApplyFunction(output)) => assert(output == result)
-      case Success(x) => fail(s"Unable to apply function $x")
+      case Success(output) => assert(output == result)
       case Failure(f) => fail(s"Apply function failed: $f")
     }
   }

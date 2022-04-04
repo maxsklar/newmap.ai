@@ -60,7 +60,7 @@ class EnvironmentInterpreter() {
       tc <- TypeChecker.typeCheck(parseTree, AnyT, env, FullFunction)
       nObject <- Evaluator(tc, env)
     } yield {
-      val nType = RetrieveType(nObject, env)
+      val nType = RetrieveType.fromNewMapObject(nObject, env)
       nType.toString
     }
 

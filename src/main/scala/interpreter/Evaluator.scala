@@ -7,48 +7,19 @@ import java.util.UUID
 // Evaluates an expression that's already been type checked
 object Evaluator {
   def apply(
-    nObject: NewMapObject,
-    env: Environment,
-    keepVersioning: Boolean = true // TODO - can we just call getCurrentConstantValue instead of passing this in?
+    nExpression: NewMapExpression,
+    env: Environment
   ): Outcome[NewMapObject, String] = {
-    nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) => {
-        Success(nObject)
-      }
-      case MapT(inputType, outputType, completeness, featureSet) => {
-        if ((completeness == RequireCompleteness) && !RetrieveType.isTermConstant(inputType)) {
-          Failure(s"A map with RequireCompleteness cannot have an expandable input type $inputType")
-        } else {
-          // Should I evaluate here?
-          Success(nObject)
-        }
-      }
-      case SequenceT(nType) => {
-        // Should I evaluate here?
-        Success(nObject)
-      }
-      case mi@MapInstance(values, mapT) => {
-        for {
-          evalValues <- evalMapInstanceVals(values, env)
-        } yield mi.copy(values = evalValues)
-      }
-      case si@SequenceInstance(values, seqT) => {
-        for {
-          evalValues <- evalSeqInstanceVals(values, env)
-        } yield SequenceInstance(evalValues, seqT)
-      }
+    nExpression match {
+      case ObjectExpression(nObject) => Success(nObject)
       case ApplyFunction(func, input) => {
         for {
           evalFunc <- this(func, env)
           evalInput <- this(input, env)
-
-          applicationAttempt <- applyFunctionAttempt(evalFunc, evalInput, env)
-
-          result <- applicationAttempt match {
-            case AbleToApplyFunction(nObject) => Success(nObject)
-            case UnableToApplyDueToFreeVariables => Success(ApplyFunction(func, evalInput))
-          }
-        } yield result
+          result <- applyFunctionAttempt(evalFunc, evalInput, env)
+        } yield {
+          result
+        }
       }
       case AccessField(struct, field) => {
         for {
@@ -56,36 +27,60 @@ object Evaluator {
           result <- accessFieldAttempt(evalStruct, field, env)
         } yield result
       }
-      // TODO: pass through eval function type
-      case StructT(params) => {
-        Success(StructT(params))
+      case ParamId(s) => {
+        env.lookup(s) match {
+          case None => Failure(s"Unbound identifier: $s")
+          case Some(EnvironmentValue(nObject, BoundStatus)) => Success(nObject)
+          case Some(EnvironmentValue(nObject, ParameterStatus)) => {
+            Failure("sCannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
+          }
+        }
       }
-      // TODO: pass through eval function type
-      case CaseT(cases) => {
-        Success(CaseT(cases))
-      }
-      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], nType) => {
-        for {
-          evalValue <- evalParameters(value, env)
-        } yield StructInstance(evalValue, nType)
-      }
-      case CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType) => {
+      case BuildCase(constructor, input, caseType) => {
         for {
           evalInput <- this(input, env)
         } yield CaseInstance(constructor, evalInput, caseType)
       }
-      case SubtypeT(func) => {
-        // Is this correct?
-        Success(SubtypeT(func))
+      case BuildMapT(inputType, outputType, completeness, featureSet) => {
+        for {
+          evalInputType <- this(inputType, env)
+          evalOutputType <- this(outputType, env)
+        } yield MapT(evalInputType, evalOutputType, completeness, featureSet)
       }
-      case vol@VersionedObjectLink(_, _) => {
-        // TODO - do we actually need to do any evaluating on these?
-        // - in other words, are versioned objects required to be fully evaluated?
-        if (keepVersioning) {
-          Success(vol)
-        } else {
-          Success(getCurrentConstantValue(vol, env))
-        }
+      case BuildSeqT(underlyingType) => {
+        for {
+          evalUnderlyingType <- this(underlyingType, env)
+        } yield SequenceT(evalUnderlyingType)
+      }
+      case BuildSubtypeT(isMember) => {
+        for {
+          evalIsMember <- this(isMember, env)
+        } yield SubtypeT(evalIsMember)
+      }
+      case BuildCaseT(cases) => {
+        for {
+          evalCases <- this(cases, env)
+        } yield CaseT(evalCases)
+      }
+      case BuildStructT(params) => {
+        for {
+          evalParams <- this(params, env)
+        } yield StructT(evalParams)
+      }
+      case BuildMapInstance(values, mapT) => {
+        for {
+          evalValues <- evalMapInstanceVals(values, env)
+        } yield MapInstance(evalValues, mapT)
+      }
+      case BuildStructInstance(values, structT) => {
+        for {
+          evalValues <- evalMapInstanceVals(values, env)
+        } yield StructInstance(evalValues, structT)
+      }
+      case BuildSeqInstance(values, sequenceT) => {
+        for {
+          evalValues <- evalSeqInstanceVals(values, env)
+        } yield SequenceInstance(evalValues, sequenceT)
       }
     }
   }
@@ -116,9 +111,8 @@ object Evaluator {
         Success(MapInstance(Vector.empty, mapT))
       }
       case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
-      case structT@StructT(params) => {
+      case structT@StructT(MapInstance(parameterList, _)) => {
         for {
-          parameterList <- TypeChecker.structParamsIntoParameterList(params)
           defaultValue <- getDefaultValueFromStructParams(parameterList, env)
         } yield {
           StructInstance(defaultValue, structT)
@@ -149,7 +143,7 @@ object Evaluator {
         } yield {
           StructT(
             MapInstance(
-              Vector(ObjectPattern(Index(0)) -> inputType, ObjectPattern(Index(1)) -> outputCommandT),
+              Vector(ObjectPattern(Index(0)) -> ObjectExpression(inputType), ObjectPattern(Index(1)) -> ObjectExpression(outputCommandT)),
               MapT(
                 Index(2),
                 TypeT,
@@ -166,7 +160,7 @@ object Evaluator {
         Success(
           StructT(
             MapInstance(
-              Vector(ObjectPattern(Index(0)) -> IdentifierT, ObjectPattern(Index(1)) -> TypeT),
+              Vector(ObjectPattern(Index(0)) -> ObjectExpression(IdentifierT), ObjectPattern(Index(1)) -> ObjectExpression(TypeT)),
               MapT(
                 Index(2),
                 TypeT,
@@ -194,16 +188,14 @@ object Evaluator {
     command: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    RetrieveType(current, env) match {
-      case CountT => {
-        quickApplyFunctionAttempt(IncrementFunc, current, env)
-      }
+    RetrieveType.fromNewMapObject(current, env) match {
+      case CountT => applyFunctionAttempt(IncrementFunc, current, env)
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
           input <- accessFieldAttempt(command, Index(0), env)
           commandForInput <- accessFieldAttempt(command, Index(1), env)
 
-          currentResultForInput <- quickApplyFunctionAttempt(current, input, env)
+          currentResultForInput <- applyFunctionAttempt(current, input, env)
 
           newResultForInput <- updateVersionedO(currentResultForInput, commandForInput, env)
 
@@ -212,7 +204,7 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          newMapValues = (ObjectPattern(input) -> newResultForInput) +: mapValues.filter(x => x._1 != ObjectPattern(input))
+          newMapValues = (ObjectPattern(input) -> ObjectExpression(newResultForInput)) +: mapValues.filter(x => x._1 != ObjectPattern(input))
         } yield {
           MapInstance(newMapValues, mapT)
         }
@@ -233,8 +225,7 @@ object Evaluator {
               newCaseName <- accessFieldAttempt(command, Index(0), env)
               newCaseInputType <- accessFieldAttempt(command, Index(1), env)
 
-
-              newMapValues = (ObjectPattern(newCaseName) -> newCaseInputType) +: values.filter(x => x._1 != ObjectPattern(newCaseName))
+              newMapValues = (ObjectPattern(newCaseName) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseName))
             } yield {
               CaseT(MapInstance(newMapValues, mapT))
             }
@@ -307,21 +298,21 @@ object Evaluator {
       currentState <- currentState(versionLink.key.uuid, env)
       newState <- updateVersionedO(currentState, command, env)
     } yield {
-      UpdateVersionedObjectResponse(latestVersion, versionLink.key.uuid, newState)
+      UpdateVersionedObjectResponse(latestVersion + 1, versionLink.key.uuid, newState)
     }
   }
 
   def getDefaultValueFromStructParams(
-    params: Vector[(NewMapPattern, NewMapObject)],
+    params: Vector[(NewMapPattern, NewMapExpression)],
     env: Environment
-  ): Outcome[Vector[(NewMapPattern, NewMapObject)], String] = {
+  ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
     params match {
       case (id, obj) +: restOfParams => {
         for {
           restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
-          paramDefault <- getDefaultValueOfCommandType(RetrieveType.getParentType(obj, env), env)
+          paramDefault <- getDefaultValueOfCommandType(RetrieveType(obj, env), env)
         } yield {
-          (id -> paramDefault) +: restOfParamsDefault
+          (id -> ObjectExpression(paramDefault)) +: restOfParamsDefault
         }
       }
       case _ => Success(Vector.empty)
@@ -329,28 +320,31 @@ object Evaluator {
   }
 
   def evalMapInstanceVals(
-    values: Vector[(NewMapPattern, NewMapObject)],
+    values: Vector[(NewMapPattern, NewMapExpression)],
     env: Environment
-  ): Outcome[Vector[(NewMapPattern, NewMapObject)], String] = values match {
-    case (k, v) +: restOfValues => {
-      for {
-        evalK <- evalPattern(k, env)
+  ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
+    values match {
+      case (k, v) +: restOfValues => {
+        val nps = newParametersFromPattern(k)
+        val newEnv = env.newParams(nps)
 
-        nps = newParametersFromPattern(evalK)
+        // What do we need to do with v?
+        // I'd argue nothing - it's already type checked so we know the internal parameters check out
+        // This should be left unevaluated!
 
-        newEnv = env.newParams(nps)
-
-        evalV <- this(v, newEnv)
-        evalRest <- evalMapInstanceVals(restOfValues, env)
-      } yield {
-        (evalK -> evalV) +: evalRest
+        // TODO - if this is a basic map, v should be evaluated down to an object
+        for {
+          evalRest <- evalMapInstanceVals(restOfValues, env)
+        } yield {
+          (k -> v) +: evalRest
+        }
       }
+      case _ => Success(Vector.empty)
     }
-    case _ => Success(Vector.empty)
   }
 
   def evalSeqInstanceVals(
-    values: Vector[NewMapObject],
+    values: Vector[NewMapExpression],
     env: Environment
   ): Outcome[Vector[NewMapObject], String] = values match {
     case v +: restOfValues => {
@@ -364,84 +358,28 @@ object Evaluator {
     case _ => Success(Vector.empty)
   }
 
-  def evalPattern(
-    pattern: NewMapPattern,
-    env: Environment
-  ): Outcome[NewMapPattern, String] = pattern match {
-    case ObjectPattern(nObject) => {
-      for {
-        result <- this(nObject, env)
-      } yield ObjectPattern(result)
-    }
-    case TypePattern(name, nType) => {
-      for {
-        result <- this(nType, env)
-      } yield TypePattern(name, result)
-    }
-    case StructPattern(params) => {
-      for {
-        eParams <- evalPatterns(params, env)
-      } yield StructPattern(eParams)
-    }
-    case CasePattern(constructor, input) => {
-      for {
-        result <- evalPattern(input, env)
-      } yield CasePattern(constructor, input)
-    }
-  }
-
-  def evalPatterns(
-    patterns: Vector[NewMapPattern],
-    env: Environment
-  ): Outcome[Vector[NewMapPattern], String] = patterns match {
-    case pattern +: otherPatterns => {
-      for {
-        ePattern <- evalPattern(pattern, env)
-        eOtherPatterns <- evalPatterns(otherPatterns, env)
-      } yield (ePattern +: eOtherPatterns)
-    }
-    case _ => Success(Vector.empty)
-  }
-
-  def evalParameters(
-    params: Vector[(NewMapPattern, NewMapObject)],
-    env: Environment
-  ): Outcome[Vector[(NewMapPattern, NewMapObject)], String] = params match {
-    case (k, v) +: restOfValues => {
-      for {
-        evalV <- this(v, env)
-
-        // TODO: investigate whether we should do something like this
-        //newEnv = env.newCommand(FullEnvironmentCommand(k, evalV))
-
-        evalRest <- evalParameters(restOfValues, env)
-      } yield {
-        (k -> evalV) +: evalRest
-      }
-    }
-    case _ => Success(Vector.empty)
-  }
-
   // Assume that this is type checked so the field should exist in the struct
+  // TODO - I believe this can be merged with apply function attempt!!!
   def accessFieldAttempt(
     struct: NewMapObject,
     field: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    getCurrentConstantValue(struct, env) match {
-      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structT) => {
+    stripVersioning(struct, env) match {
+      case StructInstance(value: Vector[(NewMapPattern, NewMapExpression)], structT) => {
         attemptPatternMatchInOrder(value, field, env)
 
       }
       case CaseT(cases) => {
         for {
-          result <- quickApplyFunctionAttempt(cases, field, env)
+          result <- applyFunctionAttempt(cases, field, env)
         } yield {
-          val caseInputType = RetrieveType.retrieveInputTypeFromFunction(cases, env)
+          val caseInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
 
+          // WHAT TO DO HERE!!!
           MapInstance(
             Vector(
-              TypePattern("input", result) -> CaseInstance(field, ParamId("input"), struct)
+              TypePattern("input", result) -> BuildCase(field, ParamId("input"), struct)
             ),
             MapT(result, struct, RequireCompleteness, SimpleFunction)
           )
@@ -451,78 +389,71 @@ object Evaluator {
     }
   }
 
-  // This is for an ordered struct.. definitely try to unify this
-  def accessFieldsAsList(struct: NewMapObject, env: Environment): Outcome[Vector[NewMapObject], String] = {
-    struct match {
-      // Should we ensure here that the struct type is correct (I believe it needs to be an ordered BasicMap)
-      case StructInstance(values, _) => {
-        Success(values.map(_._2))
+  def expressionListToObjects(
+    nExpressions: Vector[NewMapExpression],
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = {
+    nExpressions match {
+      case nExpression +: tailExpressions => {
+        for {
+          nObject <- this(nExpression, env)
+          restOfObjects <- expressionListToObjects(tailExpressions, env)
+        } yield nObject +: restOfObjects
       }
-      case _ => Failure(s"Unable to access fields as a list from $struct")
+      case _ => Success(Vector.empty)
     }
   }
 
-  sealed abstract class ApplyFunctionAttemptResult
-  case class AbleToApplyFunction(nObject: NewMapObject) extends ApplyFunctionAttemptResult
-  case object UnableToApplyDueToFreeVariables extends ApplyFunctionAttemptResult
 
   // Assume that both the function and the input have been evaluated
   def applyFunctionAttempt(
     func: NewMapObject,
     input: NewMapObject,
     env: Environment
-  ): Outcome[ApplyFunctionAttemptResult, String] = {
+  ): Outcome[NewMapObject, String] = {
     // TODO - is there a way to know if the input has already been evaluated as much as possible
     //Evaluate(input, env)
     // TODO - can we make sure that we get the Current Constant Value BEFORE this is called?
-    val funcC = getCurrentConstantValue(func, env)
-    val inputC = getCurrentConstantValue(input, env)
+    val funcC = stripVersioning(func, env)
+    val inputC = stripVersioning(input, env)
+
     (funcC, inputC) match {
-      case (_, ParamId(s)) => Success(UnableToApplyDueToFreeVariables)
-      case (ParamId(s), _) => Success(UnableToApplyDueToFreeVariables)
       case (MapInstance(values, _), key) => {
         for {
-          evaluatedKey <- this(key, env)
+          keyMatchResult <- attemptPatternMatchInOrder(values, key, env) match {
+            case Success(result) => Success(result)
+            case Failure(_) => {
+              // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+              // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+              // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+              //  and get the default from that
+              val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
 
-          keyMatchResult <- key match {
-            case ParamId(s) => Success(UnableToApplyDueToFreeVariables)
-            case _ => {
-              attemptPatternMatchInOrder(values, evaluatedKey, env) match {
-                case Success(result) => Success(AbleToApplyFunction(result))
-                case Failure(_) => {
-                  // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-                  // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                  // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-                  //  and get the default from that
-                  val nType = RetrieveType.retrieveOutputTypeFromFunction(func, env)
-                  
-                  for {
-                    initValue <- getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
-                  } yield {
-                    AbleToApplyFunction(initValue)
-                  }
-                }
-              }
+              val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
+              
+              getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
             }
           }
-        } yield keyMatchResult
+        } yield {
+          keyMatchResult
+        }
       }
       // TODO: sequences should have their own indecies rather than checking values.length
       case (SequenceInstance(values, seqT), IndexValue(i, Index(j))) if (j == values.length) => {
-        Success(AbleToApplyFunction(values(i.toInt)))
+        Success(values(i.toInt))
       }
       case (IsCommandFunc, nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
 
-        Success(AbleToApplyFunction(Index(if (isCommand) 1 else 0)))
+        Success(Index(if (isCommand) 1 else 0))
       }
-      case (IsVersionedFunc, nObject) => Success(AbleToApplyFunction(
+      case (IsVersionedFunc, nObject) => Success(
         nObject match {
           case VersionedObjectLink(_, _) => Index(1)
           case _ => Index(0)
         }
-      ))
-      case (IsConstantFunc, nObject) => Success(AbleToApplyFunction(
+      )
+      case (IsConstantFunc, nObject) => Success(
         // TODO - I'm not sure this should even be in here -
         //  whether a term is constant should be hidden!
         // Oh well - let's see if we can remove in the future
@@ -531,47 +462,31 @@ object Evaluator {
         } else {
           Index(0)
         }
-      ))
+      )
       case (IsSimpleFunction, nObject) => {
         nObject match {
           case MapInstance(_, MapT(_, _, CommandOutput, features)) => {
             if (features == SimpleFunction || features == BasicMap) {
-              Success(AbleToApplyFunction(Index(1)))
+              Success(Index(1))
             } else {
-              Success(AbleToApplyFunction(Index(0)))
+              Success(Index(0))
             }
           }
-          case _ => Success(AbleToApplyFunction(Index(0)))
+          case _ => Success(Index(0))
         }
       }
-      case (IncrementFunc, Index(i)) => Success(AbleToApplyFunction(Index(i + 1)))
-      case (AccessField(caseT@CaseT(_), field), _) => {
+      case (IncrementFunc, Index(i)) => Success(Index(i + 1))
+      /*case (AccessField(caseT@CaseT(_), field), _) => {
         Success(AbleToApplyFunction(CaseInstance(field, input, caseT)))
-      }
+      }*/
       case _ => {
         Failure(s"Not implemented: apply function\nCallable: $func\nInput: $input")
       }
     }
   }
 
-  // Make sure that nObject has been fully evaluated!
-  def quickApplyFunctionAttempt(
-    nFunction: NewMapObject,
-    nObject: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapObject, String] = {
-    for {
-      attempt <- applyFunctionAttempt(nFunction, nObject, env)
-
-      result <- attempt match {
-        case AbleToApplyFunction(result: NewMapObject) => Success(result)
-        case _ => Failure(s"Unable to apply $nObject to function $nFunction ---- $attempt")
-      }
-    } yield result
-  }
-
   def attemptPatternMatchInOrder(
-    remainingPatterns: Vector[(NewMapPattern, NewMapObject)],
+    remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
     input: NewMapObject,
     env: Environment
   ): Outcome[NewMapObject, String] = {
@@ -600,11 +515,9 @@ object Evaluator {
     (pattern, input) match {
       case (StructPattern(params), StructInstance(paramValues, _)) => {
         for {
-          inputs <- accessFieldsAsList(input, env)
+          inputs <- expressionListToObjects(paramValues.map(_._2), env)
           result <- patternMatchOnStruct(params, inputs, env)
-        } yield {
-          result
-        }
+        } yield result 
       }
       // TODO - since input is going to be a literal, do we actually need to call isMemberOfSubtype, or can we
       //  just call the function??
@@ -639,7 +552,6 @@ object Evaluator {
     }
   }
 
-  // TODO - copy of above, basically, in order to replace it eventually
   // TODO - move this elsewhere, maybe to environment!
   def newParametersFromPattern(pattern: NewMapPattern): Vector[(String, NewMapObject)] = pattern match {
     case ObjectPattern(_) => Vector.empty
@@ -655,80 +567,13 @@ object Evaluator {
     }
   }
 
-  // This function removes versioning and returns a constant value - the current value
-  def getCurrentConstantValue(nObject: NewMapObject, env: Environment): NewMapObject = {
+  def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
-      case CountT | Index(_) | IndexValue(_, _) | IncrementFunc | TypeT | AnyT | IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IdentifierT | IdentifierInstance(_) | ParamId(_) => {
-        nObject
-      }
-      case MapT(inputType, outputType, completeness, featureSet) => {
-        MapT(getCurrentConstantValue(inputType, env), getCurrentConstantValue(outputType, env), completeness, featureSet)
-      }
-      case SequenceT(nType) => SequenceT(getCurrentConstantValue(nType, env))
-      case MapInstance(values, mapT) => {
-        MapInstance(
-          constifyMapInstanceVals(values, env),
-          getCurrentConstantValue(mapT, env)
-        )
-      }
-      case SequenceInstance(values, seqT) => {
-        SequenceInstance(
-          values.map(getCurrentConstantValue(_, env)),
-          getCurrentConstantValue(seqT, env)
-        )
-      }
-      case ApplyFunction(func, input) => {
-        ApplyFunction(getCurrentConstantValue(func, env), getCurrentConstantValue(input, env))
-      }
-      case AccessField(struct, field) => {
-        AccessField(getCurrentConstantValue(struct, env), getCurrentConstantValue(field, env))
-      }
-      case StructT(params) => {
-        StructT(getCurrentConstantValue(params, env))
-      }
-      case CaseT(cases) => {
-        CaseT(getCurrentConstantValue(cases, env))
-      }
-      case StructInstance(value: Vector[(NewMapPattern, NewMapObject)], structT) => {
-        StructInstance(
-          constifyMapInstanceVals(value, env),
-          getCurrentConstantValue(structT, env)
-        )
-      }
-      case ci@CaseInstance(constructor: NewMapObject, input: NewMapObject, caseT) => {
-        CaseInstance(
-          getCurrentConstantValue(constructor, env),
-          getCurrentConstantValue(input, env),
-          getCurrentConstantValue(caseT, env)
-        )
-      }
-      case SubtypeT(func) => {
-        SubtypeT(getCurrentConstantValue(func, env))
-      }
       case VersionedObjectLink(key, status) => {
         // TODO - make this function an outcome
-        this(currentState(key.uuid, env).toOption.get, env).toOption.get
+        currentState(key.uuid, env).toOption.get
       }
-    }
-  }
-
-  def constifyMapInstanceVals(
-    values: Vector[(NewMapPattern, NewMapObject)],
-    env: Environment
-  ): Vector[(NewMapPattern, NewMapObject)] = {
-    for {
-      value <- values
-    } yield {
-      constifyPattern(value._1, env) -> getCurrentConstantValue(value._2, env)
-    }
-  }
-
-  def constifyPattern(pattern: NewMapPattern, env: Environment): NewMapPattern = {
-    pattern match {
-      case ObjectPattern(obj) => ObjectPattern(getCurrentConstantValue(obj, env))
-      case TypePattern(name, nType) => TypePattern(name, getCurrentConstantValue(nType, env))
-      case StructPattern(params) => StructPattern(params.map(constifyPattern(_, env)))
-      case CasePattern(constructor, input) => CasePattern(constructor, constifyPattern(input, env))
+      case _ => nObject
     }
   }
 }

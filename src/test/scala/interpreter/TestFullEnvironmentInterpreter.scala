@@ -64,6 +64,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(line, FailureCheck))
   }
 
+  def bind(key: NewMapObject, value: NewMapObject): (NewMapPattern, NewMapExpression) = {
+    ObjectPattern(key) -> ObjectExpression(value)
+  }
+
   "A number " should " be allowed if it's one less than the type" in {
     testLineWorks("val x: 5 = 4")
   }
@@ -87,9 +91,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       MapInstance(
         Vector(
-          ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(20, Index(100)),
-          ObjectPattern(IndexValue(1, Index(3))) -> IndexValue(43, Index(100)),
-          ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(67, Index(100))
+          bind(IndexValue(0, Index(3)), IndexValue(20, Index(100))),
+          bind(IndexValue(1, Index(3)), IndexValue(43, Index(100))),
+          bind(IndexValue(2, Index(3)), IndexValue(67, Index(100)))
         ),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
@@ -133,7 +137,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "m",
       MapInstance(
-        Vector(ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(10, Index(100)), ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(3, Index(100))),
+        Vector(
+          bind(IndexValue(0, Index(3)), IndexValue(10, Index(100))),
+          bind(IndexValue(2, Index(3)),  IndexValue(3, Index(100)))
+        ),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
     )
@@ -146,7 +153,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "s",
       StructInstance(
-        Vector((ObjectPattern(IdentifierInstance("a")), IndexValue(0, Index(2))), (ObjectPattern(IdentifierInstance("b")), IndexValue(0, Index(3)))),
+        Vector(
+          bind(IdentifierInstance("a"), IndexValue(0, Index(2))), 
+          bind(IdentifierInstance("b"), IndexValue(0, Index(3)))
+        ),
         structType
       )
     )
@@ -262,10 +272,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       MapInstance(Vector(
         TypePattern("a", Index(3)) ->
         ApplyFunction(
-          MapInstance(
-            Vector(ObjectPattern(IndexValue(0, Index(3))) -> IndexValue(2, Index(4)), ObjectPattern(IndexValue(1, Index(3))) -> IndexValue(3, Index(4)), ObjectPattern(IndexValue(2, Index(3))) -> IndexValue(1, Index(4))),
+          ObjectExpression(MapInstance(
+            Vector(
+              bind(IndexValue(0, Index(3)), IndexValue(2, Index(4))),
+              bind(IndexValue(1, Index(3)), IndexValue(3, Index(4))),
+              bind(IndexValue(2, Index(3)), IndexValue(1, Index(4)))
+            ),
             MapT(Index(3), Index(4), CommandOutput, BasicMap)
-          ),
+          )),
           ParamId("a")
         )
       ), MapT(Index(3), Index(4), RequireCompleteness, FullFunction))
@@ -317,6 +331,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val x: 12 = 6", GeneralSuccessCheck),
       CodeExpectation("(6: 10, 1: 3, 2: 1) x", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " be usable in a function" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Type => Type = (t: t)", GeneralSuccessCheck),
+      CodeExpectation("val y: Type => Type = (t: (t => 2))", GeneralSuccessCheck),
     ))
   }
 
@@ -503,7 +524,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     CodeExpectation("Increment (1: 4, 2: 5)", FailureCheck)
   }
 
-  "Versioned Objects " should " be initialized and updated for Count" in {
+  "Versioned Counts " should " be initialized and updated for Count" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
@@ -513,7 +534,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be initialized and updated for Map" in {
+  it should " be allowed to have members" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("val p: n = 1", GeneralSuccessCheck),
+    ))
+  }
+
+  "Versioned Objects " should " be initialized and updated for Map" in {
     testCodeScript(Vector(
       CodeExpectation("ver m = new Map(Identifier, Count)", GeneralSuccessCheck),
       CodeExpectation("update m (hello, ())", GeneralSuccessCheck),

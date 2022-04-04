@@ -16,16 +16,22 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          nType <- Evaluator(tcType, env)
+          //_ = println(s"Type from TypeChecker: $nType")
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
-          evaluatedObject <- Evaluator(tc, env, false)
+          //_ = println(s"Expression from TypeChecker: $tc")
+          evaluatedObject <- Evaluator(tc, env)
+          //_ = println(s"evaluatedObject: $evaluatedObject")
+          constantObject = Evaluator.stripVersioning(evaluatedObject, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, evaluatedObject))
+          Vector(FullEnvironmentCommand(id.s, constantObject))
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          nType <- TypeChecker.typeSpecificTypeChecker(typeExpression, env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          nType <- Evaluator(tcType, env)
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
@@ -43,7 +49,13 @@ object StatementInterpreter {
       }
       case ApplyCommandStatementParse(id, command) => {
         for {
-          commandObj <- TypeChecker.applyCommandTypeChecker(id.s, command, env)
+          versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
+          nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
+
+          inputT <- Evaluator.getCommandInputOfPureCommandType(nType)
+          commandExp <- typeCheck(command, inputT, env, FullFunction)
+
+          commandObj <- Evaluator(commandExp, env)
         } yield {
           Vector(ApplyIndividualCommand(id.s, commandObj))
         }
@@ -62,9 +74,10 @@ object StatementInterpreter {
       case ExpressionOnlyStatementParse(exp) => {
         for {
           tc <- TypeChecker.typeCheck(exp, AnyT, env, FullFunction)
-          evaluatedObject <- Evaluator(tc, env, false)
+          evaluatedObject <- Evaluator(tc, env)
+          constantObject = Evaluator.stripVersioning(evaluatedObject, env)
         } yield {
-          Vector(ExpOnlyEnvironmentCommand(evaluatedObject))
+          Vector(ExpOnlyEnvironmentCommand(constantObject))
         }
       }
     }

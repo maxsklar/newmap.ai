@@ -6,31 +6,16 @@ import ai.newmap.util.{Outcome, Success, Failure}
 // Subsitute the given parameters for their given values in the expression
 object MakeSubstitution {
   def apply(
-    expression: NewMapObject,
+    expression: NewMapExpression,
     parameters: Map[String, NewMapObject],
     env: Environment
-  ): NewMapObject = {
+  ): NewMapExpression = {
     expression match {
-      case CountT | TypeT | AnyT | IdentifierT | Index(_) | IndexValue(_, _) | IdentifierInstance(_) | VersionedObjectLink(_, _) => expression
-      case MapT(inputType, outputType, completeness, featureSet) => {
-        MapT(
-          this(inputType, parameters, env),
-          this(outputType, parameters, env),
-          completeness,
-          featureSet
-        )
-      }
-      case SequenceT(nType) => {
-        SequenceT(this(nType, parameters, env))
-      }
-      case StructT(values) => {
-        StructT(this(values, parameters, env))
-      }
-      case CaseT(cases) => {
-        CaseT(this(cases, parameters, env))
-      }
-      case SubtypeT(isMember) => {
-        SubtypeT(this(isMember, parameters, env))
+      case ObjectExpression(nObject) => {
+        // Temporary solution is to dig through to find the map expressions with the parameters
+        // Permanent solution is to make a "build map construction + functions"
+        val fixedObject = substObject(nObject, parameters, env)
+        ObjectExpression(fixedObject)
       }
       case ApplyFunction(func, input) => {
         ApplyFunction(
@@ -41,63 +26,89 @@ object MakeSubstitution {
       case AccessField(struct, field) => {
         AccessField(
           this(struct, parameters, env),
-          this(field, parameters, env)
+          field
         )
       }
       case ParamId(name) => {
         parameters.get(name) match {
-          case Some(obj) => obj
+          case Some(obj) => ObjectExpression(obj)
           case None => expression
         }
       }
-      case StructInstance(value, structT) => {
-        StructInstance(
-          value.map(x => (x._1 -> this(x._2, parameters, env))),
-          structT
+      case BuildCase(constructor, input, caseType) => {
+        BuildCase(constructor, this(input, parameters, env), caseType)
+      }
+      case BuildMapT(inputType, outputType, completeness, featureSet) => {
+        BuildMapT(
+          this(inputType, parameters, env),
+          this(outputType, parameters, env),
+          completeness,
+          featureSet
         )
       }
-      case CaseInstance(constructor, value, caseT) => {
-        CaseInstance(constructor, this(value, parameters, env), caseT)
+      case BuildSeqT(nType) => {
+        BuildSeqT(this(nType, parameters, env))
       }
-      case IsCommandFunc | IsSimpleFunction | IsVersionedFunc | IsConstantFunc | IncrementFunc => expression
+      case BuildSubtypeT(isMember) => {
+        BuildSubtypeT(this(isMember, parameters, env))
+      }
+      case BuildCaseT(cases) => BuildCaseT(this(cases, parameters, env))
+      case BuildStructT(params) => BuildStructT(this(params, parameters, env))
+      case BuildMapInstance(values, mapT) => {
+        val newMapValues = for {
+          (k, v) <- values
+        } yield {
+          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
+          val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
+          k -> newValue
+        }
+
+        BuildMapInstance(newMapValues, mapT)
+      }
+      case BuildStructInstance(values, structT) => {
+        val newMapValues = for {
+          (k, v) <- values
+        } yield {
+          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
+          val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
+          k -> newValue
+        }
+
+        BuildStructInstance(newMapValues, structT)
+      }
+      case BuildSeqInstance(values, sequenceT) => {
+        BuildSeqInstance(
+          values.map(value => this(value, parameters, env)),
+          sequenceT
+        )
+      }
+    }
+  }
+
+  // TODO - this will become unneccesary when we create a "buildMap" instead of relying on NewMapObject
+  // NewMapObject should not contain any outside parameters!!!
+  def substObject(
+    nObject: NewMapObject,
+    parameters: Map[String, NewMapObject],
+    env: Environment
+  ): NewMapObject = {
+    nObject match {
       case MapInstance(values, mapT) => {
         val newValues = for {
           (k, v) <- values
-          substK = substPattern(k, parameters, env)
 
-          internalParams = Evaluator.newParametersFromPattern(substK)
+          internalParams = Evaluator.newParametersFromPattern(k)
           // We cannot replace params that have the same name
 
           remainingParameters = parameters -- internalParams.map(_._1)
-        } yield (substK -> this(v, remainingParameters, env))
+        } yield (k -> this(v, remainingParameters, env))
 
         MapInstance(
           newValues,
           mapT
         )
       }
-      case SequenceInstance(values, seqT) => {
-        val newValues = for {
-          value <- values
-        } yield MakeSubstitution(value, parameters, env)
-
-        SequenceInstance(newValues, seqT)
-      }
-    }
-  }
-
-  def substPattern(
-    pattern: NewMapPattern,
-    parameters: Map[String, NewMapObject],
-    env: Environment
-  ): NewMapPattern = pattern match {
-    case ObjectPattern(oPattern) => ObjectPattern(this(oPattern, parameters, env))
-    case TypePattern(name, nType) => TypePattern(name, this(nType, parameters, env))
-    case StructPattern(params) => {
-      StructPattern(params.map(param => substPattern(param, parameters, env)))
-    }
-    case CasePattern(constructor, input) => {
-      CasePattern(constructor, substPattern(input, parameters, env))
+      case _ => nObject
     }
   }
 }
