@@ -283,6 +283,10 @@ object Environment {
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildMapT(ParamId("key"), ParamId("value"), RequireCompleteness, SimpleFunction)
     )),
+    eCommand("Table", buildDefinitionWithParameters(
+      Vector("key" -> TypeT, "value" -> TypeT),
+      BuildTableT(ParamId("key"), ParamId("value"))
+    )),
     eCommand("SubMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildMapT(ParamId("key"), ParamId("value"), SubtypeInput, SimpleFunction)

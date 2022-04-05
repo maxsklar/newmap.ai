@@ -49,24 +49,27 @@ object RetrieveType {
     case BuildCase(_, _, caseType) => caseType
     case BuildMapT(_, _, _, _) => TypeT
     case BuildSeqT(_) => TypeT
+    case BuildTableT(_, _) => TypeT
     case BuildSubtypeT(_) => TypeT
     case BuildCaseT(_) => TypeT
     case BuildStructT(_) => TypeT
     case BuildMapInstance(values, mapT) => mapT // TODO - what if this is a submap???
     case BuildStructInstance(values, structT) => structT
     case BuildSeqInstance(values, sequenceT) => sequenceT
+    case BuildTableInstance(values, tableT) => tableT
   }
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case Index(_) => CountT
     case IndexValue(_, indexT) => indexT 
-    case CountT | SequenceT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
+    case CountT | SequenceT(_) | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
     case IdentifierInstance(s) => IdentifierT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case MapInstance(values, mapT) => mapT
     case SequenceInstance(values, seqT) => seqT
+    case TableInstance(values, tableT) => tableT
     case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
@@ -99,6 +102,9 @@ object RetrieveType {
           // TODO: Sequences shouldn't merely be based on indecies, each sequence should have it's own input tag
           Index(values.length)
         }
+        case TableInstance(values, TableT(keyType, requiredValues)) => {
+          keyType
+        }
         case _ => {
           Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
             case MapT(inputType, _, _, _) => inputType
@@ -120,6 +126,7 @@ object RetrieveType {
     Evaluator.stripVersioning(typeOfFunction, env) match {
       case MapT(_, _, _, featureSet) => featureSet
       case SequenceT(_) => BasicMap
+      case TableT(_, _) => SimpleFunction
       case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
     }
   }
@@ -128,6 +135,7 @@ object RetrieveType {
     nType match {
       case MapT(_, outputType, _, _) => outputType
       case SequenceT(nType) => nType
+      case TableT(_, requiredValues) => requiredValues
       case VersionedObjectLink(key, status) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         retrieveOutputTypeFromFunctionType(currentState, env)
@@ -164,6 +172,9 @@ object RetrieveType {
         isTermClosedLiteral(outputType, knownVariables)
     }
     case BuildSeqT(nType) => isTermClosedLiteral(nType, knownVariables)
+    case BuildTableT(keyType, requiredValues) => {
+      isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
+    }
     case BuildSubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
     case BuildCaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case BuildStructT(params) => isTermClosedLiteral(params, knownVariables)
@@ -175,6 +186,9 @@ object RetrieveType {
     }
     case BuildSeqInstance(values, sequenceT) => {
       values.forall(value => isTermClosedLiteral(value, knownVariables))
+    }
+    case BuildTableInstance(values, sequenceT) => {
+      isMapValuesClosed(values, knownVariables)
     }
   }
 
@@ -199,9 +213,13 @@ object RetrieveType {
       case MapInstance(values, mapT) => isMapConstant(values)
       case SequenceInstance(values, seqT) => values.forall(value => isTermConstant(value))
       case StructInstance(values, structType) => isMapConstant(values)
+      case TableInstance(values, tableT) => isMapConstant(values)
       case CaseInstance(constructor, input, caseType) => isTermConstant(constructor) && isTermConstant(input)
       case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case SequenceT(nType) => isTermConstant(nType)
+      case TableT(expandingKeyType, requiredValues) => {
+        isTermConstant(expandingKeyType) && isTermConstant(requiredValues)
+      }
       case StructT(params) => isTermConstant(params)
       case CaseT(cases) => isTermConstant(cases)
       case SubtypeT(isMember) => isTermConstant(isMember)
@@ -255,11 +273,15 @@ object RetrieveType {
       isExpressionConstant(inputType) && isExpressionConstant(outputType)
     }
     case BuildSeqT(nType) => isExpressionConstant(nType)
+    case BuildTableT(keyType, requiredValues) => {
+      isExpressionConstant(keyType) && isExpressionConstant(requiredValues)
+    }
     case BuildSubtypeT(isMember) => isExpressionConstant(isMember)
     case BuildCaseT(cases) => isExpressionConstant(cases)
     case BuildStructT(params) => isExpressionConstant(params)
     case BuildMapInstance(values, mapT) => isMapConstant(values) && isTermConstant(mapT)
     case BuildStructInstance(values, structT) => isMapConstant(values) && isTermConstant(structT)
-    case BuildSeqInstance(values, sequenceT) => values.forall(value => isExpressionConstant(value))
+    case BuildSeqInstance(values, sequenceT) => values.forall(value => isExpressionConstant(value)) && isTermConstant(sequenceT)
+    case BuildTableInstance(values, tableT) => isMapConstant(values) && isTermConstant(tableT)
   }
 }

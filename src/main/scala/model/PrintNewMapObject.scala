@@ -24,6 +24,11 @@ object PrintNewMapObject {
     case MapInstance(values, mapT) => mapToString(values)
     case SequenceT(nType) => s"Sequence(${this(nType)})"
     case SequenceInstance(values, _) => "(" + values.map(this(_)).mkString(", ") + ")"
+    case TableT(expandingKeyType, requiredValues) => {
+      val mapTString = printMapT(this(expandingKeyType), this(requiredValues), RequireCompleteness, SimpleFunction)
+      s"Table(${mapTString})"
+    }
+    case TableInstance(values, _) => mapToString(values)
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     case StructInstance(value, structT) => {
@@ -72,6 +77,10 @@ object PrintNewMapObject {
     case BuildSeqT(nType) => {
       s"Sequence(${printExpression(nType)})"
     }
+    case BuildTableT(expandingKeyType, requiredValues) => {
+      val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), RequireCompleteness, SimpleFunction)
+      s"Table(${mapTString})"
+    }
     case BuildCaseT(cases) => {
       "Case " + printExpression(cases)
     }
@@ -99,6 +108,9 @@ object PrintNewMapObject {
     }
     case BuildSeqInstance(values, sequenceT) => {
       "(" + values.map(printExpression(_)).mkString(", ") + ")"
+    }
+    case BuildTableInstance(values, tableT) => {
+      mapToString(values)    
     }
   }
 

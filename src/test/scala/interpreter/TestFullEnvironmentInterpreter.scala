@@ -322,7 +322,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be creatable without a type given" in {
+  /*it should " be creatable without a type given" in {
     val line = "val f = (t: t)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
@@ -332,7 +332,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val x: 12 = 6", GeneralSuccessCheck),
       CodeExpectation("(6: 10, 1: 3, 2: 1) x", GeneralSuccessCheck)
     ))
-  }
+  }*/
 
   it should " be usable in a function" in {
     testCodeScript(Vector(
@@ -670,7 +670,44 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Tables " should " be allowed to be created" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Table(Count, Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update n ((), hello)", GeneralSuccessCheck),
+      CodeExpectation("update n ((), world)", GeneralSuccessCheck),
+      CodeExpectation("n", GeneralSuccessCheck),
+      CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("World")))),
+    ))
+  }
+
   /**
+   * 
+   * 
+   * 
+  Include UniqueTable 
+
+  The whole thing should be set up on creation!!
+
+  ver n = new Table(KEY, (required field params))
+  
+
+  
+
+  NO - you might need to add more!
+  But I like the idea of a table...
+
+  ver n = new Table(Count)
+  update n (RequiredField)
+
+
+  Can we deal with the fact that a field is the same as a map?
+  - 
+
+  ver n = new Count
+  requiredField n(name, Identifier, ())
+  
+
+
   TODOS:
 
   Step 3: Make sure we can deal with ReqMap(n, T) where n is an expanding COUNT!!

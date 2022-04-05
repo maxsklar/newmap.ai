@@ -49,6 +49,12 @@ object MakeSubstitution {
       case BuildSeqT(nType) => {
         BuildSeqT(this(nType, parameters, env))
       }
+      case BuildTableT(keyType, requiredValues) => {
+        BuildTableT(
+          this(keyType, parameters, env),
+          this(requiredValues, parameters, env)
+        )
+      }
       case BuildSubtypeT(isMember) => {
         BuildSubtypeT(this(isMember, parameters, env))
       }
@@ -81,6 +87,17 @@ object MakeSubstitution {
           values.map(value => this(value, parameters, env)),
           sequenceT
         )
+      }
+      case BuildTableInstance(values, tableT) => {
+        val newMapValues = for {
+          (k, v) <- values
+        } yield {
+          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
+          val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
+          k -> newValue
+        }
+
+        BuildTableInstance(newMapValues, tableT)
       }
     }
   }

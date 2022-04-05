@@ -343,7 +343,6 @@ object TypeChecker {
 
           tc <- typeCheck(valueObject, typeOfIdentifierObj, env, featureSet)
 
-          // TODO: Neccesary to make substitution here?
           substExp = MakeSubstitution(tc, newParams, env)
           substObj <- Evaluator(substExp, env)
 
@@ -361,7 +360,6 @@ object TypeChecker {
       }
       case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
         // TODO: this is pasted code from inside the case above.
-        //println(s"*** In here $valueObject -- $typeOfIdentifier -- $inPattern -- $typeOfIdentifier")
         for {
           typeOfIdentifierObj <- Evaluator(typeOfIdentifier, env)
           tc <- typeCheck(valueObject, typeOfIdentifierObj, env, featureSet)
@@ -377,7 +375,7 @@ object TypeChecker {
 
           result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, newEnv, featureSet)
         } yield {
-          (paramId, tc/*substObj*/) +: result
+          (paramId, tc) +: result
         }
       }
       case _ => {

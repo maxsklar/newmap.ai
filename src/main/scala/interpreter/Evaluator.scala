@@ -60,6 +60,12 @@ object Evaluator {
           evalUnderlyingType <- this(underlyingType, env)
         } yield SequenceT(evalUnderlyingType)
       }
+      case BuildTableT(keyType, requiredValues) => {
+        for {
+          evalKeyType <- this(keyType, env)
+          evalRequiredValues <- this(requiredValues, env)
+        } yield TableT(evalKeyType, evalRequiredValues)
+      }
       case BuildSubtypeT(isMember) => {
         for {
           evalIsMember <- this(isMember, env)
@@ -90,6 +96,11 @@ object Evaluator {
           evalValues <- evalSeqInstanceVals(values, env)
         } yield SequenceInstance(evalValues, sequenceT)
       }
+      case BuildTableInstance(values, tableT) => {
+        for {
+          evalValues <- evalMapInstanceVals(values, env)
+        } yield TableInstance(evalValues, tableT)
+      }
     }
   }
 
@@ -97,6 +108,7 @@ object Evaluator {
     nType match {
       case CountT => Success(Index(0))
       case seqT@SequenceT(nType) => Success(SequenceInstance(Vector.empty, seqT))
+      case tableT@TableT(keyType, requiredValues) => Success(TableInstance(Vector.empty, tableT))
       case Index(i) if i > 0 => Success(IndexValue(0, Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
@@ -163,6 +175,25 @@ object Evaluator {
         }
       }
       case SequenceT(nType) => Success(nType)
+      case TableT(keyType, requiredValues) => {
+        // Key Expansion + requiredValue expansion
+        // What if Key expansion is a case? (for now we don't allow this, only basic map)
+        for {
+          keyExpansionCommandT <- getCommandInputOfPureCommandType(keyType)
+        } yield {
+          StructT(
+            MapInstance(
+              Vector(ObjectPattern(Index(0)) -> ObjectExpression(keyExpansionCommandT), ObjectPattern(Index(1)) -> ObjectExpression(requiredValues)),
+              MapT(
+                Index(2),
+                TypeT,
+                RequireCompleteness,
+                BasicMap
+              )
+            )
+          )
+        }
+      }
       // This should really be a case type instead of a typeT
       case TypeT => {
         Success(
@@ -224,6 +255,19 @@ object Evaluator {
             case _ => Failure(s"Couldn't get seq values from $current")
           }
         } yield SequenceInstance(seqValues :+ command, seqT)
+      }
+      case tableT@TableT(keyType, requiredValues) => {
+        for {
+          keyExpansionCommand <- accessFieldAttempt(command, Index(0), env)
+          valueExpansionCommand <- accessFieldAttempt(command, Index(1), env)
+
+          mapValues <- current match {
+            case TableInstance(values, _) => Success(values)
+            case _ => Failure(s"Couldn't get map values from $current")
+          }
+
+          newMapValues = (ObjectPattern(keyExpansionCommand) -> ObjectExpression(valueExpansionCommand)) +: mapValues.filter(x => x._1 != ObjectPattern(keyExpansionCommand))
+        } yield TableInstance(newMapValues, tableT)
       }
       case TypeT => {
         current match {
@@ -455,6 +499,12 @@ object Evaluator {
       // TODO: sequences should have their own indecies rather than checking values.length
       case (SequenceInstance(values, seqT), IndexValue(i, Index(j))) if (j == values.length) => {
         Success(values(i.toInt))
+      }
+      case (TableInstance(values, seqT), input) => {
+        attemptPatternMatchInOrder(values, input, env) match {
+          case Success(x) => Success(x)
+          case Failure(PatternMatchErrorType(message, _)) => Failure(message)
+        }
       }
       case (IsCommandFunc, nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess

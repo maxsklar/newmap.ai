@@ -49,8 +49,16 @@ case class SequenceT(underlyingType: NewMapObject) extends NewMapObject
 
 case class SequenceInstance(seq: Vector[NewMapObject], sequenceT: NewMapObject) extends NewMapObject
 
-// Basic Function Section
-// These are pre-defined functions, their types are in comment
+case class TableT(
+  expandingKeyType: NewMapObject,
+  requiredValues: NewMapObject
+) extends NewMapObject
+
+case class TableInstance(
+  // For now, these are basic map rules (ObjectPattern, ObjectExpression)- in the future, maybe we can expand
+  values: Vector[(NewMapPattern, NewMapExpression)],
+  tableT: NewMapObject
+) extends NewMapObject
 
 /*
  * The types in the NewMap Language
@@ -108,7 +116,6 @@ object BasicMap extends MapFeatureSet
 object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only simple operations
 object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
 object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
-
 
 // TypeClass
 // defines some structure on a type

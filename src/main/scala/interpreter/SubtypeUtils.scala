@@ -110,10 +110,9 @@ object SubtypeUtils {
           // - That would require isGenericPattern to match an nType that's a NewMapPattern, not just a NewMapObject
           case StructT(MapInstance(params, MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
-              x._2 match {
-                case ObjectExpression(nObject) => isGenericPattern(x._1, nObject, env)
-                case _ => false // We're not really set up for this yet!
-              }
+              Evaluator(x._2, env).toOption.map(nObject => {
+                isGenericPattern(x._1, nObject, env)
+              }).getOrElse(false) // We're not really set up for this yet!
             })
           }
           case _ => false 
