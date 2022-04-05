@@ -43,12 +43,6 @@ case class StructInstance(value: Vector[(NewMapPattern, NewMapExpression)], stru
 
 case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: NewMapObject) extends NewMapObject
 
-// Note that this should eventually be turned into a ReqMap(Index(n), output)
-// But because we don't know "n" we can make this its own type for now
-case class SequenceT(underlyingType: NewMapObject) extends NewMapObject
-
-case class SequenceInstance(seq: Vector[NewMapObject], sequenceT: NewMapObject) extends NewMapObject
-
 case class TableT(
   expandingKeyType: NewMapObject,
   requiredValues: NewMapObject

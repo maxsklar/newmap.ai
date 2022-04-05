@@ -46,9 +46,6 @@ object MakeSubstitution {
           featureSet
         )
       }
-      case BuildSeqT(nType) => {
-        BuildSeqT(this(nType, parameters, env))
-      }
       case BuildTableT(keyType, requiredValues) => {
         BuildTableT(
           this(keyType, parameters, env),
@@ -81,12 +78,6 @@ object MakeSubstitution {
         }
 
         BuildStructInstance(newMapValues, structT)
-      }
-      case BuildSeqInstance(values, sequenceT) => {
-        BuildSeqInstance(
-          values.map(value => this(value, parameters, env)),
-          sequenceT
-        )
       }
       case BuildTableInstance(values, tableT) => {
         val newMapValues = for {

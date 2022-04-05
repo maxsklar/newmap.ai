@@ -274,7 +274,7 @@ object Environment {
     eCommand("Increment", IncrementFunc),
     eCommand("IsCommand", IsCommandFunc),
     eCommand("Sequence", MapInstance(
-      values = Vector(TypePattern("key", TypeT) -> BuildSeqT(ParamId("key"))),
+      values = Vector(TypePattern("key", TypeT) -> BuildTableT(ObjectExpression(CountT), ParamId("key"))),
       mapType = MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
     )),
     eCommand("Map", buildDefinitionWithParameters(

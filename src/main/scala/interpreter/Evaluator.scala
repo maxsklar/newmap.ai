@@ -55,11 +55,6 @@ object Evaluator {
           MapT(evalInputType, evalOutputType, completeness, featureSet)
         }
       }
-      case BuildSeqT(underlyingType) => {
-        for {
-          evalUnderlyingType <- this(underlyingType, env)
-        } yield SequenceT(evalUnderlyingType)
-      }
       case BuildTableT(keyType, requiredValues) => {
         for {
           evalKeyType <- this(keyType, env)
@@ -92,11 +87,6 @@ object Evaluator {
           evalValues <- evalMapInstanceVals(values, env)
         } yield StructInstance(evalValues, structT)
       }
-      case BuildSeqInstance(values, sequenceT) => {
-        for {
-          evalValues <- evalSeqInstanceVals(values, env)
-        } yield SequenceInstance(evalValues, sequenceT)
-      }
       case BuildTableInstance(values, tableT) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
@@ -108,7 +98,6 @@ object Evaluator {
   def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
-      case seqT@SequenceT(nType) => Success(SequenceInstance(Vector.empty, seqT))
       case tableT@TableT(keyType, requiredValues) => Success(TableInstance(Vector.empty, tableT))
       case Index(i) if i > 0 => Success(IndexValue(0, Index(i)))
       case TypeT => {
@@ -176,7 +165,6 @@ object Evaluator {
           )
         }
       }
-      case SequenceT(nType) => Success(nType)
       case TableT(keyType, requiredValues) => {
         // Key Expansion + requiredValue expansion
         // What if Key expansion is a case? (for now we don't allow this, only basic map)
@@ -248,7 +236,6 @@ object Evaluator {
       case MapInstance(values, tag) => MapInstance(values, newTypeTag)
       case StructInstance(values, tag) => StructInstance(values, newTypeTag)
       case CaseInstance(cons, input, caseType) => CaseInstance(cons, input, newTypeTag)
-      case SequenceInstance(seq, tag) => SequenceInstance(seq, newTypeTag)
       case IndexValue(i, tag) => IndexValue(i, newTypeTag)
       case TableInstance(values, tableT) => TableInstance(values, newTypeTag)
       case _ => nObject
@@ -296,14 +283,6 @@ object Evaluator {
         } yield {
           UpdateVersionedOResponse(MapInstance(newMapValues, mapT), NewMapO.emptyStruct)
         }
-      }
-      case seqT@SequenceT(nType) => {
-        for {
-          seqValues <- current match {
-            case SequenceInstance(values, seqT) => Success(values)
-            case _ => Failure(s"Couldn't get seq values from $current")
-          }
-        } yield UpdateVersionedOResponse(SequenceInstance(seqValues :+ command, seqT), NewMapO.emptyStruct)
       }
       case tableT@TableT(keyType, requiredValues) => {
         for {
@@ -480,21 +459,6 @@ object Evaluator {
     }
   }
 
-  def evalSeqInstanceVals(
-    values: Vector[NewMapExpression],
-    env: Environment
-  ): Outcome[Vector[NewMapObject], String] = values match {
-    case v +: restOfValues => {
-      for {
-        evalV <- this(v, env)
-        evalRest <- evalSeqInstanceVals(restOfValues, env)
-      } yield {
-        evalV +: evalRest
-      }
-    }
-    case _ => Success(Vector.empty)
-  }
-
   // Assume that this is type checked so the field should exist in the struct
   // TODO - I believe this can be merged with apply function attempt!!!
   def accessFieldAttempt(
@@ -581,11 +545,7 @@ object Evaluator {
           keyMatchResult
         }
       }
-      // TODO: sequences should have their own indecies rather than checking values.length
-      case (SequenceInstance(values, seqT), IndexValue(i, Index(j))) if (j == values.length) => {
-        Success(values(i.toInt))
-      }
-      case (TableInstance(values, seqT), input) => {
+      case (TableInstance(values, tableT), input) => {
         attemptPatternMatchInOrder(values, input, env) match {
           case Success(x) => Success(x)
           case Failure(PatternMatchErrorType(message, _)) => Failure(message)

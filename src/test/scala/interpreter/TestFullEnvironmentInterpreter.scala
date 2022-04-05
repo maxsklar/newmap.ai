@@ -680,6 +680,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " have a Sequence shortcut if they are based on a count" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Sequence(10)", GeneralSuccessCheck),
+      CodeExpectation("update n 2", GeneralSuccessCheck),
+      CodeExpectation("update n 7", GeneralSuccessCheck),
+      CodeExpectation("update n 5", GeneralSuccessCheck),
+      CodeExpectation("n 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, Index(10))))),
+      CodeExpectation("n 3", FailureCheck)
+    ))
+  }
+
   /**
    * 
    * 

@@ -33,10 +33,6 @@ case class BuildMapT(
   featureSet: MapFeatureSet
 ) extends NewMapExpression
 
-case class BuildSeqT(
-  underlyingType: NewMapExpression
-) extends NewMapExpression
-
 case class BuildTableT(
   expandingKeyType: NewMapExpression,
   requiredValues: NewMapExpression
@@ -54,11 +50,6 @@ case class BuildMapInstance(
 case class BuildStructInstance(
   values: Vector[(NewMapPattern, NewMapExpression)],
   structType: NewMapObject
-) extends NewMapExpression
-
-case class BuildSeqInstance(
-  values: Vector[NewMapExpression],
-  sequenceT: NewMapObject
 ) extends NewMapExpression
 
 case class BuildTableInstance(

@@ -22,8 +22,6 @@ object PrintNewMapObject {
       printMapT(this(key), this(value), completeness, featureSet)
     }
     case MapInstance(values, mapT) => mapToString(values)
-    case SequenceT(nType) => s"Sequence(${this(nType)})"
-    case SequenceInstance(values, _) => "(" + values.map(this(_)).mkString(", ") + ")"
     case TableT(expandingKeyType, requiredValues) => {
       val mapTString = printMapT(this(expandingKeyType), this(requiredValues), RequireCompleteness, SimpleFunction)
       s"Table(${mapTString})"
@@ -74,9 +72,6 @@ object PrintNewMapObject {
     case BuildMapT(inputType, outputType, completeness, featureSet) => {
       printMapT(printExpression(inputType), printExpression(outputType), completeness, featureSet)
     }
-    case BuildSeqT(nType) => {
-      s"Sequence(${printExpression(nType)})"
-    }
     case BuildTableT(expandingKeyType, requiredValues) => {
       val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), RequireCompleteness, SimpleFunction)
       s"Table(${mapTString})"
@@ -105,9 +100,6 @@ object PrintNewMapObject {
       sb.append(bindings.mkString(", "))
       sb.append(")")
       sb.toString
-    }
-    case BuildSeqInstance(values, sequenceT) => {
-      "(" + values.map(printExpression(_)).mkString(", ") + ")"
     }
     case BuildTableInstance(values, tableT) => {
       mapToString(values)    
