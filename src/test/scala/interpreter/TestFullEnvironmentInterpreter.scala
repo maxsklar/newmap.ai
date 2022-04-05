@@ -673,10 +673,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Tables " should " be allowed to be created" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Table(Count, Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update n ((), hello)", GeneralSuccessCheck),
-      CodeExpectation("update n ((), world)", GeneralSuccessCheck),
+      CodeExpectation("update n hello", GeneralSuccessCheck),
+      CodeExpectation("update n world", GeneralSuccessCheck),
       CodeExpectation("n", GeneralSuccessCheck),
-      CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("World")))),
+      CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(IdentifierInstance("world")))),
     ))
   }
 

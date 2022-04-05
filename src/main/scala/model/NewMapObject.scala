@@ -151,16 +151,16 @@ case class VersionedObjectKey(
   uuid: UUID
 )
 
-sealed abstract class VersionedObjectStatus
-object KeepUpToDate extends VersionedObjectStatus
-object CurrentlyOutOfDate extends VersionedObjectStatus
-object KeepThisVersion extends VersionedObjectStatus
-
 // This always points to the latest version of a versioned object
 case class VersionedObjectLink(
   key: VersionedObjectKey,
   status: VersionedObjectStatus
 ) extends NewMapObject
+
+sealed abstract class VersionedObjectStatus
+object KeepUpToDate extends VersionedObjectStatus
+object CurrentlyOutOfDate extends VersionedObjectStatus
+object KeepThisVersion extends VersionedObjectStatus
 
 
 //def uuid = java.util.UUID.randomUUID

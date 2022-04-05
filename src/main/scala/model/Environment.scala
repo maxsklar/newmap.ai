@@ -78,10 +78,7 @@ case class Environment(
   idToObject: ListMap[String, EnvironmentValue] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
-  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
-
-  // keep track of all the reqmaps from mutable types, because these must change over time
-  reqMapsFromMutableTypes: Vector[NewMapObject] = Vector.empty,
+  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty
 ) {
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
@@ -129,7 +126,12 @@ case class Environment(
         )
       }
       case ApplyIndividualCommand(s, nObject) => {
-        val result = Evaluator.updateVersionedObject(s, nObject, this).toOption.get
+        val updated = Evaluator.updateVersionedObject(s, nObject, this)
+
+        val result = updated match {
+          case Success(s) => s
+          case Failure(f) => throw new Exception(f)
+        }
 
         val newKey = VersionedObjectKey(result.newVersion, result.uuid)
 

@@ -63,8 +63,9 @@ object Evaluator {
       case BuildTableT(keyType, requiredValues) => {
         for {
           evalKeyType <- this(keyType, env)
+          startingType <- getDefaultValueOfCommandType(evalKeyType, env)
           evalRequiredValues <- this(requiredValues, env)
-        } yield TableT(evalKeyType, evalRequiredValues)
+        } yield TableT(startingType, evalRequiredValues)
       }
       case BuildSubtypeT(isMember) => {
         for {
@@ -150,8 +151,9 @@ object Evaluator {
     }
   }
 
-  def getCommandInputOfPureCommandType(
-    nType: NewMapObject
+  def getCommandInputOfCommandType(
+    nType: NewMapObject,
+    env: Environment
   ): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(
@@ -159,7 +161,7 @@ object Evaluator {
       )
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
-          outputCommandT <- getCommandInputOfPureCommandType(outputType)
+          outputCommandT <- getCommandInputOfCommandType(outputType, env)
         } yield {
           StructT(
             MapInstance(
@@ -179,19 +181,30 @@ object Evaluator {
         // Key Expansion + requiredValue expansion
         // What if Key expansion is a case? (for now we don't allow this, only basic map)
         for {
-          keyExpansionCommandT <- getCommandInputOfPureCommandType(keyType)
+          keyExpansionCommandT <- getCommandInputOfCommandType(RetrieveType.fromNewMapObject(keyType, env), env)
         } yield {
-          StructT(
-            MapInstance(
-              Vector(ObjectPattern(Index(0)) -> ObjectExpression(keyExpansionCommandT), ObjectPattern(Index(1)) -> ObjectExpression(requiredValues)),
-              MapT(
-                Index(2),
-                TypeT,
-                RequireCompleteness,
-                BasicMap
+          keyExpansionCommandT match {
+            case StructT(MapInstance(items, _)) if (items.length == 0) => {
+              // TODO - this is an ugle exception.. we need a better way to add fields to a struct
+              // (particularly an empty struct like in this case)
+              requiredValues
+            }
+            case _ => {
+              StructT(
+                MapInstance(
+                  Vector(ObjectPattern(Index(0)) -> ObjectExpression(keyExpansionCommandT), ObjectPattern(Index(1)) -> ObjectExpression(requiredValues)),
+                  MapT(
+                    Index(2),
+                    TypeT,
+                    RequireCompleteness,
+                    BasicMap
+                  )
+                )
               )
-            )
-          )
+            }
+          }
+
+
         }
       }
       // This should really be a case type instead of a typeT
@@ -217,18 +230,54 @@ object Evaluator {
         Failure("Cases as commands haven't been implemented yet")
       }
       case _ => {
+        throw new Exception(s"$nType is not a command type, error in type checker")
         Failure(s"$nType is not a command type, error in type checker")
       }
     }
+  }
+
+  case class UpdateVersionedOResponse(
+    newState: NewMapObject,
+    output: NewMapObject
+  )
+
+  // This is a weird artifact needed for updateVersionedO.. it's going to improve
+  // By having objects tagged the old way automatically updated to the new way
+  def retagObject(nObject: NewMapObject, newTypeTag: NewMapObject): NewMapObject = {
+    nObject match {
+      case MapInstance(values, tag) => MapInstance(values, newTypeTag)
+      case StructInstance(values, tag) => StructInstance(values, newTypeTag)
+      case CaseInstance(cons, input, caseType) => CaseInstance(cons, input, newTypeTag)
+      case SequenceInstance(seq, tag) => SequenceInstance(seq, newTypeTag)
+      case IndexValue(i, tag) => IndexValue(i, newTypeTag)
+      case TableInstance(values, tableT) => TableInstance(values, newTypeTag)
+      case _ => nObject
+    }
+  }
+
+  def retagPattern(nPattern: NewMapPattern, newTypeTag: NewMapObject): NewMapPattern = nPattern match {
+    case ObjectPattern(nObject) => ObjectPattern(retagObject(nObject, newTypeTag))
+    case _ => nPattern
   }
 
   def updateVersionedO(
     current: NewMapObject,
     command: NewMapObject,
     env: Environment
-  ): Outcome[NewMapObject, String] = {
+  ): Outcome[UpdateVersionedOResponse, String] = {
     RetrieveType.fromNewMapObject(current, env) match {
-      case CountT => applyFunctionAttempt(IncrementFunc, current, env)
+      case CountT => {
+        current match {
+          case Index(i) => {
+            for {
+              newState <- applyFunctionAttempt(IncrementFunc, current, env)
+            } yield UpdateVersionedOResponse(newState, IndexValue(i, newState))
+          }
+          case _ => {
+            throw new Exception("Invalid count in versioning upgrade")
+          }
+        }
+      }
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
           input <- accessFieldAttempt(command, Index(0), env)
@@ -243,9 +292,9 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          newMapValues = (ObjectPattern(input) -> ObjectExpression(newResultForInput)) +: mapValues.filter(x => x._1 != ObjectPattern(input))
+          newMapValues = (ObjectPattern(input) -> ObjectExpression(newResultForInput.newState)) +: mapValues.filter(x => x._1 != ObjectPattern(input))
         } yield {
-          MapInstance(newMapValues, mapT)
+          UpdateVersionedOResponse(MapInstance(newMapValues, mapT), NewMapO.emptyStruct)
         }
       }
       case seqT@SequenceT(nType) => {
@@ -254,20 +303,52 @@ object Evaluator {
             case SequenceInstance(values, seqT) => Success(values)
             case _ => Failure(s"Couldn't get seq values from $current")
           }
-        } yield SequenceInstance(seqValues :+ command, seqT)
+        } yield UpdateVersionedOResponse(SequenceInstance(seqValues :+ command, seqT), NewMapO.emptyStruct)
       }
       case tableT@TableT(keyType, requiredValues) => {
         for {
-          keyExpansionCommand <- accessFieldAttempt(command, Index(0), env)
-          valueExpansionCommand <- accessFieldAttempt(command, Index(1), env)
+          keyExpansionCommandT <- getCommandInputOfCommandType(
+            RetrieveType.fromNewMapObject(keyType, env),
+            env
+          )
 
+          result <- keyExpansionCommandT match {
+            case StructT(MapInstance(items, _)) if (items.length == 0) => {
+              // TODO - this is an ugle exception.. we need a better way to add fields to a struct
+              // (particularly an empty struct like in this case)
+              Success((StructInstance(Vector.empty, keyExpansionCommandT), command))
+            }
+            case _ => {
+              for {
+                keyField <- accessFieldAttempt(command, Index(0), env)
+                valueField <- accessFieldAttempt(command, Index(1), env)
+              } yield (keyField, valueField)
+            }
+          }
+
+          (keyExpansionCommand, valueExpansionCommand) = result
+
+          updateKeyTypeResponse <- updateVersionedO(keyType, keyExpansionCommand, env)
+
+          newTableType = TableT(updateKeyTypeResponse.newState, requiredValues)
+                  
           mapValues <- current match {
             case TableInstance(values, _) => Success(values)
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          newMapValues = (ObjectPattern(keyExpansionCommand) -> ObjectExpression(valueExpansionCommand)) +: mapValues.filter(x => x._1 != ObjectPattern(keyExpansionCommand))
-        } yield TableInstance(newMapValues, tableT)
+          newMapping = ObjectPattern(updateKeyTypeResponse.output) -> ObjectExpression(valueExpansionCommand)
+
+          prepNewValues = for {
+            value <- mapValues
+            retaggedPattern = retagPattern(value._1, updateKeyTypeResponse.newState)
+
+            // Remove old value
+            if (retaggedPattern != ObjectPattern(updateKeyTypeResponse.output))
+          } yield (retaggedPattern -> value._2)
+
+          newMapValues = newMapping +: prepNewValues
+        } yield UpdateVersionedOResponse(TableInstance(newMapValues, newTableType), NewMapO.emptyStruct)
       }
       case TypeT => {
         current match {
@@ -279,11 +360,14 @@ object Evaluator {
 
               newMapValues = (ObjectPattern(newCaseName) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseName))
             } yield {
-              CaseT(MapInstance(newMapValues, mapT))
+              UpdateVersionedOResponse(
+                CaseT(MapInstance(newMapValues, mapT)),
+                newCaseName
+              )
             }
           }
           case _ => {
-            Failure("Cannot expand type $current")
+            Failure(s"Cannot expand type $current")
           }
         }
       }
@@ -336,7 +420,8 @@ object Evaluator {
   case class UpdateVersionedObjectResponse(
     newVersion: Long,
     uuid: UUID,
-    newValue: NewMapObject
+    newValue: NewMapObject,
+    output: NewMapObject
   )
 
   def updateVersionedObject(
@@ -348,9 +433,9 @@ object Evaluator {
       versionLink <- lookupVersionedObject(id, env)
       latestVersion <- latestVersion(versionLink.key.uuid, env)
       currentState <- currentState(versionLink.key.uuid, env)
-      newState <- updateVersionedO(currentState, command, env)
+      result <- updateVersionedO(currentState, command, env)
     } yield {
-      UpdateVersionedObjectResponse(latestVersion + 1, versionLink.key.uuid, newState)
+      UpdateVersionedObjectResponse(latestVersion + 1, versionLink.key.uuid, result.newState, result.output)
     }
   }
 

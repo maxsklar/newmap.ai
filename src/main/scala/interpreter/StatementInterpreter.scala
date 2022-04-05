@@ -53,7 +53,7 @@ object StatementInterpreter {
           versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
           nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
 
-          inputT <- Evaluator.getCommandInputOfPureCommandType(nType)
+          inputT <- Evaluator.getCommandInputOfCommandType(nType, env)
           commandExp <- typeCheck(command, inputT, env, FullFunction)
 
           commandObj <- Evaluator(commandExp, env)

@@ -16,6 +16,7 @@ case class BindingCommandItem(
   value: ParseTree
 ) extends ParseTree
 
+// TODO - should be a linked list
 case class CommandList(
   values: Vector[ParseTree]
 ) extends ParseTree
