@@ -110,6 +110,11 @@ object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it 
 object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
 
 
+// TypeClass
+// defines some structure on a type
+// preservation rules preserve this structure!!
+
+
 // Params should be connected to a NewMapObject which are of type
 //  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
 // They might also be a paramObj, to be filled in later

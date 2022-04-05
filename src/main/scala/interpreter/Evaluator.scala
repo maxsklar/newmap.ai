@@ -45,7 +45,15 @@ object Evaluator {
         for {
           evalInputType <- this(inputType, env)
           evalOutputType <- this(outputType, env)
-        } yield MapT(evalInputType, evalOutputType, completeness, featureSet)
+
+          // TODO - this needs to be pushed up to the type checker
+          _ <- Outcome.failWhen(
+            (completeness == RequireCompleteness) && !RetrieveType.isTermConstant(evalInputType),
+            "Cannot build a RequireCompleteness map with an expanding input type. Try adding a required field instead."
+          )
+        } yield {
+          MapT(evalInputType, evalOutputType, completeness, featureSet)
+        }
       }
       case BuildSeqT(underlyingType) => {
         for {
@@ -367,8 +375,10 @@ object Evaluator {
   ): Outcome[NewMapObject, String] = {
     stripVersioning(struct, env) match {
       case StructInstance(value: Vector[(NewMapPattern, NewMapExpression)], structT) => {
-        attemptPatternMatchInOrder(value, field, env)
-
+        attemptPatternMatchInOrder(value, field, env) match {
+          case Success(x) => Success(x)
+          case Failure(PatternMatchErrorType(message, isEvaluationError)) => Failure(message)
+        }
       }
       case CaseT(cases) => {
         for {
@@ -422,16 +432,20 @@ object Evaluator {
         for {
           keyMatchResult <- attemptPatternMatchInOrder(values, key, env) match {
             case Success(result) => Success(result)
-            case Failure(_) => {
-              // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-              // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-              // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-              //  and get the default from that
-              val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
+            case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
+              if (isEvaluationError) {
+                Failure(message)
+              } else {
+                // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+                // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+                // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+                //  and get the default from that
+                val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
 
-              val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-              
-              getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
+                val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
+                
+                getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
+              }
             }
           }
         } yield {
@@ -485,21 +499,31 @@ object Evaluator {
     }
   }
 
+  // TODO - there should be no evaluation errors
+  // This is only to catch non-constant values, which cannot be checked by the type checker yet
+  case class PatternMatchErrorType(message: String, isEvaluationError: Boolean)
+
   def attemptPatternMatchInOrder(
     remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
     input: NewMapObject,
     env: Environment
-  ): Outcome[NewMapObject, String] = {
+  ): Outcome[NewMapObject, PatternMatchErrorType] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
           case Success(paramsToSubsitute) => {
-            this(MakeSubstitution(answer, paramsToSubsitute, env), env)
+            this(MakeSubstitution(answer, paramsToSubsitute, env), env) match {
+              case Success(nObject) => Success(nObject)
+              case Failure(s) => Failure(PatternMatchErrorType(s, true))
+            }
           }
           case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
-      case _ => Failure(s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there")
+      case _ => Failure(PatternMatchErrorType(
+        s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there",
+        false
+      ))
     }
   }
 

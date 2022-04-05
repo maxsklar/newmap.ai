@@ -17,6 +17,7 @@ object StatementInterpreter {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          //_ = println(s"tc from TypeChecker: $tcType")
           nType <- Evaluator(tcType, env)
           //_ = println(s"Type from TypeChecker: $nType")
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
