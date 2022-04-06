@@ -67,7 +67,21 @@ object SubtypeUtils {
         // Look at our keys, and find the ones that are only for this case key, and save those patterns
         val patternsWithThisConstructor = keys.flatMap(key => key match {
           case CasePattern(constructor, pattern) => Some(pattern)
-          case ObjectPattern(CaseInstance(constructor, input, _)) => Some(ObjectPattern(input))
+          case ObjectPattern(TaggedObject(UCase(constructor, input), caseT)) => {
+            Evaluator.stripVersioning(caseT, env) match {
+              case CaseT(cases) => {
+                // How do I tag the constructor
+                val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
+                val taggedConstructor = TaggedObject(constructor, caseConstructorType)
+
+                // Get the type that the input is supposed to be
+                Evaluator.applyFunctionAttempt(caseT, taggedConstructor, env).toOption.map(nType => {
+                  ObjectPattern(TaggedObject(input, nType))
+                })
+              }
+              case _ => None
+            }
+          }
           case _ => None
         })
 
@@ -108,7 +122,7 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isGenericPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case StructT(MapInstance(params, MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
+          case StructT(TaggedObject(UMap(params), MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
                 isGenericPattern(x._1, nObject, env)
@@ -126,7 +140,7 @@ object SubtypeUtils {
     Evaluator.stripVersioning(nType, env) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case SubtypeT(MapInstance(values, _)) => enumerateMapKeys(values.map(_._1))
+      case SubtypeT(TaggedObject(UMap(values), _)) => enumerateMapKeys(values.map(_._1))
       case Index(i) => {
         Success((0 until i.toInt).map(j => IndexValue(j.toLong, nType)).toSet)
       }
@@ -170,7 +184,7 @@ object SubtypeUtils {
   }
 
   def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
-    case SubtypeT(MapInstance(values, MapT(inputType, _, CommandOutput, _))) => {
+    case SubtypeT(TaggedObject(UMap(values), MapT(inputType, _, CommandOutput, _))) => {
       // TODO: Extend this to see if pattering matching in basic function covers the full type
       // Check that the function doesn't return the default value for any input
       doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
@@ -288,14 +302,14 @@ object SubtypeUtils {
         )
         // TODO: The outputs have to agree as well
       }
-      case (StructT(mi@MapInstance(values, _)), _) if (values.length == 1) => {
+      case (StructT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
           isConvertible <- isTypeConvertible(singularObj, endingType, env)
         } yield isConvertible
       }
-      case (_, StructT(mi@MapInstance(values, _))) if (values.length == 1) => {
+      case (_, StructT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
@@ -312,7 +326,7 @@ object SubtypeUtils {
         )
         // TODO: The outputs have to agree as well
       }
-      case (CaseT(mi@MapInstance(values, _)), _) if (values.length == 1) => {
+      case (CaseT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
@@ -320,7 +334,7 @@ object SubtypeUtils {
           isConvertible <- isTypeConvertible(singularObj, endingType, env)
         } yield isConvertible
       }
-      case (_, CaseT(mi@MapInstance(values, _))) if (values.length == 1) => {
+      case (_, CaseT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
@@ -358,7 +372,7 @@ object SubtypeUtils {
   // If this function only allows one input, then return the output for that input
   def outputIfFunctionHasSingularInput(nFunction: NewMapObject): Outcome[NewMapExpression, String] = {
     nFunction match {
-      case MapInstance(values, _) if (values.length == 1) => {
+      case TaggedObject(UMap(values), _) if (values.length == 1) => {
         Success(values.head._2)
       }
       case _ => Failure("Function did not have singular input")

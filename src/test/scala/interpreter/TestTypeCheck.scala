@@ -17,7 +17,7 @@ class TestTypeCheck extends FlatSpec {
   "A variable" should " be interpreted correctly is forced as an identifier" in {
     TypeChecker(IdentifierParse("x", true)) match {
       case Success(result) => {
-        assert(result == ObjectExpression(IdentifierInstance("x")))
+        assert(result == ObjectExpression(NewMapO.identifier("x")))
       }
   	  case Failure(reason) => fail(reason)
   	}
@@ -42,7 +42,7 @@ class TestTypeCheck extends FlatSpec {
   it should " be interpreted as an identifier if forced" in {
     TypeChecker(IdentifierParse("Type", true)) match {
       case Success(result) => {
-        assert(result == ObjectExpression(IdentifierInstance("Type")))
+        assert(result == ObjectExpression(NewMapO.identifier("Type")))
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -142,7 +142,7 @@ class TestTypeCheck extends FlatSpec {
         //println(objectFound)
 
       	// TODO: what should we do with this?
-      	//assert(objectFound == IdentifierInstance("Type"))
+      	//assert(objectFound == NewMapO.identifier("Type"))
   	  }
   	  case Failure(reason) => fail(reason)
     }

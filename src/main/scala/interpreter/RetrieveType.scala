@@ -14,7 +14,7 @@ object RetrieveType {
     case AccessField(objectWithField, field) => {
       objectWithField match {
         case ObjectExpression(nObject) => Evaluator.stripVersioning(nObject, env) match {
-          case StructInstance(_, StructT(params)) => {
+          case TaggedObject(_, StructT(params)) => {
             // Field should be evaluated automatically (must be closed literal)
             // TODO - do we need to evaluate the params first - or will it be evaluated already?
             Evaluator.applyFunctionAttempt(params, field, env) match {
@@ -61,18 +61,14 @@ object RetrieveType {
     case Index(_) => CountT
     case IndexValue(_, indexT) => indexT 
     case CountT | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
-    case IdentifierInstance(s) => IdentifierT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
-    case MapInstance(values, mapT) => mapT
-    case TableInstance(values, tableT) => tableT
+    case TaggedObject(_, nType) => nType
     case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsConstantFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
-    case StructInstance(value, nType) => nType
-    case CaseInstance(constructor, value, nType) => nType
     case VersionedObjectLink(key, status) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
       fromNewMapObject(currentState, env)
@@ -87,15 +83,15 @@ object RetrieveType {
           val currentState = Evaluator.currentState(key.uuid, env).toOption.get
           retrieveInputTypeFromFunction(ObjectExpression(currentState), env)
         }
-        case MapInstance(values, MapT(inputType, _, SubtypeInput, features)) => {
+        case TaggedObject(UMap(values), MapT(inputType, _, SubtypeInput, features)) => {
           SubtypeT(
-            MapInstance(
-              values.map(x => x._1 -> ObjectExpression(Index(1))),
+            TaggedObject(
+              UMap(values.map(x => x._1 -> ObjectExpression(Index(1)))),
               MapT(inputType, Index(2), CommandOutput, features)
             )
           )
         }
-        case TableInstance(values, TableT(keyType, requiredValues)) => {
+        case TaggedObject(UMap(values), TableT(keyType, requiredValues)) => {
           keyType
         }
         case _ => {
@@ -146,6 +142,8 @@ object RetrieveType {
 
   // Ensures that there are no free variables in this term
   // TODO: Return a NewMapObject if this is the case?
+  // TODO: This can be handled by a specialized type-checker on NewMapExpression (ripe for removing this code)
+  // - But it's not that simple yet
   def isTermClosedLiteral(
     nExpression: NewMapExpression,
     knownVariables: Vector[String] = Vector.empty,
@@ -196,11 +194,7 @@ object RetrieveType {
   // Ensures that the term is a constant
   def isTermConstant(nObject: NewMapObject): Boolean = {
     nObject match {
-      case IdentifierInstance(_) | Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction => true
-      case MapInstance(values, mapT) => isMapConstant(values)
-      case StructInstance(values, structType) => isMapConstant(values)
-      case TableInstance(values, tableT) => isMapConstant(values)
-      case CaseInstance(constructor, input, caseType) => isTermConstant(constructor) && isTermConstant(input)
+      case Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction => true
       case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case TableT(expandingKeyType, requiredValues) => {
         isTermConstant(expandingKeyType) && isTermConstant(requiredValues)
@@ -208,6 +202,7 @@ object RetrieveType {
       case StructT(params) => isTermConstant(params)
       case CaseT(cases) => isTermConstant(cases)
       case SubtypeT(isMember) => isTermConstant(isMember)
+      case TaggedObject(_, nType) => true
       case VersionedObjectLink(_, status) => (status == KeepThisVersion)
     }
   }
@@ -225,7 +220,8 @@ object RetrieveType {
 
   def isPatternConstant(nPattern: NewMapPattern): Boolean = nPattern match {
     case ObjectPattern(o) => {
-      isTermConstant(o)
+      true
+      //isTermConstant(o)
     }
     case TypePattern(name, nType) => {
       isTermConstant(nType)

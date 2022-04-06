@@ -38,17 +38,17 @@ class TestEvaluator extends FlatSpec {
     )
 
     assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, SimpleFunction)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, SimpleFunction)), Environment.Base),
       Index(1)
     )
 
     assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, BasicMap)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, BasicMap)), Environment.Base),
       Index(1)
     )
 
     assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, MapInstance(Vector.empty, MapT(Index(10), Index(10), CommandOutput, FullFunction)), Environment.Base),
+      Evaluator.applyFunctionAttempt(IsSimpleFunction, TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, FullFunction)), Environment.Base),
       Index(0)
     )
   }

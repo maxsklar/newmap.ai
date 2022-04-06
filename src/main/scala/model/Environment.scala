@@ -206,12 +206,12 @@ object Environment {
 
   def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2))
     }
 
     StructT(
-      MapInstance(
-        paramsToObject,
+      TaggedObject(
+        UMap(paramsToObject),
         MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
       )
     )
@@ -219,12 +219,12 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2))
     }
 
     CaseT(
-      MapInstance(
-        paramsToObject,
+      TaggedObject(
+        UMap(paramsToObject),
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
       )
     )
@@ -243,26 +243,24 @@ object Environment {
     }
   }
 
-  def i(s: String): NewMapObject = IdentifierInstance(s)
-
   // Somewhat complex for now, but this is how a pattern/function definition is built up!
   // In code, this should be done somewhat automatically
   def buildDefinitionWithParameters(
     inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
-    expression: NewMapExpression 
+    expression: NewMapExpression
   ): NewMapObject = {
     val structT = StructT(
-      MapInstance(
-        inputs.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> ObjectExpression(x._1._2)),
+      TaggedObject(
+        UMap(inputs.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> ObjectExpression(x._1._2))),
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
       )
     )
 
     val structP = StructPattern(inputs.map(x => TypePattern(x._1, x._2)))
 
-    MapInstance(
-      values = Vector(structP -> expression),
-      mapType = MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
+    TaggedObject(
+      UMap(Vector(structP -> expression)),
+      MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
     )
   }
 
@@ -273,9 +271,9 @@ object Environment {
     eCommand("Identifier", IdentifierT),
     eCommand("Increment", IncrementFunc),
     eCommand("IsCommand", IsCommandFunc),
-    eCommand("Sequence", MapInstance(
-      values = Vector(TypePattern("key", TypeT) -> BuildTableT(ObjectExpression(CountT), ParamId("key"))),
-      mapType = MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
+    eCommand("Sequence", TaggedObject(
+      UMap(Vector(TypePattern("key", TypeT) -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),
+      MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
@@ -293,11 +291,11 @@ object Environment {
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildMapT(ParamId("key"), ParamId("value"), SubtypeInput, SimpleFunction)
     )),
-    eCommand("Struct", MapInstance(
-      values = Vector(
+    eCommand("Struct", TaggedObject(
+      UMap(Vector(
         TypePattern("structParams", MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
-      ),
-      mapType = MapT(
+      )),
+      MapT(
         MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
         TypeT,
         RequireCompleteness,
@@ -305,11 +303,11 @@ object Environment {
       )
     )),
     // TODO: This CStruct is going to be merged with Struct.. once we take care of generics
-    eCommand("CStruct", MapInstance(
-      values = Vector(
+    eCommand("CStruct", TaggedObject(
+      UMap(Vector(
         TypePattern("structParams", MapT(CountT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
-      ),
-      mapType = MapT(
+      )),
+      MapT(
         MapT(CountT, TypeT, SubtypeInput, BasicMap),
         TypeT,
         RequireCompleteness,
@@ -317,22 +315,22 @@ object Environment {
       )
     )),
     // TODO: right now cases must be identifier based, expand this in the future!!
-    eCommand("Case", MapInstance(
-      values = Vector(
+    eCommand("Case", TaggedObject(
+      UMap(Vector(
         TypePattern("cases", MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)) -> BuildCaseT(ParamId("cases"))
-      ),
-      mapType = MapT(
+      )),
+      MapT(
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction),
         TypeT,
         RequireCompleteness,
         SimpleFunction
       )
     )),
-    eCommand("Subtype", MapInstance(
-      values = Vector(
+    eCommand("Subtype", TaggedObject(
+      UMap(Vector(
         TypePattern("simpleFunction", NewMapO.simpleFunctionT) -> BuildSubtypeT(ParamId("simpleFunction"))
-      ),
-      mapType = MapT(
+      )),
+      MapT(
         NewMapO.simpleFunctionT,
         TypeT,
         RequireCompleteness,

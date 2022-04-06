@@ -30,14 +30,14 @@ object TypeChecker {
           case _ => Success(ObjectExpression(Index(i)))
         }
       }
-      case IdentifierParse(s: String, true) => Success(ObjectExpression(IdentifierInstance(s)))
+      case IdentifierParse(s: String, true) => Success(ObjectExpression(NewMapO.identifier(s)))
       case IdentifierParse(s: String, false) => {
         val expectingAnIdentifier = {
           SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
         }
 
         if (expectingAnIdentifier) {
-          Success(ObjectExpression(IdentifierInstance(s)))
+          Success(ObjectExpression(TaggedObject(UIdentifier(s), expectedType)))
         } else env.lookup(s) match {
           case Some(EnvironmentValue(_, ParameterStatus)) => Success(ParamId(s))
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(ObjectExpression(nObject))
@@ -79,7 +79,7 @@ object TypeChecker {
 
           // TODO - can this actually be an expression, not just an object??
           structParams <- Evaluator.stripVersioning(evaluatedStruct, env) match {
-            case StructInstance(value, StructT(params)) => Success(params)
+            case TaggedObject(value, StructT(params)) => Success(params)
             case CaseT(cases) => Success(cases)
             case _ => {
               Failure(s"Attempting to access field object $evaluatedStruct which is not a struct instance")
@@ -120,7 +120,7 @@ object TypeChecker {
               BuildMapInstance(mapValues, mapT)
             }
           }
-          case StructT(params@MapInstance(parameterList, _)) => {
+          case StructT(params@TaggedObject(UMap(parameterList), _)) => {
             for {
               result <- typeCheckStruct(
                 parameterList,
@@ -262,7 +262,7 @@ object TypeChecker {
         }
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (CommandList(values), StructT(MapInstance(structValues, MapT(_, _, _, BasicMap)))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (CommandList(values), StructT(TaggedObject(UMap(structValues), MapT(_, _, _, BasicMap)))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {
@@ -270,11 +270,12 @@ object TypeChecker {
         }
       }
       case (ApplyParse(constructorP, input), CaseT(cases)) if (patternMatchingAllowed) => {
-        val caseIndexType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
+        val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
         for {
-          constructorTC <- typeCheck(constructorP, caseIndexType, env, BasicMap)
+          constructorTC <- typeCheck(constructorP, caseConstructorType, env, BasicMap)
           constructor <- Evaluator(constructorTC, env)
           inputTypeExpected <- Evaluator.applyFunctionAttempt(cases, constructor, env)
+
           result <- typeCheckWithPatternMatching(input, inputTypeExpected, env, externalFeatureSet, internalFeatureSet)
         } yield {
           TypeCheckWithPatternMatchingResult(
@@ -347,7 +348,7 @@ object TypeChecker {
           substObj <- Evaluator(substExp, env)
 
           newEnv = paramId match {
-            case ObjectPattern(IdentifierInstance(s)) => {
+            case ObjectPattern(TaggedObject(UIdentifier(s), _)) => {
               env.newCommand(FullEnvironmentCommand(s, substObj))
             }
             case _ => env
@@ -367,7 +368,7 @@ object TypeChecker {
           valueObj <- Evaluator(tc, env)
 
           newEnv = paramId match {
-            case ObjectPattern(IdentifierInstance(s)) => {
+            case ObjectPattern(TaggedObject(UIdentifier(s), _)) => {
               env.newCommand(FullEnvironmentCommand(s, valueObj))
             }
             case _ => env

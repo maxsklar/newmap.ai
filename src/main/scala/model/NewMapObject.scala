@@ -9,14 +9,9 @@ sealed abstract class NewMapObject {
   override def toString = PrintNewMapObject(this)
 }
 
-// Todo - replace with "user defined type" in prelude
-case class IdentifierInstance(s: String) extends NewMapObject
-
-// Idea: if MapT is an ordered map, or if it is a reqmap from an Index (array), then
-//  we should be able to just give values and not keys if we provide the whole thing
-case class MapInstance(
-  values: Vector[(NewMapPattern, NewMapExpression)],
-  mapType: NewMapObject
+case class TaggedObject(
+  uObject: UntaggedObject,
+  nType: NewMapObject
 ) extends NewMapObject
 
 // This takes as input a member of TypeT and returns true if it's a member
@@ -33,26 +28,6 @@ case object IsConstantFunc extends NewMapObject
 
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
-
-// This one is a little different/complex because each object has a unique type as defined by the struct
-// TODO: should we merge this with MapInstance, since a type is going to be attached anyway!
-// - That could cause problems because maps don't have to be finite
-// - Then again, an infinite struct could open up possibilities!!
-// The input NewMapObject values must be closed and evaluated
-case class StructInstance(value: Vector[(NewMapPattern, NewMapExpression)], structType: NewMapObject) extends NewMapObject
-
-case class CaseInstance(constructor: NewMapObject, input: NewMapObject, caseType: NewMapObject) extends NewMapObject
-
-case class TableT(
-  expandingKeyType: NewMapObject,
-  requiredValues: NewMapObject
-) extends NewMapObject
-
-case class TableInstance(
-  // For now, these are basic map rules (ObjectPattern, ObjectExpression)- in the future, maybe we can expand
-  values: Vector[(NewMapPattern, NewMapExpression)],
-  tableT: NewMapObject
-) extends NewMapObject
 
 /*
  * The types in the NewMap Language
@@ -92,6 +67,8 @@ case object IdentifierT extends NewMapObject
  * - requireAllFields tells us that we are required to specify an output for
  *   all potential inputs. It's smart to turn this on to ensure that functions and maps are checked as complete
  * - commandOutput means that the output types must all be command types, which means they start at an initial value.
+ *
+ * TODO - should we subsume struct type in here??
  */
 case class MapT(
   inputType: NewMapObject,
@@ -114,6 +91,13 @@ object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go 
 // TypeClass
 // defines some structure on a type
 // preservation rules preserve this structure!!
+
+case class TableT(
+  expandingKeyType: NewMapObject,
+  requiredValues: NewMapObject
+) extends NewMapObject
+
+
 
 
 // Params should be connected to a NewMapObject which are of type
@@ -187,7 +171,9 @@ object NewMapO {
 
   def versionedT: NewMapObject = SubtypeT(IsVersionedFunc)
 
+  def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
+
   def emptyStruct: NewMapObject = StructT(
-    MapInstance(Vector.empty, MapT(Index(0), Index(0), RequireCompleteness, BasicMap))
+    TaggedObject(UMap(Vector.empty), MapT(Index(0), Index(0), RequireCompleteness, BasicMap))
   )
 }

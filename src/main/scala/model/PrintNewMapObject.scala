@@ -17,34 +17,16 @@ object PrintNewMapObject {
     case IsConstantFunc => s"IsConstantFunc"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
-    case IdentifierInstance(s) => s
+    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + this(nType)
     case MapT(key, value, completeness, featureSet) => {
       printMapT(this(key), this(value), completeness, featureSet)
     }
-    case MapInstance(values, mapT) => mapToString(values)
     case TableT(expandingKeyType, requiredValues) => {
       val mapTString = printMapT(this(expandingKeyType), this(requiredValues), RequireCompleteness, SimpleFunction)
       s"Table(${mapTString})"
     }
-    case TableInstance(values, _) => mapToString(values)
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
-    case StructInstance(value, structT) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("StructInstance(")
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- value
-      } {
-        bindings :+= k + ": " + printExpression(v)
-      }
-      sb.append(bindings.mkString(", "))
-      sb.append(")")
-      sb.toString
-    }
-    case CaseInstance(constructor, value, caseType) => {
-      this(caseType) + "." + this(constructor) + " " + this(value) // Probably include the case here as well.
-    }
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
@@ -102,7 +84,7 @@ object PrintNewMapObject {
       sb.toString
     }
     case BuildTableInstance(values, tableT) => {
-      mapToString(values)    
+      mapToString(values)
     }
   }
 
@@ -126,8 +108,15 @@ object PrintNewMapObject {
     }
   }
 
+  def untagged(uObject: UntaggedObject): String = uObject match {
+    case UIdentifier(s) => s
+    case UMap(values) => mapToString(values)
+    case UCase(constructor, value) => "(" + untagged(constructor) + " " + untagged(value) + ")"
+    case UIndex(i) => i.toString
+  }
+
   def printParams(params: Vector[(String, NewMapObject)]): String = {
-    mapToString(params.map(x => ObjectPattern(IdentifierInstance(x._1)) -> ObjectExpression(x._2)))
+    mapToString(params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2)))
   }
 
   def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {

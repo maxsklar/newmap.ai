@@ -7,7 +7,7 @@ sealed abstract class NewMapPattern
 
 
 case class ObjectPattern(
-  nObject: NewMapObject
+  uObject: NewMapObject
 ) extends NewMapPattern
 
 case class TypePattern(

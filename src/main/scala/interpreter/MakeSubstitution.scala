@@ -101,7 +101,7 @@ object MakeSubstitution {
     env: Environment
   ): NewMapObject = {
     nObject match {
-      case MapInstance(values, mapT) => {
+      case TaggedObject(UMap(values), mapT) => {
         val newValues = for {
           (k, v) <- values
 
@@ -111,8 +111,8 @@ object MakeSubstitution {
           remainingParameters = parameters -- internalParams.map(_._1)
         } yield (k -> this(v, remainingParameters, env))
 
-        MapInstance(
-          newValues,
+        TaggedObject(
+          UMap(values),
           mapT
         )
       }
