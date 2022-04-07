@@ -15,6 +15,8 @@ class TestEvaluator extends FlatSpec {
     }
   }
 
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+
   "isCommandFunc " should " work properly on ranges" in {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, Index(10), Environment.Base)
     assertFunctionWorkedAndReturnedResult(result, Index(1))

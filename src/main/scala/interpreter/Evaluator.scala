@@ -101,19 +101,19 @@ object Evaluator {
   def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
-      case IndexValue(i, _) => Success(UIndex(i))
-      case Index(i) => Success(UIndex(i))
       case VersionedObjectLink(_, _) => Failure("Can't remove type tage from versioned object link")
       case _ => Failure("Can't yet remove type tage from typed object (once types are redefined as a case it'll be possible)")
     }
   }
 
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+
   def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
-      case OrBooleanT => Success(IndexValue(0, OrBooleanT))
+      case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
       case tableT@TableT(keyType, requiredValues) => Success(TaggedObject(UMap(Vector.empty), tableT))
-      case Index(i) if i > 0 => Success(IndexValue(0, Index(i)))
+      case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
         Success(CaseT(
@@ -247,7 +247,6 @@ object Evaluator {
   // By having objects tagged the old way automatically updated to the new way
   def retagObject(nObject: NewMapObject, newTypeTag: NewMapObject): NewMapObject = {
     nObject match {
-      case IndexValue(i, tag) => IndexValue(i, newTypeTag)
       case TaggedObject(untagged, nType) => TaggedObject(untagged, newTypeTag)
       case _ => nObject
     }
@@ -266,10 +265,10 @@ object Evaluator {
     RetrieveType.fromNewMapObject(current, env) match {
       case CountT => {
         current match {
-          case Index(i) => {
+          case TaggedObject(UIndex(i), _) => {
             for {
               newState <- applyFunctionAttempt(IncrementFunc, current, env)
-            } yield UpdateVersionedOResponse(newState, IndexValue(i, newState))
+            } yield UpdateVersionedOResponse(newState, TaggedObject(UIndex(i), newState))
           }
           case _ => {
             throw new Exception("Invalid count in versioning upgrade")
@@ -278,13 +277,13 @@ object Evaluator {
       }
       case OrBooleanT => {
         (current, command) match {
-          case (IndexValue(i, _), IndexValue(j, _)) => {
+          case (TaggedObject(UIndex(i), _), TaggedObject(UIndex(j), _)) => {
             // Only tell us if the bit finally "flipped"
             val output = if (i == 0 && j == 1) 1 else 0
             Success(
               UpdateVersionedOResponse(
-                IndexValue(i * j, OrBooleanT),
-                IndexValue(output, Index(2))
+                TaggedObject(UIndex(i * j), OrBooleanT),
+                TaggedObject(UIndex(output), Index(2))
             ))
           }
         case _ => Failure("This didn't work")
@@ -652,7 +651,7 @@ object Evaluator {
           case _ => Success(Index(0))
         }        
       }
-      case (IncrementFunc, Index(i)) => Success(Index(i + 1))
+      case (IncrementFunc, TaggedObject(UIndex(i), nType)) => Success(TaggedObject(UIndex(i + 1), nType))
       case _ => {
         Failure(s"Not implemented: apply function\nCallable: $func\nInput: $input")
       }

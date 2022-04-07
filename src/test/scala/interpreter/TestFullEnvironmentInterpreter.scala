@@ -25,6 +25,9 @@ case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 
 
 class TestFullEnvironmentInterpreter extends FlatSpec {
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+  def IndexValue(i: Long, nObject: NewMapObject): NewMapObject = TaggedObject(UIndex(i), nObject)
+
   /**
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 

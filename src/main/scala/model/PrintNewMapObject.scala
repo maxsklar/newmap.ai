@@ -6,8 +6,6 @@ import java.util.UUID
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
-    case Index(i) => i.toString
-    case IndexValue(i, n) => i.toString + "\\" + n.toString
     case CountT => "Count"
     case TypeT => s"Type"
     case AnyT => s"Any"

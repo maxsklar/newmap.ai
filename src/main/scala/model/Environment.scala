@@ -80,6 +80,8 @@ case class Environment(
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty
 ) {
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
   }
@@ -251,7 +253,7 @@ object Environment {
   ): NewMapObject = {
     val structT = StructT(
       TaggedObject(
-        UMap(inputs.zipWithIndex.map(x => ObjectPattern(Index(x._2)) -> ObjectExpression(x._1._2))),
+        UMap(inputs.zipWithIndex.map(x => ObjectPattern(TaggedObject(UIndex(x._2), CountT)) -> ObjectExpression(x._1._2))),
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
       )
     )

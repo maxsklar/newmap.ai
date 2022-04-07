@@ -39,11 +39,6 @@ case object IsSubtypeFunc extends NewMapObject
  */
 case object CountT extends NewMapObject
 
-case class Index(i: Long) extends NewMapObject
-
-// This is actually not a type!
-case class IndexValue(i: Long, fromType: NewMapObject) extends NewMapObject
-
 // This is a special type of boolean class that's being created temporarily until we get better user-defined types
 case object OrBooleanT extends NewMapObject
 
@@ -164,6 +159,8 @@ case class TypeParameterVariance(
 )*/
 
 object NewMapO {
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+  
   // This is a subtype of TypeT, basically a newmap object with a command structure
   // - It has an initial value
   // - It has a command type

@@ -57,9 +57,9 @@ object RetrieveType {
     case BuildTableInstance(values, tableT) => tableT
   }
 
+  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case Index(_) => CountT
-    case IndexValue(_, indexT) => indexT 
     case CountT | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
@@ -195,7 +195,7 @@ object RetrieveType {
   // Ensures that the term is a constant
   def isTermConstant(nObject: NewMapObject): Boolean = {
     nObject match {
-      case Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction | IsSubtypeFunc | OrBooleanT => true
+      case IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction | IsSubtypeFunc | OrBooleanT => true
       case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case TableT(expandingKeyType, requiredValues) => {
         isTermConstant(expandingKeyType) && isTermConstant(requiredValues)

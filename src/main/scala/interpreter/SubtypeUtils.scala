@@ -141,8 +141,8 @@ object SubtypeUtils {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
       case SubtypeT(TaggedObject(UMap(values), _)) => enumerateMapKeys(values.map(_._1))
-      case Index(i) => {
-        Success((0 until i.toInt).map(j => IndexValue(j.toLong, nType)).toSet)
+      case TaggedObject(UIndex(i), _) => {
+        Success((0 until i.toInt).map(j => TaggedObject(UIndex(j.toLong), nType)).toSet)
       }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }

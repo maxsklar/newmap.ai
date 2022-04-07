@@ -23,11 +23,11 @@ object TypeChecker {
       case NaturalNumberParse(i: Long) => {
         val parentExpectedType = RetrieveType.getParentType(expectedType, env)
         Evaluator.stripVersioning(parentExpectedType, env) match {
-          case Index(j) => {
-            if (i < j) Success(ObjectExpression(IndexValue(i, parentExpectedType)))
+          case TaggedObject(UIndex(j), _) => {
+            if (i < j) Success(ObjectExpression(TaggedObject(UIndex(i), parentExpectedType)))
             else Failure(s"Proposed index $i is too large for type $j")
           }
-          case _ => Success(ObjectExpression(Index(i)))
+          case _ => Success(ObjectExpression(TaggedObject(UIndex(i), CountT)))
         }
       }
       case IdentifierParse(s: String, true) => Success(ObjectExpression(NewMapO.identifier(s)))
