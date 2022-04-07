@@ -60,7 +60,7 @@ object RetrieveType {
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case Index(_) => CountT
     case IndexValue(_, indexT) => indexT 
-    case CountT | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) => TypeT
+    case CountT | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
@@ -69,6 +69,7 @@ object RetrieveType {
     case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsVersionedFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case IsConstantFunc => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+    case IsSubtypeFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
     case VersionedObjectLink(key, status) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
       fromNewMapObject(currentState, env)
@@ -194,7 +195,7 @@ object RetrieveType {
   // Ensures that the term is a constant
   def isTermConstant(nObject: NewMapObject): Boolean = {
     nObject match {
-      case Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction => true
+      case Index(_) | IndexValue(_, _) | IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsVersionedFunc | IsConstantFunc | IsSimpleFunction | IsSubtypeFunc | OrBooleanT => true
       case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case TableT(expandingKeyType, requiredValues) => {
         isTermConstant(expandingKeyType) && isTermConstant(requiredValues)

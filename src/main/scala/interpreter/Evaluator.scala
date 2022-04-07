@@ -97,6 +97,7 @@ object Evaluator {
     }
   }
 
+  // TODO - eventually this should go away
   def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
@@ -110,6 +111,7 @@ object Evaluator {
   def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
+      case OrBooleanT => Success(IndexValue(0, OrBooleanT))
       case tableT@TableT(keyType, requiredValues) => Success(TaggedObject(UMap(Vector.empty), tableT))
       case Index(i) if i > 0 => Success(IndexValue(0, Index(i)))
       case TypeT => {
@@ -160,6 +162,7 @@ object Evaluator {
       case CountT => Success(
         NewMapO.emptyStruct
       )
+      case OrBooleanT => Success(Index(2))
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
           outputCommandT <- getCommandInputOfCommandType(outputType, env)
@@ -199,12 +202,7 @@ object Evaluator {
                     ObjectPattern(Index(0)) -> ObjectExpression(keyExpansionCommandT),
                     ObjectPattern(Index(1)) -> ObjectExpression(requiredValues)
                   )),
-                  MapT(
-                    Index(2),
-                    TypeT,
-                    RequireCompleteness,
-                    BasicMap
-                  )
+                  MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
                 )
               )
             }
@@ -222,12 +220,7 @@ object Evaluator {
                 ObjectPattern(Index(0)) -> ObjectExpression(IdentifierT),
                 ObjectPattern(Index(1)) -> ObjectExpression(TypeT)
               )),
-              MapT(
-                Index(2),
-                TypeT,
-                RequireCompleteness,
-                BasicMap
-              )
+              MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
             )
           )
         )
@@ -281,6 +274,20 @@ object Evaluator {
           case _ => {
             throw new Exception("Invalid count in versioning upgrade")
           }
+        }
+      }
+      case OrBooleanT => {
+        (current, command) match {
+          case (IndexValue(i, _), IndexValue(j, _)) => {
+            // Only tell us if the bit finally "flipped"
+            val output = if (i == 0 && j == 1) 1 else 0
+            Success(
+              UpdateVersionedOResponse(
+                IndexValue(i * j, OrBooleanT),
+                IndexValue(output, Index(2))
+            ))
+          }
+        case _ => Failure("This didn't work")
         }
       }
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
@@ -638,6 +645,12 @@ object Evaluator {
           }
           case _ => Success(Index(0))
         }
+      }
+      case (IsSubtypeFunc, nObject) => {
+        nObject match {
+          case SubtypeT(_) => Success(Index(1))
+          case _ => Success(Index(0))
+        }        
       }
       case (IncrementFunc, Index(i)) => Success(Index(i + 1))
       case _ => {

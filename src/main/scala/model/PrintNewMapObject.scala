@@ -15,8 +15,10 @@ object PrintNewMapObject {
     case IsSimpleFunction => s"IsSimpleFunction"
     case IsVersionedFunc => s"IsVersionedFunc"
     case IsConstantFunc => s"IsConstantFunc"
+    case IsSubtypeFunc => s"IsSubtype"
     case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
+    case OrBooleanT => "OrBooleanT"
     case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + this(nType)
     case MapT(key, value, completeness, featureSet) => {
       printMapT(this(key), this(value), completeness, featureSet)

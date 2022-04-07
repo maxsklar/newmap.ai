@@ -29,6 +29,10 @@ case object IsConstantFunc extends NewMapObject
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
 
+// Input: a Type
+// Output: Is this a "subtype" of another construction
+case object IsSubtypeFunc extends NewMapObject
+
 /*
  * The types in the NewMap Language
  * This is actually a subset of the Objects
@@ -39,6 +43,9 @@ case class Index(i: Long) extends NewMapObject
 
 // This is actually not a type!
 case class IndexValue(i: Long, fromType: NewMapObject) extends NewMapObject
+
+// This is a special type of boolean class that's being created temporarily until we get better user-defined types
+case object OrBooleanT extends NewMapObject
 
 // Type of types
 // TODO - eventually, we will replace this with an IsType function
