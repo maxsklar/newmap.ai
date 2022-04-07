@@ -14,7 +14,7 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Boolean, String] = {
 
-    val objectKeys = keys.flatMap(_ match {
+    val objectKeys: Set[UntaggedObject] = keys.flatMap(_ match {
       case ObjectPattern(o) => Some(o)
       case _ => None
     }).toSet
@@ -62,31 +62,19 @@ object SubtypeUtils {
       var returnVal = true
 
       for {
-        constructor <- constructors
+        untaggedConstructor <- constructors
       } yield {
+        val taggedConstructor = TaggedObject(untaggedConstructor, caseKeys)
+
         // Look at our keys, and find the ones that are only for this case key, and save those patterns
         val patternsWithThisConstructor = keys.flatMap(key => key match {
-          case CasePattern(constructor, pattern) => Some(pattern)
-          case ObjectPattern(TaggedObject(UCase(constructor, input), caseT)) => {
-            Evaluator.stripVersioning(caseT, env) match {
-              case CaseT(cases) => {
-                // How do I tag the constructor
-                val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
-                val taggedConstructor = TaggedObject(constructor, caseConstructorType)
-
-                // Get the type that the input is supposed to be
-                Evaluator.applyFunctionAttempt(caseT, taggedConstructor, env).toOption.map(nType => {
-                  ObjectPattern(TaggedObject(input, nType))
-                })
-              }
-              case _ => None
-            }
-          }
+          case CasePattern(untaggedConstructor, pattern) => Some(pattern)
+          case ObjectPattern(UCase(untaggedConstructor, input)) => Some(ObjectPattern(input))
           case _ => None
         })
 
         // Find the input type for this constructor, and make sure that all of THOSE inputs are accounted for
-        Evaluator.applyFunctionAttempt(cases, constructor, env) match {
+        Evaluator.applyFunctionAttempt(cases, taggedConstructor, env) match {
           case Success(inputType) => {
             doPatternsCoverType(patternsWithThisConstructor, inputType, env) match {
               case Success(false) | Failure(_) => returnVal = false
@@ -136,19 +124,21 @@ object SubtypeUtils {
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapObject, env: Environment): Outcome[Set[NewMapObject], String] = {
+  def enumerateAllValuesIfPossible(nType: NewMapObject, env: Environment): Outcome[Set[UntaggedObject], String] = {
     Evaluator.stripVersioning(nType, env) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case SubtypeT(TaggedObject(UMap(values), _)) => enumerateMapKeys(values.map(_._1))
+      case SubtypeT(TaggedObject(UMap(values), _)) => {
+        enumerateMapKeys(values.map(_._1))
+      }
       case TaggedObject(UIndex(i), _) => {
-        Success((0 until i.toInt).map(j => TaggedObject(UIndex(j.toLong), nType)).toSet)
+        Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }
   }
 
-  def enumerateMapKeys(values: Vector[NewMapPattern]): Outcome[Set[NewMapObject], String] = {
+  def enumerateMapKeys(values: Vector[NewMapPattern]): Outcome[Set[UntaggedObject], String] = {
     values match {
       case value +: additionalValues => {
         value match {
@@ -180,6 +170,9 @@ object SubtypeUtils {
         !isConvertible,
         s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
       )
+
+      // TODO - in here isObjectConvertibleToType will also give a conversion function
+      // Run nObject through this conversion function and return!
     } yield nObject
   }
 
@@ -207,8 +200,9 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Boolean, String] = {
     val uuidStr = java.util.UUID.randomUUID.toString
-
+    
     for {
+      // TIME FOR A REDO!!!
       pureTypeConvertible <- isObjectConvertibleToType(
         ParamId(uuidStr), 
         RetrieveType.getParentType(endingType, env),
@@ -227,7 +221,10 @@ object SubtypeUtils {
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
           allValues <- enumerateAllValuesIfPossible(startingType, env)
-          doAllConvert <- allMembersOfSubtype(allValues.toVector, endingType, env)
+
+          taggedAllValues = allValues.toVector.map(u => TaggedObject(u, startingType))
+
+          doAllConvert <- allMembersOfSubtype(taggedAllValues, endingType, env)
         } yield doAllConvert
 
         allConvertedOutcome.toOption.getOrElse(false)
@@ -238,6 +235,7 @@ object SubtypeUtils {
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
   // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
+  // TODO: We also return boolean, but we should return a function if the conversion requires application of this function
   def isObjectConvertibleToType(
     startingObject: NewMapExpression,
     endingType: NewMapObject,
@@ -254,7 +252,9 @@ object SubtypeUtils {
 
         for {
           // 1: Check if startingObject is convertible to the inputType of isMember
-          convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)
+          canConvertToParentType <- isObjectConvertibleToType(startingObject, subtypeInputType, env)
+          //convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)          
+          _ <- Outcome.failWhen(!canConvertToParentType, "Cannot convert to parent type")
 
           // If not evaluated, we can't check for membership
           // TODO: What if this is a complex function?
@@ -263,11 +263,14 @@ object SubtypeUtils {
           //   message about it saying that we can't check for the subtype because we won't run your
           //   function (which could be some crazy infinite loop or fibonacci explosion crap)
           // Instead.. the function itself should have guarantees
-          evaluatedObject <- Evaluator(convertedObject, env)
+          //evaluatedObject <- Evaluator(convertedObject, env)
+          evaluatedObject <- Evaluator(startingObject, env)
+
+          //untaggedEvaluatedObject <- Evaluator.removeTypeTag(evaluatedObject)
 
           // 2: See if it's actually a member of the subtype
-          isMemberOfSubtype <- isMemberOfSubtype(evaluatedObject, endingType, env)
-          _ <- Outcome.failWhen(!isMemberOfSubtype, s"Object $evaluatedObject not a member of subtype $endingType")
+          isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
+          _ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
         } yield true
       }
       case (
@@ -385,46 +388,33 @@ object SubtypeUtils {
     nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    // TODO: if nObject is a parameter, we may still be able to confirm that it's in the subtype if the
-    // type of it is convertible
-    // TODO: We should distinguish between a closed literal - for which we can call quickApplyFunctionAttempt - and non-closed literals
+    nSubtype match {
+      case SubtypeT(isMember) => {
+        for {
+          result <- Evaluator.applyFunctionAttempt(isMember, nObject, env)
 
-    val apparentTypeOfObject = RetrieveType.fromNewMapObject(nObject, env)
-
-    isTypeConvertible(apparentTypeOfObject, nSubtype, env) match {
-      case Success(true) => {
-        // Note: This is a shortcut, but not always true
-        // - Can we redo isTypeConvertible so it acts purely as a shortcut (maybe a version that doesn't call isPureTypeConvertible)
-        Success(true)
+          // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
+          //  and find a default on that!
+          defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
+        } yield (result != defaultValueOrResultType)
       }
-      case _ => nSubtype match {
-        case SubtypeT(isMember) => {
-          for {
-            result <- Evaluator.applyFunctionAttempt(isMember, nObject, env)
-
-            // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
-            //  and find a default on that!
-            defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
-          } yield (result != defaultValueOrResultType)
-        }
-        case _ => {
-          // We already called isTypeConvertible above, so we know this works
-          Success(true)
-        }
+      case _ => {
+        // We already called isTypeConvertible above, so we know this works
+        Success(true)
       }
     }
   }
 
   def allMembersOfSubtype(
-    nObjects: Vector[NewMapObject],
+    nObjects: Vector[TaggedObject],
     nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     nObjects match {
-      case nObject +: restOfObjects => {
+      case nObject +: restOfUObjects => {
         for {
           isIt <- isMemberOfSubtype(nObject, nSubtype, env)
-          result <- if (isIt) allMembersOfSubtype(restOfObjects, nSubtype, env) else Success(false)
+          result <- if (isIt) allMembersOfSubtype(restOfUObjects, nSubtype, env) else Success(false)
         } yield result
       }
       case _ => Success(true)

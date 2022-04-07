@@ -208,7 +208,7 @@ object Environment {
 
   def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
     }
 
     StructT(
@@ -221,7 +221,7 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapObject)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
     }
 
     CaseT(
@@ -253,7 +253,7 @@ object Environment {
   ): NewMapObject = {
     val structT = StructT(
       TaggedObject(
-        UMap(inputs.zipWithIndex.map(x => ObjectPattern(TaggedObject(UIndex(x._2), CountT)) -> ObjectExpression(x._1._2))),
+        UMap(inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(x._1._2))),
         MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
       )
     )

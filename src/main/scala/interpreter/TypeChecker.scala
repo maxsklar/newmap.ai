@@ -279,7 +279,7 @@ object TypeChecker {
           result <- typeCheckWithPatternMatching(input, inputTypeExpected, env, externalFeatureSet, internalFeatureSet)
         } yield {
           TypeCheckWithPatternMatchingResult(
-            CasePattern(constructor, result.typeCheckResult),
+            CasePattern(Evaluator.removeTypeTag(constructor).toOption.get, result.typeCheckResult),
             result.newEnvironment
           )
         }
@@ -288,8 +288,9 @@ object TypeChecker {
         for {
           tc <- typeCheck(expression, expectedType, env, externalFeatureSet)
           tcObj <- Evaluator(tc, env)
+          untaggedObj <- Evaluator.removeTypeTag(tcObj)
         } yield {
-          TypeCheckWithPatternMatchingResult(ObjectPattern(tcObj), env)
+          TypeCheckWithPatternMatchingResult(ObjectPattern(untaggedObj), env)
         }
       }
     }
@@ -348,7 +349,7 @@ object TypeChecker {
           substObj <- Evaluator(substExp, env)
 
           newEnv = paramId match {
-            case ObjectPattern(TaggedObject(UIdentifier(s), _)) => {
+            case ObjectPattern(UIdentifier(s)) => {
               env.newCommand(FullEnvironmentCommand(s, substObj))
             }
             case _ => env
@@ -368,7 +369,7 @@ object TypeChecker {
           valueObj <- Evaluator(tc, env)
 
           newEnv = paramId match {
-            case ObjectPattern(TaggedObject(UIdentifier(s), _)) => {
+            case ObjectPattern(UIdentifier(s)) => {
               env.newCommand(FullEnvironmentCommand(s, valueObj))
             }
             case _ => env

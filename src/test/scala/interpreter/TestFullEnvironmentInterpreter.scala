@@ -67,7 +67,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(line, FailureCheck))
   }
 
-  def bind(key: NewMapObject, value: NewMapObject): (NewMapPattern, NewMapExpression) = {
+  def bind(key: UntaggedObject, value: NewMapObject): (NewMapPattern, NewMapExpression) = {
     ObjectPattern(key) -> ObjectExpression(value)
   }
 
@@ -94,9 +94,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       TaggedObject(
         UMap(Vector(
-          bind(IndexValue(0, Index(3)), IndexValue(20, Index(100))),
-          bind(IndexValue(1, Index(3)), IndexValue(43, Index(100))),
-          bind(IndexValue(2, Index(3)), IndexValue(67, Index(100)))
+          bind(UIndex(0), IndexValue(20, Index(100))),
+          bind(UIndex(1), IndexValue(43, Index(100))),
+          bind(UIndex(2), IndexValue(67, Index(100)))
         )),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
@@ -141,8 +141,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "m",
       TaggedObject(
         UMap(Vector(
-          bind(IndexValue(0, Index(3)), IndexValue(10, Index(100))),
-          bind(IndexValue(2, Index(3)),  IndexValue(3, Index(100)))
+          bind(UIndex(0), IndexValue(10, Index(100))),
+          bind(UIndex(2),  IndexValue(3, Index(100)))
         )),
         MapT(Index(3), Index(100), CommandOutput, BasicMap)
       )
@@ -157,8 +157,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "s",
       TaggedObject(
         UMap(Vector(
-          bind(NewMapO.identifier("a"), IndexValue(0, Index(2))), 
-          bind(NewMapO.identifier("b"), IndexValue(0, Index(3)))
+          bind(UIdentifier("a"), IndexValue(0, Index(2))), 
+          bind(UIdentifier("b"), IndexValue(0, Index(3)))
         )),
         structType
       )
@@ -278,9 +278,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           ApplyFunction(
             ObjectExpression(TaggedObject(
               UMap(Vector(
-                bind(IndexValue(0, Index(3)), IndexValue(2, Index(4))),
-                bind(IndexValue(1, Index(3)), IndexValue(3, Index(4))),
-                bind(IndexValue(2, Index(3)), IndexValue(1, Index(4)))
+                bind(UIndex(0), IndexValue(2, Index(4))),
+                bind(UIndex(1), IndexValue(3, Index(4))),
+                bind(UIndex(2), IndexValue(1, Index(4)))
               )),
               MapT(Index(3), Index(4), CommandOutput, BasicMap)
             )),

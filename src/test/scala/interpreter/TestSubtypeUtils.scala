@@ -8,8 +8,8 @@ class TestSubtypeUtils extends FlatSpec {
   "Subtype " should " be convertible into the parent type" in {
     val isMember = TaggedObject(
       UMap(Vector(
-        ObjectPattern(NewMapO.identifier("key")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT))),
-        ObjectPattern(NewMapO.identifier("value")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT)))
+        ObjectPattern(UIdentifier("key")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT))),
+        ObjectPattern(UIdentifier("value")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT)))
       )),
       MapT(IdentifierT, TaggedObject(UIndex(2), CountT), CommandOutput, BasicMap)
     )

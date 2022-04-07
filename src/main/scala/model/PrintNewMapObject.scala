@@ -115,10 +115,6 @@ object PrintNewMapObject {
     case UIndex(i) => i.toString
   }
 
-  def printParams(params: Vector[(String, NewMapObject)]): String = {
-    mapToString(params.map(x => ObjectPattern(NewMapO.identifier(x._1)) -> ObjectExpression(x._2)))
-  }
-
   def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {
     val sb: StringBuilder = new StringBuilder()
     sb.append("(")
@@ -136,9 +132,9 @@ object PrintNewMapObject {
   }
 
   def patternToString(nPattern: NewMapPattern): String = nPattern match {
-    case ObjectPattern(nObject) => this(nObject)
+    case ObjectPattern(nObject) => untagged(nObject)
     case TypePattern(name, nType) => s"($name: ${this(nType)})"
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
-    case CasePattern(constructor, input) => s"(${this(constructor)} ${patternToString(input)})"
+    case CasePattern(constructor, input) => s"(${untagged(constructor)} ${patternToString(input)})"
   }
 }

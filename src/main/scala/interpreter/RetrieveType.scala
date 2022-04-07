@@ -235,7 +235,7 @@ object RetrieveType {
         case _ => true
       }
     }
-    case CasePattern(constructor, input) => {
+    case CasePattern(_, input) => {
       isPatternConstant(input)
     }
   }

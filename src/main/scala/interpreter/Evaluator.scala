@@ -170,8 +170,8 @@ object Evaluator {
           StructT(
             TaggedObject(
               UMap(Vector(
-                ObjectPattern(Index(0)) -> ObjectExpression(inputType),
-                ObjectPattern(Index(1)) -> ObjectExpression(outputCommandT)
+                ObjectPattern(UIndex(0)) -> ObjectExpression(inputType),
+                ObjectPattern(UIndex(1)) -> ObjectExpression(outputCommandT)
               )),
               MapT(
                 Index(2),
@@ -199,8 +199,8 @@ object Evaluator {
               StructT(
                 TaggedObject(
                   UMap(Vector(
-                    ObjectPattern(Index(0)) -> ObjectExpression(keyExpansionCommandT),
-                    ObjectPattern(Index(1)) -> ObjectExpression(requiredValues)
+                    ObjectPattern(UIndex(0)) -> ObjectExpression(keyExpansionCommandT),
+                    ObjectPattern(UIndex(1)) -> ObjectExpression(requiredValues)
                   )),
                   MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
                 )
@@ -217,8 +217,8 @@ object Evaluator {
           StructT(
             TaggedObject(
               UMap(Vector(
-                ObjectPattern(Index(0)) -> ObjectExpression(IdentifierT),
-                ObjectPattern(Index(1)) -> ObjectExpression(TypeT)
+                ObjectPattern(UIndex(0)) -> ObjectExpression(IdentifierT),
+                ObjectPattern(UIndex(1)) -> ObjectExpression(TypeT)
               )),
               MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
             )
@@ -253,7 +253,7 @@ object Evaluator {
   }
 
   def retagPattern(nPattern: NewMapPattern, newTypeTag: NewMapObject): NewMapPattern = nPattern match {
-    case ObjectPattern(nObject) => ObjectPattern(retagObject(nObject, newTypeTag))
+    case ObjectPattern(nObject) => ObjectPattern(nObject)
     case _ => nPattern
   }
 
@@ -303,7 +303,9 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          newMapValues = (ObjectPattern(input) -> ObjectExpression(newResultForInput.newState)) +: mapValues.filter(x => x._1 != ObjectPattern(input))
+          untaggedInput <- removeTypeTag(input)
+
+          newMapValues = (ObjectPattern(untaggedInput) -> ObjectExpression(newResultForInput.newState)) +: mapValues.filter(x => x._1 != ObjectPattern(untaggedInput))
         } yield {
           UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), mapT), NewMapO.emptyStruct)
         }
@@ -340,14 +342,16 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          newMapping = ObjectPattern(updateKeyTypeResponse.output) -> ObjectExpression(valueExpansionCommand)
+          updateKeyUntagged <- removeTypeTag(updateKeyTypeResponse.output)
+
+          newMapping = ObjectPattern(updateKeyUntagged) -> ObjectExpression(valueExpansionCommand)
 
           prepNewValues = for {
             value <- mapValues
             retaggedPattern = retagPattern(value._1, updateKeyTypeResponse.newState)
 
             // Remove old value
-            if (retaggedPattern != ObjectPattern(updateKeyTypeResponse.output))
+            if (retaggedPattern != ObjectPattern(updateKeyUntagged))
           } yield (retaggedPattern -> value._2)
 
           newMapValues = newMapping +: prepNewValues
@@ -361,7 +365,8 @@ object Evaluator {
               newCaseName <- accessFieldAttempt(command, Index(0), env)
               newCaseInputType <- accessFieldAttempt(command, Index(1), env)
 
-              newMapValues = (ObjectPattern(newCaseName) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseName))
+              newCaseNameUntagged <- removeTypeTag(newCaseName)
+              newMapValues = (ObjectPattern(newCaseNameUntagged) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseNameUntagged))
             } yield {
               UpdateVersionedOResponse(
                 CaseT(TaggedObject(UMap(newMapValues), mapT)),
@@ -704,17 +709,25 @@ object Evaluator {
       }
       // TODO - since input is going to be a literal, do we actually need to call isMemberOfSubtype, or can we
       //  just call the function??
-      case (TypePattern(name, nType), _) if SubtypeUtils.isMemberOfSubtype(input, nType, env).toOption.getOrElse(false) => {
-        Success(Map(name -> input))
+      case (TypePattern(name, nType), _) => {
+        for {
+          //untaggedInput <- removeTypeTag(input)
+          isMember <- SubtypeUtils.isMemberOfSubtype(input /*untaggedInput*/, nType, env)
+          _ <- Outcome.failWhen(
+            !isMember,
+            "Not Member of Subtype"
+          )
+        } yield Map(name -> input)
       }
       // TODO - eventually instead of checking equality, we'll check for "convertability"
       //  For example between different type versions
       case (ObjectPattern(oPattern), _) => {
         // TODO - the retagging should not happen here
         // (In fact, at this point we should have harmonized the types)
-        val retaggedInput = retagObject(input, RetrieveType.fromNewMapObject(oPattern, env))
+        //val retaggedInput = retagObject(input, RetrieveType.fromNewMapObject(oPattern, env))
+        val untaggedInput = removeTypeTag(input).toOption.get
 
-        if (oPattern == retaggedInput) {
+        if (oPattern == untaggedInput) {
           Success(Map.empty)
         } else Failure("ObjectPattern didn't match")
       }
@@ -723,7 +736,8 @@ object Evaluator {
         val taggedConstructor = TaggedObject(constructor, caseConstructorType)
 
         for {
-          _ <- Outcome.failWhen(constructorP != taggedConstructor, "Constructors didn't match")
+          //_ <- Outcome.failWhen(constructorP != taggedConstructor, "Constructors didn't match")
+          _ <- Outcome.failWhen(constructorP != constructor, "Constructors didn't match")
 
           typeOfCInput <- applyFunctionAttempt(cases, taggedConstructor, env)
 
