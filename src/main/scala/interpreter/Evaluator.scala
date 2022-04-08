@@ -107,8 +107,7 @@ object Evaluator {
     nType match {
       case CountT => Success(Index(0))
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
-      case tableT@TableT(keyType, requiredValues) => Success(TaggedObject(UMap(Vector.empty), tableT))
-      case eSubsetT@ExpandingSubsetT(parentTye) => Success(TaggedObject(UMap(Vector.empty), eSubsetT))
+      case TableT(_, _) | ExpandingSubsetT(_) | MapT(_, _, CommandOutput, _) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
@@ -127,9 +126,6 @@ object Evaluator {
       }
       case AnyT => Failure("The \"any\" Type has no implemented default value")
       case IdentifierT => Failure("Type of Identifiers has no default value")
-      case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
-        Success(TaggedObject(UMap(Vector.empty), mapT))
-      }
       case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
       case structT@StructT(TaggedObject(UMap(parameterList), _)) => {
         for {
@@ -142,6 +138,7 @@ object Evaluator {
         // In order for cases to have a default value, there's have to be 2 things:
         // - casesType must have a default (a default case) - call it casesType.default
         // - casesToType(casesType.default) is a type that must have a default case
+        throw new Exception(s"Case Types do not have a default value -- $nType")
         Failure("Case Types do not have a default value")
       }
       case _ => {
@@ -357,7 +354,7 @@ object Evaluator {
         //current is going be of type SubsetT(parentT)
         // and the isMember function is going to have a value of isSubsetOr
         current match {
-          case SubtypeT(isMember) => {
+          case TaggedObject(UMap(values), _) => {
             // BUILD command
             val isMemberCommand = TaggedObject(
               UMap(Vector(
@@ -375,11 +372,16 @@ object Evaluator {
               )
             )
 
+            val isMember = TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap))
+
             for {
               result <- updateVersionedO(isMember, isMemberCommand, env)
             } yield {
               // TODO - eventually the output will be different (set of new items??)
-              UpdateVersionedOResponse(result.newState, NewMapO.emptyStruct)
+              UpdateVersionedOResponse(
+                retagObject(result.newState, ExpandingSubsetT(parentType)),
+                NewMapO.emptyStruct
+              )
             }
           }
           case _ => Failure(s"Didn't get what I expected for ExpandingSubsetT $parentType -- $current -- $command")
@@ -618,7 +620,7 @@ object Evaluator {
               keyMatchResult
             }
           }
-          case MapT(keyType, _, _, _) => {
+          case MapT(keyType, _, commandType, _) => {
             for {
               keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
                 case Success(result) => Success(result)
@@ -773,8 +775,6 @@ object Evaluator {
         } yield result
       }
       case _ => {
-        println(s"Pattern: $pattern")
-        println(s"input: $input")
         Failure("Failed Pattern Match")
       }
     }

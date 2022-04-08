@@ -250,6 +250,8 @@ object SubtypeUtils {
       case _ if (startingType == endingType) => Success(true)
       case (_, AnyT) => Success(true)
       case (CountT, TypeT) => Success(true)
+      case (ExpandingSubsetT(_), TypeT) => Success(true)
+      //case (TableT(_, _), TypeT) => Success(true) // TODO: Do we need this? We might!
       case (_, SubtypeT(isMember)) => {
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
 

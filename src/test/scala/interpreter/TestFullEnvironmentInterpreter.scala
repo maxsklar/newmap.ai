@@ -697,38 +697,44 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Expanding Subsets " should " work for indecies" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver ID = new ExpandingSubset(10)", GeneralSuccessCheck),
+      CodeExpectation("update ID 2", GeneralSuccessCheck),
+      CodeExpectation("update ID 7", GeneralSuccessCheck),
+      CodeExpectation("update ID 5", GeneralSuccessCheck),
+      CodeExpectation("val x: ID = 2", GeneralSuccessCheck),
+      CodeExpectation("val y: ID = 3", FailureCheck)
+    ))
+  }
+
+  it should " work for counts" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver ID = new ExpandingSubset(Count)", GeneralSuccessCheck),
+      CodeExpectation("update ID 2", GeneralSuccessCheck),
+      CodeExpectation("update ID 73", GeneralSuccessCheck),
+      CodeExpectation("update ID 5555", GeneralSuccessCheck),
+      CodeExpectation("val x: ID = 73", GeneralSuccessCheck),
+      CodeExpectation("val y: ID = 1", FailureCheck)
+    ))
+  }
+
+  it should " work for identifiers" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver ID = new ExpandingSubset(Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update ID hello", GeneralSuccessCheck),
+      CodeExpectation("update ID world", GeneralSuccessCheck),
+      CodeExpectation("val x: ID = hello", GeneralSuccessCheck),
+      CodeExpectation("val y: ID = hi", FailureCheck)
+    ))
+  }
+
   /**
    * 
    * 
    * 
   Include UniqueTable 
 
-  The whole thing should be set up on creation!!
-
-  ver n = new Table(KEY, (required field params))
-  
-
-  
-
-  NO - you might need to add more!
-  But I like the idea of a table...
-
-  ver n = new Table(Count)
-  update n (RequiredField)
-
-
-  Can we deal with the fact that a field is the same as a map?
-  - 
-
-  ver n = new Count
-  requiredField n(name, Identifier, ())
-  
-
-
-  TODOS:
-
-  Step 3: Make sure we can deal with ReqMap(n, T) where n is an expanding COUNT!!
-  - Deal with other types of ReqMaps later
 
   SEQUENCE
   (Defines a new count automatically)
@@ -845,21 +851,4 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
 
   */
-
-  // THIS IS from the REQMAP PRoblem
-  /*"Var statements" should " work correctly" in {
-    testCodeScript(Vector(
-      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      // I'm making this a  failure because n should be  made current
-      CodeExpectation("val m: ReqMap(n, 5) = (4, 2)", FailureCheck),
-      // This is a  success because m is now based on n
-      CodeExpectation("ver m: ReqMap(n, 5) = (4, 2)", GeneralSuccessCheck),
-      // This is a failure because you can't update n without updating m
-      CodeExpectation("update n()", FailureCheck),
-      // This is the correct way to update n
-      CodeExpectation("update n() with (m 3)", GeneralSuccessCheck),
-    ))
-  }*/
 }

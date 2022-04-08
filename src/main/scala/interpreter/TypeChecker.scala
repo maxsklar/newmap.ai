@@ -27,7 +27,27 @@ object TypeChecker {
             if (i < j) Success(ObjectExpression(TaggedObject(UIndex(i), parentExpectedType)))
             else Failure(s"Proposed index $i is too large for type $j")
           }
-          case _ => Success(ObjectExpression(TaggedObject(UIndex(i), CountT)))
+          case TaggedObject(umap@UMap(_), ExpandingSubsetT(superType)) => {
+            for {
+              result <- Evaluator.applyFunctionAttempt(
+                TaggedObject(umap, MapT(superType, OrBooleanT, CommandOutput, BasicMap)),
+                TaggedObject(UIndex(i), superType),
+                env
+              )
+
+              isAllowed = result match {
+                case TaggedObject(UIndex(1), _) => true
+                case _ => false
+              }
+
+              _ <- Outcome.failWhen(!isAllowed, s"number $i not in subtype $expectedType")
+            } yield {
+              ObjectExpression(TaggedObject(UIndex(i), expectedType))
+            }
+          }
+          case _ => {
+            Success(ObjectExpression(TaggedObject(UIndex(i), CountT)))
+          }
         }
       }
       case IdentifierParse(s: String, true) => Success(ObjectExpression(NewMapO.identifier(s)))
