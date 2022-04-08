@@ -49,18 +49,17 @@ object RetrieveType {
     case BuildCase(_, _, caseType) => caseType
     case BuildMapT(_, _, _, _) => TypeT
     case BuildTableT(_, _) => TypeT
+    case BuildExpandingSubsetT(_) => TypeT
     case BuildSubtypeT(_) => TypeT
     case BuildCaseT(_) => TypeT
     case BuildStructT(_) => TypeT
     case BuildMapInstance(values, mapT) => mapT // TODO - what if this is a submap???
-    case BuildStructInstance(values, structT) => structT
-    case BuildTableInstance(values, tableT) => tableT
   }
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT | TableT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
+    case CountT | TableT(_, _) | ExpandingSubsetT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
     case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
@@ -94,6 +93,9 @@ object RetrieveType {
         }
         case TaggedObject(UMap(values), TableT(keyType, requiredValues)) => {
           keyType
+        }
+        case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
+          SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap)))
         }
         case _ => {
           Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
@@ -164,16 +166,13 @@ object RetrieveType {
     case BuildTableT(keyType, requiredValues) => {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }
+    case BuildExpandingSubsetT(parentType) => {
+      isTermClosedLiteral(parentType)
+    }
     case BuildSubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
     case BuildCaseT(cases) => isTermClosedLiteral(cases, knownVariables)
     case BuildStructT(params) => isTermClosedLiteral(params, knownVariables)
     case BuildMapInstance(values, mapT) => {
-      isMapValuesClosed(values, knownVariables)
-    }
-    case BuildStructInstance(values, structT) => {
-      isMapValuesClosed(values, knownVariables)
-    }
-    case BuildTableInstance(values, tableT) => {
       isMapValuesClosed(values, knownVariables)
     }
   }
@@ -200,6 +199,7 @@ object RetrieveType {
       case TableT(expandingKeyType, requiredValues) => {
         isTermConstant(expandingKeyType) && isTermConstant(requiredValues)
       }
+      case ExpandingSubsetT(parentType) => isTermConstant(parentType)
       case StructT(params) => isTermConstant(params)
       case CaseT(cases) => isTermConstant(cases)
       case SubtypeT(isMember) => isTermConstant(isMember)
@@ -257,11 +257,12 @@ object RetrieveType {
     case BuildTableT(keyType, requiredValues) => {
       isExpressionConstant(keyType) && isExpressionConstant(requiredValues)
     }
+    case BuildExpandingSubsetT(parentType) => {
+      isExpressionConstant(parentType)
+    }
     case BuildSubtypeT(isMember) => isExpressionConstant(isMember)
     case BuildCaseT(cases) => isExpressionConstant(cases)
     case BuildStructT(params) => isExpressionConstant(params)
     case BuildMapInstance(values, mapT) => isMapConstant(values) && isTermConstant(mapT)
-    case BuildStructInstance(values, structT) => isMapConstant(values) && isTermConstant(structT)
-    case BuildTableInstance(values, tableT) => isMapConstant(values) && isTermConstant(tableT)
   }
 }

@@ -64,6 +64,11 @@ object Evaluator {
           evalRequiredValues <- this(requiredValues, env)
         } yield TableT(startingType, evalRequiredValues)
       }
+      case BuildExpandingSubsetT(parentType) => {
+        for {
+          evalParentType <- this(parentType, env)
+        } yield ExpandingSubsetT(evalParentType)
+      }
       case BuildSubtypeT(isMember) => {
         for {
           evalIsMember <- this(isMember, env)
@@ -79,20 +84,10 @@ object Evaluator {
           evalParams <- this(params, env)
         } yield StructT(evalParams)
       }
-      case BuildMapInstance(values, mapT) => {
+      case BuildMapInstance(values, nType) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
-        } yield TaggedObject(UMap(evalValues), mapT)
-      }
-      case BuildStructInstance(values, structT) => {
-        for {
-          evalValues <- evalMapInstanceVals(values, env)
-        } yield TaggedObject(UMap(evalValues), structT)
-      }
-      case BuildTableInstance(values, tableT) => {
-        for {
-          evalValues <- evalMapInstanceVals(values, env)
-        } yield TaggedObject(UMap(evalValues), tableT)
+        } yield TaggedObject(UMap(evalValues), nType)
       }
     }
   }
@@ -113,6 +108,7 @@ object Evaluator {
       case CountT => Success(Index(0))
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
       case tableT@TableT(keyType, requiredValues) => Success(TaggedObject(UMap(Vector.empty), tableT))
+      case eSubsetT@ExpandingSubsetT(parentTye) => Success(TaggedObject(UMap(Vector.empty), eSubsetT))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
@@ -207,10 +203,9 @@ object Evaluator {
               )
             }
           }
-
-
         }
       }
+      case ExpandingSubsetT(parentType) => Success(parentType)
       // This should really be a case type instead of a typeT
       case TypeT => {
         Success(
@@ -279,10 +274,11 @@ object Evaluator {
         (current, command) match {
           case (TaggedObject(UIndex(i), _), TaggedObject(UIndex(j), _)) => {
             // Only tell us if the bit finally "flipped"
+            val result = if (i == 1 || j == 1) 1 else 0
             val output = if (i == 0 && j == 1) 1 else 0
             Success(
               UpdateVersionedOResponse(
-                TaggedObject(UIndex(i * j), OrBooleanT),
+                TaggedObject(UIndex(result), OrBooleanT),
                 TaggedObject(UIndex(output), Index(2))
             ))
           }
@@ -356,6 +352,38 @@ object Evaluator {
 
           newMapValues = newMapping +: prepNewValues
         } yield UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), newTableType), NewMapO.emptyStruct)
+      }
+      case ExpandingSubsetT(parentType) => {
+        //current is going be of type SubsetT(parentT)
+        // and the isMember function is going to have a value of isSubsetOr
+        current match {
+          case SubtypeT(isMember) => {
+            // BUILD command
+            val isMemberCommand = TaggedObject(
+              UMap(Vector(
+                ObjectPattern(UIndex(0)) -> ObjectExpression(command),
+                ObjectPattern(UIndex(1)) -> ObjectExpression(TaggedObject(UIndex(1), Index(2)))
+              )),
+              StructT(
+                TaggedObject(
+                  UMap(Vector(
+                    ObjectPattern(UIndex(0)) -> ObjectExpression(parentType),
+                    ObjectPattern(UIndex(1)) -> ObjectExpression(Index(2))
+                  )),
+                  MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
+                )
+              )
+            )
+
+            for {
+              result <- updateVersionedO(isMember, isMemberCommand, env)
+            } yield {
+              // TODO - eventually the output will be different (set of new items??)
+              UpdateVersionedOResponse(result.newState, NewMapO.emptyStruct)
+            }
+          }
+          case _ => Failure(s"Didn't get what I expected for ExpandingSubsetT $parentType -- $current -- $command")
+        }
       }
       case TypeT => {
         current match {

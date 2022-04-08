@@ -5,6 +5,11 @@ import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 object StatementInterpreter {
+  case class Response(
+    commands: Vector[EnvironmentCommand],
+    output: String
+  )
+
   /*
    * @param sParse The statement parse
    * @param env This is a map of identifiers which at this point are supposed to be subsituted.
@@ -12,7 +17,7 @@ object StatementInterpreter {
   def apply(
     sParse: EnvStatementParse,
     env: Environment
-  ): Outcome[Vector[EnvironmentCommand], String] = {
+  ): Outcome[Response, String] = {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
@@ -26,7 +31,8 @@ object StatementInterpreter {
           //_ = println(s"evaluatedObject: $evaluatedObject")
           constantObject = Evaluator.stripVersioning(evaluatedObject, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, constantObject))
+          val command = FullEnvironmentCommand(id.s, constantObject)
+          Response(Vector(command), command.toString)
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
@@ -38,14 +44,16 @@ object StatementInterpreter {
           // - In fact, we have yet to build an actual command type checker
           initValue <- Evaluator.getDefaultValueOfCommandType(nType, env)
         } yield {
-          Vector(NewVersionedStatementCommand(id.s, nType))
+          val command = NewVersionedStatementCommand(id.s, nType)
+          Response(Vector(command), command.toString)
         }
       }
       case ForkedVersionedStatementParse(id, forkId) => {
         for {
           vObject <- Evaluator.lookupVersionedObject(forkId.s, env)
         } yield {
-          Vector(ForkEnvironmentCommand(id.s, vObject))
+          val command = ForkEnvironmentCommand(id.s, vObject)
+          Response(Vector(command), command.toString)
         }
       }
       case ApplyCommandStatementParse(id, command) => {
@@ -58,7 +66,8 @@ object StatementInterpreter {
 
           commandObj <- Evaluator(commandExp, env)
         } yield {
-          Vector(ApplyIndividualCommand(id.s, commandObj))
+          val command = ApplyIndividualCommand(id.s, commandObj)
+          Response(Vector(command), command.toString)
         }
       }
       case ApplyCommandsStatementParse(id, commands) => {
@@ -69,7 +78,8 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheck(objExpression, AnyT, env, FullFunction)
           evaluatedObject <- Evaluator(tc, env)
         } yield {
-          Vector(FullEnvironmentCommand(id.s, evaluatedObject))
+          val command = FullEnvironmentCommand(id.s, evaluatedObject)
+          Response(Vector(command), command.toString)
         }
       }
       case ExpressionOnlyStatementParse(exp) => {
@@ -78,7 +88,8 @@ object StatementInterpreter {
           evaluatedObject <- Evaluator(tc, env)
           constantObject = Evaluator.stripVersioning(evaluatedObject, env)
         } yield {
-          Vector(ExpOnlyEnvironmentCommand(constantObject))
+          val command = ExpOnlyEnvironmentCommand(constantObject)
+          Response(Vector(command), command.toString)
         }
       }
     }

@@ -93,14 +93,14 @@ object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go 
 // TypeClass
 // defines some structure on a type
 // preservation rules preserve this structure!!
-
 case class TableT(
   expandingKeyType: NewMapObject,
   requiredValues: NewMapObject
 ) extends NewMapObject
 
-
-
+case class ExpandingSubsetT(
+  parentType: NewMapObject
+) extends NewMapObject
 
 // Params should be connected to a NewMapObject which are of type
 //  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)

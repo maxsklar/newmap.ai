@@ -1,4 +1,4 @@
-package ai.newmap.model
+ package ai.newmap.model
 
 /**
  * The expressions in the NewMapLanguage
@@ -38,6 +38,10 @@ case class BuildTableT(
   requiredValues: NewMapExpression
 ) extends NewMapExpression
 
+case class BuildExpandingSubsetT(
+  parentType: NewMapExpression
+) extends NewMapExpression
+
 case class BuildCaseT(cases: NewMapExpression) extends NewMapExpression
 case class BuildStructT(params: NewMapExpression) extends NewMapExpression
 case class BuildSubtypeT(isMember: NewMapExpression) extends NewMapExpression
@@ -46,17 +50,6 @@ case class BuildMapInstance(
   values: Vector[(NewMapPattern, NewMapExpression)],
   mapType: NewMapObject
 ) extends NewMapExpression
-
-case class BuildStructInstance(
-  values: Vector[(NewMapPattern, NewMapExpression)],
-  structType: NewMapObject
-) extends NewMapExpression
-
-case class BuildTableInstance(
-  values: Vector[(NewMapPattern, NewMapExpression)],
-  tableT: NewMapObject
-) extends NewMapExpression
-
 
 // This is an object that stands for something else in the environment
 // Very important so that we don't repeat code

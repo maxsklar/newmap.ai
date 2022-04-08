@@ -52,6 +52,9 @@ object MakeSubstitution {
           this(requiredValues, parameters, env)
         )
       }
+      case BuildExpandingSubsetT(parentType) => {
+        BuildExpandingSubsetT(this(parentType, parameters, env))
+      }
       case BuildSubtypeT(isMember) => {
         BuildSubtypeT(this(isMember, parameters, env))
       }
@@ -67,28 +70,6 @@ object MakeSubstitution {
         }
 
         BuildMapInstance(newMapValues, mapT)
-      }
-      case BuildStructInstance(values, structT) => {
-        val newMapValues = for {
-          (k, v) <- values
-        } yield {
-          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
-          val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
-          k -> newValue
-        }
-
-        BuildStructInstance(newMapValues, structT)
-      }
-      case BuildTableInstance(values, tableT) => {
-        val newMapValues = for {
-          (k, v) <- values
-        } yield {
-          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
-          val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
-          k -> newValue
-        }
-
-        BuildTableInstance(newMapValues, tableT)
       }
     }
   }

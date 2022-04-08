@@ -134,6 +134,9 @@ object SubtypeUtils {
       case TaggedObject(UIndex(i), _) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
+      case OrBooleanT => {
+        Success(Vector(UIndex(0), UIndex(1)).toSet)
+      }
       case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
     }
   }
@@ -200,7 +203,7 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Boolean, String] = {
     val uuidStr = java.util.UUID.randomUUID.toString
-    
+
     for {
       // TIME FOR A REDO!!!
       pureTypeConvertible <- isObjectConvertibleToType(

@@ -25,6 +25,9 @@ object PrintNewMapObject {
       val mapTString = printMapT(this(expandingKeyType), this(requiredValues), RequireCompleteness, SimpleFunction)
       s"Table(${mapTString})"
     }
+    case ExpandingSubsetT(parentType) => {
+      s"ExpandingSubsetT(${this(parentType)})"
+    }
     case StructT(params) => "Struct " + this(params)
     case CaseT(cases) => "Case " + this(cases)
     //TODO(2022): we might not want to print out the full parent here, because it could be large
@@ -67,24 +70,11 @@ object PrintNewMapObject {
     case BuildSubtypeT(isMember) => {
       s"Subtype(${printExpression(isMember)})"
     }
-    case BuildMapInstance(values, mapT) => {
+    case BuildMapInstance(values, nType) => {
       mapToString(values)
     }
-    case BuildStructInstance(values, structT) => {
-      val sb: StringBuilder = new StringBuilder()
-      sb.append("StructInstance(")
-      var bindings: Vector[String] = Vector.empty
-      for {
-        (k, v) <- values
-      } {
-        bindings :+= k + ": " + printExpression(v)
-      }
-      sb.append(bindings.mkString(", "))
-      sb.append(")")
-      sb.toString
-    }
-    case BuildTableInstance(values, tableT) => {
-      mapToString(values)
+    case BuildExpandingSubsetT(parentType) => {
+      s"ExpandingSubset(${printExpression(parentType)})"
     }
   }
 

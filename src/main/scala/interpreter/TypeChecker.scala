@@ -130,7 +130,7 @@ object TypeChecker {
                 featureSet
               )
             } yield {
-              BuildStructInstance(result, StructT(params))
+              BuildMapInstance(result, StructT(params))
             }
           }
           case TypeT => {
