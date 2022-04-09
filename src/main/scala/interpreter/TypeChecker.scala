@@ -97,7 +97,7 @@ object TypeChecker {
           case Some(EnvironmentValue(_, ParameterStatus)) => Success(ParamId(s))
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(ObjectExpression(nObject))
           case None => {
-            Failure(s"Identifier $s is unknown $expectedType --- ${SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env)}")
+            Failure(s"Identifier $s is unknown, expecting type $expectedType --- ${SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env)}")
           }
         }
       }

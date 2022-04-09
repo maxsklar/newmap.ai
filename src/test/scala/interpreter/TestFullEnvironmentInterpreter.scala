@@ -730,12 +730,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " world for an expanding subset" in {
+    val tuesdayResponse = TaggedObject(
+      UIdentifier("TUE"),
+      IdentifierT
+    )
+
     testCodeScript(Vector(
       CodeExpectation("ver idChange = new Table(ExpandingSubset(Identifier), Identifier)", GeneralSuccessCheck),
       CodeExpectation("update idChange (Monday, MON)", GeneralSuccessCheck),
       CodeExpectation("update idChange (Tuesday, TUE)", GeneralSuccessCheck),
       CodeExpectation("update idChange (Wednesday, WED)", GeneralSuccessCheck),
-      CodeExpectation("idChange Tuesday", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, Index(10))))),
+      CodeExpectation("idChange Tuesday", SuccessCheck(ExpOnlyEnvironmentCommand(tuesdayResponse))),
       CodeExpectation("idChange Thursday", FailureCheck)
     ))
   }

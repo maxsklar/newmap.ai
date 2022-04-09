@@ -338,15 +338,7 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          _ = println(s"tableT: $tableT -- commnad: $command")
-          _ = println(s"keyExpansionCommandT: $keyExpansionCommandT")
-          _ = println(s"keyExpansionCommand: $keyExpansionCommand")
-          _ = println(s"updateKeyTypeResponse: $updateKeyTypeResponse")
-          _ = println(s"valueExpansionCommand: $valueExpansionCommand")
-          _ = println(s"newTableType: $newTableType")
-          _ = println(s"mapValues: $mapValues")
-
-          updateKeyUntagged <- removeTypeTag(keyExpansionCommand)
+          updateKeyUntagged <- removeTypeTag(updateKeyTypeResponse.output)
 
           newMapping = ObjectPattern(updateKeyUntagged) -> ObjectExpression(valueExpansionCommand)
 
@@ -391,7 +383,7 @@ object Evaluator {
               // TODO - eventually the output will be different (set of new items??)
               UpdateVersionedOResponse(
                 retagObject(result.newState, ExpandingSubsetT(parentType)),
-                NewMapO.emptyStruct
+                command
               )
             }
           }
@@ -593,7 +585,7 @@ object Evaluator {
     (funcC, inputC) match {
       case (TaggedObject(UMap(values), nType), _) => {
         stripVersioning(nType, env) match {
-          case TableT(_, _) => {
+          case tableT@TableT(_, _) => {
             attemptPatternMatchInOrder(values, inputC, env) match {
               case Success(x) => Success(x)
               case Failure(PatternMatchErrorType(message, _)) => Failure(message)

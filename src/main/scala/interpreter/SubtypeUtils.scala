@@ -169,11 +169,6 @@ object SubtypeUtils {
     for {
       isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
 
-      _ = if (!isConvertible) {
-        println(Evaluator.stripVersioning(requestedType, env))
-        //(world: 1\OrBooleanT, hello: 1\OrBooleanT)\ExpandingSubsetT(Identifier)
-      } else ()
-
       _ <- Outcome.failWhen(
         !isConvertible,
         s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
@@ -259,6 +254,9 @@ object SubtypeUtils {
       case (_, AnyT) => Success(true)
       case (CountT, TypeT) => Success(true)
       case (ExpandingSubsetT(_), TypeT) => Success(true)
+      case (TaggedObject(_, ExpandingSubsetT(parentType)), _) => {
+        isTypeConvertible(parentType, endingType, env)
+      }
       //case (TableT(_, _), TypeT) => Success(true) // TODO: Do we need this? We might!
       case (_, SubtypeT(isMember)) => {
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
@@ -268,6 +266,8 @@ object SubtypeUtils {
           canConvertToParentType <- isObjectConvertibleToType(startingObject, subtypeInputType, env)
           //convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)          
           _ <- Outcome.failWhen(!canConvertToParentType, "Cannot convert to parent type")
+
+          // THIS WHOLE PART BELOW - FIND A WAY TO REMOVE IT
 
           // If not evaluated, we can't check for membership
           // TODO: What if this is a complex function?
