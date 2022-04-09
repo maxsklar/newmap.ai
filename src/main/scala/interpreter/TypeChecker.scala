@@ -101,13 +101,15 @@ object TypeChecker {
           }
         }
       }
-      case ApplyParse(startingFunction: ParseTree, input: ParseTree) => {
+      case ApplyParse(function, input) => {
         for {
-          // TODO: create a typeCheckFunction to handle this specifically
-          functionTypeChecked <- typeCheck(startingFunction, AnyT, env, featureSet)
+          // TODO: Build a specialize type check for maps?
+          functionTypeChecked <- typeCheck(function, AnyT, env, featureSet)
 
-          functionFeatureSet = RetrieveType.retrieveFeatureSetFromFunction(functionTypeChecked, env)
           inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked, env)
+
+          inputValue <- typeCheck(input, inputType, env, featureSet)
+          functionFeatureSet = RetrieveType.retrieveFeatureSetFromFunction(functionTypeChecked, env)
 
           // Validate that this is allowed from the feature set
           _ <- Outcome.failWhen(
@@ -122,40 +124,33 @@ object TypeChecker {
             s"Function $functionTypeChecked is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet"
           )
 
-          inputValue <- typeCheck(input, inputType, env, featureSet)
-        } yield ApplyFunction(functionTypeChecked, inputValue)
-      }
-      case FieldAccessParse(struct, field) => {
-        for {
-          // TODO - build a specialize typeCheck where you expect a struct?
-          typeCheckedStruct <- typeCheck(struct, AnyT, env, featureSet)
+          // If the function is actually a struct, and we're trying to get a field out of it,
+          //  then we really have to know the params - a function that attached field names to field type
+          //  and later check that it all lines up
+          needToEvaluateParams = functionTypeChecked match {
+            case ObjectExpression(TaggedObject(value, StructT(params))) => Some(params)
+            case ObjectExpression(CaseT(cases)) => Some(cases)
+            case _ => None
+          }
 
-          evaluatedStruct <- Evaluator(typeCheckedStruct, env)
+          isConvertible <- needToEvaluateParams match {
+            case None => Success(true)
+            case Some(structParams) => {
+              for {
+                // Field must be fully evaluated
+                evaluatedField <- Evaluator(inputValue, env)
 
-          // TODO - can this actually be an expression, not just an object??
-          structParams <- Evaluator.stripVersioning(evaluatedStruct, env) match {
-            case TaggedObject(value, StructT(params)) => Success(params)
-            case CaseT(cases) => Success(cases)
-            case _ => {
-              Failure(s"Attempting to access field object $evaluatedStruct which is not a struct instance")
+                // Make sure that this field actually exists
+                resultingType <- Evaluator.applyFunctionAttempt(structParams, evaluatedField, env)
+
+                isConv <- SubtypeUtils.isTypeConvertible(resultingType, expectedType, env)
+              } yield isConv
             }
           }
 
-          fieldsT = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(structParams), env)
-
-          typeCheckedField <- typeCheck(field, fieldsT, env, featureSet)
-
-          // Field must be fully evaluated
-          evaluatedField <- Evaluator(typeCheckedField, env)
-
-          // Make sure that this field actually exists
-          resultingType <- Evaluator.applyFunctionAttempt(structParams, evaluatedField, env)
-
-          isConvertible <- SubtypeUtils.isTypeConvertible(resultingType, expectedType, env)
-
-          _ <- Outcome.failWhen(!isConvertible, s"Function result error: $resultingType not convertible to $expectedType")
+          _ <- Outcome.failWhen(!isConvertible, s"Function result error: ResultingType of $functionTypeChecked $inputValue not convertible to $expectedType")
         } yield {
-          ApplyFunction(typeCheckedStruct, ObjectExpression(evaluatedField))
+          ApplyFunction(functionTypeChecked, inputValue)
         }
       }
       case CommandList(values: Vector[ParseTree]) => {

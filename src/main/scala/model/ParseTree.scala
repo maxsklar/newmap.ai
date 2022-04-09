@@ -26,11 +26,6 @@ case class ApplyParse(
   input: ParseTree
 ) extends ParseTree
 
-case class FieldAccessParse(
-  struct: ParseTree,
-  field: ParseTree
-) extends ParseTree
-
 case class LambdaParse(
   params: ParseTree,
   expression: ParseTree

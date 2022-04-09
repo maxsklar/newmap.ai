@@ -245,7 +245,7 @@ class TestParser extends FlatSpec {
     )
     assert(NewMapParser(tokens) == Success(
       BindingCommandItem(
-        FieldAccessParse(IdentifierParse("Object"), IdentifierParse("getId")),
+        ApplyParse(IdentifierParse("Object"), IdentifierParse("getId")),
         NaturalNumberParse(5)
       )
     ))
@@ -256,8 +256,19 @@ class TestParser extends FlatSpec {
 
     assert(NewMapParser(tokens) == Success(
       ApplyParse(
-        FieldAccessParse(IdentifierParse("a"), IdentifierParse("b")),
+        ApplyParse(IdentifierParse("a"), IdentifierParse("b")),
         IdentifierParse("c")
+      )
+    ))
+  }
+
+  it should " take precedence over function application 2" in {
+    val tokens = Vector(Identifier("a"), Identifier("b"), Period(), Identifier("c"))
+
+    assert(NewMapParser(tokens) == Success(
+      ApplyParse(
+        IdentifierParse("a"),
+        ApplyParse(IdentifierParse("b"), IdentifierParse("c")),
       )
     ))
   }

@@ -75,6 +75,8 @@ object RetrieveType {
         case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
           SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap)))
         }
+        case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunction(ObjectExpression(params), env)
+        case CaseT(cases) => retrieveInputTypeFromFunction(ObjectExpression(cases), env)
         case _ => {
           Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
             case MapT(inputType, _, _, _) => inputType
@@ -92,12 +94,24 @@ object RetrieveType {
   }
 
   def retrieveFeatureSetFromFunction(nFunction: NewMapExpression, env: Environment): MapFeatureSet = {
-    val typeOfFunction = this(nFunction, env)
-    val typeOfFunctionC = Evaluator.stripVersioning(typeOfFunction, env)
-    typeOfFunctionC match {
-      case MapT(_, _, _, featureSet) => featureSet
-      case TableT(_, _) => SimpleFunction
-      case other => throw new Exception(s"Couldn't retrieve feature set from $typeOfFunctionC -- $other")
+    nFunction match {
+      // TODO - again this CaseT exception is really looking ugly!!!
+      case ObjectExpression(CaseT(cases)) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
+      case ObjectExpression(VersionedObjectLink(key, status)) => {
+        val currentState = Evaluator.currentState(key.uuid, env).toOption.get
+        retrieveFeatureSetFromFunction(ObjectExpression(currentState), env)
+      }
+      case _ => {
+        val typeOfFunction = this(nFunction, env)
+        val typeOfFunctionC = Evaluator.stripVersioning(typeOfFunction, env)
+        typeOfFunctionC match {
+          case MapT(_, _, _, featureSet) => featureSet
+          case TableT(_, _) => SimpleFunction
+          case StructT(params) => retrieveFeatureSetFromFunction(ObjectExpression(params), env)
+          case CaseT(cases) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
+          case other => throw new Exception(s"Couldn't retrieve feature set from $nFunction $typeOfFunctionC -- $other")
+        }
+      }
     }
   }
 
@@ -208,62 +222,5 @@ object RetrieveType {
       case TaggedObject(_, nType) => true
       case VersionedObjectLink(_, status) => (status == KeepThisVersion)
     }
-  }
-
-  def isMapConstant(
-    mapValues: Vector[(NewMapPattern, NewMapExpression)]
-  ): Boolean = {
-    mapValues match {
-      case (pattern, expression) +: restOfMapValues => {
-        isPatternConstant(pattern) && isExpressionConstant(expression) && isMapConstant(restOfMapValues)
-      }
-      case _ => true
-    }
-  }
-
-  def isPatternConstant(nPattern: NewMapPattern): Boolean = nPattern match {
-    case ObjectPattern(o) => {
-      true
-      //isTermConstant(o)
-    }
-    case TypePattern(name, nType) => {
-      isTermConstant(nType)
-    }
-    case StructPattern(params) => {
-      params match {
-        case param +: restOfParams => {
-          isPatternConstant(param) && isPatternConstant(StructPattern(restOfParams))
-        }
-        case _ => true
-      }
-    }
-    case CasePattern(_, input) => {
-      isPatternConstant(input)
-    }
-  }
-
-  def isExpressionConstant(nExpression: NewMapExpression): Boolean = nExpression match {
-    case ObjectExpression(obj) => isTermConstant(obj)
-    case ParamId(name) => true
-    case ApplyFunction(func, input) => {
-      isExpressionConstant(func) &&
-        isExpressionConstant(input)
-    }
-    case BuildCase(constructor, input, caseT) => {
-      isTermConstant(constructor) && isExpressionConstant(input) && isTermConstant(caseT)
-    }
-    case BuildMapT(inputType, outputType, _, _) => {
-      isExpressionConstant(inputType) && isExpressionConstant(outputType)
-    }
-    case BuildTableT(keyType, requiredValues) => {
-      isExpressionConstant(keyType) && isExpressionConstant(requiredValues)
-    }
-    case BuildExpandingSubsetT(parentType) => {
-      isExpressionConstant(parentType)
-    }
-    case BuildSubtypeT(isMember) => isExpressionConstant(isMember)
-    case BuildCaseT(cases) => isExpressionConstant(cases)
-    case BuildStructT(params) => isExpressionConstant(params)
-    case BuildMapInstance(values, mapT) => isMapConstant(values) && isTermConstant(mapT)
   }
 }
