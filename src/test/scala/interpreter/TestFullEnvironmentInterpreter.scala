@@ -676,27 +676,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "Tables " should " be allowed to be created" in {
-    testCodeScript(Vector(
-      CodeExpectation("ver n = new Table(Count, Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update n hello", GeneralSuccessCheck),
-      CodeExpectation("update n world", GeneralSuccessCheck),
-      CodeExpectation("n", GeneralSuccessCheck),
-      CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("world")))),
-    ))
-  }
-
-  it should " have a Sequence shortcut if they are based on a count" in {
-    testCodeScript(Vector(
-      CodeExpectation("ver n = new Sequence(10)", GeneralSuccessCheck),
-      CodeExpectation("update n 2", GeneralSuccessCheck),
-      CodeExpectation("update n 7", GeneralSuccessCheck),
-      CodeExpectation("update n 5", GeneralSuccessCheck),
-      CodeExpectation("n 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, Index(10))))),
-      CodeExpectation("n 3", FailureCheck)
-    ))
-  }
-
   "Expanding Subsets " should " work for indecies" in {
     testCodeScript(Vector(
       CodeExpectation("ver ID = new ExpandingSubset(10)", GeneralSuccessCheck),
@@ -726,6 +705,38 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update ID world", GeneralSuccessCheck),
       CodeExpectation("val x: ID = hello", GeneralSuccessCheck),
       CodeExpectation("val y: ID = hi", FailureCheck)
+    ))
+  }
+
+  "Tables " should " be allowed to be created" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Table(Count, Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update n hello", GeneralSuccessCheck),
+      CodeExpectation("update n world", GeneralSuccessCheck),
+      CodeExpectation("n", GeneralSuccessCheck),
+      CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("world")))),
+    ))
+  }
+
+  it should " have a Sequence shortcut if they are based on a count" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver n = new Sequence(10)", GeneralSuccessCheck),
+      CodeExpectation("update n 2", GeneralSuccessCheck),
+      CodeExpectation("update n 7", GeneralSuccessCheck),
+      CodeExpectation("update n 5", GeneralSuccessCheck),
+      CodeExpectation("n 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, Index(10))))),
+      CodeExpectation("n 3", FailureCheck)
+    ))
+  }
+
+  it should " world for an expanding subset" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver idChange = new Table(ExpandingSubset(Identifier), Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update idChange (Monday, MON)", GeneralSuccessCheck),
+      CodeExpectation("update idChange (Tuesday, TUE)", GeneralSuccessCheck),
+      CodeExpectation("update idChange (Wednesday, WED)", GeneralSuccessCheck),
+      CodeExpectation("idChange Tuesday", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, Index(10))))),
+      CodeExpectation("idChange Thursday", FailureCheck)
     ))
   }
 

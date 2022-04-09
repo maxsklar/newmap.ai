@@ -97,7 +97,10 @@ object Evaluator {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
       case VersionedObjectLink(_, _) => Failure("Can't remove type tage from versioned object link")
-      case _ => Failure("Can't yet remove type tage from typed object (once types are redefined as a case it'll be possible)")
+      case _ => {
+        throw new Exception(s"Can't remove type tag from $nObject")
+        Failure("Can't yet remove type tag from typed object (once types are redefined as a case it'll be possible)")
+      }
     }
   }
 
@@ -335,7 +338,15 @@ object Evaluator {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          updateKeyUntagged <- removeTypeTag(updateKeyTypeResponse.output)
+          _ = println(s"tableT: $tableT -- commnad: $command")
+          _ = println(s"keyExpansionCommandT: $keyExpansionCommandT")
+          _ = println(s"keyExpansionCommand: $keyExpansionCommand")
+          _ = println(s"updateKeyTypeResponse: $updateKeyTypeResponse")
+          _ = println(s"valueExpansionCommand: $valueExpansionCommand")
+          _ = println(s"newTableType: $newTableType")
+          _ = println(s"mapValues: $mapValues")
+
+          updateKeyUntagged <- removeTypeTag(keyExpansionCommand)
 
           newMapping = ObjectPattern(updateKeyUntagged) -> ObjectExpression(valueExpansionCommand)
 

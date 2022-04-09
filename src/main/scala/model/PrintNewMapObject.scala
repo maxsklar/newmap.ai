@@ -92,8 +92,21 @@ object PrintNewMapObject {
         "\\(" + key + ": " + value + ")"
       }
       case _ => {
+        val completenessStr = completeness match {
+          case RequireCompleteness => "Required"
+          case CommandOutput => "Command"
+          case SubtypeInput => "SubtypeInput"
+        }
+
+        val featureSetStr = featureSet match {
+          case BasicMap => "BasicMap"
+          case SimpleFunction => "Simple"
+          case WellFoundedFunction => "WellFounded"
+          case FullFunction => "FullFunction"
+        }
+
         // TODO(2022): Improve Notation so that we don't need this!
-        "SpecialMap(" + key + ", " + value + ", " + completeness + ", " + featureSet + ")"
+        "Map(" + key + ", " + value + ", " + completenessStr + ", " + featureSetStr + ")"
       }  
     }
   }

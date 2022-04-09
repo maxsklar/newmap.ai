@@ -57,7 +57,42 @@ object TypeChecker {
         }
 
         if (expectingAnIdentifier) {
-          Success(ObjectExpression(TaggedObject(UIdentifier(s), expectedType)))
+          val obj = TaggedObject(UIdentifier(s), expectedType)
+
+          Evaluator.stripVersioning(expectedType, env) match {
+            case IdentifierT => Success(ObjectExpression(NewMapO.identifier(s)))
+            case SubtypeT(isMember) => {
+              for {
+                result <- Evaluator.applyFunctionAttempt(isMember, obj, env)
+
+                // TODO: the positive condition won't always be UIndex(1)
+                isAllowed = result match {
+                  case TaggedObject(UIndex(1), _) => true
+                  case _ => false
+                }
+
+                _ <- Outcome.failWhen(!isAllowed, s"identifier $s not in subtype $expectedType")
+              } yield ObjectExpression(obj)
+            }
+            case TaggedObject(umap, ExpandingSubsetT(parentType)) => {
+              for {
+                result <- Evaluator.applyFunctionAttempt(
+                  TaggedObject(umap, MapT(parentType, OrBooleanT, CommandOutput, BasicMap)),
+                  TaggedObject(UIdentifier(s), parentType),
+                  env
+                )
+
+                // TODO: the positive condition won't always be UIndex(1)
+                isAllowed = result match {
+                  case TaggedObject(UIndex(1), _) => true
+                  case _ => false
+                }
+
+                _ <- Outcome.failWhen(!isAllowed, s"identifier $s not in subtype $expectedType")
+              } yield ObjectExpression(obj)
+            }
+            case _ => Failure(s"Can't convert identifier $s to type $expectedType")
+          }
         } else env.lookup(s) match {
           case Some(EnvironmentValue(_, ParameterStatus)) => Success(ParamId(s))
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(ObjectExpression(nObject))

@@ -169,6 +169,11 @@ object SubtypeUtils {
     for {
       isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
 
+      _ = if (!isConvertible) {
+        println(Evaluator.stripVersioning(requestedType, env))
+        //(world: 1\OrBooleanT, hello: 1\OrBooleanT)\ExpandingSubsetT(Identifier)
+      } else ()
+
       _ <- Outcome.failWhen(
         !isConvertible,
         s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
@@ -246,6 +251,9 @@ object SubtypeUtils {
   ): Outcome[Boolean, String] = {
     val startingType = RetrieveType(startingObject, env)
 
+    //STARTING TYPE: I
+    //ENDING TYPE: (world: 1\OrBooleanT, hello: 1\OrBooleanT)\ExpandingSubsetT(Identifier)
+
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(true)
       case (_, AnyT) => Success(true)
@@ -277,6 +285,9 @@ object SubtypeUtils {
           isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
           _ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
         } yield true
+      }
+      case (_, TaggedObject(_, ExpandingSubsetT(_))) => {
+        Failure(s"A) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
         MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
@@ -361,6 +372,25 @@ object SubtypeUtils {
       ) if (uuid == uuid2) && (status2 == KeepUpToDate) => {
         // Take advantage of the fact that types are backwards compatible
         Success(true)
+      }
+      case (
+        VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
+        _
+      ) => {
+        Evaluator.stripVersioning(startingType, env) match {
+          case TaggedObject(UMap(_), ExpandingSubsetT(parentType)) => {
+            isTypeConvertible(parentType, endingType, env)
+          }
+          case _ => {
+            Failure(s"B) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
+          }
+        }
+      }
+      case (
+        _,
+        VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status)
+      ) => {
+        Failure(s"C) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
       }
       case _ => Success(false)
     }
