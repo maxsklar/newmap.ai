@@ -14,11 +14,6 @@ case class ApplyFunction(
   input: NewMapExpression
 ) extends NewMapExpression
 
-case class AccessField(
-  struct: NewMapExpression, // This must be an object that has fields (StructInstance, CaseT)
-  input: NewMapObject // Note - input must be literal and free of parameters (might be able to do this with scala's type systen)
-) extends NewMapExpression
-
 case class BuildCase(
   constructor: NewMapObject,
   input: NewMapExpression,

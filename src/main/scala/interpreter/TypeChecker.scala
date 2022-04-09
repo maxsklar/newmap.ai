@@ -150,8 +150,12 @@ object TypeChecker {
 
           // Make sure that this field actually exists
           resultingType <- Evaluator.applyFunctionAttempt(structParams, evaluatedField, env)
+
+          isConvertible <- SubtypeUtils.isTypeConvertible(resultingType, expectedType, env)
+
+          _ <- Outcome.failWhen(!isConvertible, s"Function result error: $resultingType not convertible to $expectedType")
         } yield {
-          AccessField(typeCheckedStruct, evaluatedField)
+          ApplyFunction(typeCheckedStruct, ObjectExpression(evaluatedField))
         }
       }
       case CommandList(values: Vector[ParseTree]) => {

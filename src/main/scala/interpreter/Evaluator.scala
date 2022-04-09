@@ -21,12 +21,6 @@ object Evaluator {
           result
         }
       }
-      case AccessField(struct, field) => {
-        for {
-          evalStruct <- this(struct, env)
-          result <- accessFieldAttempt(evalStruct, field, env)
-        } yield result
-      }
       case ParamId(s) => {
         env.lookup(s) match {
           case None => Failure(s"Unbound identifier: $s")
@@ -287,8 +281,8 @@ object Evaluator {
       }
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
         for {
-          input <- accessFieldAttempt(command, Index(0), env)
-          commandForInput <- accessFieldAttempt(command, Index(1), env)
+          input <- applyFunctionAttempt(command, Index(0), env)
+          commandForInput <- applyFunctionAttempt(command, Index(1), env)
 
           currentResultForInput <- applyFunctionAttempt(current, input, env)
 
@@ -321,8 +315,8 @@ object Evaluator {
             }
             case _ => {
               for {
-                keyField <- accessFieldAttempt(command, Index(0), env)
-                valueField <- accessFieldAttempt(command, Index(1), env)
+                keyField <- applyFunctionAttempt(command, Index(0), env)
+                valueField <- applyFunctionAttempt(command, Index(1), env)
               } yield (keyField, valueField)
             }
           }
@@ -395,8 +389,8 @@ object Evaluator {
           case CaseT(TaggedObject(UMap(values), mapT)) => {
             // General map, adding a case
             for {
-              newCaseName <- accessFieldAttempt(command, Index(0), env)
-              newCaseInputType <- accessFieldAttempt(command, Index(1), env)
+              newCaseName <- applyFunctionAttempt(command, Index(0), env)
+              newCaseInputType <- applyFunctionAttempt(command, Index(1), env)
 
               newCaseNameUntagged <- removeTypeTag(newCaseName)
               newMapValues = (ObjectPattern(newCaseNameUntagged) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseNameUntagged))
@@ -521,39 +515,6 @@ object Evaluator {
     }
   }
 
-  // Assume that this is type checked so the field should exist in the struct
-  // TODO - I believe this can be merged with apply function attempt!!!
-  def accessFieldAttempt(
-    struct: NewMapObject,
-    field: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapObject, String] = {
-    stripVersioning(struct, env) match {
-      case TaggedObject(UMap(value), StructT(_)) => {
-        attemptPatternMatchInOrder(value, field, env) match {
-          case Success(x) => Success(x)
-          case Failure(PatternMatchErrorType(message, isEvaluationError)) => Failure(message)
-        }
-      }
-      case CaseT(cases) => {
-        for {
-          result <- applyFunctionAttempt(cases, field, env)
-        } yield {
-          val caseInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
-
-          // WHAT TO DO HERE!!!
-          TaggedObject(
-            UMap(Vector(
-              TypePattern("input", result) -> BuildCase(field, ParamId("input"), struct)
-            )),
-            MapT(result, struct, RequireCompleteness, SimpleFunction)
-          )
-        }
-      }
-      case _ => Failure(s"Unable to access fields from $struct because it is not a struct")
-    }
-  }
-
   def expressionListToObjects(
     nExpressions: Vector[NewMapExpression],
     env: Environment
@@ -585,12 +546,6 @@ object Evaluator {
     (funcC, inputC) match {
       case (TaggedObject(UMap(values), nType), _) => {
         stripVersioning(nType, env) match {
-          case tableT@TableT(_, _) => {
-            attemptPatternMatchInOrder(values, inputC, env) match {
-              case Success(x) => Success(x)
-              case Failure(PatternMatchErrorType(message, _)) => Failure(message)
-            }
-          }
           case MapT(keyType, _, SubtypeInput, _) => {
             // We have a bit of a problem with the subtype input, because the map patterns are tagged with the PARENT TYPE
             // And the inputC is tagged with the SubType
@@ -647,7 +602,27 @@ object Evaluator {
               keyMatchResult
             }
           }
-          case _ => Failure(s"Cannot apply function of type $nType") 
+          case _ => {            
+            attemptPatternMatchInOrder(values, inputC, env) match {
+              case Success(x) => Success(x)
+              case Failure(PatternMatchErrorType(message, _)) => Failure(message)
+            }
+            //Failure(s"Cannot apply function of type $nType")
+          }
+        }
+      }
+      case (CaseT(cases), field) => {
+        // Accessing constructors from case type
+        // TODO - do we really want to do it this way?
+        for {
+          result <- applyFunctionAttempt(cases, field, env)
+        } yield {
+          TaggedObject(
+            UMap(Vector(
+              TypePattern("input", result) -> BuildCase(field, ParamId("input"), func)
+            )),
+            MapT(result, func, RequireCompleteness, SimpleFunction)
+          )
         }
       }
       case (IsCommandFunc, nObject) => {

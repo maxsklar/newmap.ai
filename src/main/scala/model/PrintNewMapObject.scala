@@ -49,7 +49,6 @@ object PrintNewMapObject {
     case ApplyFunction(func, input) => {
       printExpression(func) + " " + printExpression(input)
     }
-    case AccessField(struct, field) => s"${printExpression(struct)}.${this(field)}"
     case ParamId(name) => s"$name~pi"
     case BuildCase(constructor, input, caseType) => {
       this(caseType) + "." + this(constructor) + " " + printExpression(input)

@@ -23,12 +23,6 @@ object MakeSubstitution {
           this(input, parameters, env)
         )
       }
-      case AccessField(struct, field) => {
-        AccessField(
-          this(struct, parameters, env),
-          field
-        )
-      }
       case ParamId(name) => {
         parameters.get(name) match {
           case Some(obj) => ObjectExpression(obj)

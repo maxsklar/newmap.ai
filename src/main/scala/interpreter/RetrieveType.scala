@@ -8,37 +8,15 @@ object RetrieveType {
   def apply(nExpression: NewMapExpression, env: Environment): NewMapObject = nExpression match {
     case ObjectExpression(nObject) => fromNewMapObject(nObject, env)
     case ApplyFunction(func, input) => {
-      val typeOfFunction = this(func, env)
-      retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-    }
-    case AccessField(objectWithField, field) => {
-      objectWithField match {
-        case ObjectExpression(nObject) => Evaluator.stripVersioning(nObject, env) match {
-          case TaggedObject(_, StructT(params)) => {
-            // Field should be evaluated automatically (must be closed literal)
-            // TODO - do we need to evaluate the params first - or will it be evaluated already?
-            Evaluator.applyFunctionAttempt(params, field, env) match {
-              case Success(value) => value
-              case Failure(s) => {
-                throw new Exception(s"Field access retrieve type is poorly implemented!! $params -- $field -- $s")
-              }
-            }
-          }
-          case CaseT(values) => {
-            Evaluator.applyFunctionAttempt(values, field, env) match {
-              case Success(value) => MapT(value, nObject, RequireCompleteness, SimpleFunction)
-              case Failure(s) => {
-                throw new Exception(s"Field access retrieve type is poorly implemented for case!! $values -- $field -- $s")
-              }
-            }
-          }
-        case _ => throw new Exception(s"This access of object $objectWithField with field $field is not allowed")
+      // TODO - merge these options soon
+      retrieveOutputTypeFromStruct(func, input, env) match {
+        case Success(t) => t
+        case Failure(_) => {
+          val typeOfFunction = this(func, env)
+          retrieveOutputTypeFromFunctionType(typeOfFunction, env) 
         }
-        // TODO - what if it's a different expression, but comes out to a struct, case, etc
-        case _ => throw new Exception(s"This access of $objectWithField with field $field is not allowed")
       }
     }
-    // TODO - unsafe get!!
     case ParamId(name) => {
       env.lookup(name) match {
         case None => throw new Exception(s"Attempted to retrieve type from an id that doesn't exist $name")
@@ -115,10 +93,11 @@ object RetrieveType {
 
   def retrieveFeatureSetFromFunction(nFunction: NewMapExpression, env: Environment): MapFeatureSet = {
     val typeOfFunction = this(nFunction, env)
-    Evaluator.stripVersioning(typeOfFunction, env) match {
+    val typeOfFunctionC = Evaluator.stripVersioning(typeOfFunction, env)
+    typeOfFunctionC match {
       case MapT(_, _, _, featureSet) => featureSet
       case TableT(_, _) => SimpleFunction
-      case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
+      case other => throw new Exception(s"Couldn't retrieve feature set from $typeOfFunctionC -- $other")
     }
   }
 
@@ -131,6 +110,30 @@ object RetrieveType {
         retrieveOutputTypeFromFunctionType(currentState, env)
       }
       case _ => throw new Exception(s"Couldn't retrieve output type from $nType")
+    }
+  }
+
+  def retrieveOutputTypeFromStruct(structValue: NewMapExpression, field: NewMapExpression, env: Environment): Outcome[NewMapObject, String] = {
+    structValue match {
+      case ObjectExpression(nObject) => Evaluator.stripVersioning(nObject, env) match {
+        case TaggedObject(_, StructT(params)) => {
+          // Field should be evaluated automatically (must be closed literal)
+          // TODO - do we need to evaluate the params first - or will it be evaluated already?
+          for {
+            eField <- Evaluator(field, env)
+            result <- Evaluator.applyFunctionAttempt(params, eField, env)
+          } yield result
+        }
+        case CaseT(values) => {
+          for {
+            eField <- Evaluator(field, env)
+            result <- Evaluator.applyFunctionAttempt(values, eField, env)
+          } yield MapT(result, nObject, RequireCompleteness, SimpleFunction)
+        }
+        case _ => Failure(s"This access of object $structValue with field $field is not allowed")
+      }
+      // TODO - what if it's a different expression, but comes out to a struct, case, etc
+      case _ => Failure(s"This access of $structValue with field $field is not allowed")
     }
   }
 
@@ -157,7 +160,6 @@ object RetrieveType {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
     }
-    case AccessField(struct, input) => isTermClosedLiteral(struct, knownVariables)
     case BuildCase(_, input, _) => isTermClosedLiteral(input, knownVariables)
     case BuildMapT(inputType, outputType, _, _) => {
       isTermClosedLiteral(inputType, knownVariables) &&
@@ -247,7 +249,6 @@ object RetrieveType {
       isExpressionConstant(func) &&
         isExpressionConstant(input)
     }
-    case AccessField(struct, input) => isExpressionConstant(struct) && isTermConstant(input)
     case BuildCase(constructor, input, caseT) => {
       isTermConstant(constructor) && isExpressionConstant(input) && isTermConstant(caseT)
     }
