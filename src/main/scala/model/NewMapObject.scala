@@ -22,16 +22,8 @@ case object IsCommandFunc extends NewMapObject
 // Temporary for now, this should be buildable as a map pattern in the future
 case object IsSimpleFunction extends NewMapObject
 
-case object IsVersionedFunc extends NewMapObject
-
-case object IsConstantFunc extends NewMapObject
-
 // A basic function to increment a count
 case object IncrementFunc extends NewMapObject
-
-// Input: a Type
-// Output: Is this a "subtype" of another construction
-case object IsSubtypeFunc extends NewMapObject
 
 /*
  * The types in the NewMap Language
@@ -90,6 +82,13 @@ object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only sim
 object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
 object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
 
+// Each map has a distinct mode:
+// StandardMode:
+sealed abstract class MapMode
+object StandardMode extends MapMode // There is a single output type
+object GenericMode extends MapMode // The output type depends on the input type
+object StructMode extends MapMode // The output type depends on the specific input
+
 // TypeClass
 // defines some structure on a type
 // preservation rules preserve this structure!!
@@ -146,6 +145,9 @@ object KeepThisVersion extends VersionedObjectStatus
 //def uuid = java.util.UUID.randomUUID
 
 /*
+
+Is this applied to types??
+
 case class TypeParameter(
   name: String,
   upperBounds: Vector[NewMapObject] = Vector.empty,
@@ -172,8 +174,6 @@ object NewMapO {
   // - This will be replaced once we get Map Type patterns working properly
   // - Created for now to get Subtype working properly, so that we can move on
   def simpleFunctionT: NewMapObject = SubtypeT(IsSimpleFunction)
-
-  def versionedT: NewMapObject = SubtypeT(IsVersionedFunc)
 
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 

@@ -26,7 +26,8 @@ object Evaluator {
           case None => Failure(s"Unbound identifier: $s")
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(nObject)
           case Some(EnvironmentValue(nObject, ParameterStatus)) => {
-            Failure("sCannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
+            throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
+            Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
           }
         }
       }
@@ -241,11 +242,6 @@ object Evaluator {
     }
   }
 
-  def retagPattern(nPattern: NewMapPattern, newTypeTag: NewMapObject): NewMapPattern = nPattern match {
-    case ObjectPattern(nObject) => ObjectPattern(nObject)
-    case _ => nPattern
-  }
-
   def updateVersionedO(
     current: NewMapObject,
     command: NewMapObject,
@@ -338,11 +334,10 @@ object Evaluator {
 
           prepNewValues = for {
             value <- mapValues
-            retaggedPattern = retagPattern(value._1, updateKeyTypeResponse.newState)
 
             // Remove old value
-            if (retaggedPattern != ObjectPattern(updateKeyUntagged))
-          } yield (retaggedPattern -> value._2)
+            if (value._1 != ObjectPattern(updateKeyUntagged))
+          } yield (value._1 -> value._2)
 
           newMapValues = newMapping +: prepNewValues
         } yield UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), newTableType), NewMapO.emptyStruct)
@@ -630,22 +625,6 @@ object Evaluator {
 
         Success(Index(if (isCommand) 1 else 0))
       }
-      case (IsVersionedFunc, nObject) => Success(
-        nObject match {
-          case VersionedObjectLink(_, _) => Index(1)
-          case _ => Index(0)
-        }
-      )
-      case (IsConstantFunc, nObject) => Success(
-        // TODO - I'm not sure this should even be in here -
-        //  whether a term is constant should be hidden!
-        // Oh well - let's see if we can remove in the future
-        if (RetrieveType.isTermConstant(nObject)) {
-          Index(1)
-        } else {
-          Index(0)
-        }
-      )
       case (IsSimpleFunction, nObject) => {
         nObject match {
           case TaggedObject(_, MapT(_, _, CommandOutput, features)) => {
@@ -657,12 +636,6 @@ object Evaluator {
           }
           case _ => Success(Index(0))
         }
-      }
-      case (IsSubtypeFunc, nObject) => {
-        nObject match {
-          case SubtypeT(_) => Success(Index(1))
-          case _ => Success(Index(0))
-        }        
       }
       case (IncrementFunc, TaggedObject(UIndex(i), nType)) => Success(TaggedObject(UIndex(i + 1), nType))
       case _ => {

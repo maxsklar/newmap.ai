@@ -80,8 +80,6 @@ case class Environment(
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty
 ) {
-  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
-
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
   }

@@ -187,7 +187,6 @@ object SubtypeUtils {
     }
     case SubtypeT(IsCommandFunc) => false
     case SubtypeT(IsSimpleFunction) => false
-    case SubtypeT(IsVersionedFunc) => false
     case _ => {
       // TODO: Is this appropriate - shouldn't it be false
       true

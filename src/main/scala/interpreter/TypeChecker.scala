@@ -386,6 +386,7 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
+
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         for {
@@ -400,16 +401,8 @@ object TypeChecker {
           tc <- typeCheck(valueObject, typeOfIdentifierObj, env, featureSet)
 
           substExp = MakeSubstitution(tc, newParams, env)
-          substObj <- Evaluator(substExp, env)
 
-          newEnv = paramId match {
-            case ObjectPattern(UIdentifier(s)) => {
-              env.newCommand(FullEnvironmentCommand(s, substObj))
-            }
-            case _ => env
-          }
-
-          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, newEnv, featureSet)
+          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, env, featureSet)
         } yield {
           (paramId, substExp) +: result
         }
@@ -419,17 +412,7 @@ object TypeChecker {
         for {
           typeOfIdentifierObj <- Evaluator(typeOfIdentifier, env)
           tc <- typeCheck(valueObject, typeOfIdentifierObj, env, featureSet)
-
-          valueObj <- Evaluator(tc, env)
-
-          newEnv = paramId match {
-            case ObjectPattern(UIdentifier(s)) => {
-              env.newCommand(FullEnvironmentCommand(s, valueObj))
-            }
-            case _ => env
-          }
-
-          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, newEnv, featureSet)
+          result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, env, featureSet)
         } yield {
           (paramId, tc) +: result
         }
