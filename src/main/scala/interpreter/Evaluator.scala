@@ -252,7 +252,11 @@ object Evaluator {
         current match {
           case TaggedObject(UIndex(i), _) => {
             for {
-              newState <- applyFunctionAttempt(IncrementFunc, current, env)
+              newState <- applyFunctionAttempt(
+                TaggedObject(IncrementFunc, MapT(CountT, CountT, RequireCompleteness, SimpleFunction)),
+                current,
+                env
+              )
             } yield UpdateVersionedOResponse(newState, TaggedObject(UIndex(i), newState))
           }
           case _ => {
@@ -620,12 +624,12 @@ object Evaluator {
           )
         }
       }
-      case (IsCommandFunc, nObject) => {
+      case (TaggedObject(IsCommandFunc, _), nObject) => {
         val isCommand: Boolean = getDefaultValueOfCommandType(nObject, env).isSuccess
 
         Success(Index(if (isCommand) 1 else 0))
       }
-      case (IsSimpleFunction, nObject) => {
+      case (TaggedObject(IsSimpleFunction, _), nObject) => {
         nObject match {
           case TaggedObject(_, MapT(_, _, CommandOutput, features)) => {
             if (features == SimpleFunction || features == BasicMap) {
@@ -637,7 +641,7 @@ object Evaluator {
           case _ => Success(Index(0))
         }
       }
-      case (IncrementFunc, TaggedObject(UIndex(i), nType)) => Success(TaggedObject(UIndex(i + 1), nType))
+      case (TaggedObject(IncrementFunc, _), TaggedObject(UIndex(i), nType)) => Success(TaggedObject(UIndex(i + 1), nType))
       case _ => {
         Failure(s"Not implemented: apply function\nCallable: $func\nInput: $input")
       }

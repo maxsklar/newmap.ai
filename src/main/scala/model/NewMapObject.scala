@@ -14,17 +14,6 @@ case class TaggedObject(
   nType: NewMapObject
 ) extends NewMapObject
 
-// This takes as input a member of TypeT and returns true if it's a member
-//  of the command typeclass (which means it has a default value and an update function)
-// TODO: making this a basic class is temporary for now
-case object IsCommandFunc extends NewMapObject
-
-// Temporary for now, this should be buildable as a map pattern in the future
-case object IsSimpleFunction extends NewMapObject
-
-// A basic function to increment a count
-case object IncrementFunc extends NewMapObject
-
 /*
  * The types in the NewMap Language
  * This is actually a subset of the Objects
@@ -168,12 +157,23 @@ object NewMapO {
   // - It has a command type
   // - You can give it commands to change the value
   // - You can potentially have versions available.
-  def commandT: NewMapObject = SubtypeT(IsCommandFunc)
+
+  def commandT: NewMapObject = SubtypeT(
+    TaggedObject(
+      IsCommandFunc,
+      MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+    )
+  )
 
   // This is a subtype of any, and will match every map that is a simple function (or basicMap)
   // - This will be replaced once we get Map Type patterns working properly
   // - Created for now to get Subtype working properly, so that we can move on
-  def simpleFunctionT: NewMapObject = SubtypeT(IsSimpleFunction)
+  def simpleFunctionT: NewMapObject = SubtypeT(
+    TaggedObject(
+      IsSimpleFunction,
+      MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+    )
+  )
 
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 

@@ -185,8 +185,14 @@ object SubtypeUtils {
       // Check that the function doesn't return the default value for any input
       doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
     }
-    case SubtypeT(IsCommandFunc) => false
-    case SubtypeT(IsSimpleFunction) => false
+    case SubtypeT(TaggedObject(
+      IsCommandFunc,
+      MapT(TypeT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
+    )) => false
+    case SubtypeT(TaggedObject(
+      IsSimpleFunction,
+      MapT(AnyT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
+    )) => false
     case _ => {
       // TODO: Is this appropriate - shouldn't it be false
       true
@@ -262,11 +268,19 @@ object SubtypeUtils {
 
         for {
           // 1: Check if startingObject is convertible to the inputType of isMember
-          canConvertToParentType <- isObjectConvertibleToType(startingObject, subtypeInputType, env)
-          //convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)          
-          _ <- Outcome.failWhen(!canConvertToParentType, "Cannot convert to parent type")
+          convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)
+
+          // HOW TO TELL IF THE starting type's members all are positive for isMember
+          // 1) If isMember of end covers parent, return true
+          // 3) If starttype Covers parent type, return false
+          // 2) Actually perform the conversion from starting type to parent type and loop through??
+
+          // This isn't great - but perhaps it works for now.
+          // Speedups: 1) Check for equality?
+          // 2) Caching?
 
           // THIS WHOLE PART BELOW - FIND A WAY TO REMOVE IT
+          // Code from isTypeConvertible should go here
 
           // If not evaluated, we can't check for membership
           // TODO: What if this is a complex function?
@@ -276,14 +290,29 @@ object SubtypeUtils {
           //   function (which could be some crazy infinite loop or fibonacci explosion crap)
           // Instead.. the function itself should have guarantees
           //evaluatedObject <- Evaluator(convertedObject, env)
-          evaluatedObject <- Evaluator(startingObject, env)
+          //evaluatedObject <- Evaluator(startingObject, env)
 
           //untaggedEvaluatedObject <- Evaluator.removeTypeTag(evaluatedObject)
 
           // 2: See if it's actually a member of the subtype
-          isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
-          _ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
-        } yield true
+          //isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
+          //_ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
+        } yield {
+          val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
+          doesEndtypeCoverParentType || ({
+            // End type does not cover parent type
+            // So, let's go through all the values of starting type (if we can) and see if we can brute force it
+            
+            val convertedOutcome = for {
+              convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)    
+              evaluatedObject <- Evaluator(convertedObject, env)
+              isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
+              _ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
+            } yield true
+
+            convertedOutcome.toOption.getOrElse(false)
+          })
+        }
       }
       case (_, TaggedObject(_, ExpandingSubsetT(_))) => {
         Failure(s"A) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")

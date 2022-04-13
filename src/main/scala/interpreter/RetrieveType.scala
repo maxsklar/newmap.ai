@@ -38,12 +38,9 @@ object RetrieveType {
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
     case CountT | TableT(_, _) | ExpandingSubsetT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
-    case IncrementFunc => MapT(CountT, CountT, RequireCompleteness, SimpleFunction)
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
-    case IsCommandFunc => MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
-    case IsSimpleFunction => MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
     case VersionedObjectLink(key, status) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
       fromNewMapObject(currentState, env)
@@ -207,7 +204,7 @@ object RetrieveType {
   // Ensures that the term is a constant
   def isTermConstant(nObject: NewMapObject): Boolean = {
     nObject match {
-      case IdentifierT | CountT | TypeT | AnyT | IncrementFunc | IsCommandFunc | IsSimpleFunction | OrBooleanT => true
+      case IdentifierT | CountT | TypeT | AnyT | OrBooleanT => true
       case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case TableT(expandingKeyType, requiredValues) => {
         isTermConstant(expandingKeyType) && isTermConstant(requiredValues)

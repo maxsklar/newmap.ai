@@ -269,8 +269,11 @@ object Environment {
     eCommand("Type", TypeT),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
-    eCommand("Increment", IncrementFunc),
-    eCommand("IsCommand", IsCommandFunc),
+    eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, RequireCompleteness, SimpleFunction))),
+    eCommand("IsCommand", TaggedObject(
+      IsCommandFunc,
+      MapT(TypeT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
+    )),
     eCommand("OrBoolean", OrBooleanT),
     eCommand("Sequence", TaggedObject(
       UMap(Vector(TypePattern("key", TypeT) -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),

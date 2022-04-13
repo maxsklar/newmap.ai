@@ -9,9 +9,6 @@ object PrintNewMapObject {
     case CountT => "Count"
     case TypeT => s"Type"
     case AnyT => s"Any"
-    case IsCommandFunc => s"IsCommandFunc"
-    case IsSimpleFunction => s"IsSimpleFunction"
-    case IncrementFunc => s"Increment"
     case IdentifierT => "Identifier"
     case OrBooleanT => "OrBooleanT"
     case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + this(nType)
@@ -112,6 +109,9 @@ object PrintNewMapObject {
     case UMap(values) => mapToString(values)
     case UCase(constructor, value) => "(" + untagged(constructor) + " " + untagged(value) + ")"
     case UIndex(i) => i.toString
+    case IsCommandFunc => s"IsCommandFunc"
+    case IsSimpleFunction => s"IsSimpleFunction"
+    case IncrementFunc => s"Increment"
   }
 
   def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {

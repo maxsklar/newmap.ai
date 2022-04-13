@@ -52,9 +52,7 @@ object TypeChecker {
       }
       case IdentifierParse(s: String, true) => Success(ObjectExpression(NewMapO.identifier(s)))
       case IdentifierParse(s: String, false) => {
-        val expectingAnIdentifier = {
-          SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
-        }
+        val expectingAnIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
 
         if (expectingAnIdentifier) {
           val obj = TaggedObject(UIdentifier(s), expectedType)
@@ -97,7 +95,7 @@ object TypeChecker {
           case Some(EnvironmentValue(_, ParameterStatus)) => Success(ParamId(s))
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(ObjectExpression(nObject))
           case None => {
-            Failure(s"Identifier $s is unknown, expecting type $expectedType --- ${SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env)}")
+            Failure(s"Identifier $s is unknown, expecting type $expectedType --- ${typeIsExpectingAnIdentifier(expectedType, env)}")
           }
         }
       }
@@ -299,7 +297,7 @@ object TypeChecker {
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     val patternMatchingAllowed = internalFeatureSet != BasicMap
-    val parentTypeIsIdentifier = SubtypeUtils.isTypeConvertible(expectedType, IdentifierT, env).toOption.getOrElse(false)
+    val parentTypeIsIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
 
     (expression, expectedType) match {
       case (IdentifierParse(s, false), _) if (patternMatchingAllowed && !parentTypeIsIdentifier) => {
@@ -427,6 +425,26 @@ object TypeChecker {
         }
       }
     }
+  }
+
+  def typeIsExpectingAnIdentifier(
+    nType: NewMapObject,
+    env: Environment
+  ): Boolean = nType match {
+    case IdentifierT => true
+    case SubtypeT(isMember) => {
+      val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+      typeIsExpectingAnIdentifier(inputType, env)
+    }
+    case VersionedObjectLink(key, status) => {
+      Evaluator.currentState(key.uuid, env).toOption.exists(state => {
+        typeIsExpectingAnIdentifier(state, env)
+      })
+    }
+    case TaggedObject(_, ExpandingSubsetT(parentType)) => {
+      typeIsExpectingAnIdentifier(parentType, env)
+    }
+    case _ => false
   }
 
   def apply(

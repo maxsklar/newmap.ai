@@ -18,3 +18,17 @@ case class UMap(values: Vector[(NewMapPattern, NewMapExpression)]) extends Untag
 case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends UntaggedObject
 
 case class UIndex(i: Long) extends UntaggedObject
+
+
+// Built in functions
+
+// This takes as input a member of TypeT and returns true if it's a member
+//  of the command typeclass (which means it has a default value and an update function)
+// TODO: making this a basic class is temporary for now
+case object IsCommandFunc extends UntaggedObject
+
+// Temporary for now, this should be buildable as a map pattern in the future
+case object IsSimpleFunction extends UntaggedObject
+
+// A basic function to increment a count
+case object IncrementFunc extends UntaggedObject
