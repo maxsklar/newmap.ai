@@ -16,8 +16,6 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[NewMapExpression, String] = {
-    //println(s"In typeCheck $expression -- $expectedType")
-
     // Be sure to return something whose type is convertible to expectedType
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!

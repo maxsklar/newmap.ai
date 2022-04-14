@@ -271,10 +271,7 @@ object SubtypeUtils {
           Vector.empty
         }
       }
-      case(
-        StructT(startingParams),
-        StructT(endingParams)
-      ) => {
+      case(StructT(startingParams), StructT(endingParams)) => {
         isTypeConvertible(
           RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(startingParams), env),
           RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingParams), env),

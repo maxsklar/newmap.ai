@@ -252,7 +252,7 @@ object Environment {
     val structT = StructT(
       TaggedObject(
         UMap(inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(x._1._2))),
-        MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
+        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, SubtypeInput, SimpleFunction)
       )
     )
 
