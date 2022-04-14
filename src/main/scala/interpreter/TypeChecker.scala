@@ -16,13 +16,16 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[NewMapExpression, String] = {
+    //println(s"In typeCheck $expression -- $expectedType")
+
     // Be sure to return something whose type is convertible to expectedType
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!
-    val result: Outcome[NewMapExpression, String] = expression match {
+    expression match {
       case NaturalNumberParse(i: Long) => {
         val parentExpectedType = RetrieveType.getParentType(expectedType, env)
-        Evaluator.stripVersioning(parentExpectedType, env) match {
+
+        Evaluator.stripVersioning(expectedType, env) match {
           case TaggedObject(UIndex(j), _) => {
             if (i < j) Success(ObjectExpression(TaggedObject(UIndex(i), parentExpectedType)))
             else Failure(s"Proposed index $i is too large for type $j")
@@ -45,12 +48,44 @@ object TypeChecker {
               ObjectExpression(TaggedObject(UIndex(i), expectedType))
             }
           }
+          case SubtypeT(isMember) => {
+            val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+            for {
+              inputTC <- typeCheck(expression, inputType, env, featureSet)
+
+              // We should be allowed to evaluate this because it's just a number
+              // BUT - this is an ugly call - it'd be nice if we didn't have to do it
+              inputE <- Evaluator(inputTC, env)
+              isMemberCheck <- Evaluator.applyFunctionAttempt(isMember, inputE, env)
+              defaultValueOrResultType <- {
+                Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(isMemberCheck, env), env)
+              }
+
+              isMember = (isMemberCheck != defaultValueOrResultType)
+
+              _ <- Outcome.failWhen(!isMember, s"Value $inputE not a member of subtype $expectedType")
+            } yield inputTC
+          }
           case _ => {
             Success(ObjectExpression(TaggedObject(UIndex(i), CountT)))
           }
         }
       }
-      case IdentifierParse(s: String, true) => Success(ObjectExpression(NewMapO.identifier(s)))
+      case IdentifierParse(s: String, true) => {
+        val expectingAnIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
+        if (expectingAnIdentifier) {
+          Success(ObjectExpression(TaggedObject(UIdentifier(s), expectedType)))
+        } else {
+          for {
+            convertInstructions <- SubtypeUtils.isTypeConvertible(IdentifierT, expectedType, env)
+
+            // TODO: execute convertInstructions
+            convertedObject = TaggedObject(UIdentifier(s), IdentifierT)
+          } yield convertedObject
+        }
+        // We need to check that the expectedType allows an identifier!!
+        Success(ObjectExpression(NewMapO.identifier(s)))
+      }
       case IdentifierParse(s: String, false) => {
         val expectingAnIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
 
@@ -92,8 +127,26 @@ object TypeChecker {
             case _ => Failure(s"Can't convert identifier $s to type $expectedType")
           }
         } else env.lookup(s) match {
-          case Some(EnvironmentValue(_, ParameterStatus)) => Success(ParamId(s))
-          case Some(EnvironmentValue(nObject, BoundStatus)) => Success(ObjectExpression(nObject))
+          case Some(EnvironmentValue(nType, ParameterStatus)) => {
+            for {
+              convertInstructions <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
+              // TODO - execute convert instructions?
+              // TODO - we must now check that the converted type is in the expectedType, which is not checked by isTypeConvertible
+            } yield ParamId(s)
+          }
+          case Some(EnvironmentValue(nObject, BoundStatus)) => {
+            val nType = RetrieveType.fromNewMapObject(nObject, env)
+            for {
+              // Why doesn't isTypeConvertible work?
+              convertInstructions <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
+              // TODO - execute convert instructions on nObject
+              // TODO - we must now check that the converted object is in the subtype, which is not checked by isTypeConvertible
+
+              //convertInstructions <- SubtypeUtils.isObjectConvertibleToType(ObjectExpression(nObject), expectedType, env)
+            } yield {
+              ObjectExpression(nObject)
+            }
+          }
           case None => {
             Failure(s"Identifier $s is unknown, expecting type $expectedType --- ${typeIsExpectingAnIdentifier(expectedType, env)}")
           }
@@ -131,8 +184,8 @@ object TypeChecker {
             case _ => None
           }
 
-          isConvertible <- needToEvaluateParams match {
-            case None => Success(true)
+          convertInstructions <- needToEvaluateParams match {
+            case None => Success(Vector.empty)
             case Some(structParams) => {
               for {
                 // Field must be fully evaluated
@@ -141,13 +194,13 @@ object TypeChecker {
                 // Make sure that this field actually exists
                 resultingType <- Evaluator.applyFunctionAttempt(structParams, evaluatedField, env)
 
-                isConv <- SubtypeUtils.isTypeConvertible(resultingType, expectedType, env)
-              } yield isConv
+                convertInstructions <- SubtypeUtils.isTypeConvertible(resultingType, expectedType, env)
+                // TODO - do we also need to check the subtype?
+              } yield convertInstructions
             }
           }
-
-          _ <- Outcome.failWhen(!isConvertible, s"Function result error: ResultingType of $functionTypeChecked $inputValue not convertible to $expectedType")
         } yield {
+          // TODO - execute convertInstructions??
           ApplyFunction(functionTypeChecked, inputValue)
         }
       }
@@ -226,25 +279,6 @@ object TypeChecker {
         }
       }
     }
-
-    for {
-      nObject <- result
-
-      // TODO: figure out what to really do here
-      // TODO - perhaps if we were doing this all along with the parse analysis, we wouldn't need to do this.
-      // Check that the object is part of the required subtype if given
-      // Is it possible that this will always be true given the code above?
-      // Once we can verify this, maybe we can remove this code
-
-      /*_ = if (nObject == Index(0) || nObject == Index(1) || nObject == Index(2)) {
-        println("\nAbout to call attempt to convert to type")
-        println(s"Original parsed expression: $expression")
-        println(s"Resulting Object: $nObject")
-        println(s"Expected Type: $expectedType")
-      }*/
-
-      nObjectConverted <- SubtypeUtils.attemptToConvertToType(nObject, expectedType, env)
-    } yield nObjectConverted
   }
 
   // This map could include pattern matching

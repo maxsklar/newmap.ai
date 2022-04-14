@@ -16,11 +16,8 @@ class TestSubtypeUtils extends FlatSpec {
 
     assert(RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), Environment.Base) == IdentifierT)
 
-    val result = SubtypeUtils.isTypeConvertible(SubtypeT(isMember), IdentifierT, Environment.Base)
+    val convertInstructionOutcome = SubtypeUtils.isTypeConvertible(SubtypeT(isMember), IdentifierT, Environment.Base)
     
-    result match {
-      case Success(result) => assert(result)
-      case Failure(reason) => fail(reason)
-    }
+    assert(convertInstructionOutcome.isSuccess)
   }
 }

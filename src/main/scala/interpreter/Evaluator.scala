@@ -697,7 +697,11 @@ object Evaluator {
       case (TypePattern(name, nType), _) => {
         for {
           //untaggedInput <- removeTypeTag(input)
-          isMember <- SubtypeUtils.isMemberOfSubtype(input /*untaggedInput*/, nType, env)
+          isMember <- nType match {
+            case SubtypeT(isMember) => SubtypeUtils.isMemberOfSubtype(input /*untaggedInput*/, isMember, env)
+            case _ => Success(true)
+          }
+
           _ <- Outcome.failWhen(
             !isMember,
             "Not Member of Subtype"

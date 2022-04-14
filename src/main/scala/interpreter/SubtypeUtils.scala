@@ -105,7 +105,10 @@ object SubtypeUtils {
   def isGenericPattern(pattern: NewMapPattern, nType: NewMapObject, env: Environment): Boolean = {
     pattern match {
       case ObjectPattern(_) => false
-      case TypePattern(_, subtype) => isTypeConvertible(nType, subtype, env).toOption.getOrElse(false)
+      case TypePattern(_, subtype) => {
+        // This is not enough - we then need to check everything is in the subtype
+        isTypeConvertible(nType, subtype, env).isSuccess
+      }
       case StructPattern(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
@@ -157,74 +160,41 @@ object SubtypeUtils {
     }
   }
 
-  // Try to convert an object to having a new type
-  // - Fail when the conversion is not possible
-  // - If the object already has that type, then just return itself
-  def attemptToConvertToType(
-    nObject: NewMapExpression,
-    requestedType: NewMapObject,
-    env: Environment
-  ): Outcome[NewMapExpression, String] = {
-    val nType = RetrieveType(nObject, env)
-    for {
-      isConvertible <- isObjectConvertibleToType(nObject, requestedType, env)
-
-      _ <- Outcome.failWhen(
-        !isConvertible,
-        s"Cannot convert because type of $nObject: $nType doesn't match expected parent type $requestedType."
-      )
-
-      // TODO - in here isObjectConvertibleToType will also give a conversion function
-      // Run nObject through this conversion function and return!
-    } yield nObject
-  }
-
   def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
-    case SubtypeT(TaggedObject(UMap(values), MapT(inputType, _, CommandOutput, _))) => {
-      // TODO: Extend this to see if pattering matching in basic function covers the full type
-      // Check that the function doesn't return the default value for any input
-      doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
+    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, CommandOutput, _))) => {
+      untaggedFunction match {
+        case UMap(values) => {
+          // TODO: Extend this to see if pattering matching in basic function covers the full type
+          // Check that the function doesn't return the default value for any input
+          doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
+        }
+        case IsCommandFunc | IsSimpleFunction => false
+        case _ => true
+      }
     }
-    case SubtypeT(TaggedObject(
-      IsCommandFunc,
-      MapT(TypeT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
-    )) => false
-    case SubtypeT(TaggedObject(
-      IsSimpleFunction,
-      MapT(AnyT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
-    )) => false
     case _ => {
       // TODO: Is this appropriate - shouldn't it be false
       true
     }
   }
 
-  // TODO: This can be made to work in much broader circumstances
-  // - For example, if the endingType excludes only a finite amount of objects, then we can check
-  //    to make sure that all of those are not in startingType
-  def isTypeConvertible(
-    startingType: NewMapObject,
-    endingType: NewMapObject,
-    env: Environment
-  ): Outcome[Boolean, String] = {
-    val uuidStr = java.util.UUID.randomUUID.toString
+  def doesTypeCoverSubtype(startingType: NewMapObject, endingType: NewMapObject, env: Environment): Boolean = {
+    val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
+    val doesStarttypeCoverParentType = doesTypeCoverParentType(startingType, env)
 
-    for {
-      // TIME FOR A REDO!!!
-      pureTypeConvertible <- isObjectConvertibleToType(
-        ParamId(uuidStr), 
-        RetrieveType.getParentType(endingType, env),
-        env.newParam(uuidStr, startingType) // TODO - this is an awkward solution! (and it's also wrong.. remove!!)
-      )
-
-      _ <- Outcome.failWhen(!pureTypeConvertible, s"Non-convertible pure types from $startingType to $endingType")
-    } yield {
-      val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
-      val doesStarttypeCoverParentType = doesTypeCoverParentType(startingType, env)
-
-      /// starting typecover parent type
-
-      doesEndtypeCoverParentType || (!doesStarttypeCoverParentType && {
+    endingType match {
+      case _ if doesEndtypeCoverParentType => true
+      case SubtypeT(TaggedObject(IsSimpleFunction, _)) => {
+        startingType match {
+          case MapT(_, _, _, featureSet) => isFeatureSetConvertible(featureSet, SimpleFunction)
+          case _ => false 
+        }
+      }
+      case SubtypeT(TaggedObject(IsCommandFunc, _)) => {
+        // This is definitely wrong, but we can fix when we move this out
+        true
+      }
+      case _ => (!doesStarttypeCoverParentType && {
         // End type does not cover parent type
         // So, let's go through all the values of starting type (if we can) and see if we can brute force it
         val allConvertedOutcome = for {
@@ -240,82 +210,33 @@ object SubtypeUtils {
     }
   }
 
-  // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
-  // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
-  //  - To be used in cases where you want the programmer to specifically ask for a conversion!
-  // TODO: We also return boolean, but we should return a function if the conversion requires application of this function
-  def isObjectConvertibleToType(
-    startingObject: NewMapExpression,
+  // Return - Instructions in the form of functions for converting from one type to another
+  def isTypeConvertible(
+    startingType: NewMapObject,
     endingType: NewMapObject,
     env: Environment
-  ): Outcome[Boolean, String] = {
-    val startingType = RetrieveType(startingObject, env)
-
-    //STARTING TYPE: I
-    //ENDING TYPE: (world: 1\OrBooleanT, hello: 1\OrBooleanT)\ExpandingSubsetT(Identifier)
-
+  ): Outcome[Vector[NewMapObject], String] = {
     (startingType, endingType) match {
-      case _ if (startingType == endingType) => Success(true)
-      case (_, AnyT) => Success(true)
-      case (CountT, TypeT) => Success(true)
-      case (ExpandingSubsetT(_), TypeT) => Success(true)
+      case _ if (startingType == endingType) => Success(Vector.empty)
+      case (_, AnyT) => Success(Vector.empty)
+      case (CountT, TypeT) => Success(Vector.empty)
+      case (ExpandingSubsetT(_), TypeT) => Success(Vector.empty)
       case (TaggedObject(_, ExpandingSubsetT(parentType)), _) => {
         isTypeConvertible(parentType, endingType, env)
       }
-      //case (TableT(_, _), TypeT) => Success(true) // TODO: Do we need this? We might!
+      //case (TableT(_, _), TypeT) => Success(Vector.empty) // TODO: Do we need this? We might!
       case (_, SubtypeT(isMember)) => {
-        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+        val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
 
         for {
-          // 1: Check if startingObject is convertible to the inputType of isMember
-          convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)
-
-          // HOW TO TELL IF THE starting type's members all are positive for isMember
-          // 1) If isMember of end covers parent, return true
-          // 3) If starttype Covers parent type, return false
-          // 2) Actually perform the conversion from starting type to parent type and loop through??
-
-          // This isn't great - but perhaps it works for now.
-          // Speedups: 1) Check for equality?
-          // 2) Caching?
-
-          // THIS WHOLE PART BELOW - FIND A WAY TO REMOVE IT
-          // Code from isTypeConvertible should go here
-
-          // If not evaluated, we can't check for membership
-          // TODO: What if this is a complex function?
-          // - Solution: only evaluate it if its a simplefunction..
-          //   if it's a complex function, leave it alone, and have a good error
-          //   message about it saying that we can't check for the subtype because we won't run your
-          //   function (which could be some crazy infinite loop or fibonacci explosion crap)
-          // Instead.. the function itself should have guarantees
-          //evaluatedObject <- Evaluator(convertedObject, env)
-          //evaluatedObject <- Evaluator(startingObject, env)
-
-          //untaggedEvaluatedObject <- Evaluator.removeTypeTag(evaluatedObject)
-
-          // 2: See if it's actually a member of the subtype
-          //isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
-          //_ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
-        } yield {
-          val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
-          doesEndtypeCoverParentType || ({
-            // End type does not cover parent type
-            // So, let's go through all the values of starting type (if we can) and see if we can brute force it
-            
-            val convertedOutcome = for {
-              convertedObject <- attemptToConvertToType(startingObject, subtypeInputType, env)    
-              evaluatedObject <- Evaluator(convertedObject, env)
-              isMember <- isMemberOfSubtype(evaluatedObject, endingType, env)
-              _ <- Outcome.failWhen(!isMember, s"Object $evaluatedObject not a member of subtype $endingType")
-            } yield true
-
-            convertedOutcome.toOption.getOrElse(false)
-          })
-        }
+          convertInstructions <- isTypeConvertible(startingType, superType, env)
+          // TODO - starting type must be converted before moving on
+          doesCover = doesTypeCoverSubtype(startingType, SubtypeT(isMember), env)
+          _ <- Outcome.failWhen(!doesCover, s"Cannot convert: $startingType doesn't cover $endingType")
+        } yield convertInstructions
       }
       case (_, TaggedObject(_, ExpandingSubsetT(_))) => {
-        Failure(s"A) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
+        Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
         MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
@@ -329,13 +250,25 @@ object SubtypeUtils {
         for {
           // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
           // Eventually, we'll have to implement covariance in generic types
-          inputTypesConvertible <- isTypeConvertible(endingInputType, startingInputType, env)
-          outputTypesConvertible <- isTypeConvertible(startingOutputType, endingOutputType, env)
+
+          // PROBLEM IS THAT isTypeConvertible doesn't then check if the types line up WRT subsets
+          inputTypesConversionInstruction <- isTypeConvertible(endingInputType, startingInputType, env)
+
+          outputTypesConversionInstructions <- isTypeConvertible(startingOutputType, endingOutputType, env)
+
+          _ <- Outcome.failWhen(
+            !isFeatureSetConvertible(startingFeatureSet, endingFeatureSet),
+            s"Feature sets not convertible in maps $startingType -- $endingType"
+          )
+
+          _ <- Outcome.failWhen(
+            !isMapCompletenessConvertible,
+            s"Completeness not convertible in maps $startingType -- $endingType"
+          )
+
         } yield {
-          inputTypesConvertible &&
-          outputTypesConvertible &&
-          isFeatureSetConvertible(startingFeatureSet, endingFeatureSet) &&
-          isMapCompletenessConvertible
+          // TODO - utilizing the input/output type converstion instructions
+          Vector.empty
         }
       }
       case(
@@ -347,30 +280,31 @@ object SubtypeUtils {
           RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingParams), env),
           env
         )
-        // TODO: The outputs have to agree as well
       }
       case (StructT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
-          isConvertible <- isTypeConvertible(singularObj, endingType, env)
-        } yield isConvertible
+          convertInstructions <- isTypeConvertible(singularObj, endingType, env)
+        } yield convertInstructions
       }
       case (_, StructT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
-          isConvertible <- isObjectConvertibleToType(startingObject, singularObj, env)
-        } yield isConvertible
+          convertInstructions <- isTypeConvertible(startingType, singularObj, env)
+        } yield convertInstructions
       }
       case (CaseT(startingCases), CaseT(endingCases)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
-        isTypeConvertible(
-          RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingCases), env),
-          RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(startingCases), env),
-          env
-        )
+        for {
+          convertInstructions <- isTypeConvertible(
+            RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingCases), env),
+            RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(startingCases), env),
+            env
+          )
+        } yield convertInstructions
         // TODO: The outputs have to agree as well
       }
       case (CaseT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
@@ -378,28 +312,30 @@ object SubtypeUtils {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
-          isConvertible <- isTypeConvertible(singularObj, endingType, env)
-        } yield isConvertible
+          convertInstructions <- isTypeConvertible(singularObj, endingType, env)
+        } yield convertInstructions
       }
       case (_, CaseT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(mi)
           singularObj <- Evaluator(singularOutput, env)
-          isConvertible <- isObjectConvertibleToType(startingObject, singularObj, env)
-        } yield isConvertible
+          convertInstructions <- isTypeConvertible(startingType, singularObj, env)
+        } yield convertInstructions
       }
       case (SubtypeT(isMember), _) => {
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
         
-        isTypeConvertible(subtypeInputType, endingType, env)
+        for {
+          convertInstructions <- isTypeConvertible(subtypeInputType, endingType, env)
+        } yield convertInstructions
       }
       case (
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
         VersionedObjectLink(VersionedObjectKey(versionNumber2, uuid2), status2)
       ) if (uuid == uuid2) && (status2 == KeepUpToDate) => {
         // Take advantage of the fact that types are backwards compatible
-        Success(true)
+        Success(Vector.empty)
       }
       case (
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
@@ -410,7 +346,7 @@ object SubtypeUtils {
             isTypeConvertible(parentType, endingType, env)
           }
           case _ => {
-            Failure(s"B) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
+            Failure(s"B) StartingType: $startingType\nEndingType: $endingType")
           }
         }
       }
@@ -418,9 +354,38 @@ object SubtypeUtils {
         _,
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status)
       ) => {
-        Failure(s"C) Starting Obj: $startingObject\nStartingType: $startingType\nEndingType: $endingType")
+        Failure(s"C) StartingType: $startingType\nEndingType: $endingType")
       }
-      case _ => Success(false)
+      case _ => Failure(s"No rule to convert $startingType to $endingType")
+    }
+  }
+
+  // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
+  // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
+  //  - To be used in cases where you want the programmer to specifically ask for a conversion!
+  // @return a list of simple function if the conversion requires application in order to convert
+  def isObjectConvertibleToType(
+    startingObject: NewMapObject,
+    endingType: NewMapObject,
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = endingType match {
+    case SubtypeT(isMember) => {
+      val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+      for {
+        convertInstructions <- isObjectConvertibleToType(startingObject, endingType, env)
+
+        // TODO - make explicit conversion
+        convertedObject = startingObject
+
+        checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
+        _ <- Outcome.failWhen(!checksMembership, "Couldn't confirm member of subtype: $startingObject, $endingType")
+      } yield {
+        convertInstructions
+      }
+    }
+    case _ => {
+      val nType = RetrieveType.fromNewMapObject(startingObject, env)
+      isTypeConvertible(nType, endingType, env)
     }
   }
 
@@ -445,31 +410,24 @@ object SubtypeUtils {
     }
   }
 
-  // Returns true if nObject is a member of nSubtype, assuming that it's already a member of the parent type
+  // Returns true if nObject is a member of a SubtypeT by its isMember Function
+  // - assuming that it's already a member of the parent type
   def isMemberOfSubtype(
     nObject: NewMapObject,
-    nSubtype: NewMapObject,
+    isMember: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    nSubtype match {
-      case SubtypeT(isMember) => {
-        for {
-          result <- Evaluator.applyFunctionAttempt(isMember, nObject, env)
+    for {
+      result <- Evaluator.applyFunctionAttempt(isMember, nObject, env)
 
-          // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
-          //  and find a default on that!
-          defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
-        } yield (result != defaultValueOrResultType)
-      }
-      case _ => {
-        // We already called isTypeConvertible above, so we know this works
-        Success(true)
-      }
-    }
+      // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
+      //  and find a default on that!
+      defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
+    } yield (result != defaultValueOrResultType)
   }
 
   def allMembersOfSubtype(
-    nObjects: Vector[TaggedObject],
+    nObjects: Vector[NewMapObject],
     nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
