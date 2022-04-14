@@ -58,7 +58,7 @@ object MakeSubstitution {
         val newMapValues = for {
           (k, v) <- values
         } yield {
-          val nps = Evaluator.newParametersFromPattern(k).map(_._1).toSet
+          val nps = Evaluator.newParametersFromPattern(k).toSet
           val newValue = this(v, parameters.filter(x => !nps.contains(x._1)), env)
           k -> newValue
         }
@@ -83,7 +83,7 @@ object MakeSubstitution {
           internalParams = Evaluator.newParametersFromPattern(k)
           // We cannot replace params that have the same name
 
-          remainingParameters = parameters -- internalParams.map(_._1)
+          remainingParameters = parameters -- internalParams
         } yield (k -> this(v, remainingParameters, env))
 
         TaggedObject(

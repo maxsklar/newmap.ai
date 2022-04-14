@@ -274,7 +274,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "f",
       TaggedObject(
         UMap(Vector(
-          TypePattern("a", Index(3)) ->
+          WildcardPattern("a") ->
           ApplyFunction(
             ObjectExpression(TaggedObject(
               UMap(Vector(
@@ -457,7 +457,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A SimpleMap " should " be allowed to call other simple maps" in {
     testCodeScript(Vector(
       CodeExpectation("val m1: ReqMap(3, Identifier) = (0: Zero, 1: One, 2: Two)", GeneralSuccessCheck),
-      CodeExpectation("val m2: ReqMap(3, Identifier) = (0: Nil, (x: 3): m1 x)", GeneralSuccessCheck),
+      CodeExpectation("val m2: ReqMap(3, Identifier) = (0: Nil, x: m1 x)", GeneralSuccessCheck),
       CodeExpectation("m2 0", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("Nil")))),
       CodeExpectation("m2 2", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("Two"))))
     ))
@@ -473,13 +473,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " disallow self referential function calls" in {
     testCodeScript(Vector(
       CodeExpectation("val m: ReqMap(Any, 2) = (_: 1)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, 2) = ((x: Count): 1, _: 0)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, 2) = ((x: ReqMap(Any, 2)): 1, _: 0)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, Any) = ((x: ReqMap(Any, Any)): x, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, 2) = (x: 1, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, 2) = (x: 1, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Any, Any) = (x: x, _: 0)", GeneralSuccessCheck),
       // Preventing Russell's paradox!
-      CodeExpectation("val m: ReqMap(Any, 2) = ((x: ReqMap(Any, 2)): x x, _: 0)", FailureCheck),
+      CodeExpectation("val m: ReqMap(ReqMap(Any, Any), 2) = (x: x x)", FailureCheck),
       // This line below will create an infinite loop if evaluated!! Out simple function check will catch it
-      CodeExpectation("val m: Any => 2 = ((x: ReqMap(Any, 2)): x x, _: 0)", GeneralSuccessCheck)
+      CodeExpectation("val m: ReqMap(Any, Any) => 2 = (x: x x)", GeneralSuccessCheck)
     ))
   }
 
@@ -614,7 +614,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
       // Note that x must be declares as an identifier here because otherwise it's taken as the literal identifier x
       // TODO - we need to make sure there are some GOOD ERROR MESSAGES associated with that
-      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = (First x: x, Second (x: Identifier): 2)", GeneralSuccessCheck),
+      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First x): x, (Second x): 2)", GeneralSuccessCheck),
       CodeExpectation("MyCaseTo5 (MyCase.First 4)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(4, Index(5))))),
       CodeExpectation("MyCaseTo5 (MyCase.Second hello)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(5)))))
     ))
@@ -623,7 +623,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be seen to the type if all cases are accounted for" in {
     testCodeScript(Vector(
       CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
-      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = (First x: x, Second (x: Identifier): 2)", GeneralSuccessCheck),
+      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First x): x, (Second x): 2)", GeneralSuccessCheck),
     ))
   }
 

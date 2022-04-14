@@ -10,10 +10,7 @@ case class ObjectPattern(
   uObject: UntaggedObject
 ) extends NewMapPattern
 
-case class TypePattern(
-  name: String,
-  nType: NewMapObject
-) extends NewMapPattern
+case class WildcardPattern(name: String) extends NewMapPattern
 
 case class StructPattern(
   params: Vector[NewMapPattern]

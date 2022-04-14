@@ -497,7 +497,6 @@ object Evaluator {
     values match {
       case (k, v) +: restOfValues => {
         val nps = newParametersFromPattern(k)
-        val newEnv = env.newParams(nps)
 
         // What do we need to do with v?
         // I'd argue nothing - it's already type checked so we know the internal parameters check out
@@ -553,7 +552,7 @@ object Evaluator {
             // ALSO - shouldn't this be retagged the other way??
             // TODO: REMOVE THIS UGLY CASE
             val retaggedInputC = retagObject(inputC, keyType)
-
+            
             for {
               keyMatchResult <- attemptPatternMatchInOrder(values, retaggedInputC, env) match {
                 case Success(result) => Success(result)
@@ -618,7 +617,7 @@ object Evaluator {
         } yield {
           TaggedObject(
             UMap(Vector(
-              TypePattern("input", result) -> BuildCase(field, ParamId("input"), func)
+              WildcardPattern("input") -> BuildCase(field, ParamId("input"), func)
             )),
             MapT(result, func, RequireCompleteness, SimpleFunction)
           )
@@ -694,19 +693,8 @@ object Evaluator {
       }
       // TODO - since input is going to be a literal, do we actually need to call isMemberOfSubtype, or can we
       //  just call the function??
-      case (TypePattern(name, nType), _) => {
-        for {
-          //untaggedInput <- removeTypeTag(input)
-          isMember <- nType match {
-            case SubtypeT(isMember) => SubtypeUtils.isMemberOfSubtype(input /*untaggedInput*/, isMember, env)
-            case _ => Success(true)
-          }
-
-          _ <- Outcome.failWhen(
-            !isMember,
-            "Not Member of Subtype"
-          )
-        } yield Map(name -> input)
+      case (WildcardPattern(name), _) => {
+        Success(Map(name -> input))
       }
       // TODO - eventually instead of checking equality, we'll check for "convertability"
       //  For example between different type versions
@@ -758,9 +746,9 @@ object Evaluator {
   }
 
   // TODO - move this elsewhere, maybe to environment!
-  def newParametersFromPattern(pattern: NewMapPattern): Vector[(String, NewMapObject)] = pattern match {
+  def newParametersFromPattern(pattern: NewMapPattern): Vector[String] = pattern match {
     case ObjectPattern(_) => Vector.empty
-    case TypePattern(name, nType) => Vector(name -> nType)
+    case WildcardPattern(name) => Vector(name)
     case StructPattern(patterns) => patterns match {
       case firstPattern +: otherPatterns => {
         newParametersFromPattern(firstPattern) ++ newParametersFromPattern(StructPattern(otherPatterns))

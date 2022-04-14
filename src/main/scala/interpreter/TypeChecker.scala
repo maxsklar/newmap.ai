@@ -28,7 +28,10 @@ object TypeChecker {
         Evaluator.stripVersioning(expectedType, env) match {
           case TaggedObject(UIndex(j), _) => {
             if (i < j) Success(ObjectExpression(TaggedObject(UIndex(i), parentExpectedType)))
-            else Failure(s"Proposed index $i is too large for type $j")
+            else {
+              //throw new Exception(s"Proposed index $i is too large for type $j")
+              Failure(s"Proposed index $i is too large for type $j")
+            }
           }
           case TaggedObject(umap@UMap(_), ExpandingSubsetT(superType)) => {
             for {
@@ -131,18 +134,13 @@ object TypeChecker {
             for {
               convertInstructions <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
               // TODO - execute convert instructions?
-              // TODO - we must now check that the converted type is in the expectedType, which is not checked by isTypeConvertible
             } yield ParamId(s)
           }
           case Some(EnvironmentValue(nObject, BoundStatus)) => {
             val nType = RetrieveType.fromNewMapObject(nObject, env)
             for {
-              // Why doesn't isTypeConvertible work?
-              convertInstructions <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
+              convertInstructions <- SubtypeUtils.isObjectConvertibleToType(nObject, expectedType, env)
               // TODO - execute convert instructions on nObject
-              // TODO - we must now check that the converted object is in the subtype, which is not checked by isTypeConvertible
-
-              //convertInstructions <- SubtypeUtils.isObjectConvertibleToType(ObjectExpression(nObject), expectedType, env)
             } yield {
               ObjectExpression(nObject)
             }
@@ -160,6 +158,8 @@ object TypeChecker {
           inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked, env)
 
           inputValue <- typeCheck(input, inputType, env, featureSet)
+
+          // Is member of Subtype check here?
           functionFeatureSet = RetrieveType.retrieveFeatureSetFromFunction(functionTypeChecked, env)
 
           // Validate that this is allowed from the feature set
@@ -334,18 +334,10 @@ object TypeChecker {
     val parentTypeIsIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
 
     (expression, expectedType) match {
-      case (IdentifierParse(s, false), _) if (patternMatchingAllowed && !parentTypeIsIdentifier) => {
+      case (IdentifierParse(s, false), _) if (patternMatchingAllowed /*&& !parentTypeIsIdentifier*/) => {
         Success(
-          TypeCheckWithPatternMatchingResult(TypePattern(s, expectedType), env.newParam(s, expectedType))
+          TypeCheckWithPatternMatchingResult(WildcardPattern(s), env.newParam(s, expectedType))
         )
-      }
-      case (BindingCommandItem(IdentifierParse(s, false), value), _) if (patternMatchingAllowed) => {
-        for {
-          tc <- typeCheck(value, TypeT, env, externalFeatureSet)
-          tcObj <- Evaluator(tc, env)
-        } yield {
-          TypeCheckWithPatternMatchingResult(TypePattern(s, tcObj), env.newParam(s, tcObj))
-        }
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
       case (CommandList(values), StructT(TaggedObject(UMap(structValues), MapT(_, _, _, BasicMap)))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
@@ -418,7 +410,6 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
-
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
         for {

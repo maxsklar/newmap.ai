@@ -132,7 +132,7 @@ object PrintNewMapObject {
 
   def patternToString(nPattern: NewMapPattern): String = nPattern match {
     case ObjectPattern(nObject) => untagged(nObject)
-    case TypePattern(name, nType) => s"($name: ${this(nType)})"
+    case WildcardPattern(name) => "W~" + name
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
     case CasePattern(constructor, input) => s"(${untagged(constructor)} ${patternToString(input)})"
   }

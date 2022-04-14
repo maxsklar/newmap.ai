@@ -225,7 +225,7 @@ object Environment {
     CaseT(
       TaggedObject(
         UMap(paramsToObject),
-        MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)
+        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
       )
     )
   }
@@ -256,7 +256,7 @@ object Environment {
       )
     )
 
-    val structP = StructPattern(inputs.map(x => TypePattern(x._1, x._2)))
+    val structP = StructPattern(inputs.map(x => WildcardPattern(x._1)))
 
     TaggedObject(
       UMap(Vector(structP -> expression)),
@@ -276,7 +276,7 @@ object Environment {
     )),
     eCommand("OrBoolean", OrBooleanT),
     eCommand("Sequence", TaggedObject(
-      UMap(Vector(TypePattern("key", TypeT) -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),
+      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),
       MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
     )),
     eCommand("Map", buildDefinitionWithParameters(
@@ -292,7 +292,7 @@ object Environment {
       BuildTableT(ParamId("key"), ParamId("value"))
     )),
     eCommand("ExpandingSubset", TaggedObject(
-      UMap(Vector(TypePattern("parentType", TypeT) -> BuildExpandingSubsetT(ParamId("parentType")))),
+      UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType")))),
       MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
     )),
     eCommand("SubMap", buildDefinitionWithParameters(
@@ -301,7 +301,7 @@ object Environment {
     )),
     eCommand("Struct", TaggedObject(
       UMap(Vector(
-        TypePattern("structParams", MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
+        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
         MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
@@ -313,7 +313,7 @@ object Environment {
     // TODO: This CStruct is going to be merged with Struct.. once we take care of generics
     eCommand("CStruct", TaggedObject(
       UMap(Vector(
-        TypePattern("structParams", MapT(CountT, TypeT, SubtypeInput, BasicMap)) -> BuildStructT(ParamId("structParams"))
+        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
         MapT(CountT, TypeT, SubtypeInput, BasicMap),
@@ -325,10 +325,10 @@ object Environment {
     // TODO: right now cases must be identifier based, expand this in the future!!
     eCommand("Case", TaggedObject(
       UMap(Vector(
-        TypePattern("cases", MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction)) -> BuildCaseT(ParamId("cases"))
+        WildcardPattern("cases") -> BuildCaseT(ParamId("cases"))
       )),
       MapT(
-        MapT(IdentifierT, TypeT, SubtypeInput, SimpleFunction),
+        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
         TypeT,
         RequireCompleteness,
         SimpleFunction
@@ -336,7 +336,7 @@ object Environment {
     )),
     eCommand("Subtype", TaggedObject(
       UMap(Vector(
-        TypePattern("simpleFunction", NewMapO.simpleFunctionT) -> BuildSubtypeT(ParamId("simpleFunction"))
+        WildcardPattern("simpleFunction") -> BuildSubtypeT(ParamId("simpleFunction"))
       )),
       MapT(
         NewMapO.simpleFunctionT,

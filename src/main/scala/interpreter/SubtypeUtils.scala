@@ -22,9 +22,9 @@ object SubtypeUtils {
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
-    val genericPatternExists = keys.exists(k => isGenericPattern(k, nType, env))
+    val WildcardPatternExists = keys.exists(k => isCatchallPattern(k, nType, env))
 
-    if (genericPatternExists) {
+    if (WildcardPatternExists) {
       Success(true)
     }
     else {
@@ -102,21 +102,18 @@ object SubtypeUtils {
   }
 
   // Returns true if the object is a pattern that will match everything in the type
-  def isGenericPattern(pattern: NewMapPattern, nType: NewMapObject, env: Environment): Boolean = {
+  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapObject, env: Environment): Boolean = {
     pattern match {
       case ObjectPattern(_) => false
-      case TypePattern(_, subtype) => {
-        // This is not enough - we then need to check everything is in the subtype
-        isTypeConvertible(nType, subtype, env).isSuccess
-      }
+      case WildcardPattern(_) => true
       case StructPattern(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
-          // - That would require isGenericPattern to match an nType that's a NewMapPattern, not just a NewMapObject
+          // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
           case StructT(TaggedObject(UMap(params), MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isGenericPattern(x._1, nObject, env)
+                isCatchallPattern(x._1, nObject, env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }
@@ -192,7 +189,7 @@ object SubtypeUtils {
       }
       case SubtypeT(TaggedObject(IsCommandFunc, _)) => {
         // This is definitely wrong, but we can fix when we move this out
-        true
+        (startingType == endingType)
       }
       case _ => (!doesStarttypeCoverParentType && {
         // End type does not cover parent type
@@ -222,7 +219,9 @@ object SubtypeUtils {
       case (CountT, TypeT) => Success(Vector.empty)
       case (ExpandingSubsetT(_), TypeT) => Success(Vector.empty)
       case (TaggedObject(_, ExpandingSubsetT(parentType)), _) => {
-        isTypeConvertible(parentType, endingType, env)
+        for {
+          convertInstructions <- isTypeConvertible(parentType, endingType, env)
+        } yield convertInstructions
       }
       //case (TableT(_, _), TypeT) => Success(Vector.empty) // TODO: Do we need this? We might!
       case (_, SubtypeT(isMember)) => {
@@ -231,6 +230,7 @@ object SubtypeUtils {
         for {
           convertInstructions <- isTypeConvertible(startingType, superType, env)
           // TODO - starting type must be converted before moving on
+
           doesCover = doesTypeCoverSubtype(startingType, SubtypeT(isMember), env)
           _ <- Outcome.failWhen(!doesCover, s"Cannot convert: $startingType doesn't cover $endingType")
         } yield convertInstructions
@@ -372,7 +372,7 @@ object SubtypeUtils {
     case SubtypeT(isMember) => {
       val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
       for {
-        convertInstructions <- isObjectConvertibleToType(startingObject, endingType, env)
+        convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
 
         // TODO - make explicit conversion
         convertedObject = startingObject

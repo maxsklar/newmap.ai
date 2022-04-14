@@ -47,37 +47,39 @@ object RetrieveType {
     }
   }
 
+  def retrieveInputTypeFromFunctionObject(nFunction: NewMapObject, env: Environment): NewMapObject = nFunction match {
+    case VersionedObjectLink(key, status) => {
+      val currentState = Evaluator.currentState(key.uuid, env).toOption.get
+      retrieveInputTypeFromFunctionObject(currentState, env)
+    }
+    case TaggedObject(UMap(values), MapT(inputType, _, SubtypeInput, features)) => {
+      SubtypeT(
+        TaggedObject(
+          UMap(values.map(x => x._1 -> ObjectExpression(Index(1)))),
+          MapT(inputType, Index(2), CommandOutput, features)
+        )
+      )
+    }
+    case TaggedObject(UMap(values), TableT(keyType, requiredValues)) => {
+      keyType
+    }
+    case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
+      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap)))
+    }
+    case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunctionObject(params, env)
+    case CaseT(cases) => retrieveInputTypeFromFunctionObject(cases, env)
+    case _ => {
+      Evaluator.stripVersioning(RetrieveType.fromNewMapObject(nFunction, env), env) match {
+        case MapT(inputType, _, _, _) => inputType
+        case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
+      }
+    }
+  }
+
   def retrieveInputTypeFromFunction(nFunction: NewMapExpression, env: Environment): NewMapObject = {
     // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
     nFunction match {
-      case ObjectExpression(o) => o match {
-        case VersionedObjectLink(key, status) => {
-          val currentState = Evaluator.currentState(key.uuid, env).toOption.get
-          retrieveInputTypeFromFunction(ObjectExpression(currentState), env)
-        }
-        case TaggedObject(UMap(values), MapT(inputType, _, SubtypeInput, features)) => {
-          SubtypeT(
-            TaggedObject(
-              UMap(values.map(x => x._1 -> ObjectExpression(Index(1)))),
-              MapT(inputType, Index(2), CommandOutput, features)
-            )
-          )
-        }
-        case TaggedObject(UMap(values), TableT(keyType, requiredValues)) => {
-          keyType
-        }
-        case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
-          SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap)))
-        }
-        case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunction(ObjectExpression(params), env)
-        case CaseT(cases) => retrieveInputTypeFromFunction(ObjectExpression(cases), env)
-        case _ => {
-          Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
-            case MapT(inputType, _, _, _) => inputType
-            case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
-          }
-        }
-      }
+      case ObjectExpression(o) => retrieveInputTypeFromFunctionObject(o, env)
       case param => {
         Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
           case MapT(inputType, _, _, _) => inputType
@@ -193,7 +195,7 @@ object RetrieveType {
   ): Boolean = {
     mapValues match {
       case (pattern, expression) +: restOfMapValues => {
-        val newKnownVariables = Evaluator.newParametersFromPattern(pattern).map(_._1)
+        val newKnownVariables = Evaluator.newParametersFromPattern(pattern)
         isTermClosedLiteral(expression, knownVariables ++ newKnownVariables) &&
           isMapValuesClosed(restOfMapValues, knownVariables)
       }
