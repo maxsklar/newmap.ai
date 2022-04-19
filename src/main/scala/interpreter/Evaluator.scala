@@ -46,7 +46,7 @@ object Evaluator {
           // TODO - this needs to be pushed up to the type checker
           _ <- Outcome.failWhen(
             (completeness == RequireCompleteness) && !RetrieveType.isTermConstant(evalInputType),
-            "Cannot build a RequireCompleteness map with an expanding input type. Try adding a required field instead."
+            "Cannot build a RequireCompleteness map with an expanding input type. Try creating a table instead, or using a map with a default value."
           )
         } yield {
           MapT(evalInputType, evalOutputType, completeness, featureSet)
@@ -57,7 +57,11 @@ object Evaluator {
           evalKeyType <- this(keyType, env)
           startingType <- getDefaultValueOfCommandType(evalKeyType, env)
           evalRequiredValues <- this(requiredValues, env)
-        } yield TableT(startingType, evalRequiredValues)
+        } yield {
+          // TODO - are we going to know that this is an expandable type?
+          // - I think so because startingType is tagged!!
+          MapT(startingType, evalRequiredValues, RequireCompleteness, SimpleFunction)
+        }
       }
       case BuildExpandingSubsetT(parentType) => {
         for {
@@ -93,7 +97,6 @@ object Evaluator {
       case TaggedObject(uObject, _) => Success(uObject)
       case VersionedObjectLink(_, _) => Failure("Can't remove type tage from versioned object link")
       case _ => {
-        throw new Exception(s"Can't remove type tag from $nObject")
         Failure("Can't yet remove type tag from typed object (once types are redefined as a case it'll be possible)")
       }
     }
@@ -101,11 +104,29 @@ object Evaluator {
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
+
+  /* Notes on writing this in newmap code:
+    This is really an instance of
+    Struct(t: t) where t is a CommandType (or a defaultable type?)
+    Struct(
+      TaggedObject(
+        UMap(t: t)
+        MapT(CommandType, Type, Required, SimpleMap)
+      )
+    )
+
+    Note that MapT here has an expanding key, so this is really a table
+
+    TODO - need to define an expanding struct and an expanding case
+    - A map can be an expanding struct if the output type is Type
+  */
   def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
       case CountT => Success(Index(0))
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
-      case TableT(_, _) | ExpandingSubsetT(_) | MapT(_, _, CommandOutput, _) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case ExpandingSubsetT(_) | MapT(_, _, CommandOutput, _) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case MapT(TaggedObject(UIndex(0), _), _, RequireCompleteness, _) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case MapT(TaggedObject(UMap(m), _), _, RequireCompleteness, _) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
@@ -122,9 +143,9 @@ object Evaluator {
         ))
         //Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       }
-      case AnyT => Failure("The \"any\" Type has no implemented default value")
-      case IdentifierT => Failure("Type of Identifiers has no default value")
-      case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
+      //case AnyT => Failure("The \"any\" Type has no implemented default value")
+      //case IdentifierT => Failure("Type of Identifiers has no default value")
+      //case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
       case structT@StructT(TaggedObject(UMap(parameterList), _)) => {
         for {
           defaultValue <- getDefaultValueFromStructParams(parameterList, env)
@@ -132,13 +153,13 @@ object Evaluator {
           TaggedObject(UMap(defaultValue), structT)
         }
       }
-      case CaseT(cases) => {
+      //case CaseT(cases) => {
         // In order for cases to have a default value, there's have to be 2 things:
         // - casesType must have a default (a default case) - call it casesType.default
         // - casesToType(casesType.default) is a type that must have a default case
-        throw new Exception(s"Case Types do not have a default value -- $nType")
-        Failure("Case Types do not have a default value")
-      }
+        //throw new Exception(s"Case Types do not have a default value -- $nType")
+        //Failure("Case Types do not have a default value")
+      //}
       case _ => {
         Failure(s"$nType is not a pure command type, error in type checker")
       }
@@ -155,6 +176,11 @@ object Evaluator {
       )
       case OrBooleanT => Success(Index(2))
       case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
+        // TO incorporate TableT:
+        // Look at input type
+        // See if input type is itself a command type
+        // Then, if it is - include that in the command input!
+
         for {
           outputCommandT <- getCommandInputOfCommandType(outputType, env)
         } yield {
@@ -174,7 +200,11 @@ object Evaluator {
           )
         }
       }
-      case TableT(keyType, requiredValues) => {
+      case MapT(keyType, requiredValues, _, _) => {
+        // In this case, there must be a key expansion type
+        // TODO: enforce this?
+
+
         // Key Expansion + requiredValue expansion
         // What if Key expansion is a case? (for now we don't allow this, only basic map)
         for {
@@ -182,7 +212,7 @@ object Evaluator {
         } yield {
           keyExpansionCommandT match {
             case StructT(TaggedObject(UMap(items), _)) if (items.length == 0) => {
-              // TODO - this is an ugle exception.. we need a better way to add fields to a struct
+              // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
               requiredValues
             }
@@ -300,7 +330,7 @@ object Evaluator {
           UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), mapT), NewMapO.emptyStruct)
         }
       }
-      case tableT@TableT(keyType, requiredValues) => {
+      case mapT@MapT(keyType, requiredValues, style, features) => {
         for {
           keyExpansionCommandT <- getCommandInputOfCommandType(
             RetrieveType.fromNewMapObject(keyType, env),
@@ -325,7 +355,7 @@ object Evaluator {
 
           updateKeyTypeResponse <- updateVersionedO(keyType, keyExpansionCommand, env)
 
-          newTableType = TableT(updateKeyTypeResponse.newState, requiredValues)
+          newTableType = MapT(updateKeyTypeResponse.newState, requiredValues, style, features)
                   
           mapValues <- current match {
             case TaggedObject(UMap(values), _) => Success(values)

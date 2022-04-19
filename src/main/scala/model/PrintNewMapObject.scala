@@ -15,10 +15,6 @@ object PrintNewMapObject {
     case MapT(key, value, completeness, featureSet) => {
       printMapT(this(key), this(value), completeness, featureSet)
     }
-    case TableT(expandingKeyType, requiredValues) => {
-      val mapTString = printMapT(this(expandingKeyType), this(requiredValues), RequireCompleteness, SimpleFunction)
-      s"Table(${mapTString})"
-    }
     case ExpandingSubsetT(parentType) => {
       s"ExpandingSubsetT(${this(parentType)})"
     }

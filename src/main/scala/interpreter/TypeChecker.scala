@@ -244,6 +244,7 @@ object TypeChecker {
             for {
               mapValues <- typeCheckMap(values, mapT, env, featureSet)
             } yield {
+              // TODO - MapT has the wrong input type here!
               BuildStructT(BuildMapInstance(mapValues, mapT))
             }
           }

@@ -749,83 +749,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * 
    * 
    * 
-  Include UniqueTable 
-
-
-  SEQUENCE
-  (Defines a new count automatically)
-  (Also keeps a reqmap updated)
-
-  1) Define a new count
-  2) Define a new sequence based off that count
-  3) The update function for the count also needs to be updated - another field must be added!!
-  4) The field can be numbered, but also perhaps named with the identifier for the new sequence
-
-  # IDEA: Partial update
-  (update, but some reqmaps do not get updated)
-
-  ver n = new Count
-  ver M = new ReqMap(n, Identifier)
-
-  // If this is done alone, then we alert that this is not possible because M must be updates as well
-  update n()
-
-  // If this is done alone, then we alert that this is not possible because n must be updated as well
-  update M (Append hello)
-
-  So we need a compound command:
-  update n()
-  update M (append hello)
-
-  How to define a compound update?
-  update (n(), m (append hello))
-  --> maybe this is ok?
-
-  // Single version
-  ver M = new Sequence(Identifier)
-  update M (append hello)
-  
-  How does this work with sequence?
-  Sequence(T) initializes as ReqMap(new Count, T) = ()
-  And the type overall is ReqMap(n, Type) where n is a value in this new count.
-  update function is (Case(append: T))
-
-  TAKAWAY: MAYBE UPDATE CANNOT BE THOUGHT OF AS A PURELY FUNCTIONAL THING
-
-  What does update do?
-  1) Calls the update function on current to get the next value
-  2) What is the update function also wants to update other values? Then it's not purely functional?
-  HMM
-
-
-  So now we need the ability to add to a struct
-   (should be easy)
-  And the ability to add to a case
-   (also easy)
-  BUT - what happens when we want to make those sequences too? I think that should work.
-
-  
-
-  How to deal with ReqMap(n, T)
-  (because that's what a case will be)
-  - required item, what happens when n expands!!
-  - Start by requiring reqmap to have non-versioned items
-  - Then also allow the key to be a count
-  
-  Commands on a ReqMap:
-  - Replace key/value
-  - Add key/value (when adding a key, requires update ti key type)
-  - Swap key order (later)
-
-  Step ?: Add uuid values to versioned types and to each of their different versions
-  - Only needed if we're saving these things??
-  */
-
-
 
   /* Canonical way to define boolean type */
-  /*
-  ver Bool = new Type
+  ver Bool = new CaseType
   update Bool case False
   update Bool case True
   
@@ -846,10 +772,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   - Just have direct names as entries (makes storing these things less dependant on uuid choice)
   - It's stored in a standard "prelude" document that everything should be based upon
   - True and False constructors also stored in the prelude.
-
-
-  Are reqmaps really fields? How do we tell the difference?
-  - Maybe a ReqMap is the val version, Field is the 
 
   Equality preserving Maps.. can these exist?
   -> First there needs to be an equality function (a == b)

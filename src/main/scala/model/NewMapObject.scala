@@ -53,17 +53,33 @@ case object IdentifierT extends NewMapObject
  *
  * TODO - should we subsume struct type in here??
  */
+/*case class MapT(
+  inputType: NewMapObject,
+  outputType: NewMapObject,
+  config: MapConfig
+) extends NewMapObject
+
+case class MapConfig(
+  completeness: MapCompleteness,
+  featureSet: MapFeatureSet,
+  mode: MapMode = StandardMode,
+  keyExpanderType: NewMapObject,
+  preservationRules: Vector[PreservationRule] = Vector.empty
+)
+
+sealed abstract class PreservationRule*/
+
 case class MapT(
   inputType: NewMapObject,
   outputType: NewMapObject,
   completeness: MapCompleteness,
-  featureSet: MapFeatureSet
+  featureSet: MapFeatureSet,
 ) extends NewMapObject
 
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
 object CommandOutput extends MapCompleteness
-object SubtypeInput extends MapCompleteness // TODO - remove this when the ReqMap rules are in place!
+object SubtypeInput extends MapCompleteness
 
 sealed abstract class MapFeatureSet
 object BasicMap extends MapFeatureSet
@@ -77,14 +93,6 @@ sealed abstract class MapMode
 object StandardMode extends MapMode // There is a single output type
 object GenericMode extends MapMode // The output type depends on the input type
 object StructMode extends MapMode // The output type depends on the specific input
-
-// TypeClass
-// defines some structure on a type
-// preservation rules preserve this structure!!
-case class TableT(
-  expandingKeyType: NewMapObject,
-  requiredValues: NewMapObject
-) extends NewMapObject
 
 case class ExpandingSubsetT(
   parentType: NewMapObject
