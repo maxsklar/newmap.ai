@@ -37,7 +37,7 @@ object RetrieveType {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT /*| TableT(_, _, _)*/ | ExpandingSubsetT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _, _) | OrBooleanT => TypeT
+    case CountT /*| TableT(_, _, _)*/ | ExpandingSubsetT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
@@ -52,22 +52,22 @@ object RetrieveType {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
       retrieveInputTypeFromFunctionObject(currentState, env)
     }
-    case TaggedObject(UMap(values), MapT(inputType, _, SubtypeInput, features)) => {
+    case TaggedObject(UMap(values), MapT(inputType, _, MapConfig(SubtypeInput, features, _, _))) => {
       SubtypeT(
         TaggedObject(
           UMap(values.map(x => x._1 -> ObjectExpression(Index(1)))),
-          MapT(inputType, Index(2), CommandOutput, features)
+          MapT(inputType, Index(2), MapConfig(CommandOutput, features))
         )
       )
     }
     case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
-      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap)))
+      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))))
     }
     case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunctionObject(params, env)
     case CaseT(cases) => retrieveInputTypeFromFunctionObject(cases, env)
     case _ => {
       Evaluator.stripVersioning(RetrieveType.fromNewMapObject(nFunction, env), env) match {
-        case MapT(inputType, _, _, _) => inputType
+        case MapT(inputType, _, _) => inputType
         case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
       }
     }
@@ -79,7 +79,7 @@ object RetrieveType {
       case ObjectExpression(o) => retrieveInputTypeFromFunctionObject(o, env)
       case param => {
         Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
-          case MapT(inputType, _, _, _) => inputType
+          case MapT(inputType, _, _) => inputType
           case other => throw new Exception(s"Couldn't retrieve input type from parametrized $nFunction -- $param")
         }
       }
@@ -98,7 +98,7 @@ object RetrieveType {
         val typeOfFunction = this(nFunction, env)
         val typeOfFunctionC = Evaluator.stripVersioning(typeOfFunction, env)
         typeOfFunctionC match {
-          case MapT(_, _, _, featureSet) => featureSet
+          case MapT(_, _, config) => config.featureSet
           case StructT(params) => retrieveFeatureSetFromFunction(ObjectExpression(params), env)
           case CaseT(cases) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
           case other => throw new Exception(s"Couldn't retrieve feature set from $nFunction $typeOfFunctionC -- $other")
@@ -109,7 +109,7 @@ object RetrieveType {
 
   def retrieveOutputTypeFromFunctionType(nType: NewMapObject, env: Environment): NewMapObject = {
     nType match {
-      case MapT(_, outputType, _, _) => outputType
+      case MapT(_, outputType, _) => outputType
       case VersionedObjectLink(key, status) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         retrieveOutputTypeFromFunctionType(currentState, env)
@@ -133,7 +133,7 @@ object RetrieveType {
           for {
             eField <- Evaluator(field, env)
             result <- Evaluator.applyFunctionAttempt(values, eField, env)
-          } yield MapT(result, nObject, RequireCompleteness, SimpleFunction)
+          } yield MapT(result, nObject, MapConfig(RequireCompleteness, SimpleFunction))
         }
         case _ => Failure(s"This access of object $structValue with field $field is not allowed")
       }
@@ -202,7 +202,7 @@ object RetrieveType {
   def isTermConstant(nObject: NewMapObject): Boolean = {
     nObject match {
       case IdentifierT | CountT | TypeT | AnyT | OrBooleanT => true
-      case MapT(inputType, outputType, _, _) => isTermConstant(inputType) && isTermConstant(outputType)
+      case MapT(inputType, outputType, _) => isTermConstant(inputType) && isTermConstant(outputType)
       case ExpandingSubsetT(parentType) => isTermConstant(parentType)
       case StructT(params) => isTermConstant(params)
       case CaseT(cases) => isTermConstant(cases)

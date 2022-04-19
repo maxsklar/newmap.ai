@@ -12,8 +12,8 @@ object PrintNewMapObject {
     case IdentifierT => "Identifier"
     case OrBooleanT => "OrBooleanT"
     case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + this(nType)
-    case MapT(key, value, completeness, featureSet) => {
-      printMapT(this(key), this(value), completeness, featureSet)
+    case MapT(key, value, config) => {
+      printMapT(this(key), this(value), config)
     }
     case ExpandingSubsetT(parentType) => {
       s"ExpandingSubsetT(${this(parentType)})"
@@ -44,10 +44,10 @@ object PrintNewMapObject {
       this(caseType) + "." + this(constructor) + " " + printExpression(input)
     }
     case BuildMapT(inputType, outputType, completeness, featureSet) => {
-      printMapT(printExpression(inputType), printExpression(outputType), completeness, featureSet)
+      printMapT(printExpression(inputType), printExpression(outputType), MapConfig(completeness, featureSet))
     }
     case BuildTableT(expandingKeyType, requiredValues) => {
-      val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), RequireCompleteness, SimpleFunction)
+      val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
       s"Table(${mapTString})"
     }
     case BuildCaseT(cases) => {
@@ -70,10 +70,9 @@ object PrintNewMapObject {
   def printMapT(
     key: String,
     value: String,
-    completeness: MapCompleteness,
-    featureSet: MapFeatureSet
+    config: MapConfig
   ): String = {
-    (completeness, featureSet) match {
+    (config.completeness, config.featureSet) match {
       case (CommandOutput, BasicMap) => "Map(" + key + ", " + value + ")"
       case (RequireCompleteness, SimpleFunction) => "ReqMap(" + key + ", " + value + ")"
       case (RequireCompleteness, FullFunction) => {
@@ -81,13 +80,13 @@ object PrintNewMapObject {
         "\\(" + key + ": " + value + ")"
       }
       case _ => {
-        val completenessStr = completeness match {
+        val completenessStr = config.completeness match {
           case RequireCompleteness => "Required"
           case CommandOutput => "Command"
           case SubtypeInput => "SubtypeInput"
         }
 
-        val featureSetStr = featureSet match {
+        val featureSetStr = config.featureSet match {
           case BasicMap => "BasicMap"
           case SimpleFunction => "Simple"
           case WellFoundedFunction => "WellFounded"

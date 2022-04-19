@@ -17,10 +17,12 @@ class TestEvaluator extends FlatSpec {
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
+  def mapConfig = MapConfig(CommandOutput, SimpleFunction)
+
   "isCommandFunc " should " work properly on ranges" in {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+      MapT(TypeT, Index(2), mapConfig)
     ), Index(10), Environment.Base)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
@@ -28,7 +30,7 @@ class TestEvaluator extends FlatSpec {
   it should " work properly on count" in {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+      MapT(TypeT, Index(2), mapConfig)
     ), CountT, Environment.Base)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
@@ -36,7 +38,7 @@ class TestEvaluator extends FlatSpec {
   it should " work properly on TypeT, and return false" in {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+      MapT(TypeT, Index(2), mapConfig)
     ), TypeT, Environment.Base)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
@@ -46,7 +48,7 @@ class TestEvaluator extends FlatSpec {
     assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
-        MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+        MapT(AnyT, Index(2), mapConfig)
       ), TypeT, Environment.Base),
       Index(0)
     )
@@ -54,24 +56,24 @@ class TestEvaluator extends FlatSpec {
     assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
-        MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, SimpleFunction)), Environment.Base),
+        MapT(AnyT, Index(2), mapConfig)
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), mapConfig)), Environment.Base),
       Index(1)
     )
 
     assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
-        MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, BasicMap)), Environment.Base),
+        MapT(AnyT, Index(2), mapConfig)
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, BasicMap))), Environment.Base),
       Index(1)
     )
 
     assertFunctionWorkedAndReturnedResult(
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
-        MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), CommandOutput, FullFunction)), Environment.Base),
+        MapT(AnyT, Index(2), mapConfig)
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, FullFunction))), Environment.Base),
       Index(0)
     )
   }

@@ -49,7 +49,7 @@ object Evaluator {
             "Cannot build a RequireCompleteness map with an expanding input type. Try creating a table instead, or using a map with a default value."
           )
         } yield {
-          MapT(evalInputType, evalOutputType, completeness, featureSet)
+          MapT(evalInputType, evalOutputType, MapConfig(completeness, featureSet))
         }
       }
       case BuildTableT(keyType, requiredValues) => {
@@ -60,7 +60,7 @@ object Evaluator {
         } yield {
           // TODO - are we going to know that this is an expandable type?
           // - I think so because startingType is tagged!!
-          MapT(startingType, evalRequiredValues, RequireCompleteness, SimpleFunction)
+          MapT(startingType, evalRequiredValues, MapConfig(RequireCompleteness, SimpleFunction))
         }
       }
       case BuildExpandingSubsetT(parentType) => {
@@ -111,7 +111,7 @@ object Evaluator {
     Struct(
       TaggedObject(
         UMap(t: t)
-        MapT(CommandType, Type, Required, SimpleMap)
+        MapT(CommandType, Type, MapConfig(Required, SimpleMap))
       )
     )
 
@@ -124,9 +124,9 @@ object Evaluator {
     nType match {
       case CountT => Success(Index(0))
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
-      case ExpandingSubsetT(_) | MapT(_, _, CommandOutput, _) => Success(TaggedObject(UMap(Vector.empty), nType))
-      case MapT(TaggedObject(UIndex(0), _), _, RequireCompleteness, _) => Success(TaggedObject(UMap(Vector.empty), nType))
-      case MapT(TaggedObject(UMap(m), _), _, RequireCompleteness, _) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case ExpandingSubsetT(_) | MapT(_, _, MapConfig(CommandOutput, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case MapT(TaggedObject(UIndex(0), _), _, MapConfig(RequireCompleteness, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case MapT(TaggedObject(UMap(m), _), _, MapConfig(RequireCompleteness, _, _, _)) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
         // Maybe there should be a type of cases specifically
@@ -136,8 +136,7 @@ object Evaluator {
             MapT(
               IdentifierT,
               TypeT,
-              RequireCompleteness,
-              BasicMap
+              MapConfig(RequireCompleteness, BasicMap)
             )
           )
         ))
@@ -175,7 +174,7 @@ object Evaluator {
         NewMapO.emptyStruct
       )
       case OrBooleanT => Success(Index(2))
-      case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
+      case mapT@MapT(inputType, outputType, MapConfig(CommandOutput, _, _, _)) => {
         // TO incorporate TableT:
         // Look at input type
         // See if input type is itself a command type
@@ -193,14 +192,13 @@ object Evaluator {
               MapT(
                 Index(2),
                 TypeT,
-                RequireCompleteness,
-                BasicMap
+                MapConfig(RequireCompleteness, BasicMap)
               )
             )
           )
         }
       }
-      case MapT(keyType, requiredValues, _, _) => {
+      case MapT(keyType, requiredValues, _) => {
         // In this case, there must be a key expansion type
         // TODO: enforce this?
 
@@ -223,7 +221,7 @@ object Evaluator {
                     ObjectPattern(UIndex(0)) -> ObjectExpression(keyExpansionCommandT),
                     ObjectPattern(UIndex(1)) -> ObjectExpression(requiredValues)
                   )),
-                  MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
+                  MapT(Index(2), TypeT, MapConfig(RequireCompleteness, BasicMap))
                 )
               )
             }
@@ -240,7 +238,7 @@ object Evaluator {
                 ObjectPattern(UIndex(0)) -> ObjectExpression(IdentifierT),
                 ObjectPattern(UIndex(1)) -> ObjectExpression(TypeT)
               )),
-              MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
+              MapT(Index(2), TypeT, MapConfig(RequireCompleteness, BasicMap))
             )
           )
         )
@@ -283,7 +281,7 @@ object Evaluator {
           case TaggedObject(UIndex(i), _) => {
             for {
               newState <- applyFunctionAttempt(
-                TaggedObject(IncrementFunc, MapT(CountT, CountT, RequireCompleteness, SimpleFunction)),
+                TaggedObject(IncrementFunc, MapT(CountT, CountT, MapConfig(RequireCompleteness, SimpleFunction))),
                 current,
                 env
               )
@@ -309,7 +307,7 @@ object Evaluator {
         case _ => Failure("This didn't work")
         }
       }
-      case mapT@MapT(inputType, outputType, CommandOutput, featureSet) => {
+      case mapT@MapT(inputType, outputType, MapConfig(CommandOutput, featureSet, _, _)) => {
         for {
           input <- applyFunctionAttempt(command, Index(0), env)
           commandForInput <- applyFunctionAttempt(command, Index(1), env)
@@ -330,7 +328,7 @@ object Evaluator {
           UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), mapT), NewMapO.emptyStruct)
         }
       }
-      case mapT@MapT(keyType, requiredValues, style, features) => {
+      case mapT@MapT(keyType, requiredValues, MapConfig(style, features, _, _)) => {
         for {
           keyExpansionCommandT <- getCommandInputOfCommandType(
             RetrieveType.fromNewMapObject(keyType, env),
@@ -355,7 +353,7 @@ object Evaluator {
 
           updateKeyTypeResponse <- updateVersionedO(keyType, keyExpansionCommand, env)
 
-          newTableType = MapT(updateKeyTypeResponse.newState, requiredValues, style, features)
+          newTableType = MapT(updateKeyTypeResponse.newState, requiredValues, MapConfig(style, features))
                   
           mapValues <- current match {
             case TaggedObject(UMap(values), _) => Success(values)
@@ -393,12 +391,12 @@ object Evaluator {
                     ObjectPattern(UIndex(0)) -> ObjectExpression(parentType),
                     ObjectPattern(UIndex(1)) -> ObjectExpression(Index(2))
                   )),
-                  MapT(Index(2), TypeT, RequireCompleteness, BasicMap)
+                  MapT(Index(2), TypeT, MapConfig(RequireCompleteness, BasicMap))
                 )
               )
             )
 
-            val isMember = TaggedObject(UMap(values), MapT(parentType, OrBooleanT, CommandOutput, BasicMap))
+            val isMember = TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap)))
 
             for {
               result <- updateVersionedO(isMember, isMemberCommand, env)
@@ -574,7 +572,7 @@ object Evaluator {
     (funcC, inputC) match {
       case (TaggedObject(UMap(values), nType), _) => {
         stripVersioning(nType, env) match {
-          case MapT(keyType, _, SubtypeInput, _) => {
+          case MapT(keyType, _, MapConfig(SubtypeInput, _, _, _)) => {
             // We have a bit of a problem with the subtype input, because the map patterns are tagged with the PARENT TYPE
             // And the inputC is tagged with the SubType
             // This will be fixed when we get rid of subtypes completely.. hopefully.
@@ -606,7 +604,7 @@ object Evaluator {
               keyMatchResult
             }
           }
-          case MapT(keyType, _, commandType, _) => {
+          case MapT(keyType, _, _) => {
             for {
               keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
                 case Success(result) => Success(result)
@@ -649,7 +647,7 @@ object Evaluator {
             UMap(Vector(
               WildcardPattern("input") -> BuildCase(field, ParamId("input"), func)
             )),
-            MapT(result, func, RequireCompleteness, SimpleFunction)
+            MapT(result, func, MapConfig(RequireCompleteness, SimpleFunction))
           )
         }
       }
@@ -660,7 +658,7 @@ object Evaluator {
       }
       case (TaggedObject(IsSimpleFunction, _), nObject) => {
         nObject match {
-          case TaggedObject(_, MapT(_, _, CommandOutput, features)) => {
+          case TaggedObject(_, MapT(_, _, MapConfig(CommandOutput, features, _, _))) => {
             if (features == SimpleFunction || features == BasicMap) {
               Success(Index(1))
             } else {

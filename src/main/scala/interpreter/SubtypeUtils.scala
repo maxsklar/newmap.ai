@@ -110,7 +110,7 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case StructT(TaggedObject(UMap(params), MapT(_, _, _, BasicMap))) if (params.length == patterns.length) => {
+          case StructT(TaggedObject(UMap(params), MapT(_, _, MapConfig(_, BasicMap, _, _)))) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
                 isCatchallPattern(x._1, nObject, env)
@@ -158,7 +158,7 @@ object SubtypeUtils {
   }
 
   def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
-    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, CommandOutput, _))) => {
+    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, MapConfig(CommandOutput, _, _, _)))) => {
       untaggedFunction match {
         case UMap(values) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
@@ -183,7 +183,7 @@ object SubtypeUtils {
       case _ if doesEndtypeCoverParentType => true
       case SubtypeT(TaggedObject(IsSimpleFunction, _)) => {
         startingType match {
-          case MapT(_, _, _, featureSet) => isFeatureSetConvertible(featureSet, SimpleFunction)
+          case MapT(_, _, config) => isFeatureSetConvertible(config.featureSet, SimpleFunction)
           case _ => false 
         }
       }
@@ -239,8 +239,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(startingInputType, startingOutputType, startingCompleteness, startingFeatureSet),
-        MapT(endingInputType, endingOutputType, endingCompleteness, endingFeatureSet)
+        MapT(startingInputType, startingOutputType, MapConfig(startingCompleteness, startingFeatureSet, _, _)),
+        MapT(endingInputType, endingOutputType, MapConfig(endingCompleteness, endingFeatureSet, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from

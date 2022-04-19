@@ -34,7 +34,7 @@ object TypeChecker {
           case TaggedObject(umap@UMap(_), ExpandingSubsetT(superType)) => {
             for {
               result <- Evaluator.applyFunctionAttempt(
-                TaggedObject(umap, MapT(superType, OrBooleanT, CommandOutput, BasicMap)),
+                TaggedObject(umap, MapT(superType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
                 TaggedObject(UIndex(i), superType),
                 env
               )
@@ -111,7 +111,7 @@ object TypeChecker {
             case TaggedObject(umap, ExpandingSubsetT(parentType)) => {
               for {
                 result <- Evaluator.applyFunctionAttempt(
-                  TaggedObject(umap, MapT(parentType, OrBooleanT, CommandOutput, BasicMap)),
+                  TaggedObject(umap, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
                   TaggedObject(UIdentifier(s), parentType),
                   env
                 )
@@ -204,12 +204,12 @@ object TypeChecker {
       }
       case CommandList(values: Vector[ParseTree]) => {
         expectedType match {
-          case mapT@MapT(keyTypeT, _, completeness, _) => {
+          case mapT@MapT(keyTypeT, _, config) => {
             for {
               mapValues <- typeCheckMap(values, mapT, env, featureSet)
 
               isCovered <- {
-                if (completeness != RequireCompleteness) Success(true)
+                if (config.completeness != RequireCompleteness) Success(true)
                 else {
                   SubtypeUtils.doPatternsCoverType(mapValues.map(_._1), keyTypeT, env)
                 }
@@ -239,7 +239,7 @@ object TypeChecker {
           case TypeT => {
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // TODO - can this be simplified by combining with the MapT section above?
-            val mapT = MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
+            val mapT = MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
 
             for {
               mapValues <- typeCheckMap(values, mapT, env, featureSet)
@@ -293,7 +293,7 @@ object TypeChecker {
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
         for {
-          resultKey <- typeCheckWithPatternMatching(k, keyType, env, featureSet, mapT.featureSet)
+          resultKey <- typeCheckWithPatternMatching(k, keyType, env, featureSet, mapT.config.featureSet)
           foundKeyPattern = resultKey.typeCheckResult
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
@@ -302,7 +302,7 @@ object TypeChecker {
             v,
             valueType,
             resultKey.newEnvironment,
-            featureSet = mapT.featureSet
+            featureSet = mapT.config.featureSet
           )
 
           restOfMap <- typeCheckMap(restOfValues, mapT, env, featureSet)
@@ -339,7 +339,7 @@ object TypeChecker {
         )
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (CommandList(values), StructT(TaggedObject(UMap(structValues), MapT(_, _, _, BasicMap)))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (CommandList(values), StructT(TaggedObject(UMap(structValues), MapT(_, _, MapConfig(_, BasicMap, _, _))))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {

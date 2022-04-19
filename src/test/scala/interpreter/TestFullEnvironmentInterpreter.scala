@@ -98,7 +98,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(1), IndexValue(43, Index(100))),
           bind(UIndex(2), IndexValue(67, Index(100)))
         )),
-        MapT(Index(3), Index(100), CommandOutput, BasicMap)
+        MapT(Index(3), Index(100), MapConfig(CommandOutput, BasicMap))
       )
     )
 
@@ -110,7 +110,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "m",
-      MapT(Index(3), Index(100), CommandOutput, BasicMap)
+      MapT(Index(3), Index(100), MapConfig(CommandOutput, BasicMap))
     )
 
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
@@ -144,7 +144,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(0), IndexValue(10, Index(100))),
           bind(UIndex(2),  IndexValue(3, Index(100)))
         )),
-        MapT(Index(3), Index(100), CommandOutput, BasicMap)
+        MapT(Index(3), Index(100), MapConfig(CommandOutput, BasicMap))
       )
     )
 
@@ -213,8 +213,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           )
         ),
         Index(100),
-        CommandOutput,
-        BasicMap
+        MapConfig(CommandOutput, BasicMap)
       )
     )
 
@@ -282,13 +281,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
                 bind(UIndex(1), IndexValue(3, Index(4))),
                 bind(UIndex(2), IndexValue(1, Index(4)))
               )),
-              MapT(Index(3), Index(4), CommandOutput, BasicMap)
+              MapT(Index(3), Index(4), MapConfig(CommandOutput, BasicMap))
             )),
             ParamId("a")
           )
         )),
-        MapT(Index(3), Index(4), RequireCompleteness, FullFunction
-      ))
+        MapT(Index(3), Index(4), MapConfig(RequireCompleteness, FullFunction))
+      )
     )
 
     val correctCommandUseFunc = Environment.eCommand(
@@ -431,11 +430,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       MapT(
         Index(4),
         CountT,
-        RequireCompleteness,
-        SimpleFunction
+        MapConfig(RequireCompleteness, SimpleFunction)
       ),
-      RequireCompleteness,
-      SimpleFunction
+      MapConfig(RequireCompleteness, SimpleFunction)
     )
 
     testCodeScript(Vector(

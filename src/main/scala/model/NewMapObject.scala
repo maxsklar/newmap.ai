@@ -53,7 +53,7 @@ case object IdentifierT extends NewMapObject
  *
  * TODO - should we subsume struct type in here??
  */
-/*case class MapT(
+case class MapT(
   inputType: NewMapObject,
   outputType: NewMapObject,
   config: MapConfig
@@ -63,18 +63,17 @@ case class MapConfig(
   completeness: MapCompleteness,
   featureSet: MapFeatureSet,
   mode: MapMode = StandardMode,
-  keyExpanderType: NewMapObject,
   preservationRules: Vector[PreservationRule] = Vector.empty
 )
 
-sealed abstract class PreservationRule*/
+sealed abstract class PreservationRule
 
-case class MapT(
+/*case class MapT(
   inputType: NewMapObject,
   outputType: NewMapObject,
   completeness: MapCompleteness,
   featureSet: MapFeatureSet,
-) extends NewMapObject
+) extends NewMapObject*/
 
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
@@ -169,7 +168,7 @@ object NewMapO {
   def commandT: NewMapObject = SubtypeT(
     TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, Index(2), CommandOutput, SimpleFunction)
+      MapT(TypeT, Index(2), MapConfig(CommandOutput, SimpleFunction))
     )
   )
 
@@ -179,13 +178,13 @@ object NewMapO {
   def simpleFunctionT: NewMapObject = SubtypeT(
     TaggedObject(
       IsSimpleFunction,
-      MapT(AnyT, Index(2), CommandOutput, SimpleFunction)
+      MapT(AnyT, Index(2), MapConfig(CommandOutput, SimpleFunction))
     )
   )
 
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 
   def emptyStruct: NewMapObject = StructT(
-    TaggedObject(UMap(Vector.empty), MapT(Index(0), Index(0), RequireCompleteness, BasicMap))
+    TaggedObject(UMap(Vector.empty), MapT(Index(0), Index(0), MapConfig(RequireCompleteness, BasicMap)))
   )
 }

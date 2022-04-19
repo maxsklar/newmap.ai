@@ -197,11 +197,11 @@ object Environment {
   }
 
   def simpleFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
-    MapT(inputType, outputType, RequireCompleteness, BasicMap)
+    MapT(inputType, outputType, MapConfig(RequireCompleteness, BasicMap))
   }
 
   def fullFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
-    MapT(inputType, outputType, RequireCompleteness, FullFunction)
+    MapT(inputType, outputType, MapConfig(RequireCompleteness, FullFunction))
   }
 
   def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
@@ -212,7 +212,7 @@ object Environment {
     StructT(
       TaggedObject(
         UMap(paramsToObject),
-        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
+        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
       )
     )
   }
@@ -225,7 +225,7 @@ object Environment {
     CaseT(
       TaggedObject(
         UMap(paramsToObject),
-        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap)
+        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
       )
     )
   }
@@ -252,7 +252,7 @@ object Environment {
     val structT = StructT(
       TaggedObject(
         UMap(inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(x._1._2))),
-        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, SubtypeInput, SimpleFunction)
+        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, MapConfig(SubtypeInput, SimpleFunction))
       )
     )
 
@@ -260,7 +260,7 @@ object Environment {
 
     TaggedObject(
       UMap(Vector(structP -> expression)),
-      MapT(structT, TypeT, RequireCompleteness, SimpleFunction)
+      MapT(structT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )
   }
 
@@ -269,15 +269,15 @@ object Environment {
     eCommand("Type", TypeT),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
-    eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, RequireCompleteness, SimpleFunction))),
+    eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, MapConfig(RequireCompleteness, SimpleFunction)))),
     eCommand("IsCommand", TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, TaggedObject(UIndex(2), CountT), CommandOutput, SimpleFunction)
+      MapT(TypeT, TaggedObject(UIndex(2), CountT), MapConfig(CommandOutput, SimpleFunction))
     )),
     eCommand("OrBoolean", OrBooleanT),
     eCommand("Sequence", TaggedObject(
       UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),
-      MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
+      MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
@@ -293,7 +293,7 @@ object Environment {
     )),
     eCommand("ExpandingSubset", TaggedObject(
       UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType")))),
-      MapT(TypeT, TypeT, RequireCompleteness, SimpleFunction)
+      MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("SubMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
@@ -304,10 +304,9 @@ object Environment {
         WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
-        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
+        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap)),
         TypeT,
-        RequireCompleteness,
-        SimpleFunction
+        MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
     // TODO: This CStruct is going to be merged with Struct.. once we take care of generics
@@ -316,10 +315,9 @@ object Environment {
         WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
-        MapT(CountT, TypeT, SubtypeInput, BasicMap),
+        MapT(CountT, TypeT, MapConfig(SubtypeInput, BasicMap)),
         TypeT,
-        RequireCompleteness,
-        SimpleFunction
+        MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
     // TODO: right now cases must be identifier based, expand this in the future!!
@@ -328,10 +326,9 @@ object Environment {
         WildcardPattern("cases") -> BuildCaseT(ParamId("cases"))
       )),
       MapT(
-        MapT(IdentifierT, TypeT, SubtypeInput, BasicMap),
+        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap)),
         TypeT,
-        RequireCompleteness,
-        SimpleFunction
+        MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
     eCommand("Subtype", TaggedObject(
@@ -341,8 +338,7 @@ object Environment {
       MapT(
         NewMapO.simpleFunctionT,
         TypeT,
-        RequireCompleteness,
-        SimpleFunction
+        MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
   ))

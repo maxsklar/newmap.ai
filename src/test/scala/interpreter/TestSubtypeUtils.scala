@@ -11,7 +11,7 @@ class TestSubtypeUtils extends FlatSpec {
         ObjectPattern(UIdentifier("key")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT))),
         ObjectPattern(UIdentifier("value")) -> ObjectExpression(TaggedObject(UIndex(1), TaggedObject(UIndex(2), CountT)))
       )),
-      MapT(IdentifierT, TaggedObject(UIndex(2), CountT), CommandOutput, BasicMap)
+      MapT(IdentifierT, TaggedObject(UIndex(2), CountT), MapConfig(CommandOutput, BasicMap))
     )
 
     assert(RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), Environment.Base) == IdentifierT)
