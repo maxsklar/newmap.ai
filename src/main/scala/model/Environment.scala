@@ -281,11 +281,11 @@ object Environment {
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
-      BuildMapT(ParamId("key"), ParamId("value"), CommandOutput, BasicMap)
+      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap))
     )),
     eCommand("ReqMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      BuildMapT(ParamId("key"), ParamId("value"), RequireCompleteness, SimpleFunction)
+      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Table", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
@@ -297,7 +297,7 @@ object Environment {
     )),
     eCommand("SubMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      BuildMapT(ParamId("key"), ParamId("value"), SubtypeInput, SimpleFunction)
+      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(SubtypeInput, SimpleFunction))
     )),
     eCommand("Struct", TaggedObject(
       UMap(Vector(

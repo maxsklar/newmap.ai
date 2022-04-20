@@ -32,12 +32,11 @@ object MakeSubstitution {
       case BuildCase(constructor, input, caseType) => {
         BuildCase(constructor, this(input, parameters, env), caseType)
       }
-      case BuildMapT(inputType, outputType, completeness, featureSet) => {
+      case BuildMapT(inputType, outputType, config) => {
         BuildMapT(
           this(inputType, parameters, env),
           this(outputType, parameters, env),
-          completeness,
-          featureSet
+          config
         )
       }
       case BuildTableT(keyType, requiredValues) => {

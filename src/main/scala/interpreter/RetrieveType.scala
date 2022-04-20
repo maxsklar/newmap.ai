@@ -25,7 +25,7 @@ object RetrieveType {
       }
     }
     case BuildCase(_, _, caseType) => caseType
-    case BuildMapT(_, _, _, _) => TypeT
+    case BuildMapT(_, _, _) => TypeT
     case BuildTableT(_, _) => TypeT
     case BuildExpandingSubsetT(_) => TypeT
     case BuildSubtypeT(_) => TypeT
@@ -166,7 +166,7 @@ object RetrieveType {
         isTermClosedLiteral(input, knownVariables)
     }
     case BuildCase(_, input, _) => isTermClosedLiteral(input, knownVariables)
-    case BuildMapT(inputType, outputType, _, _) => {
+    case BuildMapT(inputType, outputType, _) => {
       isTermClosedLiteral(inputType, knownVariables) &&
         isTermClosedLiteral(outputType, knownVariables)
     }

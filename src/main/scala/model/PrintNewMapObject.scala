@@ -43,8 +43,8 @@ object PrintNewMapObject {
     case BuildCase(constructor, input, caseType) => {
       this(caseType) + "." + this(constructor) + " " + printExpression(input)
     }
-    case BuildMapT(inputType, outputType, completeness, featureSet) => {
-      printMapT(printExpression(inputType), printExpression(outputType), MapConfig(completeness, featureSet))
+    case BuildMapT(inputType, outputType, config) => {
+      printMapT(printExpression(inputType), printExpression(outputType), config)
     }
     case BuildTableT(expandingKeyType, requiredValues) => {
       val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
@@ -93,8 +93,13 @@ object PrintNewMapObject {
           case FullFunction => "FullFunction"
         }
 
+        val modeCall = config.mode match {
+          //case StructMode => "Struct"
+          case _ => "Map"
+        }
+
         // TODO(2022): Improve Notation so that we don't need this!
-        "Map(" + key + ", " + value + ", " + completenessStr + ", " + featureSetStr + ")"
+        s"$modeCall($key, $value, $completenessStr, $featureSetStr)"
       }  
     }
   }

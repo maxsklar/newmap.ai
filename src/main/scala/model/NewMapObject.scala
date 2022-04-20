@@ -67,13 +67,9 @@ case class MapConfig(
 )
 
 sealed abstract class PreservationRule
-
-/*case class MapT(
-  inputType: NewMapObject,
-  outputType: NewMapObject,
-  completeness: MapCompleteness,
-  featureSet: MapFeatureSet,
-) extends NewMapObject*/
+// Preservation
+// Preserving Equality: [a == b] == [f(a) == f(b)]
+// First we need equality to be a generic type..
 
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
@@ -91,7 +87,9 @@ object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go 
 sealed abstract class MapMode
 object StandardMode extends MapMode // There is a single output type
 object GenericMode extends MapMode // The output type depends on the input type
-object StructMode extends MapMode // The output type depends on the specific input
+
+// In the future, this will allow us to remove StructT
+//object StructMode extends MapMode // The output type depends on the specific input
 
 case class ExpandingSubsetT(
   parentType: NewMapObject

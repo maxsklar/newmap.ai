@@ -38,18 +38,18 @@ object Evaluator {
           untaggedConstructor <- removeTypeTag(constructor)
         } yield TaggedObject(UCase(untaggedConstructor, untaggedInput), caseType)
       }
-      case BuildMapT(inputType, outputType, completeness, featureSet) => {
+      case BuildMapT(inputType, outputType, config) => {
         for {
           evalInputType <- this(inputType, env)
           evalOutputType <- this(outputType, env)
 
           // TODO - this needs to be pushed up to the type checker
           _ <- Outcome.failWhen(
-            (completeness == RequireCompleteness) && !RetrieveType.isTermConstant(evalInputType),
+            (config.completeness == RequireCompleteness) && !RetrieveType.isTermConstant(evalInputType),
             "Cannot build a RequireCompleteness map with an expanding input type. Try creating a table instead, or using a map with a default value."
           )
         } yield {
-          MapT(evalInputType, evalOutputType, MapConfig(completeness, featureSet))
+          MapT(evalInputType, evalOutputType, config)
         }
       }
       case BuildTableT(keyType, requiredValues) => {
@@ -78,10 +78,13 @@ object Evaluator {
           evalCases <- this(cases, env)
         } yield CaseT(evalCases)
       }
+      // TODO - eventually remove BuildStructT with BuildMapT in its place!
       case BuildStructT(params) => {
         for {
           evalParams <- this(params, env)
-        } yield StructT(evalParams)
+        } yield {
+          StructT(evalParams)
+        }
       }
       case BuildMapInstance(values, nType) => {
         for {

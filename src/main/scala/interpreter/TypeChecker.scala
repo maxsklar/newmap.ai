@@ -272,8 +272,7 @@ object TypeChecker {
           BuildMapT(
             inputType,
             outputType,
-            completeness = RequireCompleteness, 
-            featureSet = FullFunction
+            MapConfig(RequireCompleteness, FullFunction)
           )
         }
       }

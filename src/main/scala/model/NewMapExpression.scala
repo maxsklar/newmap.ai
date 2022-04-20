@@ -24,8 +24,7 @@ case class BuildCase(
 case class BuildMapT(
   inputType: NewMapExpression,
   outputType: NewMapExpression,
-  completeness: MapCompleteness,
-  featureSet: MapFeatureSet
+  config: MapConfig
 ) extends NewMapExpression
 
 case class BuildTableT(
