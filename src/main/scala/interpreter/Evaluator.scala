@@ -26,7 +26,7 @@ object Evaluator {
           case None => Failure(s"Unbound identifier: $s")
           case Some(EnvironmentValue(nObject, BoundStatus)) => Success(nObject)
           case Some(EnvironmentValue(nObject, ParameterStatus)) => {
-            throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
+            //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
             Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
           }
         }
@@ -63,10 +63,10 @@ object Evaluator {
           MapT(startingType, evalRequiredValues, MapConfig(RequireCompleteness, SimpleFunction))
         }
       }
-      case BuildExpandingSubsetT(parentType) => {
+      case BuildExpandingSubsetT(parentType, allowPatternMatching) => {
         for {
           evalParentType <- this(parentType, env)
-        } yield ExpandingSubsetT(evalParentType)
+        } yield ExpandingSubsetT(evalParentType, allowPatternMatching)
       }
       case BuildSubtypeT(isMember) => {
         for {
@@ -98,9 +98,11 @@ object Evaluator {
   def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
-      case VersionedObjectLink(_, _) => Failure("Can't remove type tage from versioned object link")
+      case VersionedObjectLink(_, _) => Failure(s"Can't remove type tage from versioned object link")
+      case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_) | CaseT(_) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) | SubtypeT(_) => Success(UType(nObject))
       case _ => {
-        Failure("Can't yet remove type tag from typed object (once types are redefined as a case it'll be possible)")
+        //throw new Exception(nObject.toString)
+        Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")
       }
     }
   }
@@ -127,7 +129,7 @@ object Evaluator {
     nType match {
       case CountT => Success(Index(0))
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
-      case ExpandingSubsetT(_) | MapT(_, _, MapConfig(CommandOutput, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
+      case ExpandingSubsetT(_, _) | MapT(_, _, MapConfig(CommandOutput, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
       case MapT(TaggedObject(UIndex(0), _), _, MapConfig(RequireCompleteness, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
       case MapT(TaggedObject(UMap(m), _), _, MapConfig(RequireCompleteness, _, _, _)) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
@@ -139,7 +141,7 @@ object Evaluator {
             MapT(
               IdentifierT,
               TypeT,
-              MapConfig(RequireCompleteness, BasicMap)
+              MapConfig(SubtypeInput, BasicMap)
             )
           )
         ))
@@ -148,11 +150,17 @@ object Evaluator {
       //case AnyT => Failure("The \"any\" Type has no implemented default value")
       //case IdentifierT => Failure("Type of Identifiers has no default value")
       //case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
-      case structT@StructT(TaggedObject(UMap(parameterList), _)) => {
-        for {
-          defaultValue <- getDefaultValueFromStructParams(parameterList, env)
-        } yield {
-          TaggedObject(UMap(defaultValue), structT)
+      case structT@StructT(TaggedObject(UMap(parameterList), MapT(keyType, _, _))) => {
+        if (isEmptySet(keyType, env)) {
+          // If the key set is empty, no parameters need to be specified, even if a pattern exists!
+          // TODO - maybe the code in this case block should be entirely driven by keyType!
+          Success(TaggedObject(UMap(Vector.empty), structT))
+        } else {   
+          for {
+            defaultValue <- getDefaultValueFromStructParams(parameterList, env)
+          } yield {
+            TaggedObject(UMap(defaultValue), structT)
+          }
         }
       }
       //case CaseT(cases) => {
@@ -165,6 +173,14 @@ object Evaluator {
       case _ => {
         Failure(s"$nType is not a pure command type, error in type checker")
       }
+    }
+  }
+
+  def isEmptySet(nType: NewMapObject, env: Environment): Boolean = {
+    stripVersioning(nType, env) match {
+      case TaggedObject(UMap(umap), _) => umap.isEmpty
+      case TaggedObject(UIndex(0), _) => true
+      case _ => false
     }
   }
 
@@ -231,7 +247,7 @@ object Evaluator {
           }
         }
       }
-      case ExpandingSubsetT(parentType) => Success(parentType)
+      case ExpandingSubsetT(parentType, _) => Success(parentType)
       // This should really be a case type instead of a typeT
       case TypeT => {
         Success(
@@ -377,7 +393,7 @@ object Evaluator {
           newMapValues = newMapping +: prepNewValues
         } yield UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), newTableType), NewMapO.emptyStruct)
       }
-      case ExpandingSubsetT(parentType) => {
+      case ExpandingSubsetT(parentType, allowPatterns) => {
         //current is going be of type SubsetT(parentT)
         // and the isMember function is going to have a value of isSubsetOr
         current match {
@@ -406,7 +422,7 @@ object Evaluator {
             } yield {
               // TODO - eventually the output will be different (set of new items??)
               UpdateVersionedOResponse(
-                retagObject(result.newState, ExpandingSubsetT(parentType)),
+                retagObject(result.newState, ExpandingSubsetT(parentType, allowPatterns)),
                 command
               )
             }
@@ -459,7 +475,7 @@ object Evaluator {
 
       versionedO <- versionedObject.nObject match {
         case vo@VersionedObjectLink(_, _) => Success(vo)
-        case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually $versionedObject.")
+        case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually ${versionedObject.nObject}.")
       }
     } yield versionedO
   }
@@ -608,6 +624,31 @@ object Evaluator {
             }
           }
           case MapT(keyType, _, _) => {
+            for {
+              keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
+                case Success(result) => Success(result)
+                case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
+                  if (isEvaluationError) {
+                    Failure(message)
+                  } else {
+                    // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+                    // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+                    // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+                    //  and get the default from that
+                    val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
+
+                    val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
+                    
+                    getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
+                  }
+                }
+              }
+            } yield {
+              keyMatchResult
+            }
+          }
+          case ExpandingSubsetT(keyType, _) => {
+            // Copied from above
             for {
               keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
                 case Success(result) => Success(result)

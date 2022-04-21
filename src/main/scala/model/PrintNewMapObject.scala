@@ -15,11 +15,12 @@ object PrintNewMapObject {
     case MapT(key, value, config) => {
       printMapT(this(key), this(value), config)
     }
-    case ExpandingSubsetT(parentType) => {
-      s"ExpandingSubsetT(${this(parentType)})"
+    case ExpandingSubsetT(parentType, allowPattern) => {
+      val p = if (allowPattern) "P" else ""
+      s"ExpandingSubsetT$p(${this(parentType)})"
     }
-    case StructT(params) => "Struct " + this(params)
-    case CaseT(cases) => "Case " + this(cases)
+    case StructT(params) => s"Struct(${this(params)})" 
+    case CaseT(cases) => s"Case(${this(cases)})"
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
@@ -62,8 +63,10 @@ object PrintNewMapObject {
     case BuildMapInstance(values, nType) => {
       mapToString(values)
     }
-    case BuildExpandingSubsetT(parentType) => {
-      s"ExpandingSubset(${printExpression(parentType)})"
+    case BuildExpandingSubsetT(parentType, allowPattern) => {
+      val p = if (allowPattern) "P" else ""
+
+      s"ExpandingSubset$p(${printExpression(parentType)})"
     }
   }
 
@@ -108,6 +111,7 @@ object PrintNewMapObject {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
     case UCase(constructor, value) => "(" + untagged(constructor) + " " + untagged(value) + ")"
+    case UType(nType) => this(nType)
     case UIndex(i) => i.toString
     case IsCommandFunc => s"IsCommandFunc"
     case IsSimpleFunction => s"IsSimpleFunction"

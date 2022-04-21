@@ -31,7 +31,7 @@ object TypeChecker {
               Failure(s"Proposed index $i is too large for type $j")
             }
           }
-          case TaggedObject(umap@UMap(_), ExpandingSubsetT(superType)) => {
+          case TaggedObject(umap@UMap(_), ExpandingSubsetT(superType, _)) => {
             for {
               result <- Evaluator.applyFunctionAttempt(
                 TaggedObject(umap, MapT(superType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
@@ -108,7 +108,7 @@ object TypeChecker {
                 _ <- Outcome.failWhen(!isAllowed, s"identifier $s not in subtype $expectedType")
               } yield ObjectExpression(obj)
             }
-            case TaggedObject(umap, ExpandingSubsetT(parentType)) => {
+            case TaggedObject(umap, ExpandingSubsetT(parentType, _)) => {
               for {
                 result <- Evaluator.applyFunctionAttempt(
                   TaggedObject(umap, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
@@ -441,6 +441,11 @@ object TypeChecker {
       case _ => {
         if (parameterList.isEmpty && valueList.isEmpty) {
           Success(Vector.empty)
+        } else if (valueList.isEmpty && (parameterList.length == 1)) {
+          parameterList.head._1 match {
+            case WildcardPattern(_) => Success(Vector.empty)
+            case _ => Failure("Additional parameters not specified " + parameterList.toString)
+          }
         } else if (parameterList.nonEmpty) {
           Failure("Additional parameters not specified " + parameterList.toString)
         } else {
@@ -464,7 +469,7 @@ object TypeChecker {
         typeIsExpectingAnIdentifier(state, env)
       })
     }
-    case TaggedObject(_, ExpandingSubsetT(parentType)) => {
+    case TaggedObject(_, ExpandingSubsetT(parentType, _)) => {
       typeIsExpectingAnIdentifier(parentType, env)
     }
     case _ => false

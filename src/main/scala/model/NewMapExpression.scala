@@ -33,7 +33,8 @@ case class BuildTableT(
 ) extends NewMapExpression
 
 case class BuildExpandingSubsetT(
-  parentType: NewMapExpression
+  parentType: NewMapExpression,
+  allowPatternMatching: Boolean
 ) extends NewMapExpression
 
 case class BuildCaseT(cases: NewMapExpression) extends NewMapExpression

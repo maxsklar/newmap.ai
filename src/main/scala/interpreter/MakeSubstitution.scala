@@ -45,8 +45,8 @@ object MakeSubstitution {
           this(requiredValues, parameters, env)
         )
       }
-      case BuildExpandingSubsetT(parentType) => {
-        BuildExpandingSubsetT(this(parentType, parameters, env))
+      case BuildExpandingSubsetT(parentType, allowPattern) => {
+        BuildExpandingSubsetT(this(parentType, parameters, env), allowPattern)
       }
       case BuildSubtypeT(isMember) => {
         BuildSubtypeT(this(isMember, parameters, env))

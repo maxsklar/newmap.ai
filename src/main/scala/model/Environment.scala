@@ -113,7 +113,15 @@ case class Environment(
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
-        val initValue = Evaluator.getDefaultValueOfCommandType(nType, this).toOption.get
+
+        val defaultOutcome = Evaluator.getDefaultValueOfCommandType(nType, this)
+
+        Evaluator.getDefaultValueOfCommandType(nType, this) match {
+          case Success(_) => ()
+          case Failure(f) => throw new Exception(f)
+        }
+
+        val initValue = defaultOutcome.toOption.get
         val key = VersionedObjectKey(0L, uuid)
         val versionedObject = VersionedObjectLink(key, KeepUpToDate)
         val envValue = EnvironmentValue(versionedObject, BoundStatus)
@@ -209,6 +217,22 @@ object Environment {
       params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
     }
 
+    /*val paramsList = {
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+    }
+
+    val keyType = SubtypeT(TaggedObject(
+      UMap(paramsList),
+      MapT(IdentifierT, OrBooleanT, MapConfig(CommandOutput, BasicMap))
+    ))
+
+    StructT(
+      TaggedObject(
+        UMap(paramsToObject),
+        MapT(keyType, TypeT, MapConfig(RequireCompleteness, BasicMap))
+      )
+    )*/
+
     StructT(
       TaggedObject(
         UMap(paramsToObject),
@@ -264,7 +288,7 @@ object Environment {
     )
   }
 
-  val Base: Environment = Environment().newCommands(Vector(
+  var Base: Environment = Environment().newCommands(Vector(
     eCommand("Any", AnyT),
     eCommand("Type", TypeT),
     eCommand("Count", CountT),
@@ -292,7 +316,7 @@ object Environment {
       BuildTableT(ParamId("key"), ParamId("value"))
     )),
     eCommand("ExpandingSubset", TaggedObject(
-      UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType")))),
+      UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType"), false))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("SubMap", buildDefinitionWithParameters(
@@ -320,6 +344,7 @@ object Environment {
         MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
+    NewVersionedStatementCommand("TypeWithDefault", ExpandingSubsetT(TypeT, true)),
     // TODO: right now cases must be identifier based, expand this in the future!!
     eCommand("Case", TaggedObject(
       UMap(Vector(
@@ -342,4 +367,26 @@ object Environment {
       )
     )),
   ))
+
+  // What do I want???
+  //GetDefault: StructT(TaggedObject(UMap(Vector.empty), MapT(TypeWithDefault, Type, MapConfig(RequireCompleteness, SimpleFunction)))) 
+  val TypeWithDefault = Base.lookup("TypeWithDefault").get.nObject
+
+  Base = Base.newCommands(Vector(
+    eCommand("TypeForDefaultStruct", StructT(TaggedObject(
+      UMap(Vector(WildcardPattern("t") -> ParamId("t"))),
+      MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
+    ))),
+    eCommand("TypeTransformStruct", TaggedObject(
+      UMap(Vector(
+        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
+      )),
+      MapT(
+        MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
+        TypeT,
+        MapConfig(RequireCompleteness, SimpleFunction)
+      )
+    )),
+  ))
+
 }

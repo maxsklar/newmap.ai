@@ -27,7 +27,7 @@ object RetrieveType {
     case BuildCase(_, _, caseType) => caseType
     case BuildMapT(_, _, _) => TypeT
     case BuildTableT(_, _) => TypeT
-    case BuildExpandingSubsetT(_) => TypeT
+    case BuildExpandingSubsetT(_, _) => TypeT
     case BuildSubtypeT(_) => TypeT
     case BuildCaseT(_) => TypeT
     case BuildStructT(_) => TypeT
@@ -37,7 +37,7 @@ object RetrieveType {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT /*| TableT(_, _, _)*/ | ExpandingSubsetT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
+    case CountT /*| TableT(_, _, _)*/ | ExpandingSubsetT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
@@ -60,8 +60,9 @@ object RetrieveType {
         )
       )
     }
-    case TaggedObject(UMap(values), ExpandingSubsetT(parentType)) => {
-      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))))
+    case TaggedObject(UMap(values), ExpandingSubsetT(parentType, allowPattern)) => {
+      val featureSet = if (allowPattern) SimpleFunction else BasicMap
+      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, featureSet))))
     }
     case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunctionObject(params, env)
     case CaseT(cases) => retrieveInputTypeFromFunctionObject(cases, env)
@@ -114,6 +115,7 @@ object RetrieveType {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         retrieveOutputTypeFromFunctionType(currentState, env)
       }
+      case ExpandingSubsetT(_, _) => OrBooleanT
       case _ => throw new Exception(s"Couldn't retrieve output type from $nType")
     }
   }
@@ -173,7 +175,7 @@ object RetrieveType {
     case BuildTableT(keyType, requiredValues) => {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }
-    case BuildExpandingSubsetT(parentType) => {
+    case BuildExpandingSubsetT(parentType, _) => {
       isTermClosedLiteral(parentType)
     }
     case BuildSubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
@@ -203,7 +205,7 @@ object RetrieveType {
     nObject match {
       case IdentifierT | CountT | TypeT | AnyT | OrBooleanT => true
       case MapT(inputType, outputType, _) => isTermConstant(inputType) && isTermConstant(outputType)
-      case ExpandingSubsetT(parentType) => isTermConstant(parentType)
+      case ExpandingSubsetT(parentType, _) => isTermConstant(parentType)
       case StructT(params) => isTermConstant(params)
       case CaseT(cases) => isTermConstant(cases)
       case SubtypeT(isMember) => isTermConstant(isMember)

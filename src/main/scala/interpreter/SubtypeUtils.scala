@@ -217,25 +217,15 @@ object SubtypeUtils {
       case _ if (startingType == endingType) => Success(Vector.empty)
       case (_, AnyT) => Success(Vector.empty)
       case (CountT, TypeT) => Success(Vector.empty)
-      case (ExpandingSubsetT(_), TypeT) => Success(Vector.empty)
-      case (TaggedObject(_, ExpandingSubsetT(parentType)), _) => {
+      case (ExpandingSubsetT(_, _), TypeT) => Success(Vector.empty)
+      case (TaggedObject(_, ExpandingSubsetT(parentType, _)), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
         } yield convertInstructions
       }
-      //case (TableT(_, _), TypeT) => Success(Vector.empty) // TODO: Do we need this? We might!
-      case (_, SubtypeT(isMember)) => {
-        val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+      case (_, TaggedObject(_, ExpandingSubsetT(_, _))) => {
+        // We must figure out the expanding subset in isTypeConvertible!!
 
-        for {
-          convertInstructions <- isTypeConvertible(startingType, superType, env)
-          // TODO - starting type must be converted before moving on
-
-          doesCover = doesTypeCoverSubtype(startingType, SubtypeT(isMember), env)
-          _ <- Outcome.failWhen(!doesCover, s"Cannot convert: $startingType doesn't cover $endingType")
-        } yield convertInstructions
-      }
-      case (_, TaggedObject(_, ExpandingSubsetT(_))) => {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
@@ -339,11 +329,14 @@ object SubtypeUtils {
         _
       ) => {
         Evaluator.stripVersioning(startingType, env) match {
-          case TaggedObject(UMap(_), ExpandingSubsetT(parentType)) => {
+          case TaggedObject(UMap(_), ExpandingSubsetT(parentType, _)) => {
             isTypeConvertible(parentType, endingType, env)
           }
+          case CaseT(TaggedObject(UMap(umap), aaa)) => {
+            throw new Exception(s"-- $umap \n--- $aaa")
+          }
           case _ => {
-            Failure(s"B) StartingType: $startingType\nEndingType: $endingType")
+            Failure(s"B) StartingType: $startingType\nEndingType: $endingType --- ${Evaluator.stripVersioning(startingType, env)}")
           }
         }
       }
@@ -351,7 +344,9 @@ object SubtypeUtils {
         _,
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status)
       ) => {
-        Failure(s"C) StartingType: $startingType\nEndingType: $endingType")
+        val sv = Evaluator.stripVersioning(endingType, env)
+        throw new Exception(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
+        Failure(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
       }
       case _ => Failure(s"No rule to convert $startingType to $endingType")
     }
@@ -365,24 +360,43 @@ object SubtypeUtils {
     startingObject: NewMapObject,
     endingType: NewMapObject,
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = endingType match {
-    case SubtypeT(isMember) => {
-      val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
-      for {
-        convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
+  ): Outcome[Vector[NewMapObject], String] = {
+    endingType match {
+      case SubtypeT(isMember) => {
+        val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+        for {
+          convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
 
-        // TODO - make explicit conversion
-        convertedObject = startingObject
+          // TODO - make explicit conversion
+          convertedObject = startingObject
 
-        checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
-        _ <- Outcome.failWhen(!checksMembership, "Couldn't confirm member of subtype: $startingObject, $endingType")
-      } yield {
-        convertInstructions
+          checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
+          _ <- Outcome.failWhen(!checksMembership, s"Not member of subtype: $startingObject, $endingType")
+        } yield {
+          convertInstructions
+        }
       }
-    }
-    case _ => {
-      val nType = RetrieveType.fromNewMapObject(startingObject, env)
-      isTypeConvertible(nType, endingType, env)
+      case TaggedObject(uMap, ExpandingSubsetT(superType, _)) => {
+        // I think this gets interpreted as a function as well as a type!
+        val isMember = endingType
+
+        for {
+          convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
+
+          // TODO - make explicit conversion
+          convertedObject = startingObject
+
+
+          checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
+          _ <- Outcome.failWhen(!checksMembership, s"Not member of subtype: $startingObject, $endingType")
+        } yield {
+          convertInstructions
+        }
+      }
+      case _ => {
+        val nType = RetrieveType.fromNewMapObject(startingObject, env)
+        isTypeConvertible(nType, endingType, env)
+      }
     }
   }
 

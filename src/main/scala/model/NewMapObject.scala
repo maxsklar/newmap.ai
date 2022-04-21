@@ -92,7 +92,8 @@ object GenericMode extends MapMode // The output type depends on the input type
 //object StructMode extends MapMode // The output type depends on the specific input
 
 case class ExpandingSubsetT(
-  parentType: NewMapObject
+  parentType: NewMapObject,
+  allowPatternMatching: Boolean
 ) extends NewMapObject
 
 // Params should be connected to a NewMapObject which are of type
