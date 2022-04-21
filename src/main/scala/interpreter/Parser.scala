@@ -213,9 +213,18 @@ object NewMapParser extends Parsers {
     }
   }
 
+  // TODO - why isn't this working!!
+  /*private def newVersionedStatement: Parser[NewVersionedStatementParse] = {
+    Lexer.Identifier("new") ~ expressionListWithOperations ~ Lexer.Identifier("as") ~ identifier ^^ {
+      case _ ~ exp ~ _ ~ id => {
+        NewVersionedStatementParse(id, exp)
+      }
+    }
+  }*/
+
   private def forkedVersionedStatement: Parser[ForkedVersionedStatementParse] = {
-    Lexer.Identifier("ver") ~ identifier ~ Lexer.Equals() ~ Lexer.Identifier("fork") ~ identifier ^^ {
-      case _ ~ id ~ _ ~ _ ~ existingId => {
+    Lexer.Identifier("fork") ~ identifier ~ Lexer.Identifier("as") ~ identifier ^^ {
+      case _ ~ existingId ~ _ ~ id => {
         ForkedVersionedStatementParse(id, existingId)
       }
     }

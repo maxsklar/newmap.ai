@@ -576,7 +576,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("ver nForked = fork n", GeneralSuccessCheck),
+      CodeExpectation("fork n as nForked", GeneralSuccessCheck),
       CodeExpectation("update nForked ()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update nForked ()", GeneralSuccessCheck),
@@ -592,7 +592,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " fail when forked off a non-versioned object" in {
     testCodeScript(Vector(
       CodeExpectation("val x: Count = 10", GeneralSuccessCheck),
-      CodeExpectation("ver n = fork x", FailureCheck)
+      CodeExpectation("fork n as x", FailureCheck)
     ))
   }
 
