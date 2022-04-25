@@ -177,7 +177,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     testCodeScript(Vector(
       CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
-      CodeExpectation("val q: 3 = s.b", SuccessCheck(correctCommand))
+      CodeExpectation("val q: 3 = s b", SuccessCheck(correctCommand))
     ))
   }
 
@@ -185,7 +185,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val fieldMap: ReqMap(2, Identifier) = (0: z, 1: b)", GeneralSuccessCheck),
-      CodeExpectation("val q: 3 = s.(fieldMap(1))", GeneralSuccessCheck)
+      CodeExpectation("val q: 3 = s (fieldMap(1))", GeneralSuccessCheck)
     ))
   }
 
@@ -242,9 +242,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     testCodeScript(Vector(
       CodeExpectation("val MyCase: Type = Case (a: 2, b: 3)", GeneralSuccessCheck),
-      CodeExpectation("val x: MyCase = MyCase.a 0", SuccessCheck(correctCommand)),
-      CodeExpectation("val y: MyCase = MyCase.a.b", FailureCheck),
-      CodeExpectation("val x: MyCase = MyCase.c", FailureCheck),
+      CodeExpectation("val x: MyCase = a.0", SuccessCheck(correctCommand)),
+      CodeExpectation("val y: MyCase = a.b", FailureCheck),
+      CodeExpectation("val x: MyCase = c", FailureCheck),
     ))
   }
 
@@ -252,9 +252,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
-      CodeExpectation("val x: maybeSix = maybeSix.None 0", GeneralSuccessCheck),
-      CodeExpectation("val y: maybeSix = maybeSix.Some 1", GeneralSuccessCheck),
-      CodeExpectation("val z: maybeSix = maybeSix.None 3", FailureCheck),
+      CodeExpectation("val x: maybeSix = None.0", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = Some.1", GeneralSuccessCheck),
+      CodeExpectation("val z: maybeSix = None.3", FailureCheck),
     ))
   }
 
@@ -601,8 +601,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver Bool = new Type", GeneralSuccessCheck),
       CodeExpectation("update Bool (False, ())", GeneralSuccessCheck),
       CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
-      CodeExpectation("Bool.True ()", GeneralSuccessCheck),
-      CodeExpectation("Bool.False ()", GeneralSuccessCheck)
+      CodeExpectation("val t: Bool = True.()", GeneralSuccessCheck),
+      CodeExpectation("val f: Bool = False.()", GeneralSuccessCheck)
     ))
   }
 
@@ -611,16 +611,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
       // Note that x must be declares as an identifier here because otherwise it's taken as the literal identifier x
       // TODO - we need to make sure there are some GOOD ERROR MESSAGES associated with that
-      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First x): x, (Second x): 2)", GeneralSuccessCheck),
-      CodeExpectation("MyCaseTo5 (MyCase.First 4)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(4, Index(5))))),
-      CodeExpectation("MyCaseTo5 (MyCase.Second hello)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(5)))))
+      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = (First.x: x, Second.x: 2)", GeneralSuccessCheck),
+      CodeExpectation("MyCaseTo5 First.4", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(4, Index(5))))),
+      CodeExpectation("MyCaseTo5 Second.hello", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, Index(5)))))
     ))
   }
 
   it should " be seen to the type if all cases are accounted for" in {
     testCodeScript(Vector(
       CodeExpectation("val MyCase = Case(First: 5, Second: Identifier)", GeneralSuccessCheck),
-      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First x): x, (Second x): 2)", GeneralSuccessCheck),
+      CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x, (Second.x): 2)", GeneralSuccessCheck),
     ))
   }
 
@@ -629,10 +629,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver ListOfCounts = new Type", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Nil, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
-      CodeExpectation("val a: ListOfCounts = ListOfCounts.Nil()", GeneralSuccessCheck),
-      CodeExpectation("val b: ListOfCounts = ListOfCounts.Node(5, a)", GeneralSuccessCheck),
-      CodeExpectation("val c: ListOfCounts = ListOfCounts.Node(1, b)", GeneralSuccessCheck),
-      CodeExpectation("val b2: ListOfCounts = ListOfCounts.Node(3, a)", GeneralSuccessCheck)
+      CodeExpectation("val a: ListOfCounts = Nil.()", GeneralSuccessCheck),
+      CodeExpectation("val b: ListOfCounts = Node.(5, a)", GeneralSuccessCheck),
+      CodeExpectation("val c: ListOfCounts = Node.(1, b)", GeneralSuccessCheck),
+      CodeExpectation("val b2: ListOfCounts = Node.(3, a)", GeneralSuccessCheck)
     ))
   }
 

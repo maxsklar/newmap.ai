@@ -65,7 +65,6 @@ object RetrieveType {
       SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, featureSet))))
     }
     case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunctionObject(params, env)
-    case CaseT(cases) => retrieveInputTypeFromFunctionObject(cases, env)
     case _ => {
       Evaluator.stripVersioning(RetrieveType.fromNewMapObject(nFunction, env), env) match {
         case MapT(inputType, _, _) => inputType
@@ -90,7 +89,7 @@ object RetrieveType {
   def retrieveFeatureSetFromFunction(nFunction: NewMapExpression, env: Environment): MapFeatureSet = {
     nFunction match {
       // TODO - again this CaseT exception is really looking ugly!!!
-      case ObjectExpression(CaseT(cases)) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
+      //case ObjectExpression(CaseT(cases)) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
       case ObjectExpression(VersionedObjectLink(key, status)) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         retrieveFeatureSetFromFunction(ObjectExpression(currentState), env)
@@ -101,7 +100,7 @@ object RetrieveType {
         typeOfFunctionC match {
           case MapT(_, _, config) => config.featureSet
           case StructT(params) => retrieveFeatureSetFromFunction(ObjectExpression(params), env)
-          case CaseT(cases) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
+          //case CaseT(cases) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
           case other => throw new Exception(s"Couldn't retrieve feature set from $nFunction $typeOfFunctionC -- $other")
         }
       }
@@ -130,12 +129,6 @@ object RetrieveType {
             eField <- Evaluator(field, env)
             result <- Evaluator.applyFunctionAttempt(params, eField, env)
           } yield result
-        }
-        case CaseT(values) => {
-          for {
-            eField <- Evaluator(field, env)
-            result <- Evaluator.applyFunctionAttempt(values, eField, env)
-          } yield MapT(result, nObject, MapConfig(RequireCompleteness, SimpleFunction))
         }
         case _ => Failure(s"This access of object $structValue with field $field is not allowed")
       }

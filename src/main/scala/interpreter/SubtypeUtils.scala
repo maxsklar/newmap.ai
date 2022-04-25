@@ -22,9 +22,9 @@ object SubtypeUtils {
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
-    val WildcardPatternExists = keys.exists(k => isCatchallPattern(k, nType, env))
+    val wildcardPatternExists = keys.exists(k => isCatchallPattern(k, nType, env))
 
-    if (WildcardPatternExists) {
+    if (wildcardPatternExists) {
       Success(true)
     }
     else {

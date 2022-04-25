@@ -373,20 +373,16 @@ object Environment {
   val TypeWithDefault = Base.lookup("TypeWithDefault").get.nObject
 
   Base = Base.newCommands(Vector(
-    eCommand("TypeForDefaultStruct", StructT(TaggedObject(
-      UMap(Vector(WildcardPattern("t") -> ParamId("t"))),
-      MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
-    ))),
-    eCommand("TypeTransformStruct", TaggedObject(
+    eCommand("TypeClassStruct", TaggedObject(
       UMap(Vector(
         WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
+        // Problem: TypeWithDefault should not be in here!!
         MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
         TypeT,
         MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
   ))
-
 }

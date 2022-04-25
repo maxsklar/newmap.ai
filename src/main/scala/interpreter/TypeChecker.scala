@@ -276,6 +276,30 @@ object TypeChecker {
           )
         }
       }
+      case ConstructCaseParse(first, second) => {
+        Evaluator.stripVersioning(expectedType, env) match {
+          case CaseT(simpleMap) => {
+            val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(simpleMap), env)
+
+            for {
+              firstExp <- typeCheck(first, inputType, env, featureSet)
+
+              // TODO - we must ensure that the evaluator is not evaluating anything too complex here
+              // must be a "simple map" type situation
+              // can this be built into the evaluator?
+              firstObj <- Evaluator(firstExp, env)
+
+              secondType <- Evaluator.applyFunctionAttempt(simpleMap, firstObj, env)
+              secondExp <- typeCheck(second, secondType, env, featureSet)
+            } yield {
+              BuildCase(firstObj, secondExp, expectedType)
+            }
+          }
+          case _ => {
+            Failure(s"Case type must be specified for $expression")
+          }
+        }
+      }
     }
   }
 
@@ -345,7 +369,7 @@ object TypeChecker {
           TypeCheckWithPatternMatchingResult(StructPattern(tcmp.patterns), tcmp.newEnvironment)
         }
       }
-      case (ApplyParse(constructorP, input), CaseT(cases)) if (patternMatchingAllowed) => {
+      case (ConstructCaseParse(constructorP, input), CaseT(cases)) if (patternMatchingAllowed) => {
         val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
         for {
           constructorTC <- typeCheck(constructorP, caseConstructorType, env, BasicMap)

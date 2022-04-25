@@ -147,9 +147,6 @@ object Evaluator {
         ))
         //Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
       }
-      //case AnyT => Failure("The \"any\" Type has no implemented default value")
-      //case IdentifierT => Failure("Type of Identifiers has no default value")
-      //case MapT(_, _, _, _) => Failure("No default map if not CommandOutput")
       case structT@StructT(TaggedObject(UMap(parameterList), MapT(keyType, _, _))) => {
         if (isEmptySet(keyType, env)) {
           // If the key set is empty, no parameters need to be specified, even if a pattern exists!
@@ -261,6 +258,29 @@ object Evaluator {
             )
           )
         )
+      }
+      case structT@StructT(TaggedObject(UMap(parameterList), MapT(keyType, valueType, config))) => {
+        // Checks:
+        val wildcardPatternExists = parameterList.map(_._1).exists(k => SubtypeUtils.isCatchallPattern(k, nType, env))
+
+        val keyTypeC = stripVersioning(keyType, env)
+
+        if (wildcardPatternExists) {
+          for {
+            keyExpansionCommandT <- getCommandInputOfCommandType(RetrieveType.fromNewMapObject(keyType, env), env)
+          } yield {
+            // We are free to add more items to this struct!
+            // There are going to be 2 inputs:
+            // - The key expansion command
+            // - The value, which now needs to be cased because the type of the value depends on the key
+
+            // TODO - unfortunately, we can't actually write a command for this can we!!
+            // More must be done here
+            CaseT(TaggedObject(UMap(parameterList), MapT(keyExpansionCommandT, valueType, config)))
+          }
+        } else {
+          Failure("The command type hasn't been implemented yet for this type of struct")
+        }
       }
       case structT@StructT(params) => {
         Failure("Structs as commands haven't been implemented yet")
@@ -679,20 +699,6 @@ object Evaluator {
             }
             //Failure(s"Cannot apply function of type $nType")
           }
-        }
-      }
-      case (CaseT(cases), field) => {
-        // Accessing constructors from case type
-        // TODO - do we really want to do it this way?
-        for {
-          result <- applyFunctionAttempt(cases, field, env)
-        } yield {
-          TaggedObject(
-            UMap(Vector(
-              WildcardPattern("input") -> BuildCase(field, ParamId("input"), func)
-            )),
-            MapT(result, func, MapConfig(RequireCompleteness, SimpleFunction))
-          )
         }
       }
       case (TaggedObject(IsCommandFunc, _), nObject) => {

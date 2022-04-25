@@ -26,6 +26,11 @@ case class ApplyParse(
   input: ParseTree
 ) extends ParseTree
 
+case class ConstructCaseParse(
+  first: ParseTree,
+  second: ParseTree
+) extends ParseTree
+
 case class LambdaParse(
   params: ParseTree,
   expression: ParseTree

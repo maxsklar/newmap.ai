@@ -186,7 +186,7 @@ object NewMapParser extends Parsers {
         }).toVector
 
         val fullExps = start :+ lastExp
-        fullExps reduceLeft ApplyParse
+        fullExps reduceLeft ConstructCaseParse
       }
     }
   }

@@ -238,7 +238,6 @@ class TestParser extends FlatSpec {
   "Field access " should " work in an expression" in {
     val tokens = Vector(
       Identifier("Object"),
-      Period(),
       Identifier("getId"),
       Colon(),
       Number(5)
@@ -251,8 +250,8 @@ class TestParser extends FlatSpec {
     ))
   }
 
-  it should " take precedence over function application" in {
-    val tokens = Vector(Identifier("a"), Period(), Identifier("b"), Identifier("c"))
+  it should " have the right precedence" in {
+    val tokens = Vector(Identifier("a"), Identifier("b"), Identifier("c"))
 
     assert(NewMapParser(tokens) == Success(
       ApplyParse(
@@ -262,8 +261,8 @@ class TestParser extends FlatSpec {
     ))
   }
 
-  it should " take precedence over function application 2" in {
-    val tokens = Vector(Identifier("a"), Identifier("b"), Period(), Identifier("c"))
+  it should " use parens to fix precedence" in {
+    val tokens = Vector(Identifier("a"), Enc(Paren, true), Identifier("b"), Identifier("c"), Enc(Paren, false))
 
     assert(NewMapParser(tokens) == Success(
       ApplyParse(
