@@ -4,7 +4,11 @@ Newmap.ai is a new programming language and database combo currently under devel
 
 ## Current Status
 
-Currently newmap.ai is under development and has no demo or alpha version yet. The design behind the data model and syntax are still in flux. Watch for this to change in the coming months. Contact Max Sklar for questions, and if you dare dive into the code, check out the unit tests to get a flavor of what is going on. There is also a mailing list and slack for those interested.
+Currently newmap.ai is under development and has no demo or alpha version. The design behind the data model and syntax are still in flux. Watch for this to change in the coming months. Contact Max Sklar for questions, and if you dare dive into the code, check out the unit tests to get a flavor of what is going on. There is also a mailing list and slack for those interested.
+
+### Use of scala and sbt
+
+The current iteration of newmap runs on scala and sbt as an interpreted language. There is no data storage yet. Once a core set of features are developed, the plan is to write as much of the internals as possible into newmap.ai code. Once the remaining scala is a small size, it can be ported to other languages.
 
 ## How to Run
 
