@@ -345,7 +345,6 @@ object SubtypeUtils {
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status)
       ) => {
         val sv = Evaluator.stripVersioning(endingType, env)
-        throw new Exception(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
         Failure(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
       }
       case _ => Failure(s"No rule to convert $startingType to $endingType")
@@ -362,6 +361,13 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Vector[NewMapObject], String] = {
     endingType match {
+      // What to do about this??? For some reason we can't put it in
+      /*case VersionedObjectLink(key, _) => {
+        for {
+          currentEndingState <- Evaluator.currentState(key.uuid, env)
+          result <- isObjectConvertibleToType(startingObject, currentEndingState, env)
+        } yield result
+      }*/
       case SubtypeT(isMember) => {
         val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
         for {
@@ -434,7 +440,20 @@ object SubtypeUtils {
       // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
       //  and find a default on that!
       defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
-    } yield (result != defaultValueOrResultType)
+    
+      // Problem is that we should be checking equality of untagged!!
+    } yield !checkEqual(result, defaultValueOrResultType)
+  }
+
+  def checkEqual(a: NewMapObject, b: NewMapObject): Boolean = {
+    a == b
+    // TODO - we need to first convert a and b into the same type
+    /*(a, b) match {
+      case (TaggedObject(ua, _), TaggedObject(ub, _)) => {
+        ua == ub
+      }
+      case _ => false
+    }*/
   }
 
   def allMembersOfSubtype(

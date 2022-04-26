@@ -6,6 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestTypeCheck extends FlatSpec {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+  val env = (new EnvironmentInterpreter()).env
   
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {
@@ -140,7 +141,7 @@ class TestTypeCheck extends FlatSpec {
 
     TypeChecker(booleanMap) match {
       case Success(result) => {
-      	assert(RetrieveType(result, Environment.Base) == TypeT)
+      	assert(RetrieveType(result, env) == TypeT)
         //println(objectFound)
 
       	// TODO: what should we do with this?
@@ -153,7 +154,7 @@ class TestTypeCheck extends FlatSpec {
   // TODO - should be in a separate file
   "A statement " should " be readable" in {
     val statement = FullStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
-    StatementInterpreter(statement, Environment.Base) match {
+    StatementInterpreter(statement, env) match {
       case Success(result) => {
         assert(result.commands.length == 1)
         val com = result.commands(0)
@@ -165,7 +166,7 @@ class TestTypeCheck extends FlatSpec {
 
   it should " be readable if there's an inferred type" in {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
-    StatementInterpreter(statement, Environment.Base) match {
+    StatementInterpreter(statement, env) match {
       case Success(result) => {
         assert(result.commands == Vector(FullEnvironmentCommand("x", Index(10))))
       }

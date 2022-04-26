@@ -100,9 +100,10 @@ class EnvironmentInterpreter() {
 }
 
 object EnvironmentInterpreter {
-  // TODO(2022): REDO ALL OF THESE COMMAND TYPES!
+  // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
     "ver _default = new TypeClassStruct(t: t)",
+    "update _default Count.0",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
   )

@@ -381,7 +381,7 @@ object Environment {
         // Problem: TypeWithDefault should not be in here!!
         MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
         TypeT,
-        MapConfig(RequireCompleteness, SimpleFunction)
+        MapConfig(RequireCompleteness, BasicMap)
       )
     )),
   ))

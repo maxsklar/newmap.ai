@@ -25,12 +25,7 @@ object RetrieveType {
       }
     }
     case BuildCase(_, _, caseType) => caseType
-    case BuildMapT(_, _, _) => TypeT
-    case BuildTableT(_, _) => TypeT
-    case BuildExpandingSubsetT(_, _) => TypeT
-    case BuildSubtypeT(_) => TypeT
-    case BuildCaseT(_) => TypeT
-    case BuildStructT(_) => TypeT
+    case BuildMapT(_, _, _) | BuildTableT(_, _) | BuildExpandingSubsetT(_, _) | BuildSubtypeT(_) | BuildCaseT(_) | BuildStructT(_) => TypeT
     case BuildMapInstance(values, mapT) => mapT // TODO - what if this is a submap???
   }
 
@@ -89,7 +84,6 @@ object RetrieveType {
   def retrieveFeatureSetFromFunction(nFunction: NewMapExpression, env: Environment): MapFeatureSet = {
     nFunction match {
       // TODO - again this CaseT exception is really looking ugly!!!
-      //case ObjectExpression(CaseT(cases)) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
       case ObjectExpression(VersionedObjectLink(key, status)) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         retrieveFeatureSetFromFunction(ObjectExpression(currentState), env)
@@ -100,7 +94,6 @@ object RetrieveType {
         typeOfFunctionC match {
           case MapT(_, _, config) => config.featureSet
           case StructT(params) => retrieveFeatureSetFromFunction(ObjectExpression(params), env)
-          //case CaseT(cases) => retrieveFeatureSetFromFunction(ObjectExpression(cases), env)
           case other => throw new Exception(s"Couldn't retrieve feature set from $nFunction $typeOfFunctionC -- $other")
         }
       }
@@ -142,6 +135,11 @@ object RetrieveType {
       case SubtypeT(isMember) => {
         getParentType(retrieveInputTypeFromFunction(ObjectExpression(isMember), env), env)
       }
+      case VersionedObjectLink(key, status) => {
+        val currentState = Evaluator.currentState(key.uuid, env).toOption.get
+        getParentType(currentState, env)
+      }
+      case TaggedObject(_, ExpandingSubsetT(parentType, _)) => getParentType(parentType, env)
       case t => t
     }
   }

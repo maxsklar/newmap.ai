@@ -136,7 +136,7 @@ object TypeChecker {
           }
           case Some(EnvironmentValue(nObject, BoundStatus)) => {
             val nType = RetrieveType.fromNewMapObject(nObject, env)
-            for {
+            for { 
               convertInstructions <- SubtypeUtils.isObjectConvertibleToType(nObject, expectedType, env)
               // TODO - execute convert instructions on nObject
             } yield {
@@ -502,6 +502,8 @@ object TypeChecker {
   def apply(
     expression: ParseTree
   ): Outcome[NewMapExpression, String] = {
-    typeCheck(expression, AnyT, Environment.Base, featureSet = FullFunction)
+    val env = (new EnvironmentInterpreter()).env
+
+    typeCheck(expression, AnyT, env, featureSet = FullFunction)
   }
 }

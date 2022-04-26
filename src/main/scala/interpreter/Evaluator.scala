@@ -36,7 +36,9 @@ object Evaluator {
           evalInput <- this(input, env)
           untaggedInput <- removeTypeTag(evalInput)
           untaggedConstructor <- removeTypeTag(constructor)
-        } yield TaggedObject(UCase(untaggedConstructor, untaggedInput), caseType)
+        } yield {
+          TaggedObject(UCase(untaggedConstructor, untaggedInput), caseType)
+        }
       }
       case BuildMapT(inputType, outputType, config) => {
         for {
@@ -109,25 +111,41 @@ object Evaluator {
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
+  /*
+   * This is getDefaultValueOfCommandType being slowly written into newmap code
+   */
+  def getDefaultValueOfCommandTypeFromEnv(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
+    env.lookup("_default") match {
+      case Some(EnvironmentValue(defaultMap, BoundStatus)) => {
+        for {
+          mapValues <- stripVersioning(defaultMap, env) match {
+            case TaggedObject(UMap(values), _) => Success(values)
+            case _ => Failure("_default doesn't look the way we expect")
+          }
+          
+          // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
+          // otherwise, we get an infinite loop
+          result <- attemptPatternMatchInOrder(mapValues, stripVersioning(nType, env), env) match {
+            case Success(s) => Success(s)
+            case Failure(f) => Failure(f.toString)
+          }
+        } yield result
+      }
+      case _ => {
+        Failure("_default doesn't exist yet")
+      }
+    }
+  }
 
-  /* Notes on writing this in newmap code:
-    This is really an instance of
-    Struct(t: t) where t is a CommandType (or a defaultable type?)
-    Struct(
-      TaggedObject(
-        UMap(t: t)
-        MapT(CommandType, Type, MapConfig(Required, SimpleMap))
-      )
-    )
-
-    Note that MapT here has an expanding key, so this is really a table
-
-    TODO - need to define an expanding struct and an expanding case
-    - A map can be an expanding struct if the output type is Type
-  */
   def getDefaultValueOfCommandType(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
+    getDefaultValueOfCommandTypeFromEnv(nType, env).rescue(f => {
+      getDefaultValueOfCommandTypeHardcoded(nType, env)
+    })
+  }
+
+  def getDefaultValueOfCommandTypeHardcoded(nType: NewMapObject, env: Environment): Outcome[NewMapObject, String] = {
     nType match {
-      case CountT => Success(Index(0))
+      // TODO - start removing these in favor of newmap code!
       case OrBooleanT => Success(TaggedObject(UIndex(0), OrBooleanT))
       case ExpandingSubsetT(_, _) | MapT(_, _, MapConfig(CommandOutput, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
       case MapT(TaggedObject(UIndex(0), _), _, MapConfig(RequireCompleteness, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
@@ -168,7 +186,7 @@ object Evaluator {
         //Failure("Case Types do not have a default value")
       //}
       case _ => {
-        Failure(s"$nType is not a pure command type, error in type checker")
+        Failure(s"$nType is not a command type, error in type checker")
       }
     }
   }
@@ -416,7 +434,7 @@ object Evaluator {
       case ExpandingSubsetT(parentType, allowPatterns) => {
         //current is going be of type SubsetT(parentT)
         // and the isMember function is going to have a value of isSubsetOr
-        current match {
+        stripVersioning(current, env) match {
           case TaggedObject(UMap(values), _) => {
             // BUILD command
             val isMemberCommand = TaggedObject(
@@ -472,8 +490,45 @@ object Evaluator {
           }
         }
       }
-      case structT@StructT(params) => {
-        Failure("Structs as commands haven't been implemented yet")
+      case StructT(params) => {
+        command match {
+          case TaggedObject(UCase(constructor, input), _) => {
+            for {
+              mapValues <- current match {
+                case TaggedObject(UMap(values), _) => Success(values)
+                case _ => Failure(s"Couldn't get map values from $current")
+              }
+
+              caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(params), env)
+              taggedConstructor = noramlizeTypeTaggedObject(TaggedObject(constructor, RetrieveType.getParentType(caseConstructorType, env)))
+
+              typeForInput <- applyFunctionAttempt(params, taggedConstructor, env)
+              taggedInput = noramlizeTypeTaggedObject(TaggedObject(input, typeForInput))
+
+              newParams <- params match {
+                // TODO - this part is currently only written for _default
+                case TaggedObject(UMap(values), MapT(keyType, valueType, config)) => {
+                  for {
+                    result <- updateVersionedO(keyType, taggedConstructor, env)
+                  } yield {
+                    val newKeyType = result.newState
+                    TaggedObject(UMap(values), MapT(newKeyType, valueType, config))
+                  }
+                }
+                case _ => {
+                  Failure(s"Unexpected struct params: $params")
+                }
+              }
+
+            } yield {
+              val newMapValues = (ObjectPattern(constructor) -> ObjectExpression(taggedInput)) +: mapValues.filter(x => x._1 != ObjectPattern(constructor))
+              UpdateVersionedOResponse(TaggedObject(UMap(newMapValues), StructT(newParams)), NewMapO.emptyStruct)
+            }
+          }
+          case _ => {
+            Failure(s"A) Structs as commands haven't been implemented yet -- $params -- $command")
+          }
+        }
       }
       case CaseT(cases) => {
         Failure("Cases as commands haven't been implemented yet")
@@ -481,6 +536,15 @@ object Evaluator {
       case _ => {
         Failure(s"$current is not a command type, error in type checker")
       }
+    }
+  }
+
+  // This is neccesary for when we have types as tagged objects and types and standalones.
+  // Once types are always tagged objects - we should be able to remove this
+  def noramlizeTypeTaggedObject(nObject: NewMapObject): NewMapObject = {
+    nObject match {
+      case TaggedObject(UType(t), TypeT) => t
+      case _ => nObject
     }
   }
 
@@ -610,95 +674,27 @@ object Evaluator {
 
     (funcC, inputC) match {
       case (TaggedObject(UMap(values), nType), _) => {
-        stripVersioning(nType, env) match {
-          case MapT(keyType, _, MapConfig(SubtypeInput, _, _, _)) => {
-            // We have a bit of a problem with the subtype input, because the map patterns are tagged with the PARENT TYPE
-            // And the inputC is tagged with the SubType
-            // This will be fixed when we get rid of subtypes completely.. hopefully.
-            // For now - I suppose that a retagging is in order
-            // ALSO - shouldn't this be retagged the other way??
-            // TODO: REMOVE THIS UGLY CASE
-            val retaggedInputC = retagObject(inputC, keyType)
-            
-            for {
-              keyMatchResult <- attemptPatternMatchInOrder(values, retaggedInputC, env) match {
-                case Success(result) => Success(result)
-                case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-                  if (isEvaluationError) {
-                    Failure(message)
-                  } else {
-                    // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-                    // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                    // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-                    //  and get the default from that
-                    val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
+        for {
+          keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
+            case Success(result) => Success(result)
+            case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
+              if (isEvaluationError) {
+                Failure(message)
+              } else {
+                // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+                // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+                // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
+                //  and get the default from that
+                val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
 
-                    val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-                    
-                    getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
-                  }
-                }
+                val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
+                
+                getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
               }
-            } yield {
-              keyMatchResult
             }
           }
-          case MapT(keyType, _, _) => {
-            for {
-              keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
-                case Success(result) => Success(result)
-                case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-                  if (isEvaluationError) {
-                    Failure(message)
-                  } else {
-                    // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-                    // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                    // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-                    //  and get the default from that
-                    val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
-
-                    val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-                    
-                    getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
-                  }
-                }
-              }
-            } yield {
-              keyMatchResult
-            }
-          }
-          case ExpandingSubsetT(keyType, _) => {
-            // Copied from above
-            for {
-              keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
-                case Success(result) => Success(result)
-                case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-                  if (isEvaluationError) {
-                    Failure(message)
-                  } else {
-                    // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-                    // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                    // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-                    //  and get the default from that
-                    val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
-
-                    val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-                    
-                    getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
-                  }
-                }
-              }
-            } yield {
-              keyMatchResult
-            }
-          }
-          case _ => {            
-            attemptPatternMatchInOrder(values, inputC, env) match {
-              case Success(x) => Success(x)
-              case Failure(PatternMatchErrorType(message, _)) => Failure(message)
-            }
-            //Failure(s"Cannot apply function of type $nType")
-          }
+        } yield {
+          keyMatchResult
         }
       }
       case (TaggedObject(IsCommandFunc, _), nObject) => {

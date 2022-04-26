@@ -17,13 +17,15 @@ class TestEvaluator extends FlatSpec {
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
+  val env = (new EnvironmentInterpreter()).env
+
   def mapConfig = MapConfig(CommandOutput, SimpleFunction)
 
   "isCommandFunc " should " work properly on ranges" in {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
       MapT(TypeT, Index(2), mapConfig)
-    ), Index(10), Environment.Base)
+    ), Index(10), env)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
@@ -31,7 +33,7 @@ class TestEvaluator extends FlatSpec {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
       MapT(TypeT, Index(2), mapConfig)
-    ), CountT, Environment.Base)
+    ), CountT, env)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
@@ -39,7 +41,7 @@ class TestEvaluator extends FlatSpec {
     val result = Evaluator.applyFunctionAttempt(TaggedObject(
       IsCommandFunc,
       MapT(TypeT, Index(2), mapConfig)
-    ), TypeT, Environment.Base)
+    ), TypeT, env)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 
@@ -49,7 +51,7 @@ class TestEvaluator extends FlatSpec {
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
         MapT(AnyT, Index(2), mapConfig)
-      ), TypeT, Environment.Base),
+      ), TypeT, env),
       Index(0)
     )
 
@@ -57,7 +59,7 @@ class TestEvaluator extends FlatSpec {
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
         MapT(AnyT, Index(2), mapConfig)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), mapConfig)), Environment.Base),
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), mapConfig)), env),
       Index(1)
     )
 
@@ -65,7 +67,7 @@ class TestEvaluator extends FlatSpec {
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
         MapT(AnyT, Index(2), mapConfig)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, BasicMap))), Environment.Base),
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, BasicMap))), env),
       Index(1)
     )
 
@@ -73,7 +75,7 @@ class TestEvaluator extends FlatSpec {
       Evaluator.applyFunctionAttempt(TaggedObject(
         IsSimpleFunction,
         MapT(AnyT, Index(2), mapConfig)
-      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, FullFunction))), Environment.Base),
+      ), TaggedObject(UMap(Vector.empty), MapT(Index(10), Index(10), MapConfig(CommandOutput, FullFunction))), env),
       Index(0)
     )
   }
