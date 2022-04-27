@@ -80,7 +80,6 @@ object Evaluator {
           evalCases <- this(cases, env)
         } yield CaseT(evalCases)
       }
-      // TODO - eventually remove BuildStructT with BuildMapT in its place!
       case BuildStructT(params) => {
         for {
           evalParams <- this(params, env)
@@ -235,7 +234,6 @@ object Evaluator {
       case MapT(keyType, requiredValues, _) => {
         // In this case, there must be a key expansion type
         // TODO: enforce this?
-
 
         // Key Expansion + requiredValue expansion
         // What if Key expansion is a case? (for now we don't allow this, only basic map)

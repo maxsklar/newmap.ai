@@ -217,7 +217,7 @@ object Environment {
       params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
     }
 
-    /*val paramsList = {
+    val paramsList = {
       params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
     }
 
@@ -230,13 +230,6 @@ object Environment {
       TaggedObject(
         UMap(paramsToObject),
         MapT(keyType, TypeT, MapConfig(RequireCompleteness, BasicMap))
-      )
-    )*/
-
-    StructT(
-      TaggedObject(
-        UMap(paramsToObject),
-        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
       )
     )
   }
@@ -276,7 +269,7 @@ object Environment {
     val structT = StructT(
       TaggedObject(
         UMap(inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(x._1._2))),
-        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, MapConfig(SubtypeInput, SimpleFunction))
+        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, MapConfig(RequireCompleteness, SimpleFunction))
       )
     )
 
@@ -328,18 +321,8 @@ object Environment {
         WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
       )),
       MapT(
+        // TODO requires a type pattern here
         MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap)),
-        TypeT,
-        MapConfig(RequireCompleteness, SimpleFunction)
-      )
-    )),
-    // TODO: This CStruct is going to be merged with Struct.. once we take care of generics
-    eCommand("CStruct", TaggedObject(
-      UMap(Vector(
-        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
-      )),
-      MapT(
-        MapT(CountT, TypeT, MapConfig(SubtypeInput, BasicMap)),
         TypeT,
         MapConfig(RequireCompleteness, SimpleFunction)
       )

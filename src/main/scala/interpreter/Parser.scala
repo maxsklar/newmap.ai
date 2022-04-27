@@ -99,6 +99,7 @@ object NewMapParser extends Parsers {
 
         val (s3, o3) = bindBinaryOpParse(s2, o2, CommaBinaryOpParse(), (a, b, first) => {
           // CommandList(Vector(a, b))
+          // This part of the parser has been such an annoyance!!
           a match {
             case CommandList(commands) => CommandList(commands :+ b)
             case _ => CommandList(Vector(a, b))

@@ -218,13 +218,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("val testType: Type = Map (Struct(a: 3, b: 3), 100)", SuccessCheck(correctCommand))
+      CodeExpectation("val myStruct: Type = (a: 3, b: 3)", GeneralSuccessCheck),
+      CodeExpectation("val testType: Type = Map (myStruct, 100)", SuccessCheck(correctCommand))
     ))
   }
 
   it should " be creatable with numerical indecies" in {
     testCodeScript(Vector(
-      CodeExpectation("val s: CStruct(0: Type, 1: 10) = (Count, 6)", GeneralSuccessCheck)
+      CodeExpectation("val s: (Type, 10) = (Count, 6)", GeneralSuccessCheck)
     ))
   }
 
@@ -487,7 +488,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val ifStatement: ReqMap(2, ReqMap(4, Count)) = (0: m1, 1: m2)", GeneralSuccessCheck),
 
       // TODO - clean up by building a shortcut
-      CodeExpectation("val f: CStruct(0: 4, 1: 2) => Count = ((first, second): ifStatement second first)", GeneralSuccessCheck),
+      CodeExpectation("val f: (4, 2) => Count = ((first, second): ifStatement second first)", GeneralSuccessCheck),
       CodeExpectation("f(0, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(100)))),
       CodeExpectation("f(1, 1)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(201)))),
       CodeExpectation("f(2, 0)", SuccessCheck(ExpOnlyEnvironmentCommand(Index(102))))

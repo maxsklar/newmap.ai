@@ -97,31 +97,17 @@ object TypeChecker {
             case IdentifierT => Success(ObjectExpression(NewMapO.identifier(s)))
             case SubtypeT(isMember) => {
               for {
-                result <- Evaluator.applyFunctionAttempt(isMember, obj, env)
-
-                // TODO: the positive condition won't always be UIndex(1)
-                isAllowed = result match {
-                  case TaggedObject(UIndex(1), _) => true
-                  case _ => false
-                }
-
+                isAllowed <- SubtypeUtils.isMemberOfSubtype(obj, isMember, env)
                 _ <- Outcome.failWhen(!isAllowed, s"identifier $s not in subtype $expectedType")
               } yield ObjectExpression(obj)
             }
             case TaggedObject(umap, ExpandingSubsetT(parentType, _)) => {
               for {
-                result <- Evaluator.applyFunctionAttempt(
-                  TaggedObject(umap, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
+                isAllowed <- SubtypeUtils.isMemberOfSubtype(
                   TaggedObject(UIdentifier(s), parentType),
+                  TaggedObject(umap, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap))),
                   env
                 )
-
-                // TODO: the positive condition won't always be UIndex(1)
-                isAllowed = result match {
-                  case TaggedObject(UIndex(1), _) => true
-                  case _ => false
-                }
-
                 _ <- Outcome.failWhen(!isAllowed, s"identifier $s not in subtype $expectedType")
               } yield ObjectExpression(obj)
             }
@@ -150,7 +136,6 @@ object TypeChecker {
       }
       case ApplyParse(function, input) => {
         for {
-          // TODO: Build a specialize type check for maps?
           functionTypeChecked <- typeCheck(function, AnyT, env, featureSet)
 
           inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked, env)
@@ -204,9 +189,9 @@ object TypeChecker {
       }
       case CommandList(values: Vector[ParseTree]) => {
         expectedType match {
-          case mapT@MapT(keyTypeT, _, config) => {
+          case mapT@MapT(keyTypeT, valueT, config) => {
             for {
-              mapValues <- typeCheckMap(values, mapT, env, featureSet)
+              mapValues <- typeCheckMap(values, keyTypeT, valueT, config.featureSet, env, featureSet)
 
               isCovered <- {
                 if (config.completeness != RequireCompleteness) Success(true)
@@ -238,15 +223,30 @@ object TypeChecker {
           }
           case TypeT => {
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
+            // OR we are just being given a list of types
             // TODO - can this be simplified by combining with the MapT section above?
-            val mapT = MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
-
-            for {
-              mapValues <- typeCheckMap(values, mapT, env, featureSet)
-            } yield {
-              // TODO - MapT has the wrong input type here!
-              BuildStructT(BuildMapInstance(mapValues, mapT))
-            }
+            {
+              for {
+                mapValues <- typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, featureSet)
+              } yield {
+                val isMemberUMap = mapValues.map(x => (x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT))))
+                val isMember = TaggedObject(UMap(isMemberUMap), MapT(IdentifierT, OrBooleanT, MapConfig(CommandOutput, BasicMap)))
+                val mapT = MapT(SubtypeT(isMember), TypeT, MapConfig(RequireCompleteness, BasicMap))
+                BuildStructT(BuildMapInstance(mapValues, mapT))
+              }
+            }.rescue(f => {
+              for {
+                expressions <- typeCheckSequence(values, TypeT, env)
+              } yield {
+                val indexType = TaggedObject(UIndex(expressions.length), CountT)
+                BuildStructT(
+                  BuildMapInstance(
+                    expressions.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> x._1),
+                    MapT(indexType, TypeT, MapConfig(RequireCompleteness, BasicMap))
+                  )
+                )
+              }
+            })
           }
           case AnyT => {
             // Steps to implement this:
@@ -306,17 +306,16 @@ object TypeChecker {
   // This map could include pattern matching
   def typeCheckMap(
     values: Vector[ParseTree],
-    mapT: MapT,
+    keyType: NewMapObject,
+    valueType: NewMapObject,
+    internalFeatureSet: MapFeatureSet,
     env: Environment,
-    featureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
+    externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
-    val keyType = mapT.inputType
-    val valueType = mapT.outputType
-
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
         for {
-          resultKey <- typeCheckWithPatternMatching(k, keyType, env, featureSet, mapT.config.featureSet)
+          resultKey <- typeCheckWithPatternMatching(k, keyType, env, externalFeatureSet, internalFeatureSet)
           foundKeyPattern = resultKey.typeCheckResult
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
@@ -325,16 +324,37 @@ object TypeChecker {
             v,
             valueType,
             resultKey.newEnvironment,
-            featureSet = mapT.config.featureSet
+            featureSet = internalFeatureSet
           )
 
-          restOfMap <- typeCheckMap(restOfValues, mapT, env, featureSet)
+          restOfMap <- typeCheckMap(restOfValues, keyType, valueType, internalFeatureSet, env, externalFeatureSet)
         } yield {
           (foundKeyPattern -> objectFoundValue) +: restOfMap
         }
       }
       case s +: _ => {
         Failure(s"No binding found in map for item $s in $values")
+      }
+      case _ => Success(Vector.empty)
+    }
+  }
+
+  def typeCheckSequence(
+    values: Vector[ParseTree],
+    valueType: NewMapObject,
+    env: Environment,
+  ): Outcome[Vector[NewMapExpression], String] = {
+    values match {
+      case BindingCommandItem(k, v) +: _ => {
+        Failure(s"Sequences don't work with binding command item $k : $v")
+      }
+      case value +: restOfValues => {
+        for {
+          objectFoundValue <- typeCheck(value, valueType, env, BasicMap)
+          restOfMap <- typeCheckSequence(restOfValues, valueType, env)
+        } yield {
+          objectFoundValue +: restOfMap
+        }
       }
       case _ => Success(Vector.empty)
     }
