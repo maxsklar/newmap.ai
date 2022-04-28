@@ -450,7 +450,7 @@ object SubtypeUtils {
 
       // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
       //  and find a default on that!
-      defaultValueOrResultType <- Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
+      defaultValueOrResultType <- CommandMaps.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
     
       // Problem is that we should be checking equality of untagged!!
     } yield !checkEqual(result, defaultValueOrResultType)

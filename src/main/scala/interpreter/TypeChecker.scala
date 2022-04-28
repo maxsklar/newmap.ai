@@ -57,13 +57,7 @@ object TypeChecker {
               // We should be allowed to evaluate this because it's just a number
               // BUT - this is an ugly call - it'd be nice if we didn't have to do it
               inputE <- Evaluator(inputTC, env)
-              isMemberCheck <- Evaluator.applyFunctionAttempt(isMember, inputE, env)
-              defaultValueOrResultType <- {
-                Evaluator.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(isMemberCheck, env), env)
-              }
-
-              isMember = (isMemberCheck != defaultValueOrResultType)
-
+              isMember <- SubtypeUtils.isMemberOfSubtype(inputE, isMember, env)
               _ <- Outcome.failWhen(!isMember, s"Value $inputE not a member of subtype $expectedType")
             } yield inputTC
           }

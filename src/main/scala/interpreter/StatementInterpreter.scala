@@ -42,7 +42,7 @@ object StatementInterpreter {
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
-          initValue <- Evaluator.getDefaultValueOfCommandType(nType, env)
+          initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
         } yield {
           val command = NewVersionedStatementCommand(id.s, nType)
           Response(Vector(command), command.toString)
@@ -61,7 +61,7 @@ object StatementInterpreter {
           versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
           nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
 
-          inputT <- Evaluator.getCommandInputOfCommandType(nType, env)
+          inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
           commandExp <- typeCheck(command, inputT, env, FullFunction)
 
           commandObj <- Evaluator(commandExp, env)

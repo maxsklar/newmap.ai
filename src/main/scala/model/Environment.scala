@@ -114,9 +114,9 @@ case class Environment(
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
 
-        val defaultOutcome = Evaluator.getDefaultValueOfCommandType(nType, this)
+        val defaultOutcome = CommandMaps.getDefaultValueOfCommandType(nType, this)
 
-        Evaluator.getDefaultValueOfCommandType(nType, this) match {
+        defaultOutcome match {
           case Success(_) => ()
           case Failure(f) => throw new Exception(f)
         }
@@ -134,7 +134,7 @@ case class Environment(
         )
       }
       case ApplyIndividualCommand(s, nObject) => {
-        val updated = Evaluator.updateVersionedObject(s, nObject, this)
+        val updated = CommandMaps.updateVersionedObject(s, nObject, this)
 
         val result = updated match {
           case Success(s) => s
