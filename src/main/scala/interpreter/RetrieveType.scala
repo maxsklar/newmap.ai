@@ -32,7 +32,7 @@ object RetrieveType {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT /*| TableT(_, _, _)*/ | ExpandingSubsetT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
+    case CountT | ExpandingSubsetT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
@@ -42,42 +42,15 @@ object RetrieveType {
     }
   }
 
-  def retrieveInputTypeFromFunctionObject(nFunction: NewMapObject, env: Environment): NewMapObject = nFunction match {
-    case VersionedObjectLink(key, status) => {
-      val currentState = Evaluator.currentState(key.uuid, env).toOption.get
-      retrieveInputTypeFromFunctionObject(currentState, env)
-    }
-    case TaggedObject(UMap(values), MapT(inputType, _, MapConfig(SubtypeInput, features, _, _))) => {
-      SubtypeT(
-        TaggedObject(
-          UMap(values.map(x => x._1 -> ObjectExpression(Index(1)))),
-          MapT(inputType, Index(2), MapConfig(CommandOutput, features))
-        )
-      )
-    }
-    case TaggedObject(UMap(values), ExpandingSubsetT(parentType, allowPattern)) => {
-      val featureSet = if (allowPattern) SimpleFunction else BasicMap
-      SubtypeT(TaggedObject(UMap(values), MapT(parentType, OrBooleanT, MapConfig(CommandOutput, featureSet))))
-    }
-    case TaggedObject(value, StructT(params)) => retrieveInputTypeFromFunctionObject(params, env)
-    case _ => {
-      Evaluator.stripVersioning(RetrieveType.fromNewMapObject(nFunction, env), env) match {
-        case MapT(inputType, _, _) => inputType
-        case other => throw new Exception(s"Couldn't retrieve input type from $nFunction -- $other")
-      }
-    }
+  def retrieveInputTypeFromFunctionObj(nFunction: NewMapObject, env: Environment): NewMapObject = {
+    inputTypeFromFunctionType(RetrieveType.fromNewMapObject(nFunction, env), env)
   }
 
-  def retrieveInputTypeFromFunction(nFunction: NewMapExpression, env: Environment): NewMapObject = {
-    // TODO - eventually these mapinstances will have an automatic conversion to type (which is the key type)
-    nFunction match {
-      case ObjectExpression(o) => retrieveInputTypeFromFunctionObject(o, env)
-      case param => {
-        Evaluator.stripVersioning(RetrieveType(nFunction, env), env) match {
-          case MapT(inputType, _, _) => inputType
-          case other => throw new Exception(s"Couldn't retrieve input type from parametrized $nFunction -- $param")
-        }
-      }
+  def inputTypeFromFunctionType(nFunctionType: NewMapObject, env: Environment): NewMapObject = {
+    Evaluator.stripVersioning(nFunctionType, env) match {
+      case MapT(inputType, _, _) => inputType
+      case StructT(params) => inputTypeFromFunctionType(RetrieveType.fromNewMapObject(params, env), env)
+      case other => throw new Exception(s"Couldn't retrieve input type from $nFunctionType -- $other")
     }
   }
 

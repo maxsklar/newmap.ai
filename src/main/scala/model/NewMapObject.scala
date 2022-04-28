@@ -74,7 +74,6 @@ sealed abstract class PreservationRule
 sealed abstract class MapCompleteness
 object RequireCompleteness extends MapCompleteness
 object CommandOutput extends MapCompleteness
-object SubtypeInput extends MapCompleteness
 
 sealed abstract class MapFeatureSet
 object BasicMap extends MapFeatureSet
@@ -113,6 +112,7 @@ case class CaseT(cases: NewMapObject) extends NewMapObject
 // - Anything that's left at the initial value is NOT in the subtype
 // For example, if the simple function is a Map from 10 to 2, and it reads (2: 1, 3: 1, 5: 1, 7: 1),
 //  then the values 2, 3, 5, and 7 are considered part of this new type; the rest are not
+// TODO - remove in favor of expanding subset?
 case class SubtypeT(
   isMember: NewMapObject
 ) extends NewMapObject

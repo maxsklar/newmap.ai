@@ -50,7 +50,7 @@ object TypeChecker {
             }
           }
           case SubtypeT(isMember) => {
-            val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+            val inputType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
             for {
               inputTC <- typeCheck(expression, inputType, env, featureSet)
 
@@ -138,7 +138,7 @@ object TypeChecker {
         for {
           functionTypeChecked <- typeCheck(function, AnyT, env, featureSet)
 
-          inputType = RetrieveType.retrieveInputTypeFromFunction(functionTypeChecked, env)
+          inputType = RetrieveType.inputTypeFromFunctionType(RetrieveType(functionTypeChecked, env), env)
 
           inputValue <- typeCheck(input, inputType, env, featureSet)
 
@@ -212,7 +212,7 @@ object TypeChecker {
             for {
               result <- typeCheckStruct(
                 parameterList,
-                RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(params), env),
+                RetrieveType.retrieveInputTypeFromFunctionObj(params, env),
                 values,
                 env,
                 featureSet
@@ -279,7 +279,7 @@ object TypeChecker {
       case ConstructCaseParse(first, second) => {
         Evaluator.stripVersioning(expectedType, env) match {
           case CaseT(simpleMap) => {
-            val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(simpleMap), env)
+            val inputType = RetrieveType.retrieveInputTypeFromFunctionObj(simpleMap, env)
 
             for {
               firstExp <- typeCheck(first, inputType, env, featureSet)
@@ -375,7 +375,7 @@ object TypeChecker {
     val patternMatchingAllowed = internalFeatureSet != BasicMap
     val parentTypeIsIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
 
-    (expression, expectedType) match {
+    (expression, Evaluator.stripVersioning(expectedType, env)) match {
       case (IdentifierParse(s, false), _) if (patternMatchingAllowed /*&& !parentTypeIsIdentifier*/) => {
         Success(
           TypeCheckWithPatternMatchingResult(WildcardPattern(s), env.newParam(s, expectedType))
@@ -390,7 +390,7 @@ object TypeChecker {
         }
       }
       case (ConstructCaseParse(constructorP, input), CaseT(cases)) if (patternMatchingAllowed) => {
-        val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
+        val caseConstructorType = RetrieveType.retrieveInputTypeFromFunctionObj(cases, env)
         for {
           constructorTC <- typeCheck(constructorP, caseConstructorType, env, BasicMap)
           constructor <- Evaluator(constructorTC, env)
@@ -505,7 +505,7 @@ object TypeChecker {
   ): Boolean = nType match {
     case IdentifierT => true
     case SubtypeT(isMember) => {
-      val inputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+      val inputType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
       typeIsExpectingAnIdentifier(inputType, env)
     }
     case VersionedObjectLink(key, status) => {

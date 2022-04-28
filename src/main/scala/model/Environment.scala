@@ -239,10 +239,19 @@ object Environment {
       params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
     }
 
+    val paramsList = {
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+    }
+
+    val keyType = SubtypeT(TaggedObject(
+      UMap(paramsList),
+      MapT(IdentifierT, OrBooleanT, MapConfig(CommandOutput, BasicMap))
+    ))
+
     CaseT(
       TaggedObject(
         UMap(paramsToObject),
-        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap))
+        MapT(keyType, TypeT, MapConfig(RequireCompleteness, BasicMap))
       )
     )
   }
@@ -313,17 +322,6 @@ object Environment {
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewVersionedStatementCommand("TypeWithDefault", ExpandingSubsetT(TypeT, true)),
-    // TODO: right now cases must be identifier based, expand this in the future!!
-    eCommand("Case", TaggedObject(
-      UMap(Vector(
-        WildcardPattern("cases") -> BuildCaseT(ParamId("cases"))
-      )),
-      MapT(
-        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap)),
-        TypeT,
-        MapConfig(RequireCompleteness, SimpleFunction)
-      )
-    )),
     eCommand("Subtype", TaggedObject(
       UMap(Vector(
         WildcardPattern("simpleFunction") -> BuildSubtypeT(ParamId("simpleFunction"))

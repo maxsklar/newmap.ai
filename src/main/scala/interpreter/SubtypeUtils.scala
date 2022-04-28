@@ -13,7 +13,6 @@ object SubtypeUtils {
     nType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-
     val objectKeys: Set[UntaggedObject] = keys.flatMap(_ match {
       case ObjectPattern(o) => Some(o)
       case _ => None
@@ -31,6 +30,12 @@ object SubtypeUtils {
       val piecemealCompletenessOutcome = nType match {
         case CaseT(cases) => checkCaseComplete(keys, cases, nType, env)
         case StructT(params) => checkStructComplete(keys, params, nType, env)
+        case VersionedObjectLink(key, _) => {
+          for {
+            state <- Evaluator.indicatedState(key, env)
+            result <- doPatternsCoverType(keys, state, env)
+          } yield result
+        }
         case _ => Success(false)
       }
 
@@ -53,7 +58,8 @@ object SubtypeUtils {
     nType: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    val caseKeys = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
+    val caseType = RetrieveType.fromNewMapObject(cases, env)
+    val caseKeys = RetrieveType.inputTypeFromFunctionType(caseType, env)
 
     for {
       // For each case key, we want to make sure that this case key is completely covered
@@ -131,13 +137,18 @@ object SubtypeUtils {
       case SubtypeT(TaggedObject(UMap(values), _)) => {
         enumerateMapKeys(values.map(_._1))
       }
+      case TaggedObject(UMap(values), ExpandingSubsetT(_, false)) => {
+        enumerateMapKeys(values.map(_._1))
+      }
       case TaggedObject(UIndex(i), _) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
       case OrBooleanT => {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
-      case _ => Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
+      case _ => {
+        Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
+      }
     }
   }
 
@@ -263,8 +274,8 @@ object SubtypeUtils {
       }
       case(StructT(startingParams), StructT(endingParams)) => {
         isTypeConvertible(
-          RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(startingParams), env),
-          RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingParams), env),
+          RetrieveType.retrieveInputTypeFromFunctionObj(startingParams, env),
+          RetrieveType.retrieveInputTypeFromFunctionObj(endingParams, env),
           env
         )
       }
@@ -287,8 +298,8 @@ object SubtypeUtils {
         // This is because a case class with fewer cases can be converted into one with more
         for {
           convertInstructions <- isTypeConvertible(
-            RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(endingCases), env),
-            RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(startingCases), env),
+            RetrieveType.retrieveInputTypeFromFunctionObj(endingCases, env),
+            RetrieveType.retrieveInputTypeFromFunctionObj(startingCases, env),
             env
           )
         } yield convertInstructions
@@ -311,7 +322,7 @@ object SubtypeUtils {
         } yield convertInstructions
       }
       case (SubtypeT(isMember), _) => {
-        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
         
         for {
           convertInstructions <- isTypeConvertible(subtypeInputType, endingType, env)
@@ -369,7 +380,7 @@ object SubtypeUtils {
         } yield result
       }*/
       case SubtypeT(isMember) => {
-        val superType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), env)
+        val superType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
         for {
           convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
 

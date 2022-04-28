@@ -44,12 +44,6 @@ object Evaluator {
         for {
           evalInputType <- this(inputType, env)
           evalOutputType <- this(outputType, env)
-
-          // TODO - this needs to be pushed up to the type checker
-          _ <- Outcome.failWhen(
-            (config.completeness == RequireCompleteness) && !RetrieveType.isTermConstant(evalInputType),
-            "Cannot build a RequireCompleteness map with an expanding input type. Try creating a table instead, or using a map with a default value."
-          )
         } yield {
           MapT(evalInputType, evalOutputType, config)
         }
@@ -488,7 +482,7 @@ object Evaluator {
                 case _ => Failure(s"Couldn't get map values from $current")
               }
 
-              caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(params), env)
+              caseConstructorType = RetrieveType.retrieveInputTypeFromFunctionObj(params, env)
               taggedConstructor = noramlizeTypeTaggedObject(TaggedObject(constructor, RetrieveType.getParentType(caseConstructorType, env)))
 
               typeForInput <- applyFunctionAttempt(params, taggedConstructor, env)
@@ -560,14 +554,19 @@ object Evaluator {
     }
   }
 
+  def indicatedState(key: VersionedObjectKey, env: Environment): Outcome[NewMapObject, String] = {
+    for {
+      currentState <- env.storedVersionedTypes.get(key) match {
+        case Some(obj) => Success(obj)
+        case None => Failure(s"Couldn't find current state of version ${key.versionNumber} number for ${key.uuid}")
+      }
+    } yield currentState
+  }
+
   def currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String] = {
     for {
       v <- latestVersion(uuid, env)
-
-      currentState <- env.storedVersionedTypes.get(VersionedObjectKey(v, uuid)) match {
-        case Some(obj) => Success(obj)
-        case None => Failure(s"Couldn't find current state of version $v number for $uuid")
-      }
+      currentState <- indicatedState(VersionedObjectKey(v, uuid), env)
     } yield currentState
   }
 
@@ -747,7 +746,7 @@ object Evaluator {
     // TODO: IMPORTANT
     // We must be able to dea with using the same variable in a pattern, like StructPattern(x, x) to
     //  denote that these are the same
-    (pattern, input) match {
+    (pattern, stripVersioning(input, env)) match {
       case (StructPattern(params), TaggedObject(UMap(paramValues), StructT(_))) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
@@ -771,12 +770,16 @@ object Evaluator {
           Success(Map.empty)
         } else Failure("ObjectPattern didn't match")
       }
-      case (CasePattern(constructorP, inputP), TaggedObject(UCase(constructor, cInput), CaseT(cases))) => {
-        val caseConstructorType = RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(cases), env)
-        val taggedConstructor = TaggedObject(constructor, caseConstructorType)
-
+      case (CasePattern(constructorP, inputP), TaggedObject(UCase(constructor, cInput), inputType)) => {
         for {
-          //_ <- Outcome.failWhen(constructorP != taggedConstructor, "Constructors didn't match")
+          cases <- stripVersioning(inputType, env) match {
+            case CaseT(params) => Success(params)
+            case _ => Failure(s"Unexpected case type: $inputType")
+          }
+
+          caseConstructorType = RetrieveType.retrieveInputTypeFromFunctionObj(cases, env)
+          taggedConstructor = TaggedObject(constructor, caseConstructorType)
+
           _ <- Outcome.failWhen(constructorP != constructor, "Constructors didn't match")
 
           typeOfCInput <- applyFunctionAttempt(cases, taggedConstructor, env)

@@ -14,7 +14,7 @@ class TestSubtypeUtils extends FlatSpec {
       MapT(IdentifierT, TaggedObject(UIndex(2), CountT), MapConfig(CommandOutput, BasicMap))
     )
 
-    assert(RetrieveType.retrieveInputTypeFromFunction(ObjectExpression(isMember), Environment.Base) == IdentifierT)
+    assert(RetrieveType.retrieveInputTypeFromFunctionObj(isMember, Environment.Base) == IdentifierT)
 
     val convertInstructionOutcome = SubtypeUtils.isTypeConvertible(SubtypeT(isMember), IdentifierT, Environment.Base)
     

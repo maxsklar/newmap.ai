@@ -86,7 +86,6 @@ object PrintNewMapObject {
         val completenessStr = config.completeness match {
           case RequireCompleteness => "Required"
           case CommandOutput => "Command"
-          case SubtypeInput => "SubtypeInput"
         }
 
         val featureSetStr = config.featureSet match {
@@ -110,7 +109,7 @@ object PrintNewMapObject {
   def untagged(uObject: UntaggedObject): String = uObject match {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
-    case UCase(constructor, value) => "(" + untagged(constructor) + " " + untagged(value) + ")"
+    case UCase(constructor, value) => "(" + untagged(constructor) + "." + untagged(value) + ")"
     case UType(nType) => this(nType)
     case UIndex(i) => i.toString
     case IsCommandFunc => s"IsCommandFunc"
@@ -138,6 +137,6 @@ object PrintNewMapObject {
     case ObjectPattern(nObject) => untagged(nObject)
     case WildcardPattern(name) => "W~" + name
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
-    case CasePattern(constructor, input) => s"(${untagged(constructor)} ${patternToString(input)})"
+    case CasePattern(constructor, input) => s"(${untagged(constructor)}.${patternToString(input)})"
   }
 }
