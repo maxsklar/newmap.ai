@@ -444,14 +444,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "SubMaps " should " work" in testCodeScript(Vector(
-    CodeExpectation("val m: SubMap(8, 2) = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
-    CodeExpectation("m 0", GeneralSuccessCheck),
-    CodeExpectation("m 1", GeneralSuccessCheck),
-    CodeExpectation("m 4", GeneralSuccessCheck),
-    CodeExpectation("m 2", FailureCheck)
-  ))
-
   "A SimpleMap " should " be allowed to call other simple maps" in {
     testCodeScript(Vector(
       CodeExpectation("val m1: ReqMap(3, Identifier) = (0: Zero, 1: One, 2: Two)", GeneralSuccessCheck),

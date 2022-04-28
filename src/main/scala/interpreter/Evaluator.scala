@@ -151,18 +151,14 @@ object Evaluator {
       case MapT(TaggedObject(UMap(m), _), _, MapConfig(RequireCompleteness, _, _, _)) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
       case TypeT => {
-        // Maybe there should be a type of cases specifically
-        Success(CaseT(
-          TaggedObject(
-            UMap(Vector.empty),
-            MapT(
-              IdentifierT,
-              TypeT,
-              MapConfig(SubtypeInput, BasicMap)
-            )
-          )
-        ))
-        //Failure("Type of Types has no implemented default value (Maybe it should be empty case)")
+        // TODO - maybe this shouldn't be TypeT, but just a Case subtype?
+        for {
+          emptyCase <- getDefaultValueOfCommandType(MapT(
+            TaggedObject(UMap(Vector.empty), ExpandingSubsetT(IdentifierT, false)),
+            TypeT,
+            MapConfig(RequireCompleteness, BasicMap)
+          ), env)
+        } yield CaseT(emptyCase)
       }
       case structT@StructT(TaggedObject(UMap(parameterList), MapT(keyType, _, _))) => {
         if (isEmptySet(keyType, env)) {
@@ -468,18 +464,13 @@ object Evaluator {
       }
       case TypeT => {
         current match {
-          case CaseT(TaggedObject(UMap(values), mapT)) => {
-            // General map, adding a case
-            for {
-              newCaseName <- applyFunctionAttempt(command, Index(0), env)
-              newCaseInputType <- applyFunctionAttempt(command, Index(1), env)
-
-              newCaseNameUntagged <- removeTypeTag(newCaseName)
-              newMapValues = (ObjectPattern(newCaseNameUntagged) -> ObjectExpression(newCaseInputType)) +: values.filter(x => x._1 != ObjectPattern(newCaseNameUntagged))
+          case CaseT(inside@TaggedObject(UMap(values), mapT)) => {
+            for{
+              result <- updateVersionedO(inside, command, env)
             } yield {
               UpdateVersionedOResponse(
-                CaseT(TaggedObject(UMap(newMapValues), mapT)),
-                newCaseName
+                CaseT(result.newState),
+                result.output
               )
             }
           }

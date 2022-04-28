@@ -312,21 +312,6 @@ object Environment {
       UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType"), false))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    eCommand("SubMap", buildDefinitionWithParameters(
-      Vector("key" -> TypeT, "value" -> TypeT),
-      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(SubtypeInput, SimpleFunction))
-    )),
-    eCommand("Struct", TaggedObject(
-      UMap(Vector(
-        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
-      )),
-      MapT(
-        // TODO requires a type pattern here
-        MapT(IdentifierT, TypeT, MapConfig(SubtypeInput, BasicMap)),
-        TypeT,
-        MapConfig(RequireCompleteness, SimpleFunction)
-      )
-    )),
     NewVersionedStatementCommand("TypeWithDefault", ExpandingSubsetT(TypeT, true)),
     // TODO: right now cases must be identifier based, expand this in the future!!
     eCommand("Case", TaggedObject(
