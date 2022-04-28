@@ -84,7 +84,7 @@ object Evaluator {
       case BuildMapInstance(values, nType) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
-        } yield TaggedObject(UMap(evalValues), nType)
+        } yield TaggedObject(UMap(values), nType)
       }
     }
   }
@@ -615,14 +615,12 @@ object Evaluator {
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
     values match {
       case (k, v) +: restOfValues => {
-        val nps = newParametersFromPattern(k)
-
-        // What do we need to do with v?
-        // I'd argue nothing - it's already type checked so we know the internal parameters check out
-        // This should be left unevaluated!
-
-        // TODO - if this is a basic map, v should be evaluated down to an object
         for {
+          // If this is a basic map element, v should be evaluated down to an object
+          newV <- if (newParametersFromPattern(k).isEmpty) {
+            Evaluator(v, env).map(vObj => ObjectExpression(vObj))
+          } else Success(v)
+
           evalRest <- evalMapInstanceVals(restOfValues, env)
         } yield {
           (k -> v) +: evalRest

@@ -106,7 +106,7 @@ object RetrieveType {
   def getParentType(nType: NewMapObject, env: Environment): NewMapObject = {
     nType match {
       case SubtypeT(isMember) => {
-        getParentType(retrieveInputTypeFromFunction(ObjectExpression(isMember), env), env)
+        getParentType(retrieveInputTypeFromFunctionObj(isMember, env), env)
       }
       case VersionedObjectLink(key, status) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
@@ -161,20 +161,6 @@ object RetrieveType {
           isMapValuesClosed(restOfMapValues, knownVariables)
       }
       case _ => true
-    }
-  }
-
-  // Ensures that the term is a constant
-  def isTermConstant(nObject: NewMapObject): Boolean = {
-    nObject match {
-      case IdentifierT | CountT | TypeT | AnyT | OrBooleanT => true
-      case MapT(inputType, outputType, _) => isTermConstant(inputType) && isTermConstant(outputType)
-      case ExpandingSubsetT(parentType, _) => isTermConstant(parentType)
-      case StructT(params) => isTermConstant(params)
-      case CaseT(cases) => isTermConstant(cases)
-      case SubtypeT(isMember) => isTermConstant(isMember)
-      case TaggedObject(_, nType) => true
-      case VersionedObjectLink(_, status) => (status == KeepThisVersion)
     }
   }
 }
