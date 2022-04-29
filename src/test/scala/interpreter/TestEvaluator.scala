@@ -42,6 +42,14 @@ class TestEvaluator extends FlatSpec {
       IsCommandFunc,
       MapT(TypeT, Index(2), mapConfig)
     ), TypeT, env)
+    assertFunctionWorkedAndReturnedResult(result, Index(0))
+  }
+
+  it should " work properly on DataTypeT, and return false" in {
+    val result = Evaluator.applyFunctionAttempt(TaggedObject(
+      IsCommandFunc,
+      MapT(TypeT, Index(2), mapConfig)
+    ), DataTypeT(Vector.empty), env)
     assertFunctionWorkedAndReturnedResult(result, Index(1))
   }
 

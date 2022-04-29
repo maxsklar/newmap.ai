@@ -61,6 +61,10 @@ object StatementInterpreter {
           versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
           nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
 
+          _  = if (nType == TypeT) {
+            println(s"versionedObjectLink: $versionedObjectLink -- ${id.s} -- ${Evaluator.stripVersioning(versionedObjectLink, env)}")
+          }
+
           inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
           commandExp <- typeCheck(command, inputT, env, FullFunction)
 

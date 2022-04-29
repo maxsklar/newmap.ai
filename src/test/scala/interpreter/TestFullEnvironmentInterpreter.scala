@@ -242,7 +242,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("ver MyCase = new Type", GeneralSuccessCheck),
+      CodeExpectation("ver MyCase = new DataType", GeneralSuccessCheck),
       CodeExpectation("update MyCase (a, 2)", GeneralSuccessCheck),
       CodeExpectation("update MyCase (b, 3)", GeneralSuccessCheck),
       // TODO - allow this check without knowing mycase id!
@@ -609,7 +609,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "Defining Bool as a Case " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("ver Bool = new Type", GeneralSuccessCheck),
+      CodeExpectation("ver Bool = new DataType", GeneralSuccessCheck),
       CodeExpectation("update Bool (False, ())", GeneralSuccessCheck),
       CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
       CodeExpectation("val t: Bool = True.()", GeneralSuccessCheck),
@@ -619,7 +619,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "A case pattern " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("ver MyCase = new Type", GeneralSuccessCheck),
+      CodeExpectation("ver MyCase = new DataType", GeneralSuccessCheck),
       CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
       CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = (First.x: x, Second.x: 2)", GeneralSuccessCheck),
@@ -630,7 +630,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " be seen to the type if all cases are accounted for" in {
     testCodeScript(Vector(
-      CodeExpectation("ver MyCase = new Type", GeneralSuccessCheck),
+      CodeExpectation("ver MyCase = new DataType", GeneralSuccessCheck),
       CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
       CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x, (Second.x): 2)", GeneralSuccessCheck),
@@ -640,7 +640,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "Defining a non-generic linked list " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("ver ListOfCounts = new Type", GeneralSuccessCheck),
+      CodeExpectation("ver ListOfCounts = new DataType", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Nil, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
       CodeExpectation("val a: ListOfCounts = Nil.()", GeneralSuccessCheck),

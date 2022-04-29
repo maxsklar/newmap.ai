@@ -87,13 +87,30 @@ sealed abstract class MapMode
 object StandardMode extends MapMode // There is a single output type
 object GenericMode extends MapMode // The output type depends on the input type
 
-// In the future, this will allow us to remove StructT
+// In the future, will this allow us to remove StructT
 //object StructMode extends MapMode // The output type depends on the specific input
 
 case class ExpandingSubsetT(
   parentType: NewMapObject,
   allowPatternMatching: Boolean
 ) extends NewMapObject
+
+// User defined datatype (like an expanding case)
+case class DataTypeT(
+  typeParameters: Vector[TypeParameter]
+) extends NewMapObject
+
+case class TypeParameter(
+  name: String,
+  upperBound: Vector[NewMapObject] = Vector.empty,
+  lowerBound: Vector[NewMapObject] = Vector.empty,
+  variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
+)
+
+case class TypeParameterVariance(
+  isCovariant: Boolean,
+  isContravariant: Boolean
+)
 
 // Params should be connected to a NewMapObject which are of type
 //  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
@@ -135,25 +152,6 @@ sealed abstract class VersionedObjectStatus
 object KeepUpToDate extends VersionedObjectStatus
 object CurrentlyOutOfDate extends VersionedObjectStatus
 object KeepThisVersion extends VersionedObjectStatus
-
-
-//def uuid = java.util.UUID.randomUUID
-
-/*
-
-Is this applied to types??
-
-case class TypeParameter(
-  name: String,
-  upperBounds: Vector[NewMapObject] = Vector.empty,
-  lowerBounds: Vector[NewMapObject] = Vector.empty,
-  variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
-)
-
-case class TypeParameterVariance(
-  isCovariant: Boolean,
-  isContravariant: Boolean
-)*/
 
 object NewMapO {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)

@@ -29,6 +29,12 @@ object SubtypeUtils {
     else {
       val piecemealCompletenessOutcome = nType match {
         case CaseT(cases) => checkCaseComplete(keys, cases, nType, env)
+        case TaggedObject(UMap(values), DataTypeT(_)) => {
+          val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+          val caseConstructorType = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
+          val caseMap = TaggedObject(UMap(values), MapT(caseConstructorType, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+          checkCaseComplete(keys, caseMap, nType, env)
+        }
         case StructT(params) => checkStructComplete(keys, params, nType, env)
         case VersionedObjectLink(key, _) => {
           for {
@@ -229,6 +235,7 @@ object SubtypeUtils {
       case (_, AnyT) => Success(Vector.empty)
       case (CountT, TypeT) => Success(Vector.empty)
       case (ExpandingSubsetT(_, _), TypeT) => Success(Vector.empty)
+      case (DataTypeT(_), TypeT) => Success(Vector.empty)
       case (TaggedObject(_, ExpandingSubsetT(parentType, _)), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
@@ -461,7 +468,7 @@ object SubtypeUtils {
     // TODO - we need to first convert a and b into the same type
     /*(a, b) match {
       case (TaggedObject(ua, _), TaggedObject(ub, _)) => {
-        ua == ub
+      ua == ub
       }
       case _ => false
     }*/

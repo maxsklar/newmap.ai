@@ -94,7 +94,7 @@ object Evaluator {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
       case VersionedObjectLink(_, _) => Failure(s"Can't remove type tage from versioned object link")
-      case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_) | CaseT(_) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) | SubtypeT(_) => Success(UType(nObject))
+      case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_) | CaseT(_) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) | SubtypeT(_) | DataTypeT(_) => Success(UType(nObject))
       case _ => {
         //throw new Exception(nObject.toString)
         Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")
@@ -306,6 +306,12 @@ object Evaluator {
         for {
           cases <- stripVersioning(inputType, env) match {
             case CaseT(params) => Success(params)
+            case TaggedObject(UMap(values), DataTypeT(_)) => {
+              val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+              val caseConstructorType = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
+              val caseMap = TaggedObject(UMap(values), MapT(caseConstructorType, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+              Success(caseMap)
+            }
             case _ => Failure(s"Unexpected case type: $inputType")
           }
 

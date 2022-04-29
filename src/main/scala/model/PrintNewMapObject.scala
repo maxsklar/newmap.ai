@@ -8,6 +8,7 @@ object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case CountT => "Count"
     case TypeT => s"Type"
+    case DataTypeT(x) => s"DataType[$x]"
     case AnyT => s"Any"
     case IdentifierT => "Identifier"
     case OrBooleanT => "OrBooleanT"

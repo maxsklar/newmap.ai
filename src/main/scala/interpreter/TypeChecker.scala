@@ -289,6 +289,25 @@ object TypeChecker {
               BuildCase(firstObj, secondExp, expectedType)
             }
           }
+          case TaggedObject(UMap(cases), DataTypeT(_)) => {
+            val uConstructors = cases.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+            val expandingUConstructors = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
+            val caseMap = TaggedObject(UMap(cases), MapT(expandingUConstructors, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+
+            for {
+              firstExp <- typeCheck(first, expandingUConstructors, env, featureSet)
+
+              // TODO - we must ensure that the evaluator is not evaluating anything too complex here
+              // must be a "simple map" type situation
+              // can this be built into the evaluator?
+              firstObj <- Evaluator(firstExp, env)
+
+              secondType <- Evaluator.applyFunctionAttempt(caseMap, firstObj, env)
+              secondExp <- typeCheck(second, secondType, env, featureSet)
+            } yield {
+              BuildCase(firstObj, secondExp, expectedType)
+            }
+          }
           case _ => {
             Failure(s"Case type must be specified for $expression")
           }
@@ -310,6 +329,7 @@ object TypeChecker {
       case BindingCommandItem(k, v) +: restOfValues => {
         for {
           resultKey <- typeCheckWithPatternMatching(k, keyType, env, externalFeatureSet, internalFeatureSet)
+          
           foundKeyPattern = resultKey.typeCheckResult
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
@@ -389,6 +409,24 @@ object TypeChecker {
           constructorTC <- typeCheck(constructorP, caseConstructorType, env, BasicMap)
           constructor <- Evaluator(constructorTC, env)
           inputTypeExpected <- Evaluator.applyFunctionAttempt(cases, constructor, env)
+
+          result <- typeCheckWithPatternMatching(input, inputTypeExpected, env, externalFeatureSet, internalFeatureSet)
+        } yield {
+          TypeCheckWithPatternMatchingResult(
+            CasePattern(Evaluator.removeTypeTag(constructor).toOption.get, result.typeCheckResult),
+            result.newEnvironment
+          )
+        }
+      }
+      case (ConstructCaseParse(constructorP, input), TaggedObject(UMap(values), DataTypeT(_))) if (patternMatchingAllowed) => {
+        val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+        val caseConstructorType = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
+        val caseMap = TaggedObject(UMap(values), MapT(caseConstructorType, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+
+        for {
+          constructorTC <- typeCheck(constructorP, caseConstructorType, env, BasicMap)
+          constructor <- Evaluator(constructorTC, env)
+          inputTypeExpected <- Evaluator.applyFunctionAttempt(caseMap, constructor, env)
 
           result <- typeCheckWithPatternMatching(input, inputTypeExpected, env, externalFeatureSet, internalFeatureSet)
         } yield {

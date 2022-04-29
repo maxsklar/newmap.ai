@@ -79,6 +79,8 @@ case class Environment(
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty
+
+  // TODO - add use-defined types as a special case of latest version number?
 ) {
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
@@ -293,6 +295,7 @@ object Environment {
   var Base: Environment = Environment().newCommands(Vector(
     eCommand("Any", AnyT),
     eCommand("Type", TypeT),
+    eCommand("DataType", DataTypeT(Vector.empty)),
     eCommand("Count", CountT),
     eCommand("Identifier", IdentifierT),
     eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, MapConfig(RequireCompleteness, SimpleFunction)))),

@@ -32,7 +32,7 @@ object RetrieveType {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT | ExpandingSubsetT(_, _) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
+    case CountT | ExpandingSubsetT(_, _) | DataTypeT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
     case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType

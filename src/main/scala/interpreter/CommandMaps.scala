@@ -57,15 +57,8 @@ object CommandMaps {
       case MapT(TaggedObject(UIndex(0), _), _, MapConfig(RequireCompleteness, _, _, _)) => Success(TaggedObject(UMap(Vector.empty), nType))
       case MapT(TaggedObject(UMap(m), _), _, MapConfig(RequireCompleteness, _, _, _)) if (m.isEmpty) => Success(TaggedObject(UMap(Vector.empty), nType))
       case TaggedObject(UIndex(i), _) if i > 0 => Success(TaggedObject(UIndex(0), Index(i)))
-      case TypeT => {
-        // TODO - maybe this shouldn't be TypeT, but just a Case subtype?
-        for {
-          emptyCase <- getDefaultValueOfCommandType(MapT(
-            TaggedObject(UMap(Vector.empty), ExpandingSubsetT(IdentifierT, false)),
-            TypeT,
-            MapConfig(RequireCompleteness, BasicMap)
-          ), env)
-        } yield CaseT(emptyCase)
+      case DataTypeT(typeParams) => {
+        Success(TaggedObject(UMap(Vector.empty), DataTypeT(typeParams)))
       }
       case structT@StructT(TaggedObject(UMap(parameterList), MapT(keyType, _, _))) => {
         if (isEmptySet(keyType, env)) {
@@ -165,7 +158,7 @@ object CommandMaps {
       }
       case ExpandingSubsetT(parentType, _) => Success(parentType)
       // This should really be a case type instead of a typeT
-      case TypeT => {
+      case DataTypeT(typeParams) => {
         Success(
           StructT(
             TaggedObject(
@@ -369,14 +362,20 @@ object CommandMaps {
           case _ => Failure(s"Didn't get what I expected for ExpandingSubsetT $parentType -- $current -- $command")
         }
       }
-      case TypeT => {
+      case DataTypeT(typeParams) => {
         current match {
-          case CaseT(inside@TaggedObject(UMap(values), mapT)) => {
+          case TaggedObject(uCases@UMap(values), _) => {
+            val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
+            val expandingUConstructors = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
+            val caseMap = TaggedObject(UMap(values), MapT(expandingUConstructors, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+
             for{
-              result <- updateVersionedO(inside, command, env)
+              result <- updateVersionedO(caseMap, command, env)
             } yield {
+              val retagged = retagObject(result.newState, DataTypeT(typeParams))
+
               UpdateVersionedOResponse(
-                CaseT(result.newState),
+                retagged,
                 result.output
               )
             }
