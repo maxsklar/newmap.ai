@@ -192,8 +192,8 @@ object Evaluator {
     val funcC = stripVersioning(func, env)
     val inputC = stripVersioning(input, env)
 
-    (funcC, inputC) match {
-      case (TaggedObject(UMap(values), nType), _) => {
+    funcC match {
+      case TaggedObject(UMap(values), nType) => {
         for {
           keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
             case Success(result) => Success(result)
@@ -203,13 +203,8 @@ object Evaluator {
               } else {
                 // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
                 // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                // TODO - instead of calling "RetrieveType" on the full object, we should look at the output type of Func,
-                //  and get the default from that
-                val typeOfFunction = RetrieveType.fromNewMapObject(func, env)
-
-                val nType = RetrieveType.retrieveOutputTypeFromFunctionType(typeOfFunction, env)
-                
-                CommandMaps.getDefaultValueOfCommandType(RetrieveType.getParentType(nType, env), env)
+                val outputType = RetrieveType.retrieveOutputTypeFromFunctionType(nType, env)
+                CommandMaps.getDefaultValueOfCommandType(outputType, env)
               }
             }
           }
@@ -217,13 +212,13 @@ object Evaluator {
           keyMatchResult
         }
       }
-      case (TaggedObject(IsCommandFunc, _), nObject) => {
-        val isCommand: Boolean = CommandMaps.getDefaultValueOfCommandType(nObject, env).isSuccess
+      case TaggedObject(IsCommandFunc, _) => {
+        val isCommand: Boolean = CommandMaps.getDefaultValueOfCommandType(inputC, env).isSuccess
 
         Success(Index(if (isCommand) 1 else 0))
       }
-      case (TaggedObject(IsSimpleFunction, _), nObject) => {
-        nObject match {
+      case TaggedObject(IsSimpleFunction, _) => {
+        inputC match {
           case TaggedObject(_, MapT(_, _, MapConfig(CommandOutput, features, _, _))) => {
             if (features == SimpleFunction || features == BasicMap) {
               Success(Index(1))
@@ -234,7 +229,12 @@ object Evaluator {
           case _ => Success(Index(0))
         }
       }
-      case (TaggedObject(IncrementFunc, _), TaggedObject(UIndex(i), nType)) => Success(TaggedObject(UIndex(i + 1), nType))
+      case TaggedObject(IncrementFunc, _) => {
+        inputC match {
+          case TaggedObject(UIndex(i), nType) => Success(TaggedObject(UIndex(i + 1), nType))
+          case _ => Failure(s"Cannot increment $inputC")
+        }
+      }
       case _ => {
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
       }
