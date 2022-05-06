@@ -44,11 +44,6 @@ object NewMapO {
 
   def commandT: NewMapType = SubtypeT(IsCommandFunc, TypeT, SimpleFunction)
 
-  // This is a subtype of any, and will match every map that is a simple function (or basicMap)
-  // - This will be replaced once we get Map Type patterns working properly
-  // - Created for now to get Subtype working properly, so that we can move on
-  def simpleFunctionT: NewMapType = SubtypeT(IsSimpleFunction, TypeT, SimpleFunction)
-
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 
   def emptyStruct: NewMapType = StructT(Vector.empty, CountT, BasicMap, Vector.empty)

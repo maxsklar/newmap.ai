@@ -172,56 +172,6 @@ object SubtypeUtils {
     }
   }
 
-  /*def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
-    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, MapConfig(CommandOutput, _, _)))) => {
-      untaggedFunction match {
-        case UMap(values) => {
-          // TODO: Extend this to see if pattering matching in basic function covers the full type
-          // Check that the function doesn't return the default value for any input
-          doPatternsCoverType(values.map(_._1), inputType, env).toOption.getOrElse(false)
-        }
-        case IsCommandFunc | IsSimpleFunction => false
-        case _ => true
-      }
-    }
-    case _ => {
-      // TODO: Is this appropriate - shouldn't it be false
-      true
-    }
-  }
-
-  def doesTypeCoverSubtype(startingType: NewMapObject, endingType: NewMapObject, env: Environment): Boolean = {
-    val doesEndtypeCoverParentType = doesTypeCoverParentType(endingType, env)
-    val doesStarttypeCoverParentType = doesTypeCoverParentType(startingType, env)
-
-    endingType match {
-      case _ if doesEndtypeCoverParentType => true
-      case SubtypeT(TaggedObject(IsSimpleFunction, _)) => {
-        startingType match {
-          case MapT(_, _, config) => isFeatureSetConvertible(config.featureSet, SimpleFunction)
-          case _ => false 
-        }
-      }
-      case SubtypeT(TaggedObject(IsCommandFunc, _)) => {
-        // This is definitely wrong, but we can fix when we move this out
-        (startingType == endingType)
-      }
-      case _ => (!doesStarttypeCoverParentType && {
-        // End type does not cover parent type
-        // So, let's go through all the values of starting type (if we can) and see if we can brute force it
-        val allConvertedOutcome = for {
-          allValues <- enumerateAllValuesIfPossible(startingType, env)
-
-          taggedAllValues = allValues.toVector.map(u => TaggedObject(u, startingType))
-
-          doAllConvert <- allMembersOfSubtype(taggedAllValues, endingType, env)
-        } yield doAllConvert
-
-        allConvertedOutcome.toOption.getOrElse(false)
-      })
-    }
-  }*/
-
   // Return - Instructions in the form of functions for converting from one type to another
   def isTypeConvertible(
     startingType: NewMapType,
@@ -232,27 +182,12 @@ object SubtypeUtils {
       case _ if (startingType == endingType) => Success(Vector.empty)
       case (_, AnyT) => Success(Vector.empty)
       case (CountT, TypeT) => Success(Vector.empty)
-      //case (ExpandingSubsetT(_, _), TypeT) => Success(Vector.empty)
-      //case (DataTypeT(_), TypeT) => Success(Vector.empty)
-      /*case (TaggedObject(_, ExpandingSubsetT(parentType, _)), _) => {
-        for {
-          convertInstructions <- isTypeConvertible(parentType, endingType, env)
-        } yield convertInstructions
-      }
-      case (_, TaggedObject(_, ExpandingSubsetT(_, _))) => {
-        // We must figure out the expanding subset in isTypeConvertible!!
-
-        Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
-      }*/
       case (SubtypeT(isMember, parentType, featureSet), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
         } yield convertInstructions
       }
       case (_, SubtypeT(isMember, parentType, featureSet)) => {
-        // We must figure out the subset in isTypeConvertible!!
-        throw new Exception(s"Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
-
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
@@ -352,13 +287,6 @@ object SubtypeUtils {
       case (CustomT(uuid, _), CustomT(uuid2, _)) if (uuid == uuid2) => {
         Success(Vector.empty)
       }
-      /*case (SubtypeT(isMember), _) => {
-        val subtypeInputType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
-        
-        for {
-          convertInstructions <- isTypeConvertible(subtypeInputType, endingType, env)
-        } yield convertInstructions
-      }*/
       /*case (
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
         VersionedObjectLink(VersionedObjectKey(versionNumber2, uuid2), status2)
@@ -491,7 +419,7 @@ object SubtypeUtils {
       defaultValueOrResultType <- CommandMaps.getDefaultValueOfCommandType(UType(isMemberOutputType), env)
     
       // Problem is that we should be checking equality of untagged!!
-    } yield !checkEqual(result, defaultValueOrResultType)
+    } yield !checkEqual(result, defaultValueOrResultType) && !checkEqual(result, UInit)
   }
 
   def checkEqual(a: UntaggedObject, b: UntaggedObject): Boolean = {

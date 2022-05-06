@@ -118,8 +118,8 @@ object PrintNewMapObject {
     case UCase(constructor, value) => "(" + untagged(constructor) + "." + untagged(value) + ")"
     case UType(nType) => newMapType(nType)
     case UIndex(i) => i.toString
+    case UInit => "()"
     case IsCommandFunc => s"IsCommandFunc"
-    case IsSimpleFunction => s"IsSimpleFunction"
     case IncrementFunc => s"Increment"
     case ULink(key) => {
       s"ULink[${key.toString}]"

@@ -166,13 +166,9 @@ object CommandMaps {
         for {
           newMembersMap <- updateVersionedObject(isMemberMap, adjustedCommand, env)
           untaggedNewMembersMap <- Evaluator.removeTypeTag(newMembersMap)
-          fixedUntaggedNewMembersMap = untaggedNewMembersMap match {
-            case UMap(values) => UMap(values :+ (WildcardPattern("_") -> ObjectExpression(UIndex(0))))
-            case _ => untaggedNewMembersMap
-          }
         } yield {
           ExpandKeyResponse(
-            SubtypeT(fixedUntaggedNewMembersMap, parentType, featureSet),
+            SubtypeT(untaggedNewMembersMap, parentType, featureSet),
             Some(ObjectPattern(command)),
             untaggedIdentity
           )
@@ -276,7 +272,7 @@ object CommandMaps {
   /*def retagObject(nObject: NewMapObject, newTypeTag: NewMapObject): NewMapObject = {
     nObject match {
       case TaggedObject(untagged, nType) => TaggedObject(untagged, newTypeTag)
-      case _ => nObject
+    case _ => nObject
     }
   }*/
 
@@ -288,9 +284,15 @@ object CommandMaps {
     RetrieveType.fromNewMapObject(current, env) match {
       case CountT => {
         current match {
-          case TaggedObject(c@UIndex(i), nType) => {
+          case TaggedObject(count, nType) => {
             for {
-              newState <- Evaluator.applyFunctionAttempt(IncrementFunc, c, env)
+              c <- count match {
+                case UIndex(i) => Success(i)
+                case UInit => Success(0L)
+                case _ => Failure(s"Couldn't interpret count value: $count")
+              }
+
+              newState <- Evaluator.applyFunctionAttempt(IncrementFunc, UIndex(c), env)
             } yield {
               TaggedObject(newState, nType)
             }
@@ -301,14 +303,21 @@ object CommandMaps {
         }
       }
       case OrBooleanT => {
-        (current, command) match {
-          case (TaggedObject(UIndex(i), _), UIndex(j)) => {
-            val result = if (i == 1 || j == 1) 1 else 0
-            Success(
-              TaggedObject(UIndex(result), OrBooleanT),
-            )
+        for {
+          currentValue <- current match {
+            case TaggedObject(UIndex(i), _) => Success(i)
+            case TaggedObject(UInit, _) => Success(0)
+            case _ => Failure(s"Couldn't interpret current value: $current")
           }
-        case _ => Failure("This didn't work")
+
+          j <- command match {
+            case UIndex(i) => Success(i)
+            case UInit => Success(0)
+            case _ => Failure(s"Couldn't interpret command $command")
+          }
+        } yield {
+          val result = if (currentValue == 1 || j == 1) 1 else 0
+          TaggedObject(UIndex(result), OrBooleanT)
         }
       }
       case mapT@MapT(inputType, outputType, MapConfig(CommandOutput, featureSet, _)) => {
@@ -318,14 +327,7 @@ object CommandMaps {
 
           untaggedCurrent <- Evaluator.removeTypeTag(current)
 
-          defaultValue <- CommandMaps.getDefaultValueOfCommandType(UType(outputType), env)
-
-          fixedUntaggedCurrent = untaggedCurrent match {
-            case UMap(values) => UMap(values :+ (WildcardPattern("_") -> ObjectExpression(defaultValue)))
-            case _ => untaggedCurrent
-          }
-
-          currentResultForInput <- Evaluator.applyFunctionAttempt(fixedUntaggedCurrent, input, env)
+          currentResultForInput <- Evaluator.applyFunctionAttempt(untaggedCurrent, input, env)
 
           newResultForInput <- updateVersionedObject(
             TaggedObject(currentResultForInput, outputType),

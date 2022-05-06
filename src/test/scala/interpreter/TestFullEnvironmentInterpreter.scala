@@ -117,7 +117,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key" in {
-    val correctCommand = Environment.eCommand("result", IndexValue(43, IndexT(100)))
+    val correctCommand = Environment.eCommand("result", TaggedObject(UIndex(43), IndexT(100)))
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
@@ -125,11 +125,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " be applyable to a key not specified and use the default" in {
-    val correctCommand = Environment.eCommand("result", IndexValue(0, IndexT(100)))
+    val correctCommand = Environment.eCommand("result", TaggedObject(UIndex(0), IndexT(100)))
 
     testCodeScript(Vector(
       CodeExpectation("val m: Map (3, 100) = (0: 20, 2: 67)", GeneralSuccessCheck),
       CodeExpectation("val result: 100 = m 1", SuccessCheck(correctCommand))
+      // TODO - check equality between result and 0 here
     ))
   }
 
@@ -331,7 +332,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  /*it should " be creatable without a type given" in {
+  /*
+  // This "might" be possible with generics
+  it should " be creatable without a type given" in {
     val line = "val f = (t: t)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
@@ -508,8 +511,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "A Subset Type " should "work" in {
     testCodeScript(Vector(
-      CodeExpectation("val underlyingMap: Map(8, 2) = (0: 1, 1: 1, 4: 1)", GeneralSuccessCheck),
-      CodeExpectation("val x: Type = Subtype(underlyingMap)", GeneralSuccessCheck),
+      CodeExpectation("data x = Subtype(8)", GeneralSuccessCheck),
+      CodeExpectation("update x 0", GeneralSuccessCheck),
+      CodeExpectation("update x 1", GeneralSuccessCheck),
+      CodeExpectation("update x 4", GeneralSuccessCheck),
       CodeExpectation("val y: x = 1", GeneralSuccessCheck),
       CodeExpectation("val y: x = 6", FailureCheck)
     ))
@@ -517,9 +522,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " have functions made from them" in {
     testCodeScript(Vector(
-      // TODO: should be able to call Subtype(True: 1, False: 1) directly - but that requires generics
-      CodeExpectation("val BoolMap: Map(Identifier, 2) = (True: 1, False: 1)", GeneralSuccessCheck),      
-      CodeExpectation("val Bool: Type = Subtype(BoolMap)", GeneralSuccessCheck),
+      // TODO: should be able to call Subtype(True: 1, False: 1) - how can we make this work?
+      CodeExpectation("data Bool = Subtype(Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update Bool True", GeneralSuccessCheck),
+      CodeExpectation("update Bool False", GeneralSuccessCheck),
       CodeExpectation("val shorten: Map(Bool, 2) = (True: 1, False: 0)", GeneralSuccessCheck),
       CodeExpectation("val x: 2 = shorten True", GeneralSuccessCheck)
     ))
@@ -653,13 +659,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "Map conversions " should " have a contravariant input type" in {
     testCodeScript(Vector(
-      CodeExpectation("val mySubset: Map(7, 2) = (0: 1, 1:1, 4:1, 6: 1)", GeneralSuccessCheck),
+      CodeExpectation("data mySubset = Subtype(7)", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 0", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 1", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 4", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 6", GeneralSuccessCheck),
       CodeExpectation("val testInput1: ReqMap(7, Count) = (_: 0)", GeneralSuccessCheck),
-      CodeExpectation("val testInput2: ReqMap(Subtype(mySubset), Count) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val testInput2: ReqMap(mySubset, Count) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val supertypeInputFunc: ReqMap(7, Count) => Count = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("supertypeInputFunc testInput1", GeneralSuccessCheck),
       CodeExpectation("supertypeInputFunc testInput2", FailureCheck),
-      CodeExpectation("val subtypeInputFunc: ReqMap(Subtype(mySubset), Count) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val subtypeInputFunc: ReqMap(mySubset, Count) => Count = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("subtypeInputFunc testInput1", GeneralSuccessCheck),
       CodeExpectation("subtypeInputFunc testInput2", GeneralSuccessCheck)
     ))
@@ -667,13 +677,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " have a covariant output type" in {
     testCodeScript(Vector(
-      CodeExpectation("val mySubset: Map(7, 2) = (0: 1, 1:1, 4:1, 6: 1)", GeneralSuccessCheck),
+      CodeExpectation("data mySubset = Subtype(7)", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 0", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 1", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 4", GeneralSuccessCheck),
+      CodeExpectation("update mySubset 6", GeneralSuccessCheck),
       CodeExpectation("val testInput1: ReqMap(Count, 7) = (_: 0)", GeneralSuccessCheck),
-      CodeExpectation("val testInput2: ReqMap(Count, Subtype(mySubset)) = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val testInput2: ReqMap(Count, mySubset) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val supertypeInputFunc: ReqMap(Count, 7) => Count = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("supertypeInputFunc testInput1", GeneralSuccessCheck),
       CodeExpectation("supertypeInputFunc testInput2", GeneralSuccessCheck),
-      CodeExpectation("val subtypeInputFunc: ReqMap(Count, Subtype(mySubset)) => Count = (_: 0)", GeneralSuccessCheck),
+      CodeExpectation("val subtypeInputFunc: ReqMap(Count, mySubset) => Count = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("subtypeInputFunc testInput1", FailureCheck),
       CodeExpectation("subtypeInputFunc testInput2", GeneralSuccessCheck)
     ))

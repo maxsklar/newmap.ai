@@ -217,15 +217,13 @@ object Evaluator {
           keyMatchResult <- attemptPatternMatchInOrder(values, input, env) match {
             case Success(result) => Success(result)
             case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-              //if (isEvaluationError) {
+              if (isEvaluationError) {
                 Failure(message)
-              //} else {
-                // TODO - this needs to be handled in type checker!!!
+              } else {
                 // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
                 // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                //val outputType = RetrieveType.retrieveOutputTypeFromFunctionType(nType, env)
-                //CommandMaps.getDefaultValueOfCommandType(outputType, env)
-              //}
+                Success(UInit)
+              }
             }
           }
         } yield {
@@ -241,22 +239,6 @@ object Evaluator {
 
         Success(UIndex(if (isCommand) 1 else 0))
       }
-      /*case IsSimpleFunction => {
-        val outcome = for {
-          nType <- asType(input)
-        }
-
-        inputC match {
-          case TaggedObject(_, MapT(_, _, MapConfig(CommandOutput, features, _, _))) => {
-            if (features == SimpleFunction || features == BasicMap) {
-              Success(Index(1))
-            } else {
-              Success(Index(0))
-            }
-          }
-          case _ => Success(Index(0))
-        }
-      }*/
       case IncrementFunc => {
         input match {
           case UIndex(i) => Success(UIndex(i + 1))

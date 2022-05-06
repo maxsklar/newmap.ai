@@ -28,8 +28,10 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
           evaluatedObject <- Evaluator(tc, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
+
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
         } yield {
-          val command = FullEnvironmentCommand(id.s, TaggedObject(constantObject, nType))
+          val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
         }
       }
@@ -99,8 +101,9 @@ object StatementInterpreter {
           // TODO - we need a type inference here!!
           tc <- TypeChecker.typeCheckUnknownType(objExpression, env)
           evaluatedObject <- Evaluator(tc._1, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc._2, env)
         } yield {
-          val command = FullEnvironmentCommand(id.s, TaggedObject(evaluatedObject, tc._2))
+          val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
         }
       }
@@ -110,8 +113,9 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheckUnknownType(exp, env)
           evaluatedObject <- Evaluator(tc._1, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, tc._2, env)
         } yield {
-          val command = ExpOnlyEnvironmentCommand(TaggedObject(constantObject, tc._2))
+          val command = ExpOnlyEnvironmentCommand(nObject)
           Response(Vector(command), command.toString)
         }
       }

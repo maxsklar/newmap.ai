@@ -15,8 +15,6 @@ class TestEvaluator extends FlatSpec {
     }
   }
 
-  //def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
-
   val env = (new EnvironmentInterpreter()).env
 
   def mapConfig = MapConfig(CommandOutput, SimpleFunction)
@@ -35,42 +33,4 @@ class TestEvaluator extends FlatSpec {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, UType(TypeT), env)
     assertFunctionWorkedAndReturnedResult(result, UIndex(0))
   }
-
-  /*it should " work properly on DataTypeT, and return false" in {
-    val result = Evaluator.applyFunctionAttempt(IsCommandFunc, DataTypeT(Vector.empty), env)
-    assertFunctionWorkedAndReturnedResult(result, Index(1))
-  }*/
-
-  // TODO: remove this when IsSimpleFunction is eliminated
-  // TODO - IsSimpleFunction should not exist!!
-  /*"IsSimpleFunction" should "work properly" in {
-    assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(TaggedObject(
-        IsSimpleFunction,
-        MapT(AnyT, IndexT(2), mapConfig)
-      ), TypeT, env),
-      Index(0)
-    )
-
-    assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(IsSimpleFunction, UMap(Vector.empty), env),
-      Index(1)
-    )
-
-    assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(TaggedObject(
-        IsSimpleFunction,
-        MapT(AnyT, IndexT(2), mapConfig)
-      ), TaggedObject(UMap(Vector.empty), MapT(IndexT(10), IndexT(10), MapConfig(CommandOutput, BasicMap))), env),
-      Index(1)
-    )
-
-    assertFunctionWorkedAndReturnedResult(
-      Evaluator.applyFunctionAttempt(TaggedObject(
-        IsSimpleFunction,
-        MapT(AnyT, IndexT(2), mapConfig)
-      ), TaggedObject(UMap(Vector.empty), MapT(IndexT(10), IndexT(10), MapConfig(CommandOutput, FullFunction))), env),
-      Index(0)
-    )
-  }*/
 }

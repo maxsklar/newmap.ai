@@ -19,6 +19,9 @@ case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends Unt
 
 case class UIndex(i: Long) extends UntaggedObject
 
+// Set to the initial value of a command type
+case object UInit extends UntaggedObject
+
 // We can't yet untag types directly, so we can use this instead
 case class UType(nType: NewMapType) extends UntaggedObject
 
@@ -31,9 +34,6 @@ case class ULink(key: VersionedObjectKey) extends UntaggedObject
 //  of the command typeclass (which means it has a default value and an update function)
 // TODO: making this a basic class is temporary for now
 case object IsCommandFunc extends UntaggedObject
-
-// Temporary for now, this should be buildable as a map pattern in the future
-case object IsSimpleFunction extends UntaggedObject
 
 // A basic function to increment a count
 case object IncrementFunc extends UntaggedObject
