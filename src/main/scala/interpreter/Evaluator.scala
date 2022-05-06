@@ -9,7 +9,7 @@ object Evaluator {
   def apply(
     nExpression: NewMapExpression,
     env: Environment
-  ): Outcome[NewMapObject, String] = {
+  ): Outcome[UntaggedObject, String] = {
     nExpression match {
       case ObjectExpression(nObject) => Success(nObject)
       case ApplyFunction(func, input) => {
@@ -24,77 +24,103 @@ object Evaluator {
       case ParamId(s) => {
         env.lookup(s) match {
           case None => Failure(s"Unbound identifier: $s")
-          case Some(EnvironmentValue(nObject, BoundStatus)) => Success(nObject)
-          case Some(EnvironmentValue(nObject, ParameterStatus)) => {
+          case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
+          case Some(EnvironmentParameter(nObject)) => {
             //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
             Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
           }
         }
       }
-      case BuildCase(constructor, input, caseType) => {
+      case BuildCase(constructor, input) => {
         for {
           evalInput <- this(input, env)
-          untaggedInput <- removeTypeTag(evalInput)
-          untaggedConstructor <- removeTypeTag(constructor)
         } yield {
-          TaggedObject(UCase(untaggedConstructor, untaggedInput), caseType)
+          UCase(constructor, evalInput)
         }
       }
       case BuildMapT(inputType, outputType, config) => {
         for {
           evalInputType <- this(inputType, env)
+          inputT <- asType(evalInputType, env)
+
           evalOutputType <- this(outputType, env)
+          outputT <- asType(evalOutputType, env)
         } yield {
-          MapT(evalInputType, evalOutputType, config)
+          UType(MapT(inputT, outputT, config))
         }
       }
       case BuildTableT(keyType, requiredValues) => {
         for {
           evalKeyType <- this(keyType, env)
-          startingType <- CommandMaps.getDefaultValueOfCommandType(evalKeyType, env)
+          startingT <- asType(evalKeyType, env)
+
           evalRequiredValues <- this(requiredValues, env)
+          valueT <- asType(evalRequiredValues, env)
         } yield {
           // TODO - are we going to know that this is an expandable type?
           // - I think so because startingType is tagged!!
-          MapT(startingType, evalRequiredValues, MapConfig(RequireCompleteness, SimpleFunction))
+          UType(MapT(
+            startingT,
+            valueT,
+            MapConfig(RequireCompleteness, SimpleFunction)
+          ))
         }
       }
-      case BuildExpandingSubsetT(parentType, allowPatternMatching) => {
-        for {
-          evalParentType <- this(parentType, env)
-        } yield ExpandingSubsetT(evalParentType, allowPatternMatching)
-      }
-      case BuildSubtypeT(isMember) => {
+      case BuildSubtypeT(isMember, parentType, featureSet) => {
         for {
           evalIsMember <- this(isMember, env)
-        } yield SubtypeT(evalIsMember)
+          evalParentType <- this(parentType, env)
+          evalParentT <- asType(evalParentType, env)
+        } yield UType(SubtypeT(evalIsMember, evalParentT, featureSet))
       }
-      case BuildCaseT(cases) => {
+      case BuildCaseT(cases, parentFieldType, featureSet) => {
         for {
           evalCases <- this(cases, env)
-        } yield CaseT(evalCases)
+          evalCasesM <- evalCases match {
+            case UMap(m) => Success(m)
+            case _ => Failure(s"Unexpected case map: $evalCases")
+          }
+        } yield UType(CaseT(evalCasesM, parentFieldType, featureSet))
       }
-      case BuildStructT(params) => {
+      case BuildStructT(params, parentFieldType, featureSet) => {
         for {
           evalParams <- this(params, env)
+
+          evalStructM <- evalParams match {
+            case UMap(m) => Success(m)
+            case _ => Failure(s"Unexpected struct map: $evalParams")
+          }
         } yield {
-          StructT(evalParams)
+          UType(StructT(evalStructM, parentFieldType, featureSet))
         }
       }
-      case BuildMapInstance(values, nType) => {
+      case BuildNewTypeClassT(typeTransform) => {
+        for {
+          evalTypeTransform <- this(typeTransform, env)
+
+          evalTypeTransformM <- evalTypeTransform match {
+            case UMap(m) => Success(m)
+            case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
+          }
+        } yield {
+          UType(TypeClassT(evalTypeTransformM, Vector.empty))
+        }
+      }
+      case BuildMapInstance(values) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
-        } yield TaggedObject(UMap(values), nType)
+        } yield UMap(values)
       }
     }
   }
 
-  // TODO - eventually this should go away
+  // TODO - try to remove the usage of this as much as possible
+  // (In other words, look for ways to rely on the type less)
   def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
-      case VersionedObjectLink(_, _) => Failure(s"Can't remove type tage from versioned object link")
-      case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_) | CaseT(_) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) | SubtypeT(_) | DataTypeT(_) => Success(UType(nObject))
+      case VersionedObjectLink(key, _) => Success(ULink(key))
+      //case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_, _) | CaseT(_, _) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) /*| SubtypeT(_)*/ | DataTypeT(_) => Success(UType(nObject))
       case _ => {
         //throw new Exception(nObject.toString)
         Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")
@@ -111,11 +137,10 @@ object Evaluator {
     for {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
-      _ <- Outcome.failWhen(versionedObject.status != BoundStatus, s"Identifier $id is a parameter, should be an object")
-
-      versionedO <- versionedObject.nObject match {
-        case vo@VersionedObjectLink(_, _) => Success(vo)
-        case _ => Failure(s"Identifier $id does not point to a versioned object. It is actually ${versionedObject.nObject}.")
+      versionedO <- versionedObject match {
+        case EnvironmentBinding(vo@VersionedObjectLink(_, _)) => Success(vo)
+        case EnvironmentBinding(nObject) => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
+        case EnvironmentParameter(_) => Failure(s"Identifier $id is a parameter, should be an object")
       }
     } yield versionedO
   }
@@ -167,7 +192,7 @@ object Evaluator {
   def expressionListToObjects(
     nExpressions: Vector[NewMapExpression],
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
+  ): Outcome[Vector[UntaggedObject], String] = {
     nExpressions match {
       case nExpression +: tailExpressions => {
         for {
@@ -182,42 +207,45 @@ object Evaluator {
 
   // Assume that both the function and the input have been evaluated
   def applyFunctionAttempt(
-    func: NewMapObject,
-    input: NewMapObject,
+    func: UntaggedObject,
+    input: UntaggedObject,
     env: Environment
-  ): Outcome[NewMapObject, String] = {
-    // TODO - is there a way to know if the input has already been evaluated as much as possible
-    //Evaluate(input, env)
-    // TODO - can we make sure that we get the Current Constant Value BEFORE this is called?
-    val funcC = stripVersioning(func, env)
-    val inputC = stripVersioning(input, env)
-
-    funcC match {
-      case TaggedObject(UMap(values), nType) => {
+  ): Outcome[UntaggedObject, String] = {
+    stripVersioningU(func, env) match {
+      case UMap(values) => {
         for {
-          keyMatchResult <- attemptPatternMatchInOrder(values, inputC, env) match {
+          keyMatchResult <- attemptPatternMatchInOrder(values, input, env) match {
             case Success(result) => Success(result)
             case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-              if (isEvaluationError) {
+              //if (isEvaluationError) {
                 Failure(message)
-              } else {
+              //} else {
+                // TODO - this needs to be handled in type checker!!!
                 // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
                 // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                val outputType = RetrieveType.retrieveOutputTypeFromFunctionType(nType, env)
-                CommandMaps.getDefaultValueOfCommandType(outputType, env)
-              }
+                //val outputType = RetrieveType.retrieveOutputTypeFromFunctionType(nType, env)
+                //CommandMaps.getDefaultValueOfCommandType(outputType, env)
+              //}
             }
           }
         } yield {
           keyMatchResult
         }
       }
-      case TaggedObject(IsCommandFunc, _) => {
-        val isCommand: Boolean = CommandMaps.getDefaultValueOfCommandType(inputC, env).isSuccess
+      case IsCommandFunc => {
+        val defaultValueOutcome = for {
+          defaultValue <- CommandMaps.getDefaultValueOfCommandType(input, env)
+        } yield defaultValue
 
-        Success(Index(if (isCommand) 1 else 0))
+        val isCommand: Boolean = defaultValueOutcome.isSuccess
+
+        Success(UIndex(if (isCommand) 1 else 0))
       }
-      case TaggedObject(IsSimpleFunction, _) => {
+      /*case IsSimpleFunction => {
+        val outcome = for {
+          nType <- asType(input)
+        }
+
         inputC match {
           case TaggedObject(_, MapT(_, _, MapConfig(CommandOutput, features, _, _))) => {
             if (features == SimpleFunction || features == BasicMap) {
@@ -228,11 +256,11 @@ object Evaluator {
           }
           case _ => Success(Index(0))
         }
-      }
-      case TaggedObject(IncrementFunc, _) => {
-        inputC match {
-          case TaggedObject(UIndex(i), nType) => Success(TaggedObject(UIndex(i + 1), nType))
-          case _ => Failure(s"Cannot increment $inputC")
+      }*/
+      case IncrementFunc => {
+        input match {
+          case UIndex(i) => Success(UIndex(i + 1))
+          case _ => Failure(s"Cannot increment $input")
         }
       }
       case _ => {
@@ -247,9 +275,9 @@ object Evaluator {
 
   def attemptPatternMatchInOrder(
     remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
-    input: NewMapObject,
+    input: UntaggedObject,
     env: Environment
-  ): Outcome[NewMapObject, PatternMatchErrorType] = {
+  ): Outcome[UntaggedObject, PatternMatchErrorType] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
@@ -272,14 +300,14 @@ object Evaluator {
   // The input must be a literal input (or at least the first layer cannot be a parameter)
   def attemptPatternMatch(
     pattern: NewMapPattern,
-    input: NewMapObject,
+    input: UntaggedObject,
     env: Environment
-  ): Outcome[Map[String, NewMapObject], String] = {
+  ): Outcome[Map[String, UntaggedObject], String] = {
     // TODO: IMPORTANT
     // We must be able to dea with using the same variable in a pattern, like StructPattern(x, x) to
     //  denote that these are the same
-    (pattern, stripVersioning(input, env)) match {
-      case (StructPattern(params), TaggedObject(UMap(paramValues), StructT(_))) => {
+    (pattern, input/*stripVersioning(input, env)*/) match {
+      case (StructPattern(params), UMap(paramValues)) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
           result <- patternMatchOnStruct(params, inputs, env)
@@ -296,33 +324,16 @@ object Evaluator {
         // TODO - the retagging should not happen here
         // (In fact, at this point we should have harmonized the types)
         //val retaggedInput = retagObject(input, RetrieveType.fromNewMapObject(oPattern, env))
-        val untaggedInput = removeTypeTag(input).toOption.get
+        //val untaggedInput = removeTypeTag(input).toOption.get
 
-        if (oPattern == untaggedInput) {
+        if (oPattern == input) {
           Success(Map.empty)
         } else Failure("ObjectPattern didn't match")
       }
-      case (CasePattern(constructorP, inputP), TaggedObject(UCase(constructor, cInput), inputType)) => {
+      case (CasePattern(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
-          cases <- stripVersioning(inputType, env) match {
-            case CaseT(params) => Success(params)
-            case TaggedObject(UMap(values), DataTypeT(_)) => {
-              val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
-              val caseConstructorType = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
-              val caseMap = TaggedObject(UMap(values), MapT(caseConstructorType, TypeT, MapConfig(RequireCompleteness, BasicMap)))
-              Success(caseMap)
-            }
-            case _ => Failure(s"Unexpected case type: $inputType")
-          }
-
-          caseConstructorType = RetrieveType.retrieveInputTypeFromFunctionObj(cases, env)
-          taggedConstructor = TaggedObject(constructor, caseConstructorType)
-
           _ <- Outcome.failWhen(constructorP != constructor, "Constructors didn't match")
-
-          typeOfCInput <- applyFunctionAttempt(cases, taggedConstructor, env)
-
-          result <- attemptPatternMatch(inputP, TaggedObject(cInput, typeOfCInput), env)
+          result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
       case _ => {
@@ -333,9 +344,9 @@ object Evaluator {
 
   def patternMatchOnStruct(
     structPattern: Vector[NewMapPattern],
-    inputs: Vector[NewMapObject],
+    inputs: Vector[UntaggedObject],
     env: Environment
-  ): Outcome[Map[String, NewMapObject], String] = {
+  ): Outcome[Map[String, UntaggedObject], String] = {
     (structPattern, inputs) match {
       case (firstPattern +: restOfPatterns, firstInput +: restOfInputs) => {
         for {
@@ -371,6 +382,31 @@ object Evaluator {
         currentState(key.uuid, env).toOption.get
       }
       case _ => nObject
+    }
+  }
+
+  def stripVersioningU(uObject: UntaggedObject, env: Environment): UntaggedObject = {
+    uObject match {
+      case ULink(key) => removeTypeTag(currentState(key.uuid, env).toOption.get).toOption.get
+      case _ => uObject
+    }
+  }
+
+  def stripCustomTag(nType: NewMapType): NewMapType = {
+    nType match {
+      case CustomT(_, t) => t
+      case _ => nType
+    }
+  }
+
+  def asType(uObject: UntaggedObject, env: Environment): Outcome[NewMapType, String] = {
+    stripVersioningU(uObject, env) match {
+      case UType(t) => Success(t)
+      case UIndex(j) => Success(IndexT(j))
+      case other => {
+        //throw new Exception(s"Not a type: $uObject")
+        Failure(s"Not a type: $other")
+      }
     }
   }
 }

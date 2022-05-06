@@ -5,7 +5,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 object RetrieveType {
   // Every object has many types, but it's "official type" is in either how it's tagged or how it's defined
-  def apply(nExpression: NewMapExpression, env: Environment): NewMapObject = nExpression match {
+  /*def apply(nExpression: NewMapExpression, env: Environment): NewMapObject = nExpression match {
     case ObjectExpression(nObject) => fromNewMapObject(nObject, env)
     case ApplyFunction(func, input) => {
       // TODO - merge these options soon
@@ -27,14 +27,14 @@ object RetrieveType {
     case BuildCase(_, _, caseType) => caseType
     case BuildMapT(_, _, _) | BuildTableT(_, _) | BuildExpandingSubsetT(_, _) | BuildSubtypeT(_) | BuildCaseT(_) | BuildStructT(_) => TypeT
     case BuildMapInstance(values, mapT) => mapT // TODO - what if this is a submap???
-  }
+  }*/
 
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
 
-  def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapObject = nObject match {
-    case CountT | ExpandingSubsetT(_, _) | DataTypeT(_) | TypeT | AnyT | IdentifierT | StructT(_) | CaseT(_) | MapT(_, _, _) | OrBooleanT => TypeT
+  def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapType = nObject match {
+    //case CountT | ExpandingSubsetT(_, _) | DataTypeT(_) | TypeT | AnyT | IdentifierT | StructT(_, _) | CaseT(_, _) | MapT(_, _, _) | OrBooleanT => TypeT
     //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
-    case SubtypeT(isMember) => TypeT // Is this right?
+    //case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
     case VersionedObjectLink(key, status) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
@@ -42,50 +42,53 @@ object RetrieveType {
     }
   }
 
-  def retrieveInputTypeFromFunctionObj(nFunction: NewMapObject, env: Environment): NewMapObject = {
+  def retrieveInputTypeFromFunctionObj(nFunction: NewMapObject, env: Environment): NewMapType = {
     inputTypeFromFunctionType(RetrieveType.fromNewMapObject(nFunction, env), env)
   }
 
-  def inputTypeFromFunctionType(nFunctionType: NewMapObject, env: Environment): NewMapObject = {
-    Evaluator.stripVersioning(nFunctionType, env) match {
+  def inputTypeFromFunctionType(nFunctionType: NewMapType, env: Environment): NewMapType = {
+    Evaluator.stripCustomTag(nFunctionType) match {
       case MapT(inputType, _, _) => inputType
-      case StructT(params) => inputTypeFromFunctionType(RetrieveType.fromNewMapObject(params, env), env)
+      case StructT(params, parentFieldType, featureSet, _) => {
+        SubtypeT(UMap(params), parentFieldType, featureSet)
+        
+        //TaggedObject(params, ExpandingSubsetT(parentFieldType, true))
+        //inputTypeFromFunctionType(RetrieveType.fromNewMapObject(params, env), env)
+      }
+      case TypeClassT(typeTransform, typesInTypeClass) => {
+        SubtypeT(
+          UMap(typesInTypeClass.map(x => (x -> ObjectExpression(UIndex(1))))),
+          TypeT,
+          SimpleFunction
+        )
+      }
       case other => throw new Exception(s"Couldn't retrieve input type from $nFunctionType -- $other")
     }
   }
 
-  def retrieveFeatureSetFromFunction(nFunction: NewMapExpression, env: Environment): MapFeatureSet = {
-    nFunction match {
-      // TODO - again this CaseT exception is really looking ugly!!!
-      case ObjectExpression(VersionedObjectLink(key, status)) => {
-        val currentState = Evaluator.currentState(key.uuid, env).toOption.get
-        retrieveFeatureSetFromFunction(ObjectExpression(currentState), env)
-      }
-      case _ => {
-        val typeOfFunction = this(nFunction, env)
-        val typeOfFunctionC = Evaluator.stripVersioning(typeOfFunction, env)
-        typeOfFunctionC match {
-          case MapT(_, _, config) => config.featureSet
-          case StructT(params) => retrieveFeatureSetFromFunction(ObjectExpression(params), env)
-          case other => throw new Exception(s"Couldn't retrieve feature set from $nFunction $typeOfFunctionC -- $other")
-        }
-      }
+  def retrieveFeatureSetFromFunctionType(nType: NewMapType, env: Environment): Outcome[MapFeatureSet, String] = {
+    nType match {
+      case MapT(_, _, config) => Success(config.featureSet)
+      case StructT(_, _, featureSet, _) => Success(featureSet)
+      case TypeClassT(_, _) => Success(SimpleFunction)
+      case CustomT(_, t) => retrieveFeatureSetFromFunctionType(t, env)
+      case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nType")
     }
   }
 
-  def retrieveOutputTypeFromFunctionType(nType: NewMapObject, env: Environment): NewMapObject = {
-    nType match {
+  def outputTypeFromFunctionType(nType: NewMapType, env: Environment): NewMapType = {
+    Evaluator.stripCustomTag(nType) match {
       case MapT(_, outputType, _) => outputType
-      case VersionedObjectLink(key, status) => {
+      /*case VersionedObjectLink(key, status) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
-        retrieveOutputTypeFromFunctionType(currentState, env)
-      }
-      case ExpandingSubsetT(_, _) => OrBooleanT
+        outputTypeFromFunctionType(currentState, env)
+      }*/
+      //case ExpandingSubsetT(_, _) => OrBooleanT
       case _ => throw new Exception(s"Couldn't retrieve output type from $nType")
     }
   }
 
-  def retrieveOutputTypeFromStruct(structValue: NewMapExpression, field: NewMapExpression, env: Environment): Outcome[NewMapObject, String] = {
+  /*def retrieveOutputTypeFromStruct(structValue: NewMapExpression, field: NewMapExpression, env: Environment): Outcome[NewMapObject, String] = {
     structValue match {
       case ObjectExpression(nObject) => Evaluator.stripVersioning(nObject, env) match {
         case TaggedObject(_, StructT(params)) => {
@@ -101,18 +104,19 @@ object RetrieveType {
       // TODO - what if it's a different expression, but comes out to a struct, case, etc
       case _ => Failure(s"This access of $structValue with field $field is not allowed")
     }
-  }
+  }*/
 
-  def getParentType(nType: NewMapObject, env: Environment): NewMapObject = {
+  def getParentType(nType: NewMapType, env: Environment): NewMapType = {
     nType match {
-      case SubtypeT(isMember) => {
+      /*case SubtypeT(isMember) => {
         getParentType(retrieveInputTypeFromFunctionObj(isMember, env), env)
-      }
-      case VersionedObjectLink(key, status) => {
+      }*/
+      /*case VersionedObjectLink(key, status) => {
         val currentState = Evaluator.currentState(key.uuid, env).toOption.get
         getParentType(currentState, env)
-      }
-      case TaggedObject(_, ExpandingSubsetT(parentType, _)) => getParentType(parentType, env)
+      }*/
+      //case TaggedObject(_, ExpandingSubsetT(parentType, _)) => getParentType(parentType, env)
+      case SubtypeT(_, parentType, _) => getParentType(parentType, env)
       case t => t
     }
   }
@@ -131,7 +135,7 @@ object RetrieveType {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
     }
-    case BuildCase(_, input, _) => isTermClosedLiteral(input, knownVariables)
+    case BuildCase(_, input) => isTermClosedLiteral(input, knownVariables)
     case BuildMapT(inputType, outputType, _) => {
       isTermClosedLiteral(inputType, knownVariables) &&
         isTermClosedLiteral(outputType, knownVariables)
@@ -139,13 +143,14 @@ object RetrieveType {
     case BuildTableT(keyType, requiredValues) => {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }
-    case BuildExpandingSubsetT(parentType, _) => {
+    /*case BuildExpandingSubsetT(parentType, _) => {
       isTermClosedLiteral(parentType)
-    }
-    case BuildSubtypeT(isMember) => isTermClosedLiteral(isMember, knownVariables)
-    case BuildCaseT(cases) => isTermClosedLiteral(cases, knownVariables)
-    case BuildStructT(params) => isTermClosedLiteral(params, knownVariables)
-    case BuildMapInstance(values, mapT) => {
+    }*/
+    case BuildSubtypeT(isMember, _, _) => isTermClosedLiteral(isMember, knownVariables)
+    case BuildCaseT(cases, _, _) => isTermClosedLiteral(cases, knownVariables)
+    case BuildStructT(params, _, _) => isTermClosedLiteral(params, knownVariables)
+    case BuildNewTypeClassT(typeTransform) => isTermClosedLiteral(typeTransform)
+    case BuildMapInstance(values) => {
       isMapValuesClosed(values, knownVariables)
     }
   }

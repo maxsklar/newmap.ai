@@ -75,6 +75,11 @@ case class ApplyCommandsStatementParse(
   expression: ParseTree // Represents a list of commands to apply
 ) extends EnvStatementParse
 
+case class NewTypeStatementParse(
+  identifier: IdentifierParse, // New Name of the type
+  expression: ParseTree // Expression that evaluates to a type
+) extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
 

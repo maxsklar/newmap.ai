@@ -6,25 +6,7 @@ import java.util.UUID
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
-    case CountT => "Count"
-    case TypeT => s"Type"
-    case DataTypeT(x) => s"DataType[$x]"
-    case AnyT => s"Any"
-    case IdentifierT => "Identifier"
-    case OrBooleanT => "OrBooleanT"
-    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + this(nType)
-    case MapT(key, value, config) => {
-      printMapT(this(key), this(value), config)
-    }
-    case ExpandingSubsetT(parentType, allowPattern) => {
-      val p = if (allowPattern) "P" else ""
-      s"ExpandingSubsetT$p(${this(parentType)})"
-    }
-    case StructT(params) => s"Struct(${this(params)})" 
-    case CaseT(cases) => s"Case(${this(cases)})"
-    //TODO(2022): we might not want to print out the full parent here, because it could be large
-    // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
-    case x@SubtypeT(isMember) => s"Subtype(${this(isMember)})"
+    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + newMapType(nType)
     case VersionedObjectLink(key, status) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
@@ -34,16 +16,41 @@ object PrintNewMapObject {
     }
   }
 
+  def newMapType(nType: NewMapType): String = nType match {
+    case CountT => "Count"
+    case IndexT(i) => i.toString
+    case CustomT(uuid, nType) => s"Type:$uuid:${newMapType(nType)}"
+    case TypeT => s"Type"
+    //case DataTypeT(x) => s"DataType[$x]"
+    case AnyT => s"Any"
+    case IdentifierT => "Identifier"
+    case OrBooleanT => "OrBooleanT"
+    case MapT(key, value, config) => {
+      printMapT(newMapType(key), newMapType(value), config)
+    }
+    case GenericMapT(typeTransform, config) => {
+      s"Generic(${typeMapToString(typeTransform)})"
+    }
+    case StructT(params, _, _, _) => s"Struct(${mapToString(params)})"
+    case TypeClassT(typeTransform, implementation) => {
+      s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> ObjectExpression(UIndex(0)))))})"
+    }
+    case CaseT(cases, _, _, _) => s"Case(${mapToString(cases)})"
+    //TODO(2022): we might not want to print out the full parent here, because it could be large
+    // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
+    case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+  }
+
   def printExpression(
     nExpression: NewMapExpression
   ): String = nExpression match {
-    case ObjectExpression(nObject) => this(nObject)
+    case ObjectExpression(nObject) => untagged(nObject)
     case ApplyFunction(func, input) => {
       printExpression(func) + " " + printExpression(input)
     }
     case ParamId(name) => s"$name~pi"
-    case BuildCase(constructor, input, caseType) => {
-      this(caseType) + "." + this(constructor) + " " + printExpression(input)
+    case BuildCase(constructor, input) => {
+      untagged(constructor) + "." + printExpression(input)
     }
     case BuildMapT(inputType, outputType, config) => {
       printMapT(printExpression(inputType), printExpression(outputType), config)
@@ -52,23 +59,26 @@ object PrintNewMapObject {
       val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
       s"Table(${mapTString})"
     }
-    case BuildCaseT(cases) => {
+    case BuildCaseT(cases, _, _) => {
       "Case " + printExpression(cases)
     }
-    case BuildStructT(params) => {
+    case BuildStructT(params, _, _) => {
       "Struct " + printExpression(params)
     }
-    case BuildSubtypeT(isMember) => {
+    case BuildSubtypeT(isMember, _, _) => {
       s"Subtype(${printExpression(isMember)})"
     }
-    case BuildMapInstance(values, nType) => {
+    case BuildNewTypeClassT(typeTransform) => {
+      s"new TypeClassT(${printExpression(typeTransform)})}"
+    }
+    case BuildMapInstance(values) => {
       mapToString(values)
     }
-    case BuildExpandingSubsetT(parentType, allowPattern) => {
+    /*case BuildExpandingSubsetT(parentType, allowPattern) => {
       val p = if (allowPattern) "P" else ""
 
       s"ExpandingSubset$p(${printExpression(parentType)})"
-    }
+    }*/
   }
 
   def printMapT(
@@ -96,13 +106,8 @@ object PrintNewMapObject {
           case FullFunction => "FullFunction"
         }
 
-        val modeCall = config.mode match {
-          //case StructMode => "Struct"
-          case _ => "Map"
-        }
-
         // TODO(2022): Improve Notation so that we don't need this!
-        s"$modeCall($key, $value, $completenessStr, $featureSetStr)"
+        s"Map($key, $value, $completenessStr, $featureSetStr)"
       }  
     }
   }
@@ -111,11 +116,14 @@ object PrintNewMapObject {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
     case UCase(constructor, value) => "(" + untagged(constructor) + "." + untagged(value) + ")"
-    case UType(nType) => this(nType)
+    case UType(nType) => newMapType(nType)
     case UIndex(i) => i.toString
     case IsCommandFunc => s"IsCommandFunc"
     case IsSimpleFunction => s"IsSimpleFunction"
     case IncrementFunc => s"Increment"
+    case ULink(key) => {
+      s"ULink[${key.toString}]"
+    }
   }
 
   def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {
@@ -134,10 +142,31 @@ object PrintNewMapObject {
     sb.toString
   }
 
+  def typeMapToString(values: Vector[(TypePattern, NewMapExpression)]): String = {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("(")
+
+    var bindings: Vector[String] = Vector.empty
+    for {
+      (k, v) <- values
+    } {
+      bindings :+= typePatternToString(k) + ": " + printExpression(v)
+    }
+    sb.append(bindings.mkString(", "))
+
+    sb.append(")")
+    sb.toString
+  }
+
   def patternToString(nPattern: NewMapPattern): String = nPattern match {
     case ObjectPattern(nObject) => untagged(nObject)
     case WildcardPattern(name) => "W~" + name
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
     case CasePattern(constructor, input) => s"(${untagged(constructor)}.${patternToString(input)})"
+  }
+
+  def typePatternToString(pattern: TypePattern): String = pattern match {
+    case ConstantTypePattern(nType) => newMapType(nType)
+    case WildcardTypePattern(name) => "W~" + name
   }
 }

@@ -11,127 +11,7 @@ sealed abstract class NewMapObject {
 
 case class TaggedObject(
   uObject: UntaggedObject,
-  nType: NewMapObject
-) extends NewMapObject
-
-/*
- * The types in the NewMap Language
- * This is actually a subset of the Objects
- */
-case object CountT extends NewMapObject
-
-// This is a special type of boolean class that's being created temporarily until we get better user-defined types
-case object OrBooleanT extends NewMapObject
-
-// Type of types
-// TODO - eventually, we will replace this with an IsType function
-//  that will be a subtype of type object
-case object TypeT extends NewMapObject
-
-case object AnyT extends NewMapObject
-
-// Todo - replace with "user defined type" in prelude
-case object IdentifierT extends NewMapObject
-
-/* Note on maps:
- *
- * A map is essentially a function or key-value store, and there are 3 levels:
- * - The first (BasicMap) is a map where each key-value pair needs to be specified directly.
- *   BasicMap has the distinction of always being finite!
- * - The second is a simple function, which can be coded but it's likely to be executed quickly
- *   (In other words, the coding set is not turing complete and infinite loops are avoided.
- *    we can thus execute simple functions without too much worry about compute time
- * - The third is the full function - which has a full coding set to turn an input into an output
- *
- * Note that a map can be used as a simple function and a full function,
- *  and a simple function can be used as a full function.
- *
- * The completeness field also has several options:
- * - requireAllFields tells us that we are required to specify an output for
- *   all potential inputs. It's smart to turn this on to ensure that functions and maps are checked as complete
- * - commandOutput means that the output types must all be command types, which means they start at an initial value.
- *
- * TODO - should we subsume struct type in here??
- */
-case class MapT(
-  inputType: NewMapObject,
-  outputType: NewMapObject,
-  config: MapConfig
-) extends NewMapObject
-
-case class MapConfig(
-  completeness: MapCompleteness,
-  featureSet: MapFeatureSet,
-  mode: MapMode = StandardMode,
-  preservationRules: Vector[PreservationRule] = Vector.empty
-)
-
-sealed abstract class PreservationRule
-// Preservation
-// Preserving Equality: [a == b] == [f(a) == f(b)]
-// First we need equality to be a generic type..
-
-sealed abstract class MapCompleteness
-object RequireCompleteness extends MapCompleteness
-object CommandOutput extends MapCompleteness
-
-sealed abstract class MapFeatureSet
-object BasicMap extends MapFeatureSet
-object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only simple operations
-object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
-object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
-
-// Each map has a distinct mode:
-// StandardMode:
-sealed abstract class MapMode
-object StandardMode extends MapMode // There is a single output type
-object GenericMode extends MapMode // The output type depends on the input type
-
-// In the future, will this allow us to remove StructT
-//object StructMode extends MapMode // The output type depends on the specific input
-
-case class ExpandingSubsetT(
-  parentType: NewMapObject,
-  allowPatternMatching: Boolean
-) extends NewMapObject
-
-// User defined datatype (like an expanding case)
-case class DataTypeT(
-  typeParameters: Vector[TypeParameter]
-) extends NewMapObject
-
-case class TypeParameter(
-  name: String,
-  upperBound: Vector[NewMapObject] = Vector.empty,
-  lowerBound: Vector[NewMapObject] = Vector.empty,
-  variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
-)
-
-case class TypeParameterVariance(
-  isCovariant: Boolean,
-  isContravariant: Boolean
-)
-
-// Params should be connected to a NewMapObject which are of type
-//  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
-// They might also be a paramObj, to be filled in later
-// TODO(2022): once generics are introduced, fieldType might be unneccesary
-// TODO: What about simpler product types (no identifiers) based on MapT(TypeT, Count, CommandOutput, BasicMap)
-
-// Params is a map from the fields of the struct to the Types (all the same level)
-case class StructT(params: NewMapObject) extends NewMapObject
-
-// cases: input type is the case constructors, output type is the field types per constructor
-case class CaseT(cases: NewMapObject) extends NewMapObject
-
-// Represents a type that contains a subset of the parent type, represented by a simple function
-// - The output type of the simple function is usually a boolean (2) or at least a command type
-// - Anything that's left at the initial value is NOT in the subtype
-// For example, if the simple function is a Map from 10 to 2, and it reads (2: 1, 3: 1, 5: 1, 7: 1),
-//  then the values 2, 3, 5, and 7 are considered part of this new type; the rest are not
-// TODO - remove in favor of expanding subset?
-case class SubtypeT(
-  isMember: NewMapObject
+  nType: NewMapType
 ) extends NewMapObject
 
 // The versionNumber and uuid uniquely define this versioned object within any environment
@@ -162,26 +42,14 @@ object NewMapO {
   // - You can give it commands to change the value
   // - You can potentially have versions available.
 
-  def commandT: NewMapObject = SubtypeT(
-    TaggedObject(
-      IsCommandFunc,
-      MapT(TypeT, Index(2), MapConfig(CommandOutput, SimpleFunction))
-    )
-  )
+  def commandT: NewMapType = SubtypeT(IsCommandFunc, TypeT, SimpleFunction)
 
   // This is a subtype of any, and will match every map that is a simple function (or basicMap)
   // - This will be replaced once we get Map Type patterns working properly
   // - Created for now to get Subtype working properly, so that we can move on
-  def simpleFunctionT: NewMapObject = SubtypeT(
-    TaggedObject(
-      IsSimpleFunction,
-      MapT(AnyT, Index(2), MapConfig(CommandOutput, SimpleFunction))
-    )
-  )
+  def simpleFunctionT: NewMapType = SubtypeT(IsSimpleFunction, TypeT, SimpleFunction)
 
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 
-  def emptyStruct: NewMapObject = StructT(
-    TaggedObject(UMap(Vector.empty), MapT(Index(0), Index(0), MapConfig(RequireCompleteness, BasicMap)))
-  )
+  def emptyStruct: NewMapType = StructT(Vector.empty, CountT, BasicMap, Vector.empty)
 }

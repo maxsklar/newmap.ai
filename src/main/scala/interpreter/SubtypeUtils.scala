@@ -10,7 +10,7 @@ object SubtypeUtils {
   // For Maps, we want to know that the default value is never used
   def doPatternsCoverType(
     keys: Vector[NewMapPattern],
-    nType: NewMapObject,
+    nType: NewMapType,
     env: Environment
   ): Outcome[Boolean, String] = {
     val objectKeys: Set[UntaggedObject] = keys.flatMap(_ match {
@@ -28,20 +28,18 @@ object SubtypeUtils {
     }
     else {
       val piecemealCompletenessOutcome = nType match {
-        case CaseT(cases) => checkCaseComplete(keys, cases, nType, env)
-        case TaggedObject(UMap(values), DataTypeT(_)) => {
-          val uConstructors = values.map(x => x._1 -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
-          val caseConstructorType = TaggedObject(UMap(uConstructors), ExpandingSubsetT(IdentifierT, false))
-          val caseMap = TaggedObject(UMap(values), MapT(caseConstructorType, TypeT, MapConfig(RequireCompleteness, BasicMap)))
-          checkCaseComplete(keys, caseMap, nType, env)
-        }
-        case StructT(params) => checkStructComplete(keys, params, nType, env)
-        case VersionedObjectLink(key, _) => {
+        case CaseT(cases, _, _, _) => checkCaseComplete(keys, cases, env)
+        /*case UMap(values) => {
+          checkCaseComplete(keys, UMap(values), env)
+        }*/
+        case StructT(params, _, _, _) => checkStructComplete(keys, params, env)
+        /*case ULink(key) => {
           for {
             state <- Evaluator.indicatedState(key, env)
-            result <- doPatternsCoverType(keys, state, env)
+            untaggedState <- Evaluator.removeTypeTag(state)
+            result <- doPatternsCoverType(keys, untaggedState, env)
           } yield result
-        }
+        }*/ // TODO - add custom type here
         case _ => Success(false)
       }
 
@@ -60,24 +58,18 @@ object SubtypeUtils {
 
   def checkCaseComplete(
     keys: Vector[NewMapPattern],
-    cases: NewMapObject,
-    nType: NewMapObject,
+    cases: Vector[(NewMapPattern, NewMapExpression)],
     env: Environment
   ): Outcome[Boolean, String] = {
-    val caseType = RetrieveType.fromNewMapObject(cases, env)
-    val caseKeys = RetrieveType.inputTypeFromFunctionType(caseType, env)
-
     for {
       // For each case key, we want to make sure that this case key is completely covered
-      constructors <- enumerateAllValuesIfPossible(caseKeys, env)
+      constructors <- enumerateMapKeys(cases.map(_._1))
     } yield {
       var returnVal = true
 
       for {
         untaggedConstructor <- constructors
       } yield {
-        val taggedConstructor = TaggedObject(untaggedConstructor, caseKeys)
-
         // Look at our keys, and find the ones that are only for this case key, and save those patterns
         val patternsWithThisConstructor = keys.flatMap(key => key match {
           case CasePattern(untaggedConstructor, pattern) => Some(pattern)
@@ -86,11 +78,17 @@ object SubtypeUtils {
         })
 
         // Find the input type for this constructor, and make sure that all of THOSE inputs are accounted for
-        Evaluator.applyFunctionAttempt(cases, taggedConstructor, env) match {
+        // TODO - cleanup this pattern matching!!!
+        Evaluator.applyFunctionAttempt(UMap(cases), untaggedConstructor, env) match {
           case Success(inputType) => {
-            doPatternsCoverType(patternsWithThisConstructor, inputType, env) match {
-              case Success(false) | Failure(_) => returnVal = false
-              case _ => ()
+            Evaluator.asType(inputType, env) match {
+              case Failure(_) => returnVal = false
+              case Success(inputTypeT) => {
+                doPatternsCoverType(patternsWithThisConstructor, inputTypeT, env) match {
+                  case Success(false) | Failure(_) => returnVal = false
+                  case _ => ()
+                }
+              }
             }
           }
           case _ => {
@@ -105,8 +103,7 @@ object SubtypeUtils {
 
   def checkStructComplete(
     keys: Vector[NewMapPattern],
-    cases: NewMapObject,
-    nType: NewMapObject,
+    params: Vector[(NewMapPattern, NewMapExpression)],
     env: Environment
   ): Outcome[Boolean, String] = {
     // TODO: Implement
@@ -114,7 +111,7 @@ object SubtypeUtils {
   }
 
   // Returns true if the object is a pattern that will match everything in the type
-  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapObject, env: Environment): Boolean = {
+  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapType, env: Environment): Boolean = {
     pattern match {
       case ObjectPattern(_) => false
       case WildcardPattern(_) => true
@@ -122,10 +119,10 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case StructT(TaggedObject(UMap(params), MapT(_, _, MapConfig(_, BasicMap, _, _)))) if (params.length == patterns.length) => {
+          case StructT(params, _, _, _) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, nObject, env)
+                isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }
@@ -136,17 +133,18 @@ object SubtypeUtils {
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapObject, env: Environment): Outcome[Set[UntaggedObject], String] = {
-    Evaluator.stripVersioning(nType, env) match {
+  def enumerateAllValuesIfPossible(nType: NewMapType, env: Environment): Outcome[Set[UntaggedObject], String] = {
+    nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case SubtypeT(TaggedObject(UMap(values), _)) => {
+      case SubtypeT(UMap(values), parentType, _) => {
+        // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      case TaggedObject(UMap(values), ExpandingSubsetT(_, false)) => {
-        enumerateMapKeys(values.map(_._1))
-      }
-      case TaggedObject(UIndex(i), _) => {
+      /*case CaseT(values, parentType, BasicMap, typeParameters) if typeParameter.isEmpty => {
+        ???
+      }*/
+      case IndexT(i) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
       case OrBooleanT => {
@@ -174,8 +172,8 @@ object SubtypeUtils {
     }
   }
 
-  def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
-    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, MapConfig(CommandOutput, _, _, _)))) => {
+  /*def doesTypeCoverParentType(nType: NewMapObject, env: Environment): Boolean = nType match {
+    case SubtypeT(TaggedObject(untaggedFunction, MapT(inputType, _, MapConfig(CommandOutput, _, _)))) => {
       untaggedFunction match {
         case UMap(values) => {
           // TODO: Extend this to see if pattering matching in basic function covers the full type
@@ -222,21 +220,21 @@ object SubtypeUtils {
         allConvertedOutcome.toOption.getOrElse(false)
       })
     }
-  }
+  }*/
 
   // Return - Instructions in the form of functions for converting from one type to another
   def isTypeConvertible(
-    startingType: NewMapObject,
-    endingType: NewMapObject,
+    startingType: NewMapType,
+    endingType: NewMapType,
     env: Environment
   ): Outcome[Vector[NewMapObject], String] = {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(Vector.empty)
       case (_, AnyT) => Success(Vector.empty)
       case (CountT, TypeT) => Success(Vector.empty)
-      case (ExpandingSubsetT(_, _), TypeT) => Success(Vector.empty)
-      case (DataTypeT(_), TypeT) => Success(Vector.empty)
-      case (TaggedObject(_, ExpandingSubsetT(parentType, _)), _) => {
+      //case (ExpandingSubsetT(_, _), TypeT) => Success(Vector.empty)
+      //case (DataTypeT(_), TypeT) => Success(Vector.empty)
+      /*case (TaggedObject(_, ExpandingSubsetT(parentType, _)), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
         } yield convertInstructions
@@ -245,10 +243,21 @@ object SubtypeUtils {
         // We must figure out the expanding subset in isTypeConvertible!!
 
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
+      }*/
+      case (SubtypeT(isMember, parentType, featureSet), _) => {
+        for {
+          convertInstructions <- isTypeConvertible(parentType, endingType, env)
+        } yield convertInstructions
+      }
+      case (_, SubtypeT(isMember, parentType, featureSet)) => {
+        // We must figure out the subset in isTypeConvertible!!
+        throw new Exception(s"Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
+
+        Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(startingInputType, startingOutputType, MapConfig(startingCompleteness, startingFeatureSet, _, _)),
-        MapT(endingInputType, endingOutputType, MapConfig(endingCompleteness, endingFeatureSet, _, _))
+        MapT(startingInputType, startingOutputType, MapConfig(startingCompleteness, startingFeatureSet, _)),
+        MapT(endingInputType, endingOutputType, MapConfig(endingCompleteness, endingFeatureSet, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -279,63 +288,78 @@ object SubtypeUtils {
           Vector.empty
         }
       }
-      case(StructT(startingParams), StructT(endingParams)) => {
-        isTypeConvertible(
+      case(StructT(startingParams, startingFieldType, _, _), StructT(endingParams, endingFieldType, _, _)) => {
+        // 1) Can we convert starting field type to ending field type?
+        // - For each param in startingParams:
+        //   - Convert to ending param
+        //   - does the starting param type convert to ending param type?
+
+        // TODO - rethink this!!
+        /*isTypeConvertible(
           RetrieveType.retrieveInputTypeFromFunctionObj(startingParams, env),
           RetrieveType.retrieveInputTypeFromFunctionObj(endingParams, env),
           env
-        )
+        )*/
+        Failure("Need to implement struct conversion")
       }
-      case (StructT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
+      case (StructT(values, fieldParentType, _, _), _) if (values.length == 1) => {
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
-          convertInstructions <- isTypeConvertible(singularObj, endingType, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
         } yield convertInstructions
       }
-      case (_, StructT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
+      case (_, StructT(values, fieldParentType, _, _)) if (values.length == 1) => {
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
-          convertInstructions <- isTypeConvertible(startingType, singularObj, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
         } yield convertInstructions
       }
-      case (CaseT(startingCases), CaseT(endingCases)) => {
+      case (CaseT(startingCases, startingFieldType, _, _), CaseT(endingCases, endingFieldType, _, _)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
-        for {
+        /*for {
           convertInstructions <- isTypeConvertible(
             RetrieveType.retrieveInputTypeFromFunctionObj(endingCases, env),
             RetrieveType.retrieveInputTypeFromFunctionObj(startingCases, env),
             env
           )
-        } yield convertInstructions
+        } yield convertInstructions*/
         // TODO: The outputs have to agree as well
+        Failure("Need to implement case conversion")
       }
-      case (CaseT(mi@TaggedObject(UMap(values), _)), _) if (values.length == 1) => {
+      case (CaseT(values, startingFieldType, _, _), _) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
-          convertInstructions <- isTypeConvertible(singularObj, endingType, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
         } yield convertInstructions
       }
-      case (_, CaseT(mi@TaggedObject(UMap(values), _))) if (values.length == 1) => {
+      case (_, CaseT(values, endingFieldType, _, _)) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(mi)
+          singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
-          convertInstructions <- isTypeConvertible(startingType, singularObj, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
         } yield convertInstructions
       }
-      case (SubtypeT(isMember), _) => {
+      case (CustomT(uuid, _), CustomT(uuid2, _)) if (uuid == uuid2) => {
+        Success(Vector.empty)
+      }
+      /*case (SubtypeT(isMember), _) => {
         val subtypeInputType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
         
         for {
           convertInstructions <- isTypeConvertible(subtypeInputType, endingType, env)
         } yield convertInstructions
-      }
-      case (
+      }*/
+      /*case (
         VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
         VersionedObjectLink(VersionedObjectKey(versionNumber2, uuid2), status2)
       ) if (uuid == uuid2) && (status2 == KeepUpToDate) => {
@@ -350,7 +374,7 @@ object SubtypeUtils {
           case TaggedObject(UMap(_), ExpandingSubsetT(parentType, _)) => {
             isTypeConvertible(parentType, endingType, env)
           }
-          case CaseT(TaggedObject(UMap(umap), aaa)) => {
+          case CaseT(umap, aaa) => {
             throw new Exception(s"-- $umap \n--- $aaa")
           }
           case _ => {
@@ -364,7 +388,7 @@ object SubtypeUtils {
       ) => {
         val sv = Evaluator.stripVersioning(endingType, env)
         Failure(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
-      }
+      }*/
       case _ => Failure(s"No rule to convert $startingType to $endingType")
     }
   }
@@ -375,32 +399,37 @@ object SubtypeUtils {
   // @return a list of simple function if the conversion requires application in order to convert
   def isObjectConvertibleToType(
     startingObject: NewMapObject,
-    endingType: NewMapObject,
+    endingType: NewMapType,
     env: Environment
   ): Outcome[Vector[NewMapObject], String] = {
     endingType match {
       // What to do about this??? For some reason we can't put it in
+      // Eventually - CustomT
       /*case VersionedObjectLink(key, _) => {
         for {
           currentEndingState <- Evaluator.currentState(key.uuid, env)
           result <- isObjectConvertibleToType(startingObject, currentEndingState, env)
         } yield result
       }*/
-      case SubtypeT(isMember) => {
-        val superType = RetrieveType.retrieveInputTypeFromFunctionObj(isMember, env)
+      case SubtypeT(isMember, parentType, featureSet) => {
         for {
-          convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
+          convertInstructions <- isObjectConvertibleToType(startingObject, parentType, env)
 
           // TODO - make explicit conversion
           convertedObject = startingObject
 
-          checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
+          // TODO - this should be unneccesary for when we change isMemberOfSubtype
+          isMemberTagged = TaggedObject(isMember, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, SimpleFunction)))
+
+          soUntagged <- Evaluator.removeTypeTag(startingObject)
+
+          checksMembership <- isMemberOfSubtype(soUntagged, isMemberTagged, env)
           _ <- Outcome.failWhen(!checksMembership, s"Not member of subtype: $startingObject, $endingType")
         } yield {
           convertInstructions
         }
       }
-      case TaggedObject(uMap, ExpandingSubsetT(superType, _)) => {
+      /*case TaggedObject(uMap, ExpandingSubsetT(superType, _)) => {
         // I think this gets interpreted as a function as well as a type!
         val isMember = endingType
 
@@ -416,7 +445,7 @@ object SubtypeUtils {
         } yield {
           convertInstructions
         }
-      }
+      }*/
       case _ => {
         val nType = RetrieveType.fromNewMapObject(startingObject, env)
         isTypeConvertible(nType, endingType, env)
@@ -436,34 +465,36 @@ object SubtypeUtils {
   }
 
   // If this function only allows one input, then return the output for that input
-  def outputIfFunctionHasSingularInput(nFunction: NewMapObject): Outcome[NewMapExpression, String] = {
-    nFunction match {
-      case TaggedObject(UMap(values), _) if (values.length == 1) => {
-        Success(values.head._2)
-      }
-      case _ => Failure("Function did not have singular input")
+  def outputIfFunctionHasSingularInput(mapValues: Vector[(NewMapPattern, NewMapExpression)]): Outcome[NewMapExpression, String] = {
+    if (mapValues.length == 1) {
+      Success(mapValues.head._2)
+    } else {
+      Failure("Function did not have singular input")
     }
   }
 
   // Returns true if nObject is a member of a SubtypeT by its isMember Function
   // - assuming that it's already a member of the parent type
   def isMemberOfSubtype(
-    nObject: NewMapObject,
+    nObjectUntagged: UntaggedObject,
     isMember: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {
     for {
-      result <- Evaluator.applyFunctionAttempt(isMember, nObject, env)
+      isMemberUntagged <- Evaluator.removeTypeTag(isMember)
+      result <- Evaluator.applyFunctionAttempt(isMemberUntagged, nObjectUntagged, env)
+
+      isMemberOutputType = RetrieveType.outputTypeFromFunctionType(RetrieveType.fromNewMapObject(isMember, env), env)
 
       // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
       //  and find a default on that!
-      defaultValueOrResultType <- CommandMaps.getDefaultValueOfCommandType(RetrieveType.fromNewMapObject(result, env), env)
+      defaultValueOrResultType <- CommandMaps.getDefaultValueOfCommandType(UType(isMemberOutputType), env)
     
       // Problem is that we should be checking equality of untagged!!
     } yield !checkEqual(result, defaultValueOrResultType)
   }
 
-  def checkEqual(a: NewMapObject, b: NewMapObject): Boolean = {
+  def checkEqual(a: UntaggedObject, b: UntaggedObject): Boolean = {
     a == b
     // TODO - we need to first convert a and b into the same type
     /*(a, b) match {
@@ -475,7 +506,7 @@ object SubtypeUtils {
   }
 
   def allMembersOfSubtype(
-    nObjects: Vector[NewMapObject],
+    nObjects: Vector[UntaggedObject],
     nSubtype: NewMapObject,
     env: Environment
   ): Outcome[Boolean, String] = {

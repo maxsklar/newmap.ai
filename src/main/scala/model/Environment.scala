@@ -19,16 +19,25 @@ case class FullEnvironmentCommand(
 
 case class NewVersionedStatementCommand(
   id: String,
-  nType: NewMapObject
+  nType: NewMapType
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"ver $id = new ${nType}"
   }
 }
 
+case class NewTypeCommand(
+  id: String,
+  nType: NewMapType
+) extends EnvironmentCommand {
+  override def toString: String = {
+    s"data $id = ${nType}"
+  }
+}
+
 case class ApplyIndividualCommand(
   id: String,
-  nObject: NewMapObject
+  nObject: UntaggedObject
 ) extends EnvironmentCommand {
   override def toString: String = {
     "" //s"update $id $nObject"
@@ -46,7 +55,7 @@ case class ForkEnvironmentCommand(
 
 case class ParameterEnvironmentCommand(
   id: String,
-  nType: NewMapObject
+  nType: NewMapType
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"parameter $id: ${nType}"
@@ -59,18 +68,10 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
-sealed abstract class EnvironmentValueStatus
+sealed abstract class EnvironmentValue
 
-// This means that the identifier is bound to a specific object
-case object BoundStatus extends EnvironmentValueStatus
-
-// This means that the identifier is a parameter, with a type given
-case object ParameterStatus extends EnvironmentValueStatus
-
-case class EnvironmentValue(
-  nObject: NewMapObject,
-  status: EnvironmentValueStatus
-)
+case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
+case class EnvironmentParameter(nType: NewMapType) extends EnvironmentValue
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
@@ -89,9 +90,9 @@ case class Environment(
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
     for ((id, envValue) <- idToObject) {
-      val command = envValue.status match {
-        case BoundStatus => FullEnvironmentCommand(id, envValue.nObject)
-        case ParameterStatus => ParameterEnvironmentCommand(id, envValue.nObject)
+      val command = envValue match {
+        case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
+        case EnvironmentParameter(nType) => ParameterEnvironmentCommand(id, nType)
       }
       builder.append(command.toString)
       builder.append("\n")
@@ -110,13 +111,13 @@ case class Environment(
       case FullEnvironmentCommand(s, nObject) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentValue(nObject, BoundStatus))
+          idToObject = idToObject + (s -> EnvironmentBinding(nObject))
         )
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
 
-        val defaultOutcome = CommandMaps.getDefaultValueOfCommandType(nType, this)
+        val defaultOutcome = CommandMaps.getDefaultValueOfCommandType(UType(nType), this)
 
         defaultOutcome match {
           case Success(_) => ()
@@ -126,34 +127,65 @@ case class Environment(
         val initValue = defaultOutcome.toOption.get
         val key = VersionedObjectKey(0L, uuid)
         val versionedObject = VersionedObjectLink(key, KeepUpToDate)
-        val envValue = EnvironmentValue(versionedObject, BoundStatus)
+        val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
           idToObject = idToObject + (s -> envValue),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          storedVersionedTypes = storedVersionedTypes + (VersionedObjectKey(0L, uuid) -> initValue)
+          storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(initValue, nType))
         )
       }
-      case ApplyIndividualCommand(s, nObject) => {
-        val updated = CommandMaps.updateVersionedObject(s, nObject, this)
-
-        val result = updated match {
-          case Success(s) => s
-          case Failure(f) => throw new Exception(f)
-        }
-
-        val newKey = VersionedObjectKey(result.newVersion, result.uuid)
-
-        // TODO - during this, versions that are no longer in use can be destroyed
-        val newStoredVTypes = storedVersionedTypes + (newKey -> result.newValue)
+      case NewTypeCommand(s, nType) => {
+        val uuid = java.util.UUID.randomUUID
+        val key = VersionedObjectKey(0L, uuid)
+        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentValue(VersionedObjectLink(newKey, KeepUpToDate), BoundStatus)),
-          latestVersionNumber = latestVersionNumber + (result.uuid -> result.newVersion),
-          storedVersionedTypes = newStoredVTypes
+          idToObject = idToObject + (s -> envValue),
+          latestVersionNumber = latestVersionNumber + (uuid -> 0L),
+          storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(UType(CustomT(uuid, nType)), TypeT))
         )
+      }
+      case ApplyIndividualCommand(s, command) => {
+        val retVal = for {
+          versionLink <- Evaluator.lookupVersionedObject(s, this)
+          latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
+          currentState <- Evaluator.currentState(versionLink.key.uuid, this)
+          nType = RetrieveType.fromNewMapObject(currentState, this)
+          newValue <- if (nType == TypeT) {
+            for {  
+              currentUntagged <- Evaluator.removeTypeTag(currentState)
+              currentAsType <- Evaluator.asType(currentUntagged, this)
+              response <- CommandMaps.expandType(currentAsType, command, this)
+              // TODO - we must contend with expandedKeyResponse.converter
+              // - This will allow us to convert objects from one type to another - needs to be stored in the environment!
+            } yield TaggedObject(UType(response.newType), TypeT)
+          } else {
+            CommandMaps.updateVersionedObject(currentState, command, this)
+          }
+        } yield {
+          val newUuid = versionLink.key.uuid
+          val newVersion = latestVersion + 1
+          val newKey = VersionedObjectKey(newVersion, newUuid)
+
+          // TODO - during this, versions that are no longer in use can be destroyed
+          val newStoredVTypes = storedVersionedTypes + (newKey -> newValue)
+
+          this.copy(
+            commands = newCommands,
+            idToObject = idToObject + (s -> EnvironmentBinding(VersionedObjectLink(newKey, KeepUpToDate))),
+            latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
+            storedVersionedTypes = newStoredVTypes
+          )
+        }
+
+        retVal match {
+          case Success(s) => s
+          case Failure(f) => throw new Exception(s"type checker failed on command $command: $f")
+        }
       }
       case ForkEnvironmentCommand(s, vObject) => {
         val uuid = java.util.UUID.randomUUID
@@ -161,7 +193,7 @@ case class Environment(
         val current = Evaluator.currentState(vObject.key.uuid, this).toOption.get
         val key = VersionedObjectKey(version, uuid)
         val versionedObject = VersionedObjectLink(key, KeepUpToDate)
-        val envValue = EnvironmentValue(versionedObject, BoundStatus)
+        val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
@@ -173,7 +205,7 @@ case class Environment(
       case ParameterEnvironmentCommand(s, nType) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentValue(nType, ParameterStatus))
+          idToObject = idToObject + (s -> EnvironmentParameter(nType))
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
@@ -192,11 +224,11 @@ case class Environment(
   }
 
   // TODO - should we ensure that nType is actually a type?
-  def newParam(id: String, nType: NewMapObject): Environment = {
+  def newParam(id: String, nType: NewMapType): Environment = {
     newCommand(ParameterEnvironmentCommand(id, nType))
   }
 
-  def newParams(xs: Vector[(String, NewMapObject)]) = {
+  def newParams(xs: Vector[(String, NewMapType)]) = {
     newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, x._2)))
   }
 }
@@ -206,65 +238,37 @@ object Environment {
     FullEnvironmentCommand(id, nObject)
   }
 
-  def simpleFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
+  def simpleFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
     MapT(inputType, outputType, MapConfig(RequireCompleteness, BasicMap))
   }
 
-  def fullFuncT(inputType: NewMapObject, outputType: NewMapObject): NewMapObject = {
+  def fullFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
     MapT(inputType, outputType, MapConfig(RequireCompleteness, FullFunction))
   }
 
-  def structTypeFromParams(params: Vector[(String, NewMapObject)]) = {
+  def structTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(UType(x._2)))
     }
 
-    val paramsList = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
-    }
-
-    val keyType = SubtypeT(TaggedObject(
-      UMap(paramsList),
-      MapT(IdentifierT, OrBooleanT, MapConfig(CommandOutput, BasicMap))
-    ))
-
-    StructT(
-      TaggedObject(
-        UMap(paramsToObject),
-        MapT(keyType, TypeT, MapConfig(RequireCompleteness, BasicMap))
-      )
-    )
+    StructT(paramsToObject, IdentifierT)
   }
 
-  def caseTypeFromParams(params: Vector[(String, NewMapObject)]) = {
+  def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(x._2))
+      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(UType(x._2)))
     }
 
-    val paramsList = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(TaggedObject(UIndex(1), OrBooleanT)))
-    }
-
-    val keyType = SubtypeT(TaggedObject(
-      UMap(paramsList),
-      MapT(IdentifierT, OrBooleanT, MapConfig(CommandOutput, BasicMap))
-    ))
-
-    CaseT(
-      TaggedObject(
-        UMap(paramsToObject),
-        MapT(keyType, TypeT, MapConfig(RequireCompleteness, BasicMap))
-      )
-    )
+    CaseT(paramsToObject, IdentifierT)
   }
 
   // For Debugging
   def printEnvWithoutBase(env: Environment): Unit = {
     for ((id, envValue) <- env.idToObject) {
       if (!Base.idToObject.contains(id)) {
-        val command = envValue.status match {
-          case BoundStatus => FullEnvironmentCommand(id, envValue.nObject)
-          case ParameterStatus => ParameterEnvironmentCommand(id, envValue.nObject)
+        val command = envValue match {
+          case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
+          case EnvironmentParameter(nType) => ParameterEnvironmentCommand(id, nType)
         }
         println(command.toString)
       }
@@ -274,14 +278,12 @@ object Environment {
   // Somewhat complex for now, but this is how a pattern/function definition is built up!
   // In code, this should be done somewhat automatically
   def buildDefinitionWithParameters(
-    inputs: Vector[(String, NewMapObject)], // A map from parameters and their type
+    inputs: Vector[(String, NewMapType)], // A map from parameters and their type
     expression: NewMapExpression
   ): NewMapObject = {
     val structT = StructT(
-      TaggedObject(
-        UMap(inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(x._1._2))),
-        MapT(TaggedObject(UIndex(inputs.length), CountT), TypeT, MapConfig(RequireCompleteness, SimpleFunction))
-      )
+      inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(UType(x._1._2))),
+      IndexT(inputs.length)
     )
 
     val structP = StructPattern(inputs.map(x => WildcardPattern(x._1)))
@@ -292,20 +294,21 @@ object Environment {
     )
   }
 
+  def typeAsObject(nType: NewMapType): NewMapObject = TaggedObject(UType(nType), TypeT)
+
   var Base: Environment = Environment().newCommands(Vector(
-    eCommand("Any", AnyT),
-    eCommand("Type", TypeT),
-    eCommand("DataType", DataTypeT(Vector.empty)),
-    eCommand("Count", CountT),
-    eCommand("Identifier", IdentifierT),
+    eCommand("Any", typeAsObject(AnyT)),
+    eCommand("Type", typeAsObject(TypeT)),
+    eCommand("Count", typeAsObject(CountT)),
+    eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, MapConfig(RequireCompleteness, SimpleFunction)))),
     eCommand("IsCommand", TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, TaggedObject(UIndex(2), CountT), MapConfig(CommandOutput, SimpleFunction))
+      MapT(TypeT, IndexT(2), MapConfig(CommandOutput, SimpleFunction))
     )),
-    eCommand("OrBoolean", OrBooleanT),
+    eCommand("OrBoolean", typeAsObject(OrBooleanT)),
     eCommand("Sequence", TaggedObject(
-      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(CountT), ParamId("key")))),
+      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(UType(IndexT(0))), ParamId("key")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildDefinitionWithParameters(
@@ -320,38 +323,11 @@ object Environment {
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildTableT(ParamId("key"), ParamId("value"))
     )),
-    eCommand("ExpandingSubset", TaggedObject(
-      UMap(Vector(WildcardPattern("parentType") -> BuildExpandingSubsetT(ParamId("parentType"), false))),
+    eCommand("CaseType", TaggedObject(UType(CaseT(Vector.empty, IdentifierT, BasicMap, Vector.empty)), TypeT)),
+    eCommand("Subtype", TaggedObject(
+      UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewVersionedStatementCommand("TypeWithDefault", ExpandingSubsetT(TypeT, true)),
-    eCommand("Subtype", TaggedObject(
-      UMap(Vector(
-        WildcardPattern("simpleFunction") -> BuildSubtypeT(ParamId("simpleFunction"))
-      )),
-      MapT(
-        NewMapO.simpleFunctionT,
-        TypeT,
-        MapConfig(RequireCompleteness, SimpleFunction)
-      )
-    )),
-  ))
-
-  // What do I want???
-  //GetDefault: StructT(TaggedObject(UMap(Vector.empty), MapT(TypeWithDefault, Type, MapConfig(RequireCompleteness, SimpleFunction)))) 
-  val TypeWithDefault = Base.lookup("TypeWithDefault").get.nObject
-
-  Base = Base.newCommands(Vector(
-    eCommand("TypeClassStruct", TaggedObject(
-      UMap(Vector(
-        WildcardPattern("structParams") -> BuildStructT(ParamId("structParams"))
-      )),
-      MapT(
-        // Problem: TypeWithDefault should not be in here!!
-        MapT(TypeWithDefault, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
-        TypeT,
-        MapConfig(RequireCompleteness, BasicMap)
-      )
-    )),
+    NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
   ))
 }

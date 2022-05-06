@@ -247,6 +247,14 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def newTypeCommand: Parser[NewTypeStatementParse] = {
+    Lexer.Identifier("data") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ _ ~ exp => {
+        NewTypeStatementParse(id, exp)
+      }
+    }
+  }
+
   private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
     Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
@@ -279,7 +287,7 @@ object NewMapParser extends Parsers {
     tokens: Seq[Lexer.Token]
   ): Outcome[EnvStatementParse, String] = {
     val reader = new TokenReader(tokens)
-    val program = phrase(fullStatement | newVersionedStatement | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
+    val program = phrase(fullStatement | newVersionedStatement | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
 
     program(reader) match {
       case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

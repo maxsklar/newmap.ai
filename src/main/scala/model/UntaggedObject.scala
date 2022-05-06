@@ -20,7 +20,9 @@ case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends Unt
 case class UIndex(i: Long) extends UntaggedObject
 
 // We can't yet untag types directly, so we can use this instead
-case class UType(nType: NewMapObject) extends UntaggedObject
+case class UType(nType: NewMapType) extends UntaggedObject
+
+case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
 
 // Built in functions

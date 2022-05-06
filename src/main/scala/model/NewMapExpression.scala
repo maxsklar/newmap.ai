@@ -6,7 +6,7 @@
 sealed abstract class NewMapExpression
 
 case class ObjectExpression(
-  nObject: NewMapObject
+  uObject: UntaggedObject
 ) extends NewMapExpression
 
 case class ApplyFunction(
@@ -15,9 +15,8 @@ case class ApplyFunction(
 ) extends NewMapExpression
 
 case class BuildCase(
-  constructor: NewMapObject,
-  input: NewMapExpression,
-  caseType: NewMapObject
+  constructor: UntaggedObject,
+  input: NewMapExpression
 ) extends NewMapExpression
 
 // Future: Replace with Buildcase when MapT is a Case Instance
@@ -32,18 +31,31 @@ case class BuildTableT(
   requiredValues: NewMapExpression
 ) extends NewMapExpression
 
-case class BuildExpandingSubsetT(
+case class BuildSubtypeT(
+  isMember: NewMapExpression,
   parentType: NewMapExpression,
-  allowPatternMatching: Boolean
+  featureSet: MapFeatureSet = BasicMap
 ) extends NewMapExpression
 
-case class BuildCaseT(cases: NewMapExpression) extends NewMapExpression
-case class BuildStructT(params: NewMapExpression) extends NewMapExpression
-case class BuildSubtypeT(isMember: NewMapExpression) extends NewMapExpression
+case class BuildCaseT(
+  cases: NewMapExpression,
+  parentFieldType: NewMapType,
+  featureSet: MapFeatureSet
+) extends NewMapExpression
+
+case class BuildStructT(
+  params: NewMapExpression,
+  parentFieldType: NewMapType,
+  featureSet: MapFeatureSet
+) extends NewMapExpression
+//case class BuildSubtypeT(isMember: NewMapExpression) extends NewMapExpression
+
+case class BuildNewTypeClassT(
+  params: NewMapExpression
+) extends NewMapExpression
 
 case class BuildMapInstance(
-  values: Vector[(NewMapPattern, NewMapExpression)],
-  mapType: NewMapObject
+  values: Vector[(NewMapPattern, NewMapExpression)]
 ) extends NewMapExpression
 
 // This is an object that stands for something else in the environment

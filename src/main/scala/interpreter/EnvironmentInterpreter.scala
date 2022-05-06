@@ -8,7 +8,10 @@ class EnvironmentInterpreter() {
   var env: Environment = Environment.Base
 
   for (code <- EnvironmentInterpreter.initialCommands) {
-    apply(code)
+    apply(code) match {
+      case Failure(f) => println(s"Error: $f\n => $code")
+      case Success(_) => ()
+    }
   }
 
   /*
@@ -60,8 +63,10 @@ class EnvironmentInterpreter() {
       tc <- TypeChecker.typeCheck(parseTree, AnyT, env, FullFunction)
       nObject <- Evaluator(tc, env)
     } yield {
-      val nType = RetrieveType.fromNewMapObject(nObject, env)
-      nType.toString
+      //val nType = RetrieveType.fromNewMapObject(nObject, env)
+      //nType.toString
+      // TODO - reimplement this! There should be a typing system here
+      s"TypeChecker temporarily down: $nObject"
     }
 
     result match {
@@ -102,7 +107,6 @@ class EnvironmentInterpreter() {
 object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
-    "ver _default = new TypeClassStruct(t: t)",
     "update _default Count.0",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",

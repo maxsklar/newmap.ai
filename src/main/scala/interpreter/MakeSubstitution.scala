@@ -7,7 +7,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object MakeSubstitution {
   def apply(
     expression: NewMapExpression,
-    parameters: Map[String, NewMapObject],
+    parameters: Map[String, UntaggedObject],
     env: Environment
   ): NewMapExpression = {
     expression match {
@@ -29,8 +29,8 @@ object MakeSubstitution {
           case None => expression
         }
       }
-      case BuildCase(constructor, input, caseType) => {
-        BuildCase(constructor, this(input, parameters, env), caseType)
+      case BuildCase(constructor, input) => {
+        BuildCase(constructor, this(input, parameters, env))
       }
       case BuildMapT(inputType, outputType, config) => {
         BuildMapT(
@@ -45,15 +45,16 @@ object MakeSubstitution {
           this(requiredValues, parameters, env)
         )
       }
-      case BuildExpandingSubsetT(parentType, allowPattern) => {
+      /*case BuildExpandingSubsetT(parentType, allowPattern) => {
         BuildExpandingSubsetT(this(parentType, parameters, env), allowPattern)
+      }*/
+      case BuildSubtypeT(isMember, parentType, featureSet) => {
+        BuildSubtypeT(this(isMember, parameters, env), this(parentType, parameters, env), featureSet)
       }
-      case BuildSubtypeT(isMember) => {
-        BuildSubtypeT(this(isMember, parameters, env))
-      }
-      case BuildCaseT(cases) => BuildCaseT(this(cases, parameters, env))
-      case BuildStructT(params) => BuildStructT(this(params, parameters, env))
-      case BuildMapInstance(values, mapT) => {
+      case BuildCaseT(cases, parentFieldType, featureSet) => BuildCaseT(this(cases, parameters, env), parentFieldType, featureSet)
+      case BuildStructT(params, parentFieldType, featureSet) => BuildStructT(this(params, parameters, env), parentFieldType, featureSet)
+      case BuildNewTypeClassT(typeTransform) => BuildNewTypeClassT(this(typeTransform, parameters, env))
+      case BuildMapInstance(values) => {
         val newMapValues = for {
           (k, v) <- values
         } yield {
@@ -62,7 +63,7 @@ object MakeSubstitution {
           k -> newValue
         }
 
-        BuildMapInstance(newMapValues, mapT)
+        BuildMapInstance(newMapValues)
       }
     }
   }
@@ -70,12 +71,12 @@ object MakeSubstitution {
   // TODO - this will become unneccesary when we create a "buildMap" instead of relying on NewMapObject
   // NewMapObject should not contain any outside parameters!!!
   def substObject(
-    nObject: NewMapObject,
-    parameters: Map[String, NewMapObject],
+    nObject: UntaggedObject,
+    parameters: Map[String, UntaggedObject],
     env: Environment
-  ): NewMapObject = {
+  ): UntaggedObject = {
     nObject match {
-      case TaggedObject(UMap(values), mapT) => {
+      case UMap(values) => {
         val newValues = for {
           (k, v) <- values
 
@@ -85,10 +86,7 @@ object MakeSubstitution {
           remainingParameters = parameters -- internalParams
         } yield (k -> this(v, remainingParameters, env))
 
-        TaggedObject(
-          UMap(values),
-          mapT
-        )
+        UMap(newValues)
       }
       case _ => nObject
     }

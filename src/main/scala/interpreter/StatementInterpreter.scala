@@ -22,29 +22,38 @@ object StatementInterpreter {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
-          //_ = println(s"tc from TypeChecker: $tcType")
-          nType <- Evaluator(tcType, env)
-          //_ = println(s"Type from TypeChecker: $nType")
+          nTypeObj <- Evaluator(tcType, env)
+
+          nType <- Evaluator.asType(nTypeObj, env)
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
-          //_ = println(s"Expression from TypeChecker: $tc")
           evaluatedObject <- Evaluator(tc, env)
-          //_ = println(s"evaluatedObject: $evaluatedObject")
-          constantObject = Evaluator.stripVersioning(evaluatedObject, env)
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
         } yield {
-          val command = FullEnvironmentCommand(id.s, constantObject)
+          val command = FullEnvironmentCommand(id.s, TaggedObject(constantObject, nType))
           Response(Vector(command), command.toString)
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
-          nType <- Evaluator(tcType, env)
+          nTypeObj <- Evaluator(tcType, env)
+          nType <- Evaluator.asType(nTypeObj, env)
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
-          initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
+          initValue <- CommandMaps.getDefaultValueOfCommandType(nTypeObj, env)
         } yield {
           val command = NewVersionedStatementCommand(id.s, nType)
+          Response(Vector(command), command.toString)
+        }
+      }
+      case NewTypeStatementParse(id, typeExpression) => {
+        for {
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          nTypeObj <- Evaluator(tcType, env)
+          nType <- Evaluator.asType(nTypeObj, env)
+        } yield {
+          val command = NewTypeCommand(id.s, nType)
           Response(Vector(command), command.toString)
         }
       }
@@ -61,11 +70,19 @@ object StatementInterpreter {
           versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
           nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
 
-          _  = if (nType == TypeT) {
-            println(s"versionedObjectLink: $versionedObjectLink -- ${id.s} -- ${Evaluator.stripVersioning(versionedObjectLink, env)}")
+          inputT <- if (nType == TypeT) {
+            // TODO - this roundabout way of doing things suggests a refactor
+            val nObjectStripped = Evaluator.stripVersioning(versionedObjectLink, env)
+            for {  
+              currentUntagged <- Evaluator.removeTypeTag(nObjectStripped)
+              currentAsType <- Evaluator.asType(currentUntagged, env)
+              customT = CustomT(versionedObjectLink.key.uuid, currentAsType)
+              result <- CommandMaps.getTypeExpansionCommandInput(customT)
+            } yield result
+          } else {
+            CommandMaps.getCommandInputOfCommandType(nType, env)
           }
 
-          inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
           commandExp <- typeCheck(command, inputT, env, FullFunction)
 
           commandObj <- Evaluator(commandExp, env)
@@ -79,20 +96,22 @@ object StatementInterpreter {
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
-          tc <- TypeChecker.typeCheck(objExpression, AnyT, env, FullFunction)
-          evaluatedObject <- Evaluator(tc, env)
+          // TODO - we need a type inference here!!
+          tc <- TypeChecker.typeCheckUnknownType(objExpression, env)
+          evaluatedObject <- Evaluator(tc._1, env)
         } yield {
-          val command = FullEnvironmentCommand(id.s, evaluatedObject)
+          val command = FullEnvironmentCommand(id.s, TaggedObject(evaluatedObject, tc._2))
           Response(Vector(command), command.toString)
         }
       }
       case ExpressionOnlyStatementParse(exp) => {
         for {
-          tc <- TypeChecker.typeCheck(exp, AnyT, env, FullFunction)
-          evaluatedObject <- Evaluator(tc, env)
-          constantObject = Evaluator.stripVersioning(evaluatedObject, env)
+          // TODO - we need a type inference here!!
+          tc <- TypeChecker.typeCheckUnknownType(exp, env)
+          evaluatedObject <- Evaluator(tc._1, env)
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
         } yield {
-          val command = ExpOnlyEnvironmentCommand(constantObject)
+          val command = ExpOnlyEnvironmentCommand(TaggedObject(constantObject, tc._2))
           Response(Vector(command), command.toString)
         }
       }
