@@ -482,6 +482,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   // TODO - the same thing must be caught for a map that's being updated with commands
+  // TODO - must be upgraded with generic types
   it should " disallow self referential function calls" in {
     testCodeScript(Vector(
       CodeExpectation("val m: ReqMap(Any, 2) = (_: 1)", GeneralSuccessCheck),
@@ -489,9 +490,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val m: ReqMap(Any, 2) = (x: 1, _: 0)", GeneralSuccessCheck),
       CodeExpectation("val m: ReqMap(Any, Any) = (x: x, _: 0)", GeneralSuccessCheck),
       // Preventing Russell's paradox!
-      CodeExpectation("val m: ReqMap(ReqMap(Any, Any), 2) = (x: x x)", FailureCheck),
+      CodeExpectation("val m: ReqMap(ReqMap(Any, Any), Any) = (x: x x)", FailureCheck),
       // This line below will create an infinite loop if evaluated!! Out simple function check will catch it
-      CodeExpectation("val m: ReqMap(Any, Any) => 2 = (x: x x)", GeneralSuccessCheck)
+      CodeExpectation("val m: ReqMap(Any, Any) => Any = (x: x x)", GeneralSuccessCheck)
     ))
   }
 

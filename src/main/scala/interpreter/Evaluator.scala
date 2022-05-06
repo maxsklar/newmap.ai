@@ -279,16 +279,15 @@ object Evaluator {
     }
   }
 
-  // The input must be a literal input (or at least the first layer cannot be a parameter)
   def attemptPatternMatch(
     pattern: NewMapPattern,
     input: UntaggedObject,
     env: Environment
   ): Outcome[Map[String, UntaggedObject], String] = {
     // TODO: IMPORTANT
-    // We must be able to dea with using the same variable in a pattern, like StructPattern(x, x) to
+    // We must be able to deal with using the same variable in a pattern, like StructPattern(x, x) to
     //  denote that these are the same
-    (pattern, input/*stripVersioning(input, env)*/) match {
+    (pattern, stripVersioningU(input, env)) match {
       case (StructPattern(params), UMap(paramValues)) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
@@ -303,18 +302,13 @@ object Evaluator {
       // TODO - eventually instead of checking equality, we'll check for "convertability"
       //  For example between different type versions
       case (ObjectPattern(oPattern), _) => {
-        // TODO - the retagging should not happen here
-        // (In fact, at this point we should have harmonized the types)
-        //val retaggedInput = retagObject(input, RetrieveType.fromNewMapObject(oPattern, env))
-        //val untaggedInput = removeTypeTag(input).toOption.get
-
-        if (oPattern == input) {
+        if (SubtypeUtils.checkEqual(oPattern, input)) {
           Success(Map.empty)
         } else Failure("ObjectPattern didn't match")
       }
       case (CasePattern(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
-          _ <- Outcome.failWhen(constructorP != constructor, "Constructors didn't match")
+          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }

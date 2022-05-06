@@ -33,6 +33,7 @@ object SubtypeUtils {
           checkCaseComplete(keys, UMap(values), env)
         }*/
         case StructT(params, _, _, _) => checkStructComplete(keys, params, env)
+        case CustomT(_, underlying) => doPatternsCoverType(keys, underlying, env)
         /*case ULink(key) => {
           for {
             state <- Evaluator.indicatedState(key, env)
@@ -357,23 +358,6 @@ object SubtypeUtils {
           convertInstructions
         }
       }
-      /*case TaggedObject(uMap, ExpandingSubsetT(superType, _)) => {
-        // I think this gets interpreted as a function as well as a type!
-        val isMember = endingType
-
-        for {
-          convertInstructions <- isObjectConvertibleToType(startingObject, superType, env)
-
-          // TODO - make explicit conversion
-          convertedObject = startingObject
-
-
-          checksMembership <- isMemberOfSubtype(startingObject, isMember, env)
-          _ <- Outcome.failWhen(!checksMembership, s"Not member of subtype: $startingObject, $endingType")
-        } yield {
-          convertInstructions
-        }
-      }*/
       case _ => {
         val nType = RetrieveType.fromNewMapObject(startingObject, env)
         isTypeConvertible(nType, endingType, env)
@@ -422,15 +406,9 @@ object SubtypeUtils {
     } yield !checkEqual(result, defaultValueOrResultType) && !checkEqual(result, UInit)
   }
 
+  // In the future - replace this with a type class (implementing equals)
   def checkEqual(a: UntaggedObject, b: UntaggedObject): Boolean = {
     a == b
-    // TODO - we need to first convert a and b into the same type
-    /*(a, b) match {
-      case (TaggedObject(ua, _), TaggedObject(ub, _)) => {
-      ua == ub
-      }
-      case _ => false
-    }*/
   }
 
   def allMembersOfSubtype(
