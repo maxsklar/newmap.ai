@@ -267,15 +267,6 @@ object CommandMaps {
     }
   }
 
-  // This is a weird artifact needed for updateVersionedO.. it's going to improve
-  // By having objects tagged the old way automatically updated to the new way
-  /*def retagObject(nObject: NewMapObject, newTypeTag: NewMapObject): NewMapObject = {
-    nObject match {
-      case TaggedObject(untagged, nType) => TaggedObject(untagged, newTypeTag)
-    case _ => nObject
-    }
-  }*/
-
   def updateVersionedObject(
     current: NewMapObject,
     command: UntaggedObject,

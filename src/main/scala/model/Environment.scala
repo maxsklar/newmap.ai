@@ -328,6 +328,10 @@ object Environment {
       UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
+    eCommand("GenericId", TaggedObject(
+      UMap(Vector(WildcardPattern("t") -> ParamId("t"))),
+      GenericMapT(Vector(WildcardPattern("t") -> ParamId("t")), MapConfig(RequireCompleteness, SimpleFunction))
+    )),
     NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
   ))
 }

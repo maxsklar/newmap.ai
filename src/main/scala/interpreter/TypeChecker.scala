@@ -21,8 +21,6 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case NaturalNumberParse(i: Long) => {
-        val parentExpectedType = RetrieveType.getParentType(expectedType, env)
-
         Evaluator.stripCustomTag(expectedType) match {
           case IndexT(j) => {
             if (i < j) Success(ObjectExpression(UIndex(i)))
@@ -222,12 +220,8 @@ object TypeChecker {
       case ConstructCaseParse(first, second) => {
         Evaluator.stripCustomTag(expectedType) match {
           case CaseT(simpleMap, parentFieldType, _, _) => {
-            //val inputType = RetrieveType.retrieveInputTypeFromFunctionObj(simpleMap, env)
-            // TODO - we need this to be a subtype!
-            val inputType = parentFieldType
-
             for {
-              firstExp <- typeCheck(first, inputType, env, featureSet)
+              firstExp <- typeCheck(first, parentFieldType, env, featureSet)
 
               // TODO - we must ensure that the evaluator is not evaluating anything too complex here
               // must be a "simple map" type situation
@@ -532,18 +526,67 @@ object TypeChecker {
     for {
       functionTypeChecked <- typeCheckUnknownType(function, env)
 
-      inputT = RetrieveType.inputTypeFromFunctionType(functionTypeChecked._2, env)
+      typeOfFunction = functionTypeChecked._2
+
+      inputT = inputTypeCheckFromFunctionType(typeOfFunction, env)
       inputTC <- typeCheck(input, inputT, env, FullFunction)
 
-      resultingType <- functionTypeChecked._2 match {
+      resultingType <- typeOfFunction match {
         case MapT(_, outputType, _) => Success(outputType)
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
-        case TypeClassT(typeTransform, _) => outputTypeFromStructParams(typeTransform, inputTC, env)
+        case TypeClassT(typeTransform, typesInTypeClass) => {
+          outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)
+        }
         case _ => Failure(s"Cannot get resulting type from function type ${functionTypeChecked._2}")
       }
     } yield {
-      TypeCheckUnknownFunctionResult(functionTypeChecked._1, functionTypeChecked._2, inputTC, resultingType)
+      TypeCheckUnknownFunctionResult(functionTypeChecked._1, typeOfFunction, inputTC, resultingType)
     }    
+  }
+
+  // Returns a set of patterns representing newmap types
+  def inputTypeCheckFromFunctionType(nFunctionType: NewMapType, env: Environment): NewMapType = {
+    Evaluator.stripCustomTag(nFunctionType) match {
+      case MapT(inputType, _, _) => inputType
+      case StructT(params, parentFieldType, featureSet, _) => {
+        parentFieldType
+      }
+      case TypeClassT(typeTransform, typesInTypeClass) => {
+        //eventually send typesInTypeClass to the type checker
+        TypeT
+        /*SubtypeT(
+          UMap(typesInTypeClass.map(x => (x -> ObjectExpression(UIndex(1))))),
+          TypeT,
+          SimpleFunction
+        )*/
+      }
+      case GenericMapT(typeTransform, config) => {
+        AnyT
+        // Really we want a list of the type patterns in typeTransform, but that's going to require a larger change to the type checker
+      }
+      case other => throw new Exception(s"Couldn't retrieve input type from $nFunctionType -- $other")
+    }
+  }
+
+  def outputTypeFromTypeClassParams(
+    params: Vector[(NewMapPattern, NewMapExpression)],
+    typesInTypeClass: Vector[NewMapPattern],
+    input: NewMapExpression,
+    env: Environment
+  ): Outcome[NewMapType, String] = {
+    val uMap = UMap(typesInTypeClass.map(pattern => pattern -> ObjectExpression(UIndex(1))))
+    
+    for {
+      inputObj <- Evaluator(input, env)
+
+      // Ensure that this type is a member of the type class
+      _ <- Evaluator.applyFunctionAttempt(uMap, inputObj, env)
+
+      resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
+      resultingT <- Evaluator.asType(resultingType, env)
+
+      _ <- Outcome.failWhen(resultingT == UInit, s"Not a valid parameter: $input")
+    } yield resultingT
   }
 
   def outputTypeFromStructParams(
@@ -555,6 +598,8 @@ object TypeChecker {
       inputObj <- Evaluator(input, env)
       resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
       resultingT <- Evaluator.asType(resultingType, env)
+
+      _ <- Outcome.failWhen(resultingT == UInit, s"Not a valid parameter: $input")
     } yield resultingT
   }
 

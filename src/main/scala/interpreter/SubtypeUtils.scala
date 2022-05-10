@@ -395,15 +395,7 @@ object SubtypeUtils {
     for {
       isMemberUntagged <- Evaluator.removeTypeTag(isMember)
       result <- Evaluator.applyFunctionAttempt(isMemberUntagged, nObjectUntagged, env)
-
-      isMemberOutputType = RetrieveType.outputTypeFromFunctionType(RetrieveType.fromNewMapObject(isMember, env), env)
-
-      // Instead of calling RetrieveType on the result, look at the outputType on nSubtype
-      //  and find a default on that!
-      defaultValueOrResultType <- CommandMaps.getDefaultValueOfCommandType(UType(isMemberOutputType), env)
-    
-      // Problem is that we should be checking equality of untagged!!
-    } yield !checkEqual(result, defaultValueOrResultType) && !checkEqual(result, UInit)
+    } yield result != UInit
   }
 
   // In the future - replace this with a type class (implementing equals)

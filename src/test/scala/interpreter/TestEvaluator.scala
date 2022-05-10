@@ -31,6 +31,6 @@ class TestEvaluator extends FlatSpec {
 
   it should " work properly on TypeT, and return false" in {
     val result = Evaluator.applyFunctionAttempt(IsCommandFunc, UType(TypeT), env)
-    assertFunctionWorkedAndReturnedResult(result, UIndex(0))
+    assertFunctionWorkedAndReturnedResult(result, UInit)
   }
 }

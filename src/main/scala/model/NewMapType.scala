@@ -54,7 +54,7 @@ case class MapT(
 ) extends NewMapType
 
 case class GenericMapT(
-  typeTransform: Vector[(TypePattern, NewMapExpression)],
+  typeTransform: Vector[(NewMapPattern, NewMapExpression)],
   config: MapConfig
 ) extends NewMapType
 
@@ -140,7 +140,6 @@ case class CaseT(
 // - Anything that's left at the initial value is NOT in the subtype
 // For example, if the simple function is a Map from 10 to 2, and it reads (2: 1, 3: 1, 5: 1, 7: 1),
 //  then the values 2, 3, 5, and 7 are considered part of this new type; the rest are not
-// TODO - remove in favor of expanding subset?
 case class SubtypeT(
   isMember: UntaggedObject,
   parentType: NewMapType,

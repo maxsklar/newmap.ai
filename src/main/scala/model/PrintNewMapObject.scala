@@ -29,7 +29,7 @@ object PrintNewMapObject {
       printMapT(newMapType(key), newMapType(value), config)
     }
     case GenericMapT(typeTransform, config) => {
-      s"Generic(${typeMapToString(typeTransform)})"
+      s"Generic(${mapToString(typeTransform)})"
     }
     case StructT(params, _, _, _) => s"Struct(${mapToString(params)})"
     case TypeClassT(typeTransform, implementation) => {
@@ -142,31 +142,10 @@ object PrintNewMapObject {
     sb.toString
   }
 
-  def typeMapToString(values: Vector[(TypePattern, NewMapExpression)]): String = {
-    val sb: StringBuilder = new StringBuilder()
-    sb.append("(")
-
-    var bindings: Vector[String] = Vector.empty
-    for {
-      (k, v) <- values
-    } {
-      bindings :+= typePatternToString(k) + ": " + printExpression(v)
-    }
-    sb.append(bindings.mkString(", "))
-
-    sb.append(")")
-    sb.toString
-  }
-
   def patternToString(nPattern: NewMapPattern): String = nPattern match {
     case ObjectPattern(nObject) => untagged(nObject)
     case WildcardPattern(name) => "W~" + name
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
     case CasePattern(constructor, input) => s"(${untagged(constructor)}.${patternToString(input)})"
-  }
-
-  def typePatternToString(pattern: TypePattern): String = pattern match {
-    case ConstantTypePattern(nType) => newMapType(nType)
-    case WildcardTypePattern(name) => "W~" + name
   }
 }

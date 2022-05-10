@@ -237,7 +237,7 @@ object Evaluator {
 
         val isCommand: Boolean = defaultValueOutcome.isSuccess
 
-        Success(UIndex(if (isCommand) 1 else 0))
+        Success(if (isCommand) UIndex(1) else UInit)
       }
       case IncrementFunc => {
         input match {
