@@ -5,9 +5,6 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 object RetrieveType {
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapType = nObject match {
-    //case CountT | ExpandingSubsetT(_, _) | DataTypeT(_) | TypeT | AnyT | IdentifierT | StructT(_, _) | CaseT(_, _) | MapT(_, _, _) | OrBooleanT => TypeT
-    //case SubtypeT(isMember) => this(retrieveInputTypeFromFunction(isMember, env), env)
-    //case SubtypeT(isMember) => TypeT // Is this right?
     case TaggedObject(_, nType) => nType
     case VersionedObjectLink(key, status) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
@@ -18,9 +15,10 @@ object RetrieveType {
   def retrieveFeatureSetFromFunctionType(nType: NewMapType, env: Environment): Outcome[MapFeatureSet, String] = {
     nType match {
       case MapT(_, _, config) => Success(config.featureSet)
-      case StructT(_, _, featureSet, _) => Success(featureSet)
+      case StructT(_, _, _, featureSet, _) => Success(featureSet)
       case TypeClassT(_, _) => Success(SimpleFunction)
       case CustomT(_, t) => retrieveFeatureSetFromFunctionType(t, env)
+      case GenericMapT(_, config) => Success(config.featureSet)
       case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nType")
     }
   }
@@ -49,7 +47,7 @@ object RetrieveType {
     }
     case BuildSubtypeT(isMember, _, _) => isTermClosedLiteral(isMember, knownVariables)
     case BuildCaseT(cases, _, _) => isTermClosedLiteral(cases, knownVariables)
-    case BuildStructT(params, _, _) => isTermClosedLiteral(params, knownVariables)
+    case BuildStructT(params, _, _, _) => isTermClosedLiteral(params, knownVariables)
     case BuildNewTypeClassT(typeTransform) => isTermClosedLiteral(typeTransform)
     case BuildMapInstance(values) => {
       isMapValuesClosed(values, knownVariables)

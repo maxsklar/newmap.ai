@@ -46,6 +46,7 @@ case class BuildCaseT(
 case class BuildStructT(
   params: NewMapExpression,
   parentFieldType: NewMapType,
+  completeness: MapCompleteness,
   featureSet: MapFeatureSet
 ) extends NewMapExpression
 //case class BuildSubtypeT(isMember: NewMapExpression) extends NewMapExpression

@@ -79,16 +79,6 @@ object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only sim
 object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
 object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
 
-/*case class ExpandingSubsetT(
-  parentType: NewMapObject,
-  allowPatternMatching: Boolean
-) extends NewMapObject
-
-// User defined datatype (like an expanding case)
-case class DataTypeT(
-  typeParameters: Vector[TypeParameter]
-) extends NewMapObject*/
-
 case class TypeParameter(
   name: String,
   upperBound: Vector[NewMapType] = Vector.empty,
@@ -112,6 +102,7 @@ case class TypeParameterVariance(
 case class StructT(
   params: Vector[(NewMapPattern, NewMapExpression)],
   fieldParentType: NewMapType,
+  conpleteness: MapCompleteness = RequireCompleteness,
   featureSet: MapFeatureSet = BasicMap,
   typeParameters: Vector[TypeParameter] = Vector.empty
 ) extends NewMapType
@@ -122,7 +113,7 @@ case class TypeClassT(
   // Note that this value isn't named, but its'
   typeTransform: Vector[(NewMapPattern, NewMapExpression)],
 
-  // PList of he actual types in the class, but not their implementations - that's in the actual object (with a UMap)
+  // List of the actual types in the class, but not their implementations - that's in the actual object (with a UMap)
   typesInTypeClass: Vector[NewMapPattern],
 ) extends NewMapType
 

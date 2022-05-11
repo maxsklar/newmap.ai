@@ -308,7 +308,7 @@ object Environment {
     )),
     eCommand("OrBoolean", typeAsObject(OrBooleanT)),
     eCommand("Sequence", TaggedObject(
-      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(UType(IndexT(0))), ParamId("key")))),
+      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(UIndex(0)), ParamId("key")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildDefinitionWithParameters(
@@ -327,6 +327,10 @@ object Environment {
     eCommand("Subtype", TaggedObject(
       UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
+    )),
+    eCommand("GenericIdType", TaggedObject(
+      UType(GenericMapT(Vector(WildcardPattern("t") -> ParamId("t")), MapConfig(RequireCompleteness, SimpleFunction))),
+      TypeT
     )),
     eCommand("GenericId", TaggedObject(
       UMap(Vector(WildcardPattern("t") -> ParamId("t"))),

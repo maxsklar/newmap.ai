@@ -45,8 +45,7 @@ object CommandMaps {
   def getDefaultValueOfCommandTypeHardcoded(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
     nType match {
       // TODO - start removing these in favor of newmap code!
-      case UType(IndexT(i)) if i > 0 => Success(UIndex(0))
-      case UType(OrBooleanT) => Success(UIndex(0))
+      case UType(IndexT(i)) if i > 0 => Success(UIndex(0)) //REmove?
       case UType(MapT(_, _, MapConfig(CommandOutput, _, _))) => Success(defaultUMap)
       case UType(MapT(IndexT(0), _, MapConfig(RequireCompleteness, _, _))) => Success(defaultUMap)
       case UType(MapT(SubtypeT(UMap(m), _, _), _, MapConfig(RequireCompleteness, _, _))) => {
@@ -56,20 +55,10 @@ object CommandMaps {
           Success(defaultUMap)
         } else {
           Failure(s"Can't start off map with key subtype $m")
-        }
-        
+        } 
       }
-      //case DataTypeT(_) => Success(defaultUMap)
-      case UType(StructT(params, _, _, _)) => {
-        // TODO - This is only true if all the type values in params actually have a default
+      case UType(StructT(params, _, CommandOutput, _, _)) => {
         Success(defaultUMap)
-      }
-      case UType(CaseT(cases, _, _, _)) => {
-        // In order for cases to have a default value, there's have to be 2 things:
-        // - casesType must have a default (a default case) - call it casesType.default
-        // - casesToType(casesType.default) is a type that must have a default case
-        //throw new Exception(s"Case Types do not have a default value -- $nType")
-        Failure("Case Types do not have a default value")
       }
       case UType(TypeClassT(typeTransform, typesInTypeClass)) if (typesInTypeClass.isEmpty) => {
         Success(defaultUMap)
@@ -95,7 +84,7 @@ object CommandMaps {
           IndexT(2)
         ))
       }
-      case StructT(cases, parentType, featureSet, typeParameters) => {
+      case StructT(cases, parentType, _, featureSet, typeParameters) => {
         Success(StructT(
           Vector(
             ObjectPattern(UIndex(0)) -> ObjectExpression(UType(parentType)),
@@ -233,7 +222,7 @@ object CommandMaps {
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
         } yield {
           keyExpansionCommandT match {
-            case StructT(items, _, _, _) if (items.length == 0) => {
+            case StructT(items, _, _, _, _) if (items.length == 0) => {
               // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
               requiredValues
@@ -250,7 +239,12 @@ object CommandMaps {
           }
         }
       }
-      case structT@StructT(parameterList, parentFieldType, featureSet, typeParameters) => {
+      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet, typeParameters) => {
+        // Change to CaseT because we are adding a single parameter!
+        // Are we allowed to change an old parameter? Let's say sure.
+        Success(CaseT(parameterList, parentFieldType, featureSet, typeParameters))
+      }
+      case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet, typeParameters) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
         Success(CaseT(parameterList, parentFieldType, featureSet, typeParameters))
@@ -343,7 +337,7 @@ object CommandMaps {
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
 
           result <- keyExpansionCommandT match {
-            case StructT(items, _, _, _) if (items.length == 0) => {
+            case StructT(items, _, _, _, _) if (items.length == 0) => {
               // TODO - this is an ugle exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
               Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), command))
@@ -388,7 +382,7 @@ object CommandMaps {
           TaggedObject(UMap(newMapValues), newTableType)
         }
       }
-      case StructT(params, parentFieldType, _, _) => {
+      case StructT(params, parentFieldType, _, _, _) => {
         command match {
           case UCase(constructor, input) => {
             for {

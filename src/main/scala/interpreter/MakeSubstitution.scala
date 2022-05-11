@@ -52,7 +52,7 @@ object MakeSubstitution {
         BuildSubtypeT(this(isMember, parameters, env), this(parentType, parameters, env), featureSet)
       }
       case BuildCaseT(cases, parentFieldType, featureSet) => BuildCaseT(this(cases, parameters, env), parentFieldType, featureSet)
-      case BuildStructT(params, parentFieldType, featureSet) => BuildStructT(this(params, parameters, env), parentFieldType, featureSet)
+      case BuildStructT(params, parentFieldType, completeness, featureSet) => BuildStructT(this(params, parameters, env), parentFieldType, completeness, featureSet)
       case BuildNewTypeClassT(typeTransform) => BuildNewTypeClassT(this(typeTransform, parameters, env))
       case BuildMapInstance(values) => {
         val newMapValues = for {

@@ -20,3 +20,8 @@ case class CasePattern(
   constructor: UntaggedObject,
   input: NewMapPattern
 ) extends NewMapPattern
+
+// Type Patterns
+
+// Match if I am dealing with an index type
+//case class IndexTPattern(name: String) extends NewMapPattern

@@ -82,7 +82,7 @@ object Evaluator {
           }
         } yield UType(CaseT(evalCasesM, parentFieldType, featureSet))
       }
-      case BuildStructT(params, parentFieldType, featureSet) => {
+      case BuildStructT(params, parentFieldType, completeness, featureSet) => {
         for {
           evalParams <- this(params, env)
 
@@ -91,7 +91,7 @@ object Evaluator {
             case _ => Failure(s"Unexpected struct map: $evalParams")
           }
         } yield {
-          UType(StructT(evalStructM, parentFieldType, featureSet))
+          UType(StructT(evalStructM, parentFieldType, completeness, featureSet))
         }
       }
       case BuildNewTypeClassT(typeTransform) => {
@@ -120,7 +120,6 @@ object Evaluator {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
       case VersionedObjectLink(key, _) => Success(ULink(key))
-      //case CountT | TypeT | AnyT | MapT(_, _, _) | StructT(_, _) | CaseT(_, _) | OrBooleanT | IdentifierT | ExpandingSubsetT(_, _) /*| SubtypeT(_)*/ | DataTypeT(_) => Success(UType(nObject))
       case _ => {
         //throw new Exception(nObject.toString)
         Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")

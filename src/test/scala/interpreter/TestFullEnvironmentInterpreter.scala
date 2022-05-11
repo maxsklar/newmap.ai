@@ -374,10 +374,22 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be usable" in {
     testCodeScript(Vector(
       CodeExpectation("val id: (Any => Any) = (t: t)", GeneralSuccessCheck),
-      // Because this is tagged as AnyT - it shows the downside of the universal identity function
-      // In the future - perhaps there is a way to force this into being a generic function
       CodeExpectation("id ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), AnyT)))),
       CodeExpectation("id 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), AnyT)))),
+      CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),
+      CodeExpectation("m (id 5)", FailureCheck)
+    ))
+  }
+
+  "Generic Identity Function " should " work" in {
+    testCodeScript(Vector(
+      CodeExpectation("GenericId ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), IdentifierT)))),
+      CodeExpectation("GenericId 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+      CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),
+      // This line is needed because 3 will get converted into a count
+      // - in the future, when we're working with type classes, maybe we can call (m (GenericId 3)) directly
+      CodeExpectation("val x: 5 = 3", GeneralSuccessCheck),
+      CodeExpectation("m (GenericId x)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(1), IndexT(2)))))
     ))
   }
 

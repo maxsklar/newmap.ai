@@ -108,6 +108,7 @@ object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
     "update _default Count.0",
+    "update _default OrBoolean.0",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
   )

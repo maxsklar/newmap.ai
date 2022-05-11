@@ -31,7 +31,7 @@ object PrintNewMapObject {
     case GenericMapT(typeTransform, config) => {
       s"Generic(${mapToString(typeTransform)})"
     }
-    case StructT(params, _, _, _) => s"Struct(${mapToString(params)})"
+    case StructT(params, _, _, _, _) => s"Struct(${mapToString(params)})"
     case TypeClassT(typeTransform, implementation) => {
       s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> ObjectExpression(UIndex(0)))))})"
     }
@@ -62,7 +62,7 @@ object PrintNewMapObject {
     case BuildCaseT(cases, _, _) => {
       "Case " + printExpression(cases)
     }
-    case BuildStructT(params, _, _) => {
+    case BuildStructT(params, _, _, _) => {
       "Struct " + printExpression(params)
     }
     case BuildSubtypeT(isMember, _, _) => {

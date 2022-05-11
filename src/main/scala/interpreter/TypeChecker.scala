@@ -6,12 +6,14 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object TypeChecker {
   /*
    * @param expression The literal expression that needs to be type-checked
-   * @param expectedType The type that we are expecting the expression to be.
-   *   The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
+   * @param typeClass This represents the typeClass that we expect the object to be
+   *  If it's a single ObjectPattern - then that represents the common case where we are expecting a specific type
+   *  The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
    * @param env This is the environment of values upon which we are working
    */
   def typeCheck(
     expression: ParseTree,
+    //typeClass: Vector[NewMapPattern],
     expectedType: NewMapType,
     env: Environment,
     featureSet: MapFeatureSet
@@ -21,7 +23,9 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case NaturalNumberParse(i: Long) => {
-        Evaluator.stripCustomTag(expectedType) match {
+        expectedType/*Evaluator.stripCustomTag(expectedType)*/ match {
+          case CountT => Success(ObjectExpression(UIndex(i)))
+            case OrBooleanT => Success(ObjectExpression(UIndex(i)))
           case IndexT(j) => {
             if (i < j) Success(ObjectExpression(UIndex(i)))
             else {
@@ -46,6 +50,10 @@ object TypeChecker {
           }
           case TypeT => Success(ObjectExpression(UType(IndexT(i))))
           case _ => {
+            // This is required if we recieve an "AnyT" type - which in the future won't happen
+            // because this is going to be a type class and not an actual type
+
+            //Failure(s"Unexpected type with number: $expectedType")
             Success(ObjectExpression(UIndex(i)))
           }
         }
@@ -151,7 +159,7 @@ object TypeChecker {
               BuildMapInstance(mapValues)
             }
           }
-          case StructT(parameterList, parentFieldType, _, _) => {
+          case StructT(parameterList, parentFieldType, _, _, _) => {
             for {
               result <- typeCheckStruct(
                 parameterList,
@@ -164,6 +172,13 @@ object TypeChecker {
               BuildMapInstance(result)
             }
           }
+          case GenericMapT(typeTransform, config) => {
+            for {
+              mapValues <- typeCheckGenericMap(values, typeTransform, config.featureSet, env, featureSet)
+            } yield {
+              BuildMapInstance(mapValues)
+            }
+          }
           case TypeT => {
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // OR we are just being given a list of types
@@ -172,7 +187,7 @@ object TypeChecker {
               for {
                 mapValues <- typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, featureSet)
               } yield {
-                BuildStructT(BuildMapInstance(mapValues), IdentifierT, BasicMap)
+                BuildStructT(BuildMapInstance(mapValues), IdentifierT, RequireCompleteness, BasicMap)
               }
             }.rescue(f => {
               for {
@@ -184,6 +199,7 @@ object TypeChecker {
                     expressions.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> x._1),
                   ),
                   indexType,
+                  RequireCompleteness,
                   BasicMap
                 )
               }
@@ -301,6 +317,42 @@ object TypeChecker {
     }
   }
 
+  def typeCheckGenericMap(
+    values: Vector[ParseTree],
+    typeTransform: Vector[(NewMapPattern, NewMapExpression)],
+    internalFeatureSet: MapFeatureSet,
+    env: Environment,
+    externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
+  ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
+    throw new Exception("Unimplemented: typeCheckGenericMap")
+    /*values match {
+      case BindingCommandItem(k, v) +: restOfValues => {
+        for {
+          resultKey <- typeCheckWithPatternMatching(k, keyType, env, externalFeatureSet, internalFeatureSet)
+          
+          foundKeyPattern = resultKey.typeCheckResult
+
+          // Now we want to type check the object, but we have to tell it what kind of map we're in
+          //  in order to ensure that the right features are being used
+          objectFoundValue <- typeCheck(
+            v,
+            valueType,
+            resultKey.newEnvironment,
+            featureSet = internalFeatureSet
+          )
+
+          restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, internalFeatureSet, env, externalFeatureSet)
+        } yield {
+          (foundKeyPattern -> objectFoundValue) +: restOfMap
+        }
+      }
+      case s +: _ => {
+        Failure(s"No binding found in map for item $s in $values")
+      }
+      case _ => Success(Vector.empty)
+    }*/
+  }
+
   case class TypeCheckWithPatternMatchingResult(
     typeCheckResult: NewMapPattern,
     newEnvironment: Environment // TODO: can this be grabbed from the pattern above??
@@ -323,7 +375,7 @@ object TypeChecker {
         )
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (CommandList(values), StructT(structValues, parentFieldType, _, _)) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (CommandList(values), StructT(structValues, parentFieldType, _, _, _)) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {
@@ -450,11 +502,6 @@ object TypeChecker {
     env: Environment
   ): Boolean = nType match {
     case IdentifierT => true
-    /*case VersionedObjectLink(key, status) => {
-      Evaluator.currentState(key.uuid, env).toOption.exists(state => {
-        typeIsExpectingAnIdentifier(state, env)
-      })
-    }*/
     case CustomT(_, t) => typeIsExpectingAnIdentifier(t, env)
     case SubtypeT(_, parentType, _) => typeIsExpectingAnIdentifier(parentType, env)
     case _ => false
@@ -528,14 +575,32 @@ object TypeChecker {
 
       typeOfFunction = functionTypeChecked._2
 
-      inputT = inputTypeCheckFromFunctionType(typeOfFunction, env)
-      inputTC <- typeCheck(input, inputT, env, FullFunction)
+      inputTypeOption = inputTypeCheckFromFunctionType(typeOfFunction, env)
+
+      inputTagged <- inputTypeOption match {
+        case Some(inputT) => for {
+          inputTypeChecked <- typeCheck(input, inputT, env, FullFunction)
+        } yield {
+          (inputTypeChecked -> inputT)
+        }
+        case None => typeCheckUnknownType(input, env)
+      }
+
+      (inputTC, inputT) = inputTagged
 
       resultingType <- typeOfFunction match {
         case MapT(_, outputType, _) => Success(outputType)
-        case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
+        case StructT(params, _, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, typesInTypeClass) => {
           outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)
+        }
+        case GenericMapT(typeTransform, config) => {
+          for {
+            typeAsObj <- Evaluator.applyFunctionAttempt(UMap(typeTransform), UType(inputT), env)
+            nType <- Evaluator.asType(typeAsObj, env)
+          } yield {
+            nType
+          }
         }
         case _ => Failure(s"Cannot get resulting type from function type ${functionTypeChecked._2}")
       }
@@ -545,15 +610,15 @@ object TypeChecker {
   }
 
   // Returns a set of patterns representing newmap types
-  def inputTypeCheckFromFunctionType(nFunctionType: NewMapType, env: Environment): NewMapType = {
+  def inputTypeCheckFromFunctionType(nFunctionType: NewMapType, env: Environment): Option[NewMapType] = {
     Evaluator.stripCustomTag(nFunctionType) match {
-      case MapT(inputType, _, _) => inputType
-      case StructT(params, parentFieldType, featureSet, _) => {
-        parentFieldType
+      case MapT(inputType, _, _) => Some(inputType)
+      case StructT(params, parentFieldType, _, _, _) => {
+        Some(parentFieldType)
       }
       case TypeClassT(typeTransform, typesInTypeClass) => {
         //eventually send typesInTypeClass to the type checker
-        TypeT
+        Some(TypeT)
         /*SubtypeT(
           UMap(typesInTypeClass.map(x => (x -> ObjectExpression(UIndex(1))))),
           TypeT,
@@ -561,10 +626,11 @@ object TypeChecker {
         )*/
       }
       case GenericMapT(typeTransform, config) => {
-        AnyT
+        // TODO - this is what has to change!!!
+        None
         // Really we want a list of the type patterns in typeTransform, but that's going to require a larger change to the type checker
       }
-      case other => throw new Exception(s"Couldn't retrieve input type from $nFunctionType -- $other")
+      case other => None
     }
   }
 
@@ -583,9 +649,9 @@ object TypeChecker {
       _ <- Evaluator.applyFunctionAttempt(uMap, inputObj, env)
 
       resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
-      resultingT <- Evaluator.asType(resultingType, env)
 
-      _ <- Outcome.failWhen(resultingT == UInit, s"Not a valid parameter: $input")
+      // This will (correctly) fail when resultingType == UInit (ie, it's not in params)
+      resultingT <- Evaluator.asType(resultingType, env)
     } yield resultingT
   }
 
@@ -597,9 +663,9 @@ object TypeChecker {
     for {
       inputObj <- Evaluator(input, env)
       resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
-      resultingT <- Evaluator.asType(resultingType, env)
 
-      _ <- Outcome.failWhen(resultingT == UInit, s"Not a valid parameter: $input")
+      // This will (correctly) fail when resultingType == UInit (ie, it's not in params)
+      resultingT <- Evaluator.asType(resultingType, env)
     } yield resultingT
   }
 
