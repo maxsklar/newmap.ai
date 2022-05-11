@@ -55,7 +55,7 @@ case class ForkEnvironmentCommand(
 
 case class ParameterEnvironmentCommand(
   id: String,
-  nType: NewMapType
+  nType: NewMapPattern // Pattern representing a type
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"parameter $id: ${nType}"
@@ -71,7 +71,7 @@ case class ExpOnlyEnvironmentCommand(
 sealed abstract class EnvironmentValue
 
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
-case class EnvironmentParameter(nType: NewMapType) extends EnvironmentValue
+case class EnvironmentParameter(nTypeClass: NewMapPattern) extends EnvironmentValue
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
@@ -92,7 +92,7 @@ case class Environment(
     for ((id, envValue) <- idToObject) {
       val command = envValue match {
         case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
-        case EnvironmentParameter(nType) => ParameterEnvironmentCommand(id, nType)
+        case EnvironmentParameter(nTypeClass) => ParameterEnvironmentCommand(id, nTypeClass)
       }
       builder.append(command.toString)
       builder.append("\n")
@@ -202,10 +202,10 @@ case class Environment(
           storedVersionedTypes = storedVersionedTypes + (key -> current)
         )
       }
-      case ParameterEnvironmentCommand(s, nType) => {
+      case ParameterEnvironmentCommand(s, nTypeClass) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentParameter(nType))
+          idToObject = idToObject + (s -> EnvironmentParameter(nTypeClass))
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
@@ -225,11 +225,15 @@ case class Environment(
 
   // TODO - should we ensure that nType is actually a type?
   def newParam(id: String, nType: NewMapType): Environment = {
-    newCommand(ParameterEnvironmentCommand(id, nType))
+    newCommand(ParameterEnvironmentCommand(id, ObjectPattern(UType(nType))))
+  }
+
+  def newParamTypeClass(id: String, nTypeClass: NewMapPattern): Environment = {
+    newCommand(ParameterEnvironmentCommand(id, nTypeClass))
   }
 
   def newParams(xs: Vector[(String, NewMapType)]) = {
-    newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, x._2)))
+    newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, ObjectPattern(UType(x._2)))))
   }
 }
 
@@ -297,7 +301,7 @@ object Environment {
   def typeAsObject(nType: NewMapType): NewMapObject = TaggedObject(UType(nType), TypeT)
 
   var Base: Environment = Environment().newCommands(Vector(
-    eCommand("Any", typeAsObject(AnyT)),
+    //eCommand("Any", typeAsObject(AnyT)),
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
@@ -331,10 +335,6 @@ object Environment {
     eCommand("GenericIdType", TaggedObject(
       UType(GenericMapT(Vector(WildcardPattern("t") -> ParamId("t")), MapConfig(RequireCompleteness, SimpleFunction))),
       TypeT
-    )),
-    eCommand("GenericId", TaggedObject(
-      UMap(Vector(WildcardPattern("t") -> ParamId("t"))),
-      GenericMapT(Vector(WildcardPattern("t") -> ParamId("t")), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
   ))

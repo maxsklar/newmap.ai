@@ -12,17 +12,6 @@ object RetrieveType {
     }
   }
 
-  def retrieveFeatureSetFromFunctionType(nType: NewMapType, env: Environment): Outcome[MapFeatureSet, String] = {
-    nType match {
-      case MapT(_, _, config) => Success(config.featureSet)
-      case StructT(_, _, _, featureSet, _) => Success(featureSet)
-      case TypeClassT(_, _) => Success(SimpleFunction)
-      case CustomT(_, t) => retrieveFeatureSetFromFunctionType(t, env)
-      case GenericMapT(_, config) => Success(config.featureSet)
-      case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nType")
-    }
-  }
-
   // Ensures that there are no free variables in this term
   // TODO: Return a NewMapObject if this is the case?
   // TODO: This can be handled by a specialized type-checker on NewMapExpression (ripe for removing this code)

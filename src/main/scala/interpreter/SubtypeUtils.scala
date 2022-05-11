@@ -181,7 +181,7 @@ object SubtypeUtils {
   ): Outcome[Vector[NewMapObject], String] = {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(Vector.empty)
-      case (_, AnyT) => Success(Vector.empty)
+      //case (_, AnyT) => Success(Vector.empty)
       case (CountT, TypeT) => Success(Vector.empty)
       case (SubtypeT(isMember, parentType, featureSet), _) => {
         for {
@@ -347,13 +347,9 @@ object SubtypeUtils {
           // TODO - make explicit conversion
           convertedObject = startingObject
 
-          // TODO - this should be unneccesary for when we change isMemberOfSubtype
-          isMemberTagged = TaggedObject(isMember, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, SimpleFunction)))
-
           soUntagged <- Evaluator.removeTypeTag(startingObject)
-
-          checksMembership <- isMemberOfSubtype(soUntagged, isMemberTagged, env)
-          _ <- Outcome.failWhen(!checksMembership, s"Not member of subtype: $startingObject, $endingType")
+          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, soUntagged, env)
+          _ <- Outcome.failWhen(membershipCheck == UInit, s"Not member of subtype: $startingObject, $endingType")
         } yield {
           convertInstructions
         }
@@ -385,37 +381,8 @@ object SubtypeUtils {
     }
   }
 
-  // Returns true if nObject is a member of a SubtypeT by its isMember Function
-  // - assuming that it's already a member of the parent type
-  def isMemberOfSubtype(
-    nObjectUntagged: UntaggedObject,
-    isMember: NewMapObject,
-    env: Environment
-  ): Outcome[Boolean, String] = {
-    for {
-      isMemberUntagged <- Evaluator.removeTypeTag(isMember)
-      result <- Evaluator.applyFunctionAttempt(isMemberUntagged, nObjectUntagged, env)
-    } yield result != UInit
-  }
-
   // In the future - replace this with a type class (implementing equals)
   def checkEqual(a: UntaggedObject, b: UntaggedObject): Boolean = {
     a == b
-  }
-
-  def allMembersOfSubtype(
-    nObjects: Vector[UntaggedObject],
-    nSubtype: NewMapObject,
-    env: Environment
-  ): Outcome[Boolean, String] = {
-    nObjects match {
-      case nObject +: restOfUObjects => {
-        for {
-          isIt <- isMemberOfSubtype(nObject, nSubtype, env)
-          result <- if (isIt) allMembersOfSubtype(restOfUObjects, nSubtype, env) else Success(false)
-        } yield result
-      }
-      case _ => Success(true)
-    }
   }
 }

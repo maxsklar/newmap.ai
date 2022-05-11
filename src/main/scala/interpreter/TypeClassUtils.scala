@@ -7,24 +7,43 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object TypeClassUtils {
   def typeIsExpectingAnIdentifier(
     nType: NewMapType,
+    s: String,
     env: Environment
-  ): Boolean = nType match {
-    case IdentifierT => true
-    case CustomT(_, t) => typeIsExpectingAnIdentifier(t, env)
-    case SubtypeT(_, parentType, _) => typeIsExpectingAnIdentifier(parentType, env)
-    case _ => false
+  ): Outcome[Unit, String] = nType match {
+    case IdentifierT => Success()
+    case CustomT(_, t) => typeIsExpectingAnIdentifier(t, s, env)
+    case SubtypeT(isMember, parentType, _) => {
+      for {
+        _ <- typeIsExpectingAnIdentifier(parentType, s, env)
+        membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIdentifier(s), env)
+        _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $s not a member of subtype $nType")
+      } yield ()
+    }
+    case _ => {
+      Failure(s"Type couldn't accept identifier $s as value: $nType")
+    }
   }
 
   def typeIsExpectingAnIndex(
     nType: NewMapType,
+    i: Long,
     env: Environment
-  ): Boolean = nType match {
-    case TypeT => true
-    case CountT => true
-    case IndexT(_) => true // with condition
-    case CustomT(_, t) => typeIsExpectingAnIndex(t, env)
-    case SubtypeT(_, parentType, _) => typeIsExpectingAnIndex(parentType, env)
-    case _ => false
+  ): Outcome[Unit, String] = nType match {
+    case TypeT => Success()
+    case CountT => Success()
+    case OrBooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
+    case IndexT(j) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
+    case CustomT(_, t) => typeIsExpectingAnIndex(t, i, env)
+    case SubtypeT(isMember, parentType, _) => {
+      for {
+        _ <- typeIsExpectingAnIndex(parentType, i, env)
+        membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIndex(i), env)
+        _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $i not a member of subtype $nType")
+      } yield ()
+    }
+    case _ => {
+      Failure(s"Type couldn't accept index $i as value: $nType")
+    }
   }
 
   def intersectTypeClasses(
@@ -43,6 +62,61 @@ object TypeClassUtils {
     }
 
     retVal
+  }
+
+  // Return conversion instructions
+  def isTypeConvertibleToPattern(
+    startingType: NewMapType,
+    endingTypePattern: NewMapPattern,
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = {
+    endingTypePattern match {
+      case ObjectPattern(UType(endingType)) => {
+        SubtypeUtils.isTypeConvertible(startingType, endingType, env)
+      }
+      case WildcardPattern(_) => {
+        Success(Vector.empty)
+      }
+      case _ => {
+        Failure(s"Unimplemented isTypeConvertibleToPattern: $startingType --> $endingTypePattern")
+      }
+    }
+  }
+
+  def isPatternConvertibleToPattern(
+    startingTypePattern: NewMapPattern,
+    endingTypePattern: NewMapPattern,
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = {
+    startingTypePattern match {
+      case ObjectPattern(UType(startingType)) => {
+        isTypeConvertibleToPattern(startingType, endingTypePattern, env)
+      }
+      case _ => {
+        endingTypePattern match {
+          case WildcardPattern(_) => Success(Vector.empty)
+          case _ => Failure(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
+        }
+      }
+    }
+  }
+
+  def isObjectConvertibleToPattern(
+    startingObject: NewMapObject,
+    endingTypePattern: NewMapPattern,
+    env: Environment
+  ): Outcome[Vector[NewMapObject], String] = {
+    endingTypePattern match {
+      case ObjectPattern(UType(endingType)) => {
+        SubtypeUtils.isObjectConvertibleToType(startingObject, endingType, env)
+      }
+      case WildcardPattern(_) => {
+        Success(Vector.empty)
+      }
+      case _ => {
+        Failure(s"Unimplemented isObjectConvertibleToPattern: $startingObject --> $endingTypePattern")
+      }
+    }
   }
 
   def intersectTypeClassPatterns(

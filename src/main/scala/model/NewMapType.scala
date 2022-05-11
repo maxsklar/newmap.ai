@@ -22,7 +22,7 @@ case object OrBooleanT extends NewMapType
 //  that will be a subtype of type object
 case object TypeT extends NewMapType
 
-case object AnyT extends NewMapType
+//case object AnyT extends NewMapType
 
 // Todo - replace with "user defined type" in prelude
 case object IdentifierT extends NewMapType

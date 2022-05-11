@@ -293,8 +293,6 @@ object Evaluator {
           result <- patternMatchOnStruct(params, inputs, env)
         } yield result 
       }
-      // TODO - since input is going to be a literal, do we actually need to call isMemberOfSubtype, or can we
-      //  just call the function??
       case (WildcardPattern(name), _) => {
         Success(Map(name -> input))
       }
@@ -364,13 +362,6 @@ object Evaluator {
     uObject match {
       case ULink(key) => removeTypeTag(currentState(key.uuid, env).toOption.get).toOption.get
       case _ => uObject
-    }
-  }
-
-  def stripCustomTag(nType: NewMapType): NewMapType = {
-    nType match {
-      case CustomT(_, t) => t
-      case _ => nType
     }
   }
 

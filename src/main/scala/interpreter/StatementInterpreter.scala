@@ -21,15 +21,15 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
-          nTypeObj <- Evaluator(tcType, env)
+          tcType <- TypeChecker.typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          nTypeObj <- Evaluator(tcType.nExpression, env)
 
           nType <- Evaluator.asType(nTypeObj, env)
-          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
-          evaluatedObject <- Evaluator(tc, env)
+          tc <- TypeChecker.typeCheck(objExpression, ObjectPattern(UType(nType)), env, FullFunction)
+          evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
 
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, ObjectPattern(UType(nType)), env)
         } yield {
           val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
@@ -37,8 +37,8 @@ object StatementInterpreter {
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
-          nTypeObj <- Evaluator(tcType, env)
+          tcType <- typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
           // TODO: Maybe a special error message if this is not a command type
@@ -51,8 +51,8 @@ object StatementInterpreter {
       }
       case NewTypeStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
-          nTypeObj <- Evaluator(tcType, env)
+          tcType <- typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
           val command = NewTypeCommand(id.s, nType)
@@ -85,9 +85,9 @@ object StatementInterpreter {
             CommandMaps.getCommandInputOfCommandType(nType, env)
           }
 
-          commandExp <- typeCheck(command, inputT, env, FullFunction)
+          commandExp <- typeCheck(command, ObjectPattern(UType(inputT)), env, FullFunction)
 
-          commandObj <- Evaluator(commandExp, env)
+          commandObj <- Evaluator(commandExp.nExpression, env)
         } yield {
           val command = ApplyIndividualCommand(id.s, commandObj)
           Response(Vector(command), command.toString)
@@ -100,8 +100,8 @@ object StatementInterpreter {
         for {
           // TODO - we need a type inference here!!
           tc <- TypeChecker.typeCheckUnknownType(objExpression, env)
-          evaluatedObject <- Evaluator(tc._1, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc._2, env)
+          evaluatedObject <- Evaluator(tc.nExpression, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc.refinedTypeClass, env)
         } yield {
           val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
@@ -111,9 +111,9 @@ object StatementInterpreter {
         for {
           // TODO - we need a type inference here!!
           tc <- TypeChecker.typeCheckUnknownType(exp, env)
-          evaluatedObject <- Evaluator(tc._1, env)
+          evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, tc._2, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, tc.refinedTypeClass, env)
         } yield {
           val command = ExpOnlyEnvironmentCommand(nObject)
           Response(Vector(command), command.toString)

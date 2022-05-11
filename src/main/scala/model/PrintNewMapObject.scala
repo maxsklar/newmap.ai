@@ -21,8 +21,7 @@ object PrintNewMapObject {
     case IndexT(i) => i.toString
     case CustomT(uuid, nType) => s"Type:$uuid:${newMapType(nType)}"
     case TypeT => s"Type"
-    //case DataTypeT(x) => s"DataType[$x]"
-    case AnyT => s"Any"
+    //case AnyT => s"Any"
     case IdentifierT => "Identifier"
     case OrBooleanT => "OrBooleanT"
     case MapT(key, value, config) => {

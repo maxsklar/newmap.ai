@@ -374,15 +374,22 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be usable" in {
     testCodeScript(Vector(
       CodeExpectation("val id: (Any => Any) = (t: t)", GeneralSuccessCheck),
-      CodeExpectation("id ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), AnyT)))),
-      CodeExpectation("id 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), AnyT)))),
+      CodeExpectation("id ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), IdentifierT)))),
+      CodeExpectation("id 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
       CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),
       CodeExpectation("m (id 5)", FailureCheck)
     ))
   }
 
-  "Generic Identity Function " should " work" in {
+  "Generic Identity Function " should " be implemented from its type" in {
     testCodeScript(Vector(
+      CodeExpectation("val gid: GenericIdType = (t: t)", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " work" in {
+    testCodeScript(Vector(
+      CodeExpectation("val GenericId: GenericIdType = (t: t)", GeneralSuccessCheck),
       CodeExpectation("GenericId ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), IdentifierT)))),
       CodeExpectation("GenericId 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
       CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),
@@ -489,6 +496,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " not be allowed to call a full function map" in {
     testCodeScript(Vector(
+      CodeExpectation("ReqMap(Any, 2)", GeneralSuccessCheck),
       CodeExpectation("val m: ReqMap(Any, 2) = ((y: (Any => 2)): y 5, _: 0)", FailureCheck)
     ))
   }
