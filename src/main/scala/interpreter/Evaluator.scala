@@ -245,6 +245,7 @@ object Evaluator {
         }
       }
       case _ => {
+        //throw new Exception(s"Not implemented: apply function\nFunction: $func\nInput: $input")
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
       }
     }

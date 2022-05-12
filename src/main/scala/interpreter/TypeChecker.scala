@@ -267,32 +267,15 @@ object TypeChecker {
     env: Environment,
     externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
-    values match {
-      case BindingCommandItem(k, v) +: restOfValues => {
-        for {
-          resultKey <- typeCheckWithPatternMatching(k, ObjectPattern(UType(keyType)), env, externalFeatureSet, internalFeatureSet)
-          
-          foundKeyPattern = resultKey.typeCheckResult
+    val typeTransform = Vector(ObjectPattern(UType(keyType)) -> ObjectExpression(UType(valueType)))
 
-          // Now we want to type check the object, but we have to tell it what kind of map we're in
-          //  in order to ensure that the right features are being used
-          objectFoundValue <- typeCheck(
-            v,
-            ObjectPattern(UType(valueType)),
-            resultKey.newEnvironment,
-            featureSet = internalFeatureSet
-          )
-
-          restOfMap <- typeCheckMap(restOfValues, keyType, valueType, internalFeatureSet, env, externalFeatureSet)
-        } yield {
-          (foundKeyPattern -> objectFoundValue.nExpression) +: restOfMap
-        }
-      }
-      case s +: _ => {
-        Failure(s"No binding found in map for item $s in $values")
-      }
-      case _ => Success(Vector.empty)
-    }
+    typeCheckGenericMap(
+      values,
+      typeTransform,
+      internalFeatureSet,
+      env,
+      externalFeatureSet
+    )
   }
 
   def typeCheckSequence(
@@ -336,7 +319,7 @@ object TypeChecker {
           
           foundKeyPattern = resultKey.typeCheckResult
 
-          valueTypePattern = getValueTypePattern(foundKeyPattern, typeTransform, env)
+          valueTypePattern <- getValueTypePattern(resultKey.expectedTypeRefinement, typeTransform, env)
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
           //  in order to ensure that the right features are being used
@@ -349,7 +332,7 @@ object TypeChecker {
 
           restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, internalFeatureSet, env, externalFeatureSet)
         } yield {
-          (foundKeyPattern -> objectFoundValue.nExpression) +: restOfMap
+          (resultKey.typeCheckResult -> objectFoundValue.nExpression) +: restOfMap
         }
       }
       case s +: _ => {
@@ -363,13 +346,24 @@ object TypeChecker {
     foundKeyPattern: NewMapPattern,
     typeTransform: Vector[(NewMapPattern, NewMapExpression)],
     env: Environment
-  ): NewMapPattern = {
-    // TODO - needs a better implementation!!
-    WildcardPattern("_")
+  ): Outcome[NewMapPattern, String] = {
+    foundKeyPattern match {
+      case ObjectPattern(UType(t)) => {
+        for {
+          result <- Evaluator.applyFunctionAttempt(UMap(typeTransform), UType(t), env)
+          _ <- Evaluator.asType(result, env)
+        } yield ObjectPattern(result)
+      }
+      case _ => {
+        // TODO - needs a better implementation!!
+        Success(WildcardPattern("_"))
+      }
+    }
   }
 
   case class TypeCheckWithPatternMatchingResult(
     typeCheckResult: NewMapPattern,
+    expectedTypeRefinement: NewMapPattern,
     newEnvironment: Environment // TODO: can this be grabbed from the pattern above??
   )
 
@@ -386,7 +380,7 @@ object TypeChecker {
     (expression, stripCustomTag(expectedType)) match {
       case (IdentifierParse(s, false), _) if (patternMatchingAllowed /*&& !parentTypeIsIdentifier*/) => {
         Success(
-          TypeCheckWithPatternMatchingResult(WildcardPattern(s), env.newParamTypeClass(s, expectedType))
+          TypeCheckWithPatternMatchingResult(WildcardPattern(s), expectedType, env.newParamTypeClass(s, expectedType))
         )
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
@@ -394,7 +388,7 @@ object TypeChecker {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {
-          TypeCheckWithPatternMatchingResult(StructPattern(tcmp.patterns), tcmp.newEnvironment)
+          TypeCheckWithPatternMatchingResult(StructPattern(tcmp.patterns), expectedType, tcmp.newEnvironment)
         }
       }
       case (ConstructCaseParse(constructorP, input), ObjectPattern(UType(CaseT(cases, parentFieldType, _, _)))) if (patternMatchingAllowed) => {
@@ -411,6 +405,7 @@ object TypeChecker {
         } yield {
           TypeCheckWithPatternMatchingResult(
             CasePattern(constructor, result.typeCheckResult),
+            expectedType,
             result.newEnvironment
           )
         }
@@ -420,7 +415,7 @@ object TypeChecker {
           tc <- typeCheck(expression, expectedType, env, externalFeatureSet)
           tcObj <- Evaluator(tc.nExpression, env)
         } yield {
-          TypeCheckWithPatternMatchingResult(ObjectPattern(tcObj), env)
+          TypeCheckWithPatternMatchingResult(ObjectPattern(tcObj), expectedType, env)
         }
       }
     }

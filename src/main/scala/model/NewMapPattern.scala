@@ -21,6 +21,12 @@ case class CasePattern(
   input: NewMapPattern
 ) extends NewMapPattern
 
+/*case class MapTPattern(
+  keyType: NewMapPattern,
+  valueType: NewMapPattern,
+  config: MapConfig
+) extends NewMapPattern*/
+
 // Type Patterns
 
 // Match if I am dealing with an index type

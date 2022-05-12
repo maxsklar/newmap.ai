@@ -265,7 +265,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }*/
 
   // TODO: Return to this when there is better tooling!
-  /*"A generic option case " should " be callable without naming it" in {
+  /*it should " be callable without naming it" in {
     testCodeScript(Vector(
       CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
       CodeExpectation("val x: Option Count = (Option Count).None 0", GeneralSuccessCheck),
@@ -494,6 +494,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  // These should be reserved for recursive maps
   it should " not be allowed to call a full function map" in {
     testCodeScript(Vector(
       CodeExpectation("ReqMap(Any, 2)", GeneralSuccessCheck),
