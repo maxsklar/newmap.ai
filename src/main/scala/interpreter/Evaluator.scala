@@ -49,6 +49,18 @@ object Evaluator {
           UType(MapT(inputT, outputT, config))
         }
       }
+      case BuildGenericMapT(typeTransform, config) => {
+        for {
+          evalTypeTransform <- this(typeTransform, env)
+
+          evalTypeTransformM <- evalTypeTransform match {
+            case UMap(m) => Success(m)
+            case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
+          }
+        } yield {
+          UType(GenericMapT(evalTypeTransformM, config))
+        }
+      }
       case BuildTableT(keyType, requiredValues) => {
         for {
           evalKeyType <- this(keyType, env)

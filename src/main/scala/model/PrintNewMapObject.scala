@@ -54,6 +54,9 @@ object PrintNewMapObject {
     case BuildMapT(inputType, outputType, config) => {
       printMapT(printExpression(inputType), printExpression(outputType), config)
     }
+    case BuildGenericMapT(typeTransform, config) => {
+      s"Generic(${printExpression(typeTransform)})"
+    }
     case BuildTableT(expandingKeyType, requiredValues) => {
       val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
       s"Table(${mapTString})"

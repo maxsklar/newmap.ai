@@ -359,37 +359,22 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   // val y: T = (asdf) x
   // We should be able to infer that whatever is in "asdf" is of type S -> T
 
-
-  // REDO these tests when we have type inference
-  "Universal identity function " should " have a valid type signature" in {
-    val line = "val u: Type = Any => Any"
-    testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
-  }
-
-  it should " be creatable" in {
-    val line = "val id: Any => Any = (x: x)"
-    testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
-  }
-
-  it should " be usable" in {
+  "Generic Identity Function " should " have a valid type signature" in {
     testCodeScript(Vector(
-      CodeExpectation("val id: (Any => Any) = (t: t)", GeneralSuccessCheck),
-      CodeExpectation("id ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), IdentifierT)))),
-      CodeExpectation("id 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
-      CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),
-      CodeExpectation("m (id 5)", FailureCheck)
+      CodeExpectation("val GenericIdType: Type = GenericMap(t: t)", GeneralSuccessCheck)
     ))
   }
 
-  "Generic Identity Function " should " be implemented from its type" in {
+  it should " be creatable from its type" in {
     testCodeScript(Vector(
+      CodeExpectation("val GenericIdType: Type = GenericMap(t: t)", GeneralSuccessCheck),
       CodeExpectation("val gid: GenericIdType = (t: t)", GeneralSuccessCheck)
     ))
   }
 
   it should " work" in {
     testCodeScript(Vector(
-      CodeExpectation("val GenericId: GenericIdType = (t: t)", GeneralSuccessCheck),
+      CodeExpectation("val GenericId: GenericMap(t: t) = (t: t)", GeneralSuccessCheck),
       CodeExpectation("GenericId ~hi", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIdentifier("hi"), IdentifierT)))),
       CodeExpectation("GenericId 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
       CodeExpectation("val m: Map(5, 2) = (0: 1, 3: 1)", GeneralSuccessCheck),

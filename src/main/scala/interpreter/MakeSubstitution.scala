@@ -39,15 +39,15 @@ object MakeSubstitution {
           config
         )
       }
+      case BuildGenericMapT(typeTransform, config) => {
+        BuildGenericMapT(this(typeTransform, parameters, env), config)
+      }
       case BuildTableT(keyType, requiredValues) => {
         BuildTableT(
           this(keyType, parameters, env),
           this(requiredValues, parameters, env)
         )
       }
-      /*case BuildExpandingSubsetT(parentType, allowPattern) => {
-        BuildExpandingSubsetT(this(parentType, parameters, env), allowPattern)
-      }*/
       case BuildSubtypeT(isMember, parentType, featureSet) => {
         BuildSubtypeT(this(isMember, parameters, env), this(parentType, parameters, env), featureSet)
       }

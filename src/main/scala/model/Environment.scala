@@ -319,6 +319,14 @@ object Environment {
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
       BuildMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap))
     )),
+    eCommand("GenericMap", TaggedObject(
+      UMap(Vector(WildcardPattern("typeTransform") -> BuildGenericMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction)))),
+      MapT(
+        MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
+        TypeT,
+        MapConfig(RequireCompleteness, SimpleFunction)
+      )
+    )),
     eCommand("ReqMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction))
@@ -331,10 +339,6 @@ object Environment {
     eCommand("Subtype", TaggedObject(
       UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
-    )),
-    eCommand("GenericIdType", TaggedObject(
-      UType(GenericMapT(Vector(WildcardPattern("t") -> ParamId("t")), MapConfig(RequireCompleteness, SimpleFunction))),
-      TypeT
     )),
     NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
   ))

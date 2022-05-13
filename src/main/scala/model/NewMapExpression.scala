@@ -26,6 +26,11 @@ case class BuildMapT(
   config: MapConfig
 ) extends NewMapExpression
 
+case class BuildGenericMapT(
+  typeTransform: NewMapExpression,
+  config: MapConfig
+) extends NewMapExpression
+
 case class BuildTableT(
   expandingKeyType: NewMapExpression,
   requiredValues: NewMapExpression

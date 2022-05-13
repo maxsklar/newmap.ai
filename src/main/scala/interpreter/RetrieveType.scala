@@ -31,6 +31,7 @@ object RetrieveType {
       isTermClosedLiteral(inputType, knownVariables) &&
         isTermClosedLiteral(outputType, knownVariables)
     }
+    case BuildGenericMapT(typeTransform, config) => isTermClosedLiteral(typeTransform, knownVariables)
     case BuildTableT(keyType, requiredValues) => {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }

@@ -268,14 +268,7 @@ object TypeChecker {
     externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
   ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
     val typeTransform = Vector(ObjectPattern(UType(keyType)) -> ObjectExpression(UType(valueType)))
-
-    typeCheckGenericMap(
-      values,
-      typeTransform,
-      internalFeatureSet,
-      env,
-      externalFeatureSet
-    )
+    typeCheckGenericMap(values, typeTransform, internalFeatureSet, env, externalFeatureSet)
   }
 
   def typeCheckSequence(
