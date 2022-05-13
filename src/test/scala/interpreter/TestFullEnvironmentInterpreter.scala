@@ -393,6 +393,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be able to include exceptions" in {
+    testCodeScript(Vector(
+      CodeExpectation("val constantCount: GenericMap(t: Count) = (0: 100, ~yo: 1, x: 5)", GeneralSuccessCheck),
+      CodeExpectation("constantCount 10", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+      CodeExpectation("constantCount ~hello", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+      CodeExpectation("constantCount 0", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(100), CountT)))),
+      CodeExpectation("constantCount ~yo", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(1), CountT))))
+    ))
+  }
+
   "Variable Substitution " should " work" in {
     testCodeScript(Vector(
       CodeExpectation("val id5: ReqMap(5, 5) = (t: t)", GeneralSuccessCheck),
