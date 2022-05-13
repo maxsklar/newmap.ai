@@ -385,6 +385,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Generic Constant Function " should " be creatable" in {
+    testCodeScript(Vector(
+      CodeExpectation("val constantCount: GenericMap(t: Count) = (x: 5)", GeneralSuccessCheck),
+      CodeExpectation("constantCount 10", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+      CodeExpectation("constantCount ~hello", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT))))
+    ))
+  }
+
   "Variable Substitution " should " work" in {
     testCodeScript(Vector(
       CodeExpectation("val id5: ReqMap(5, 5) = (t: t)", GeneralSuccessCheck),
