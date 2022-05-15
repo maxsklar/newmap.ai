@@ -821,25 +821,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * 
    * 
    * 
-  
-
-  More about CaseType:
-  Starts with Case()
-  The inputs are keys, n
-  This means there is 1 ReqMap:
-    ReqMap(n, Identifier)
-  (It also should preserve equality)
-
-  Then theres a ReqMap(n, Type) which gives an input type
-  - The input type could be anything
-  - Starts out as unit
-    - Maybe new Struct (where you can add a field)
-
-  How does Bool get saved?
-  - Just have direct names as entries (makes storing these things less dependant on uuid choice)
-  - It's stored in a standard "prelude" document that everything should be based upon
-  - True and False constructors also stored in the prelude.
-
   Equality preserving Maps.. can these exist?
   -> First there needs to be an equality function (a == b)
   -> Can equality function this be built?
@@ -853,7 +834,5 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   Equals function (a == b) requires some form of generics?
   UGHH!!!
   We can skip this for now?
-
-
   */
 }
