@@ -253,30 +253,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "A generic option case " should " be possible" in {
-    testCodeScript(Vector(
-      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
-      CodeExpectation("val maybeSix = Option.6", GeneralSuccessCheck),
-      CodeExpectation("val x: maybeSix = None.()", GeneralSuccessCheck),
-      CodeExpectation("val y: maybeSix = Some.1", GeneralSuccessCheck),
-      CodeExpectation("val y: maybeSix = Some.10", FailureCheck),
-      CodeExpectation("val z: maybeSix = None.3", FailureCheck),
-    ))
-  }
-
-  it should " be callable without naming it" in {
-    testCodeScript(Vector(
-      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
-      CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
-      CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
-      CodeExpectation("val z: Option.Count = None.0", FailureCheck),
-    ))
-  }
-
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = Environment.eCommand(
       "f",
@@ -681,12 +657,58 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Defining a non-generic linked list " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update ListOfCounts (Nil, ())", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
-      CodeExpectation("val a: ListOfCounts = Nil.()", GeneralSuccessCheck),
+      CodeExpectation("val a: ListOfCounts = Empty.()", GeneralSuccessCheck),
       CodeExpectation("val b: ListOfCounts = Node.(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: ListOfCounts = Node.(1, b)", GeneralSuccessCheck),
       CodeExpectation("val b2: ListOfCounts = Node.(3, a)", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " be allowed to be equipted with a recursive length function" in {
+    testCodeScript(Vector(
+      CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
+      CodeExpectation("val length: (ListOfCounts => Count) = (Empty._: 0, Node.(head, tail): Increment (length(tail)))", GeneralSuccessCheck),
+      // Include examples to test the length function
+    ))
+  }
+
+  "A generic option case " should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("val maybeSix = Option.6", GeneralSuccessCheck),
+      CodeExpectation("val x: maybeSix = None.()", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = Some.1", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = Some.10", FailureCheck),
+      CodeExpectation("val z: maybeSix = None.3", FailureCheck),
+    ))
+  }
+
+  it should " be callable without naming it" in {
+    testCodeScript(Vector(
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
+      CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
+      CodeExpectation("val z: Option.Count = None.0", FailureCheck),
+    ))
+  }
+
+  "A generic LinkedList case " should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("data List (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update List (Empty, ())", GeneralSuccessCheck),
+      CodeExpectation("update List (Node, (head: T, tail: List.T))", GeneralSuccessCheck),
+      CodeExpectation("val a: List.Count = Empty.()", GeneralSuccessCheck),
+      CodeExpectation("val b: List.Count = Node.(5, a)", GeneralSuccessCheck),
+      CodeExpectation("val c: List.Count = Node.(1, b)", GeneralSuccessCheck),
+      CodeExpectation("val b2: List.Count = Node.(3, a)", GeneralSuccessCheck)
     ))
   }
 
