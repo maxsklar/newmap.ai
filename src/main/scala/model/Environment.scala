@@ -35,6 +35,15 @@ case class NewTypeCommand(
   }
 }
 
+case class NewParamTypeCommand(
+  id: String,
+  nObject: NewMapObject
+) extends EnvironmentCommand {
+  override def toString: String = {
+    s"data $id = ${nObject}"
+  }
+}
+
 case class ApplyIndividualCommand(
   id: String,
   nObject: UntaggedObject
@@ -126,7 +135,7 @@ case class Environment(
 
         val initValue = defaultOutcome.toOption.get
         val key = VersionedObjectKey(0L, uuid)
-        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val versionedObject = VersionedObjectLink(key)
         val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
@@ -139,7 +148,7 @@ case class Environment(
       case NewTypeCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
         val key = VersionedObjectKey(0L, uuid)
-        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val versionedObject = VersionedObjectLink(key)
         val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
@@ -147,6 +156,19 @@ case class Environment(
           idToObject = idToObject + (s -> envValue),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
           storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(UType(CustomT(uuid, nType)), TypeT))
+        )
+      }
+      case NewParamTypeCommand(id, nObject) => {
+        val uuid = java.util.UUID.randomUUID
+        val key = VersionedObjectKey(0L, uuid)
+        val versionedObject = VersionedObjectLink(key)
+        val envValue = EnvironmentBinding(versionedObject)
+
+        this.copy(
+          commands = newCommands,
+          idToObject = idToObject + (id -> envValue),
+          latestVersionNumber = latestVersionNumber + (uuid -> 0L),
+          storedVersionedTypes = storedVersionedTypes + (key -> nObject)
         )
       }
       case ApplyIndividualCommand(s, command) => {
@@ -164,7 +186,12 @@ case class Environment(
               // - This will allow us to convert objects from one type to another - needs to be stored in the environment!
             } yield TaggedObject(UType(response.newType), TypeT)
           } else {
-            CommandMaps.updateVersionedObject(currentState, command, this)
+            currentState match {
+              case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
+                CommandMaps.expandParametrizedCaseType(currentState, command, this.newParams(parameters))
+              }
+              case _ => CommandMaps.updateVersionedObject(currentState, command, this)
+            }
           }
         } yield {
           val newUuid = versionLink.key.uuid
@@ -176,7 +203,7 @@ case class Environment(
 
           this.copy(
             commands = newCommands,
-            idToObject = idToObject + (s -> EnvironmentBinding(VersionedObjectLink(newKey, KeepUpToDate))),
+            idToObject = idToObject + (s -> EnvironmentBinding(VersionedObjectLink(newKey))),
             latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
             storedVersionedTypes = newStoredVTypes
           )
@@ -192,7 +219,7 @@ case class Environment(
         val version = Evaluator.latestVersion(vObject.key.uuid, this).toOption.get
         val current = Evaluator.currentState(vObject.key.uuid, this).toOption.get
         val key = VersionedObjectKey(version, uuid)
-        val versionedObject = VersionedObjectLink(key, KeepUpToDate)
+        val versionedObject = VersionedObjectLink(key)
         val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
@@ -310,7 +337,7 @@ object Environment {
       IsCommandFunc,
       MapT(TypeT, IndexT(2), MapConfig(CommandOutput, SimpleFunction))
     )),
-    eCommand("OrBoolean", typeAsObject(OrBooleanT)),
+    eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", TaggedObject(
       UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(UIndex(0)), ParamId("key")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
@@ -335,7 +362,15 @@ object Environment {
       Vector("key" -> TypeT, "value" -> TypeT),
       BuildTableT(ParamId("key"), ParamId("value"))
     )),
-    eCommand("CaseType", TaggedObject(UType(CaseT(Vector.empty, IdentifierT, BasicMap, Vector.empty)), TypeT)),
+    eCommand("CaseType", TaggedObject(UType(CaseT(Vector.empty, IdentifierT, BasicMap)), TypeT)),
+    eCommand("ParametrizedCaseType", TaggedObject(
+      UParametrizedCaseT(Vector.empty, CaseT(Vector.empty, IdentifierT)),
+      MapT(
+        NewMapO.emptyStruct,
+        TypeT,
+        MapConfig(RequireCompleteness, SimpleFunction)
+      )
+    )),
     eCommand("Subtype", TaggedObject(
       UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))

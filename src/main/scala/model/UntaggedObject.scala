@@ -28,6 +28,13 @@ case class UType(nType: NewMapType) extends UntaggedObject
 case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
 
+// Note this is actually an UntaggedObject with type MapT(??, TypeT, RequireCompleteness, SimpleFunction)
+// But it's really more associated with being a type
+case class UParametrizedCaseT(
+  parameters: Vector[(String, NewMapType)],
+  caseT: CaseT // This must be an expression because it has parameters
+) extends UntaggedObject
+
 // Built in functions
 
 // This takes as input a member of TypeT and returns true if it's a member

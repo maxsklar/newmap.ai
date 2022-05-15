@@ -26,7 +26,9 @@ object CommandMaps {
             case Success(s) => Success(s)
             case Failure(f) => Failure(f.toString)
           }
-        } yield result
+
+          uObject <- Evaluator(result, env)
+        } yield uObject
       }
       case _ => {
         Failure("_default doesn't exist yet")
@@ -58,7 +60,7 @@ object CommandMaps {
           Failure(s"Can't start off map with key subtype $m")
         } 
       }
-      case UType(StructT(params, _, CommandOutput, _, _)) => {
+      case UType(StructT(params, _, CommandOutput, _)) => {
         Success(defaultUMap)
       }
       case UType(TypeClassT(typeTransform, typesInTypeClass)) if (typesInTypeClass.isEmpty) => {
@@ -70,13 +72,24 @@ object CommandMaps {
     }
   }
 
+  // UParametrizedCaseT is a little different, so we hardcode the input differently
+  def expandParametrizedCaseTInput(currentState: UParametrizedCaseT, env: Environment) = {
+    Success(StructT(
+      Vector(
+        ObjectPattern(UIndex(0)) -> ObjectExpression(UType(currentState.caseT.fieldParentType)),
+        ObjectPattern(UIndex(1)) -> ObjectExpression(UType(TypeT))
+      ),
+      IndexT(2)
+    ))
+  }
+
   // Shouldn't this be called expand type?
   def getTypeExpansionCommandInput(
     nType: NewMapType
   ): Outcome[NewMapType, String] = {
     nType match {
       case IndexT(i) => Success(NewMapO.emptyStruct) // Where to insert the new value?
-      case CaseT(cases, parentType, featureSet, typeParameters) => {
+      case CaseT(cases, parentType, featureSet) => {
         Success(StructT(
           Vector(
             ObjectPattern(UIndex(0)) -> ObjectExpression(UType(parentType)),
@@ -85,7 +98,7 @@ object CommandMaps {
           IndexT(2)
         ))
       }
-      case StructT(cases, parentType, _, featureSet, typeParameters) => {
+      case StructT(cases, parentType, _, featureSet) => {
         Success(StructT(
           Vector(
             ObjectPattern(UIndex(0)) -> ObjectExpression(UType(parentType)),
@@ -119,12 +132,12 @@ object CommandMaps {
         val newType = IndexT(i + 1)
         Success(ExpandKeyResponse(IndexT(i + 1), Some(ObjectPattern(UIndex(i))), untaggedIdentity))
       }
-      case CaseT(cases, parentType, featureSet, typeParameters) => {
+      case CaseT(cases, parentType, featureSet) => {
         val uConstructors = cases.map(x => x._1 -> ObjectExpression(UIndex(1)))
         val constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
         val caseMap = TaggedObject(UMap(cases), MapT(constructorsSubtype, TypeT, MapConfig(RequireCompleteness, BasicMap)))
 
-        for{
+        for {
           newCaseMap <- updateVersionedObject(caseMap, command, env)
           untaggedNewCaseMap <- Evaluator.removeTypeTag(newCaseMap)
 
@@ -133,7 +146,7 @@ object CommandMaps {
           untaggedNewCaseMap match {
             case UMap(newCases) => {
               ExpandKeyResponse(
-                CaseT(newCases, parentType, featureSet, typeParameters),
+                CaseT(newCases, parentType, featureSet),
                 Some(CasePattern(newCaseName, WildcardPattern("_"))),
                 untaggedIdentity
               )
@@ -142,11 +155,10 @@ object CommandMaps {
               throw new Exception("This shouldn't happen!!")
             }
           }
-
         }
       }
       case SubtypeT(isMember, parentType, featureSet) => {
-        val isMemberMap = TaggedObject(isMember, MapT(parentType, OrBooleanT, MapConfig(CommandOutput, BasicMap)))
+        val isMemberMap = TaggedObject(isMember, MapT(parentType, BooleanT, MapConfig(CommandOutput, BasicMap)))
 
         val adjustedCommand = UMap(Vector(
           ObjectPattern(UIndex(0)) -> ObjectExpression(command),
@@ -186,6 +198,41 @@ object CommandMaps {
     }
   }
 
+  def expandParametrizedCaseType(
+    current: NewMapObject,
+    command: UntaggedObject,
+    env: Environment
+  ): Outcome[NewMapObject, String] = {
+    current match {
+      case TaggedObject(UParametrizedCaseT(parameters, caseT), mapT) => {
+        val uConstructors = caseT.cases.map(x => x._1 -> ObjectExpression(UIndex(1)))
+        val constructorsSubtype = SubtypeT(UMap(uConstructors), caseT.fieldParentType, caseT.featureSet)
+        val caseMap = TaggedObject(UMap(caseT.cases), MapT(constructorsSubtype, TypeT, MapConfig(RequireCompleteness, BasicMap)))
+
+        for{
+          newCaseMap <- updateVersionedObject(caseMap, command, env)
+          untaggedNewCaseMap <- Evaluator.removeTypeTag(newCaseMap)
+          newCaseName <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+        } yield {
+          untaggedNewCaseMap match {
+            case UMap(newCases) => {
+              TaggedObject(
+                UParametrizedCaseT(parameters, caseT.copy(cases = newCases)),
+                mapT
+              )
+            }
+            case _ => {
+              throw new Exception("This shouldn't happen!!")
+            }
+          }
+        }
+      }
+      case _ => {
+        Failure(s"Expected ParametrizedCaseT, got $current")
+      }
+    }
+  }
+
   def getCommandInputOfCommandType(
     nType: NewMapType,
     env: Environment
@@ -194,7 +241,7 @@ object CommandMaps {
       case CountT => Success(
         NewMapO.emptyStruct
       )
-      case OrBooleanT => Success(IndexT(2))
+      case BooleanT => Success(IndexT(2))
       case MapT(inputType, outputType, MapConfig(CommandOutput, _, _)) => {
         // TO incorporate TableT:
         // Look at input type
@@ -223,7 +270,7 @@ object CommandMaps {
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
         } yield {
           keyExpansionCommandT match {
-            case StructT(items, _, _, _, _) if (items.length == 0) => {
+            case StructT(items, _, _, _) if (items.length == 0) => {
               // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
               requiredValues
@@ -240,17 +287,17 @@ object CommandMaps {
           }
         }
       }
-      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet, typeParameters) => {
+      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
-        Success(CaseT(parameterList, parentFieldType, featureSet, typeParameters))
+        Success(CaseT(parameterList, parentFieldType, featureSet))
       }
-      case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet, typeParameters) => {
+      case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
-        Success(CaseT(parameterList, parentFieldType, featureSet, typeParameters))
+        Success(CaseT(parameterList, parentFieldType, featureSet))
       }
-      case CaseT(cases, _, _, _) => {
+      case CaseT(cases, _, _) => {
         Failure("Cases as commands haven't been implemented yet")
       }
       case TypeClassT(typeTransform, typesInTypeClass) => {
@@ -288,7 +335,7 @@ object CommandMaps {
           }
         }
       }
-      case OrBooleanT => {
+      case BooleanT => {
         for {
           currentValue <- current match {
             case TaggedObject(UIndex(i), _) => Success(i)
@@ -303,7 +350,7 @@ object CommandMaps {
           }
         } yield {
           val result = if (currentValue == 1 || j == 1) 1 else 0
-          TaggedObject(UIndex(result), OrBooleanT)
+          TaggedObject(UIndex(result), BooleanT)
         }
       }
       case mapT@MapT(inputType, outputType, MapConfig(CommandOutput, featureSet, _)) => {
@@ -338,20 +385,29 @@ object CommandMaps {
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
 
           result <- keyExpansionCommandT match {
-            case StructT(items, _, _, _, _) if (items.length == 0) => {
+            case StructT(items, _, _, _) if (items.length == 0) => {
               // TODO - this is an ugle exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
-              Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), command))
+              Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), ObjectExpression(command)))
             }
             case _ => {
+
               for {
+                commandPatterns <- command match {
+                  case UMap(patterns) => Success(patterns)
+                  case _ => Failure(s"Unexpected command shape $command")
+                }
+
                 keyField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-                valueField <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
-              } yield (TaggedObject(keyField, keyType), valueField)
+
+                valueExpression <- Evaluator.attemptPatternMatchInOrder(commandPatterns, UIndex(1), env)
+              } yield {
+                (TaggedObject(keyField, keyType), valueExpression)
+              }
             }
           }
 
-          (keyExpansionCommand, valueExpansionCommand) = result
+          (keyExpansionCommand, valueExpansionExpression) = result
 
           updateKeyUntagged <- Evaluator.removeTypeTag(keyExpansionCommand)
           
@@ -369,8 +425,6 @@ object CommandMaps {
 
           newPattern <- Outcome(updateKeyTypeResponse.newValueOpt, "Cannot expand type: $keyType and get a new pattern to match")
 
-          newMapping = newPattern -> ObjectExpression(valueExpansionCommand)
-
           prepNewValues = for {
             value <- mapValues
 
@@ -378,12 +432,12 @@ object CommandMaps {
             if (value._1 != ObjectPattern(updateKeyUntagged))
           } yield (value._1 -> value._2)
 
-          newMapValues = newMapping +: prepNewValues
+          newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
         } yield {
           TaggedObject(UMap(newMapValues), newTableType)
         }
       }
-      case StructT(params, parentFieldType, _, _, _) => {
+      case StructT(params, parentFieldType, _, _) => {
         command match {
           case UCase(constructor, input) => {
             for {

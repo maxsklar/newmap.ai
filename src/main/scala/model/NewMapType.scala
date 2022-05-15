@@ -15,7 +15,7 @@ case object CountT extends NewMapType
 case class IndexT(i: Long) extends NewMapType
 
 // This is a special type of boolean class that's being created temporarily until we get better user-defined types
-case object OrBooleanT extends NewMapType
+case object BooleanT extends NewMapType
 
 // Type of types
 // TODO - eventually, we will replace this with an IsType function
@@ -102,11 +102,11 @@ case class TypeParameterVariance(
 case class StructT(
   params: Vector[(NewMapPattern, NewMapExpression)],
   fieldParentType: NewMapType,
-  conpleteness: MapCompleteness = RequireCompleteness,
-  featureSet: MapFeatureSet = BasicMap,
-  typeParameters: Vector[TypeParameter] = Vector.empty
+  completeness: MapCompleteness = RequireCompleteness,
+  featureSet: MapFeatureSet = BasicMap
 ) extends NewMapType
 
+// Is this really a type? Or just an instance of SubtypeT(TypeT)?
 case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
@@ -118,12 +118,16 @@ case class TypeClassT(
 ) extends NewMapType
 
 // cases: input type is the case constructors, output type is the field types per constructor
-// TODO: We also need a feature set!
+// TODO - this is not really a type because of the existance of type parameters. This is more of a type constructor
 case class CaseT(
   cases: Vector[(NewMapPattern, NewMapExpression)],
   fieldParentType: NewMapType,
   featureSet: MapFeatureSet = BasicMap,
-  typeParameters: Vector[TypeParameter] = Vector.empty
+) extends NewMapType
+
+case class ConstructedType(
+  genericType: NewMapObject,
+  params: UntaggedObject
 ) extends NewMapType
 
 // Represents a type that contains a subset of the parent type, represented by a simple function

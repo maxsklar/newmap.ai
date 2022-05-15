@@ -253,26 +253,29 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  // TODO - add generics to get this to work!
-  /*"A generic option case " should " be possible" in {
+  "A generic option case " should " be possible" in {
     testCodeScript(Vector(
-      CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
-      CodeExpectation("val maybeSix = Option 6", GeneralSuccessCheck),
-      CodeExpectation("val x: maybeSix = None.0", GeneralSuccessCheck),
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("val maybeSix = Option.6", GeneralSuccessCheck),
+      CodeExpectation("val x: maybeSix = None.()", GeneralSuccessCheck),
       CodeExpectation("val y: maybeSix = Some.1", GeneralSuccessCheck),
+      CodeExpectation("val y: maybeSix = Some.10", FailureCheck),
       CodeExpectation("val z: maybeSix = None.3", FailureCheck),
     ))
-  }*/
+  }
 
-  // TODO: Return to this when there is better tooling!
-  /*it should " be callable without naming it" in {
+  it should " be callable without naming it" in {
     testCodeScript(Vector(
-      CodeExpectation("val Option: ReqMap(Type, Type) = (t: Case (None: 1, Some: t))", GeneralSuccessCheck),
-      CodeExpectation("val x: Option Count = (Option Count).None 0", GeneralSuccessCheck),
-      CodeExpectation("val y: Option Count = (Option Count).Some 20", GeneralSuccessCheck),
-      CodeExpectation("val z: Option Count = (Option Count).None 3", FailureCheck),
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
+      CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
+      CodeExpectation("val z: Option.Count = None.0", FailureCheck),
     ))
-  }*/
+  }
 
   "Lambda expressions" should " be creatable as a type, object and applied" in {
     val correctCommandCreateFunc = Environment.eCommand(
@@ -393,6 +396,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  // TODO: Think about this - maybe this shouldn't be allowed because things like "0" and "~yo" have no type interpretation
+  // - Maybe require this to be composed with maps that have an exact input type
   it should " be able to include exceptions" in {
     testCodeScript(Vector(
       CodeExpectation("val constantCount: GenericMap(t: Count) = (0: 100, ~yo: 1, x: 5)", GeneralSuccessCheck),
@@ -500,8 +505,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   // These should be reserved for recursive maps
   it should " not be allowed to call a full function map" in {
     testCodeScript(Vector(
-      CodeExpectation("ReqMap(Any, 2)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, 2) = ((y: (Any => 2)): y 5, _: 0)", FailureCheck)
+      CodeExpectation("data Funny = CaseType", GeneralSuccessCheck),
+      CodeExpectation("update Funny (FunMap, (Funny => 2))", GeneralSuccessCheck),
+      CodeExpectation("val funnyMap: ReqMap(Funny, 2) = (_: 1)", GeneralSuccessCheck),  
+      CodeExpectation("val funnyItem: Funny = FunMap.funnyMap", GeneralSuccessCheck),      
+      CodeExpectation("val m: ReqMap(Funny, 2) = (FunMap.f: funnyMap f)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Funny, 2) = (FunMap.f: f funnyItem)", FailureCheck)
     ))
   }
 
@@ -509,14 +518,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   // TODO - must be upgraded with generic types
   it should " disallow self referential function calls" in {
     testCodeScript(Vector(
-      CodeExpectation("val m: ReqMap(Any, 2) = (_: 1)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, 2) = (x: 1, _: 0)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, 2) = (x: 1, _: 0)", GeneralSuccessCheck),
-      CodeExpectation("val m: ReqMap(Any, Any) = (x: x, _: 0)", GeneralSuccessCheck),
+      CodeExpectation("data Funny = CaseType", GeneralSuccessCheck),
+      CodeExpectation("update Funny (FunMap, ReqMap(Funny, 2))", GeneralSuccessCheck),
+      CodeExpectation("val m: Funny = FunMap.(_: 1)", GeneralSuccessCheck),
       // Preventing Russell's paradox!
-      CodeExpectation("val m: ReqMap(ReqMap(Any, Any), Any) = (x: x x)", FailureCheck),
-      // This line below will create an infinite loop if evaluated!! Out simple function check will catch it
-      CodeExpectation("val m: ReqMap(Any, Any) => Any = (x: x x)", GeneralSuccessCheck)
+      CodeExpectation("val f: ReqMap(Funny, 2) = (FunMap.x: x FunMap.x)", FailureCheck),
+      // This line below will create an infinite loop if evaluated on itself!! (f m) should work. Out simple function check will catch it
+      CodeExpectation("val f: Funny => 2 = (FunMap.x: x FunMap.x)", GeneralSuccessCheck),
     ))
   }
 
@@ -791,11 +799,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * 
    * 
    * 
-
-  /* Canonical way to define boolean type */
-  ver Bool = new CaseType
-  update Bool case False
-  update Bool case True
   
 
   More about CaseType:

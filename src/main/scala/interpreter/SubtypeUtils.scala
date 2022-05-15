@@ -28,11 +28,11 @@ object SubtypeUtils {
     }
     else {
       val piecemealCompletenessOutcome = nType match {
-        case CaseT(cases, _, _, _) => checkCaseComplete(keys, cases, env)
+        case CaseT(cases, _, _) => checkCaseComplete(keys, cases, env)
         /*case UMap(values) => {
           checkCaseComplete(keys, UMap(values), env)
         }*/
-        case StructT(params, _, _, _, _) => checkStructComplete(keys, params, env)
+        case StructT(params, _, _, _) => checkStructComplete(keys, params, env)
         case CustomT(_, underlying) => doPatternsCoverType(keys, underlying, env)
         /*case ULink(key) => {
           for {
@@ -120,7 +120,7 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case StructT(params, _, _, _, _) if (params.length == patterns.length) => {
+          case StructT(params, _, _, _) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
                 isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
@@ -142,13 +142,13 @@ object SubtypeUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case CaseT(values, parentType, BasicMap, typeParameters) if typeParameter.isEmpty => {
+      /*case CaseT(values, parentType, BasicMap) if typeParameter.isEmpty => {
         ???
       }*/
       case IndexT(i) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
-      case OrBooleanT => {
+      case BooleanT => {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
       case _ => {
@@ -224,7 +224,7 @@ object SubtypeUtils {
           Vector.empty
         }
       }
-      case(StructT(startingParams, startingFieldType, _, _, _), StructT(endingParams, endingFieldType, _, _, _)) => {
+      case(StructT(startingParams, startingFieldType, _, _), StructT(endingParams, endingFieldType, _, _)) => {
         // 1) Can we convert starting field type to ending field type?
         // - For each param in startingParams:
         //   - Convert to ending param
@@ -238,7 +238,7 @@ object SubtypeUtils {
         )*/
         Failure("Need to implement struct conversion")
       }
-      case (StructT(values, fieldParentType, _, _, _), _) if (values.length == 1) => {
+      case (StructT(values, fieldParentType, _, _), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
@@ -246,7 +246,7 @@ object SubtypeUtils {
           convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
         } yield convertInstructions
       }
-      case (_, StructT(values, fieldParentType, _, _, _)) if (values.length == 1) => {
+      case (_, StructT(values, fieldParentType, _, _)) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
@@ -254,7 +254,7 @@ object SubtypeUtils {
           convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
         } yield convertInstructions
       }
-      case (CaseT(startingCases, startingFieldType, _, _), CaseT(endingCases, endingFieldType, _, _)) => {
+      case (CaseT(startingCases, startingFieldType, _), CaseT(endingCases, endingFieldType, _)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
         /*for {
@@ -267,7 +267,7 @@ object SubtypeUtils {
         // TODO: The outputs have to agree as well
         Failure("Need to implement case conversion")
       }
-      case (CaseT(values, startingFieldType, _, _), _) if (values.length == 1) => {
+      case (CaseT(values, startingFieldType, _), _) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values)
@@ -276,7 +276,7 @@ object SubtypeUtils {
           convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
         } yield convertInstructions
       }
-      case (_, CaseT(values, endingFieldType, _, _)) if (values.length == 1) => {
+      case (_, CaseT(values, endingFieldType, _)) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values)

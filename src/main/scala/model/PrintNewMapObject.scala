@@ -7,7 +7,7 @@ import java.util.UUID
 object PrintNewMapObject {
   def apply(obj: NewMapObject): String = obj match {
     case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + newMapType(nType)
-    case VersionedObjectLink(key, status) => {
+    case VersionedObjectLink(key) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
       s"VER[${key.toString}]"
@@ -23,18 +23,23 @@ object PrintNewMapObject {
     case TypeT => s"Type"
     //case AnyT => s"Any"
     case IdentifierT => "Identifier"
-    case OrBooleanT => "OrBooleanT"
+    case BooleanT => "BooleanT"
     case MapT(key, value, config) => {
       printMapT(newMapType(key), newMapType(value), config)
     }
     case GenericMapT(typeTransform, config) => {
       s"Generic(${mapToString(typeTransform)})"
     }
-    case StructT(params, _, _, _, _) => s"Struct(${mapToString(params)})"
+    case StructT(params, _, _, _) => s"Struct(${mapToString(params)})"
     case TypeClassT(typeTransform, implementation) => {
       s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> ObjectExpression(UIndex(0)))))})"
     }
-    case CaseT(cases, _, _, _) => s"Case(${mapToString(cases)})"
+    case CaseT(cases, _, _) => {
+      s"Case${mapToString(cases)}"
+    }
+    case ConstructedType(genericType, params) => {
+      s"${this(genericType)}.${untagged(params)}"
+    }
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
@@ -76,11 +81,6 @@ object PrintNewMapObject {
     case BuildMapInstance(values) => {
       mapToString(values)
     }
-    /*case BuildExpandingSubsetT(parentType, allowPattern) => {
-      val p = if (allowPattern) "P" else ""
-
-      s"ExpandingSubset$p(${printExpression(parentType)})"
-    }*/
   }
 
   def printMapT(
@@ -125,6 +125,11 @@ object PrintNewMapObject {
     case IncrementFunc => s"Increment"
     case ULink(key) => {
       s"ULink[${key.toString}]"
+    }
+    case UParametrizedCaseT(typeParameters, caseT) => {
+      val typeParameterNames = typeParameters.map(_._1)
+      val typeParametersStr = s"[${typeParameterNames.mkString(", ")}]"
+      s"Case${typeParametersStr}${mapToString(caseT.cases)}"
     }
   }
 

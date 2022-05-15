@@ -31,7 +31,7 @@ object TypeClassUtils {
   ): Outcome[Unit, String] = nType match {
     case TypeT => Success()
     case CountT => Success()
-    case OrBooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
+    case BooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
     case IndexT(j) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
     case CustomT(_, t) => typeIsExpectingAnIndex(t, i, env)
     case SubtypeT(isMember, parentType, _) => {
@@ -40,6 +40,17 @@ object TypeClassUtils {
         membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIndex(i), env)
         _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $i not a member of subtype $nType")
       } yield ()
+    }
+    case StructT(params, _, _, _) => {
+      if (params.length == 1) {
+        for {
+          typeObj <- Evaluator(params.head._2, env)
+          t <- Evaluator.asType(typeObj, env)
+          result <- typeIsExpectingAnIndex(t, i, env)
+        } yield result
+      } else {
+        Failure(s"Struct Type couldn't accept index $i as value: $nType")
+      }
     }
     case _ => {
       Failure(s"Type couldn't accept index $i as value: $nType")

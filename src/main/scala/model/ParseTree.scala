@@ -80,6 +80,11 @@ case class NewTypeStatementParse(
   expression: ParseTree // Expression that evaluates to a type
 ) extends EnvStatementParse
 
+case class NewParamTypeStatementParse(
+  identifier: IdentifierParse, // New Name of the type
+  parameters: ParseTree
+) extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
 

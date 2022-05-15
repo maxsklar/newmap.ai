@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object RetrieveType {
   def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapType = nObject match {
     case TaggedObject(_, nType) => nType
-    case VersionedObjectLink(key, status) => {
+    case VersionedObjectLink(key) => {
       val currentState = Evaluator.currentState(key.uuid, env).toOption.get
       fromNewMapObject(currentState, env)
     }

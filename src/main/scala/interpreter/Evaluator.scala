@@ -131,7 +131,7 @@ object Evaluator {
   def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
     nObject match {
       case TaggedObject(uObject, _) => Success(uObject)
-      case VersionedObjectLink(key, _) => Success(ULink(key))
+      case VersionedObjectLink(key) => Success(ULink(key))
       case _ => {
         //throw new Exception(nObject.toString)
         Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")
@@ -149,7 +149,7 @@ object Evaluator {
       versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
 
       versionedO <- versionedObject match {
-        case EnvironmentBinding(vo@VersionedObjectLink(_, _)) => Success(vo)
+        case EnvironmentBinding(vo@VersionedObjectLink(_)) => Success(vo)
         case EnvironmentBinding(nObject) => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
         case EnvironmentParameter(_) => Failure(s"Identifier $id is a parameter, should be an object")
       }
@@ -186,14 +186,16 @@ object Evaluator {
     values match {
       case (k, v) +: restOfValues => {
         for {
-          // If this is a basic map element, v should be evaluated down to an object
-          newV <- if (newParametersFromPattern(k).isEmpty) {
-            Evaluator(v, env).map(vObj => ObjectExpression(vObj))
-          } else Success(v)
-
           evalRest <- evalMapInstanceVals(restOfValues, env)
         } yield {
-          (k -> v) +: evalRest
+          // TODO - rethink about "when to evaluate" what's inside a map
+          // - We probably should not evaluate if it's not a simple function
+          val newV = Evaluator(v, env) match {
+            case Success(vObj) => ObjectExpression(vObj)
+            case _ => v
+          }
+
+          (k -> newV) +: evalRest
         }
       }
       case _ => Success(Vector.empty)
@@ -224,22 +226,16 @@ object Evaluator {
   ): Outcome[UntaggedObject, String] = {
     stripVersioningU(func, env) match {
       case UMap(values) => {
-        for {
-          keyMatchResult <- attemptPatternMatchInOrder(values, input, env) match {
-            case Success(result) => Success(result)
-            case Failure(PatternMatchErrorType(message, isEvaluationError)) => {
-              if (isEvaluationError) {
-                Failure(message)
-              } else {
-                // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-                // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-                Success(UInit)
-              }
-            }
+        val keyMatchResult = attemptPatternMatchInOrder(values, input, env) match {
+          case Success(result) => result
+          case Failure(_) => {
+            // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+            // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+            ObjectExpression(UInit)
           }
-        } yield {
-          keyMatchResult
         }
+
+        this(keyMatchResult, env)
       }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
@@ -263,31 +259,23 @@ object Evaluator {
     }
   }
 
-  // TODO - there should be no evaluation errors
-  // This is only to catch non-constant values, which cannot be checked by the type checker yet
-  case class PatternMatchErrorType(message: String, isEvaluationError: Boolean)
-
   def attemptPatternMatchInOrder(
     remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
     input: UntaggedObject,
     env: Environment
-  ): Outcome[UntaggedObject, PatternMatchErrorType] = {
+  ): Outcome[NewMapExpression, String] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
           case Success(paramsToSubsitute) => {
-            this(MakeSubstitution(answer, paramsToSubsitute, env), env) match {
-              case Success(nObject) => Success(nObject)
-              case Failure(s) => Failure(PatternMatchErrorType(s, true))
-            }
+            Success(MakeSubstitution(answer, paramsToSubsitute, env))
           }
           case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
       }
-      case _ => Failure(PatternMatchErrorType(
+      case _ => Failure(
         s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there",
-        false
-      ))
+      )
     }
   }
 
@@ -305,6 +293,9 @@ object Evaluator {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
           result <- patternMatchOnStruct(params, inputs, env)
         } yield result 
+      }
+      case (StructPattern(params), singleValue) if (params.length == 1) => {
+        attemptPatternMatch(params.head, singleValue, env)
       }
       case (WildcardPattern(name), _) => {
         Success(Map(name -> input))
@@ -363,7 +354,7 @@ object Evaluator {
 
   def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
-      case VersionedObjectLink(key, status) => {
+      case VersionedObjectLink(key) => {
         // TODO - make this function an outcome
         currentState(key.uuid, env).toOption.get
       }
@@ -382,8 +373,10 @@ object Evaluator {
     stripVersioningU(uObject, env) match {
       case UType(t) => Success(t)
       case UIndex(j) => Success(IndexT(j))
+      case UCase(ULink(key), input) => {
+        Success(ConstructedType(VersionedObjectLink(key), input))
+      }
       case other => {
-        //throw new Exception(s"Not a type: $uObject")
         Failure(s"Not a type: $other")
       }
     }
