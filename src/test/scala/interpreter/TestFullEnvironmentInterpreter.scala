@@ -700,6 +700,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be ok to equip it with a getOrElse function" in {
+    testCodeScript(Vector(
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("val getOrElse: GenericMap (Option.T: ReqMap(T, T)) = (None.(): (t: t), Some.t: (_: t))", GeneralSuccessCheck),
+      CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
+      CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
+      CodeExpectation("getOrElse x 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
+      CodeExpectation("getOrElse y 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(20, CountT))))
+    ))
+  }
+
   "A generic LinkedList case " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data List (T: Type)", GeneralSuccessCheck),

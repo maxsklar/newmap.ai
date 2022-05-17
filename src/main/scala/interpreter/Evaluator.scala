@@ -381,4 +381,24 @@ object Evaluator {
       }
     }
   }
+
+  def asTypePattern(nExpression: NewMapExpression, env: Environment): Outcome[NewMapPattern, String] = {
+    nExpression match {
+      case ObjectExpression(uObject) => Success(ObjectPattern(uObject))
+      case BuildCase(constructor, value) => {
+        for {
+          valuePattern <- asTypePattern(value, env)
+        } yield CasePattern(constructor, valuePattern)
+      }
+      case ParamId(s) => {
+        env.lookup(s) match {
+          case Some(EnvironmentParameter(nType)) => Success(nType)
+          case _ => Failure(s"Param $s not a known parameter")
+        }
+      }
+      case _ => {
+        Failure("Cannot interpret expression as a type pattern: $nExpression")
+      }
+    }
+  }
 }

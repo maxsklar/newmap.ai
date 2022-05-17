@@ -4,13 +4,17 @@ import ai.newmap.model._
 import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 
-class EnvironmentInterpreter() {
+class EnvironmentInterpreter(
+  useInitialCommands: Boolean = true
+) {
   var env: Environment = Environment.Base
 
   for (code <- EnvironmentInterpreter.initialCommands) {
-    apply(code) match {
-      case Failure(f) => println(s"Error: $f\n => $code")
-      case Success(_) => ()
+    if (useInitialCommands) {
+      apply(code) match {
+        case Failure(f) => println(s"Error: $f\n => $code")
+        case Success(_) => ()
+      }
     }
   }
 
@@ -111,5 +115,8 @@ object EnvironmentInterpreter {
     "update _default Boolean.0",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
+    "data Option (T: Type)",
+    "update Option (None, ())",
+    "update Option (Some, T)"
   )
 }

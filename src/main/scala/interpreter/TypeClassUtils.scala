@@ -103,10 +103,16 @@ object TypeClassUtils {
       case ObjectPattern(UType(startingType)) => {
         isTypeConvertibleToPattern(startingType, endingTypePattern, env)
       }
+      case ObjectPattern(UInit) => {
+        throw new Exception(s"Here: $startingTypePattern --> $endingTypePattern")
+      }
       case _ => {
         endingTypePattern match {
           case WildcardPattern(_) => Success(Vector.empty)
-          case _ => Failure(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
+          case _ => {
+            throw new Exception(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
+            Failure(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
+          }
         }
       }
     }

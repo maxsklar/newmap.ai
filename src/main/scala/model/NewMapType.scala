@@ -17,10 +17,13 @@ case class IndexT(i: Long) extends NewMapType
 // This is a special type of boolean class that's being created temporarily until we get better user-defined types
 case object BooleanT extends NewMapType
 
-// Type of types
-// TODO - eventually, we will replace this with an IsType function
-//  that will be a subtype of type object
+// Type of types!
 case object TypeT extends NewMapType
+
+// This is the "bottom" type
+// It's equivalent to type 0 or type Case()
+// Difference here is that we disallow any function to ever return this. This is truly the "base type"
+case object UndefinedT extends NewMapType
 
 //case object AnyT extends NewMapType
 

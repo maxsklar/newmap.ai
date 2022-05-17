@@ -24,14 +24,8 @@ case class VersionedObjectKey(
 
 // This always points to the latest version of a versioned object
 case class VersionedObjectLink(
-  key: VersionedObjectKey,
-  //status: VersionedObjectStatus
+  key: VersionedObjectKey
 ) extends NewMapObject
-
-/*sealed abstract class VersionedObjectStatus
-object KeepUpToDate extends VersionedObjectStatus
-object CurrentlyOutOfDate extends VersionedObjectStatus
-object KeepThisVersion extends VersionedObjectStatus*/
 
 object NewMapO {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)

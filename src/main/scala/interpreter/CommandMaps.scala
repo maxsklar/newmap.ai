@@ -49,6 +49,7 @@ object CommandMaps {
       // TODO - start removing these in favor of newmap code!
       case UType(IndexT(i)) if i > 0 => Success(UIndex(0)) //REmove?
       case UIndex(i) if i > 0 => Success(UIndex(0)) //REmove?
+      case UType(TypeT) => Success(UType(UndefinedT))
       case UType(MapT(_, _, MapConfig(CommandOutput, _, _))) => Success(defaultUMap)
       case UType(MapT(IndexT(0), _, MapConfig(RequireCompleteness, _, _))) => Success(defaultUMap)
       case UType(MapT(SubtypeT(UMap(m), _, _), _, MapConfig(RequireCompleteness, _, _))) => {

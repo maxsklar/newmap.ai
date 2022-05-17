@@ -142,7 +142,7 @@ object SubtypeUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case CaseT(values, parentType, BasicMap) if typeParameter.isEmpty => {
+      /*case CaseT(values, parentType, BasicMap) => {
         ???
       }*/
       case IndexT(i) => {
@@ -152,6 +152,7 @@ object SubtypeUtils {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
       case _ => {
+        throw new Exception(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
         Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
       }
     }
@@ -288,36 +289,17 @@ object SubtypeUtils {
       case (CustomT(uuid, _), CustomT(uuid2, _)) if (uuid == uuid2) => {
         Success(Vector.empty)
       }
-      /*case (
-        VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
-        VersionedObjectLink(VersionedObjectKey(versionNumber2, uuid2), status2)
-      ) if (uuid == uuid2) && (status2 == KeepUpToDate) => {
-        // Take advantage of the fact that types are backwards compatible
-        Success(Vector.empty)
-      }
-      case (
-        VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status),
-        _
-      ) => {
-        Evaluator.stripVersioning(startingType, env) match {
-          case TaggedObject(UMap(_), ExpandingSubsetT(parentType, _)) => {
-            isTypeConvertible(parentType, endingType, env)
-          }
-          case CaseT(umap, aaa) => {
-            throw new Exception(s"-- $umap \n--- $aaa")
-          }
-          case _ => {
-            Failure(s"B) StartingType: $startingType\nEndingType: $endingType --- ${Evaluator.stripVersioning(startingType, env)}")
-          }
+      case (ConstructedType(VersionedObjectLink(key1), params1), ConstructedType(VersionedObjectLink(key2), params2)) => {
+        // Todo - we need to work out how this works
+        // This is also where the covariance/contravariance information should come in!!
+        // We are also not taking versions into account!!!
+        // Eventually type constructions above (map, case) will be subsumed under this
+        if ((key1.uuid == key2.uuid) && (params1 == params2)) {
+          Success(Vector.empty)
+        } else {
+          Failure(s"Cannot convert constructed types: $startingType to $endingType")
         }
       }
-      case (
-        _,
-        VersionedObjectLink(VersionedObjectKey(versionNumber, uuid), status)
-      ) => {
-        val sv = Evaluator.stripVersioning(endingType, env)
-        Failure(s"C) StartingType: $startingType\nEndingType: $endingType -- $sv")
-      }*/
       case _ => Failure(s"No rule to convert $startingType to $endingType")
     }
   }

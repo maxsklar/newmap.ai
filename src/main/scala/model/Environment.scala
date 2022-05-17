@@ -349,7 +349,7 @@ object Environment {
     eCommand("GenericMap", TaggedObject(
       UMap(Vector(WildcardPattern("typeTransform") -> BuildGenericMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction)))),
       MapT(
-        MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction)),
+        MapT(TypeT, TypeT, MapConfig(CommandOutput, SimpleFunction)),
         TypeT,
         MapConfig(RequireCompleteness, SimpleFunction)
       )
