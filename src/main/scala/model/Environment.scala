@@ -376,5 +376,11 @@ object Environment {
       MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
+    NewVersionedStatementCommand("_typeOf", 
+      TypeClassT(
+        Vector(WildcardPattern("t") -> BuildMapT(ParamId("t"), ObjectExpression(UType(TypeT)), MapConfig(RequireCompleteness, SimpleFunction))),
+        Vector.empty
+      )
+    ),
   ))
 }

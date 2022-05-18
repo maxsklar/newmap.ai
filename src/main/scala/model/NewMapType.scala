@@ -14,8 +14,13 @@ case object CountT extends NewMapType
 
 case class IndexT(i: Long) extends NewMapType
 
-// This is a special type of boolean class that's being created temporarily until we get better user-defined types
+// Base types (will later be equated to derived/userdefined types)
 case object BooleanT extends NewMapType
+case object ByteT extends NewMapType
+case object CharacterT extends NewMapType
+case object StringT extends NewMapType
+case object LongT extends NewMapType
+case object DoubleT extends NewMapType
 
 // Type of types!
 case object TypeT extends NewMapType

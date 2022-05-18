@@ -332,12 +332,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-//
-  // Another test:
-  // val x: S = ....
-  // val y: T = (asdf) x
-  // We should be able to infer that whatever is in "asdf" is of type S -> T
-
   "Generic Identity Function " should " have a valid type signature" in {
     testCodeScript(Vector(
       CodeExpectation("val GenericIdType: Type = GenericMap(t: t)", GeneralSuccessCheck)
@@ -700,7 +694,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be ok to equip it with a getOrElse function" in {
+  it should " be ok to equip with a getOrElse function" in {
     testCodeScript(Vector(
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
       CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
@@ -827,6 +821,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update idChange (Wednesday, WED)", GeneralSuccessCheck),
       CodeExpectation("idChange Tuesday", SuccessCheck(ExpOnlyEnvironmentCommand(tuesdayResponse))),
       CodeExpectation("idChange Thursday", FailureCheck)
+    ))
+  }
+
+  "A typeOf function " should " be creatable as a type class" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),
+      CodeExpectation("val y: Identifier = ~hi", GeneralSuccessCheck),
+      CodeExpectation("typeOf(x)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(IndexT(9)), TypeT)))),
+      CodeExpectation("typeOf(y)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(IdentifierT), TypeT)))),
+      CodeExpectation("typeOf(4)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(CountT), TypeT)))),
     ))
   }
 

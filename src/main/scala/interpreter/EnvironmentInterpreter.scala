@@ -113,6 +113,9 @@ object EnvironmentInterpreter {
   val initialCommands: Vector[String] = Vector(
     "update _default Count.0",
     "update _default Boolean.0",
+    // todo - _typeOf should be creatable all in one swoop, and as a generic
+    "update _typeOf Count.(_: Count)",
+    "update _typeOf Identifier.(_: Identifier)",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
     "data Option (T: Type)",

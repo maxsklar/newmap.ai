@@ -11,7 +11,7 @@ object Evaluator {
     env: Environment
   ): Outcome[UntaggedObject, String] = {
     nExpression match {
-      case ObjectExpression(nObject) => Success(nObject)
+      case ObjectExpression(uObject) => Success(uObject)
       case ApplyFunction(func, input) => {
         for {
           evalFunc <- this(func, env)
@@ -23,7 +23,9 @@ object Evaluator {
       }
       case ParamId(s) => {
         env.lookup(s) match {
-          case None => Failure(s"Unbound identifier: $s")
+          case None => {
+            Failure(s"Unbound identifier: $s")
+          }
           case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
           case Some(EnvironmentParameter(nObject)) => {
             //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
@@ -268,7 +270,8 @@ object Evaluator {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
           case Success(paramsToSubsitute) => {
-            Success(MakeSubstitution(answer, paramsToSubsitute, env))
+            val paramsAsExpressions = paramsToSubsitute.toVector.map(x => (x._1 -> ObjectExpression(x._2))).toMap
+            Success(MakeSubstitution(answer, paramsAsExpressions, env))
           }
           case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
@@ -334,6 +337,61 @@ object Evaluator {
         }
       }
       case _ => Success(Map.empty) // No patterns to match
+    }
+  }
+
+  def attemptPatternMatchOnPattern(
+    pattern: NewMapPattern,
+    input: NewMapPattern,
+    env: Environment
+  ): Outcome[Map[String, NewMapPattern], String] = {
+    (pattern, input) match {
+      case (_, ObjectPattern(inputObj)) => {
+        for {
+          result <- attemptPatternMatch(pattern, inputObj, env)
+        } yield result.toVector.map(x => x._1 -> ObjectPattern(x._2)).toMap
+      }
+      case (StructPattern(params), StructPattern(inputParams)) => {
+        patternMatchOnStructPattern(params, inputParams, env)
+      }
+      case (StructPattern(params), singleValue) if (params.length == 1) => {
+        attemptPatternMatchOnPattern(params.head, singleValue, env)
+      }
+      case (WildcardPattern(name), WildcardPattern(inputName)) => {
+        Success(Map(name -> WildcardPattern(inputName)))
+      }
+      case (CasePattern(constructorP, inputP), CasePattern(constructor, cInput)) => {
+        for {
+          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
+          result <- attemptPatternMatchOnPattern(inputP, cInput, env)
+        } yield result
+      }
+      case _ => {
+        Failure("Failed Pattern Match on Pattern")
+      }
+    }
+  }
+
+  def patternMatchOnStructPattern(
+    structPattern: Vector[NewMapPattern],
+    inputPatterns: Vector[NewMapPattern],
+    env: Environment
+  ): Outcome[Map[String, NewMapPattern], String] = {
+    (structPattern, inputPatterns) match {
+      case (firstPattern +: restOfPatterns, firstInput +: restOfInputs) => {
+        for {
+          newParameters <- attemptPatternMatchOnPattern(firstPattern, firstInput, env)
+          otherParameters <- patternMatchOnStructPattern(restOfPatterns, restOfInputs, env)
+        } yield {
+          newParameters ++ otherParameters
+        }
+      }
+      case _ if (structPattern.isEmpty && inputPatterns.isEmpty) => {
+        Success(Map.empty) // No patterns to match
+      }
+      case _ => {
+        Failure("patternMatchOnStructPattern: structPattern and inputPattern are of different length. Leftovers: $structPattern -- $inputPatterns")
+      }
     }
   }
 

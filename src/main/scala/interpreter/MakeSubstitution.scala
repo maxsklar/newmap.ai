@@ -7,7 +7,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object MakeSubstitution {
   def apply(
     expression: NewMapExpression,
-    parameters: Map[String, UntaggedObject],
+    parameters: Map[String, NewMapExpression],
     env: Environment
   ): NewMapExpression = {
     expression match {
@@ -25,7 +25,7 @@ object MakeSubstitution {
       }
       case ParamId(name) => {
         parameters.get(name) match {
-          case Some(obj) => ObjectExpression(obj)
+          case Some(nExpression) => (nExpression)
           case None => expression
         }
       }
@@ -72,7 +72,7 @@ object MakeSubstitution {
   // NewMapObject should not contain any outside parameters!!!
   def substObject(
     nObject: UntaggedObject,
-    parameters: Map[String, UntaggedObject],
+    parameters: Map[String, NewMapExpression],
     env: Environment
   ): UntaggedObject = {
     nObject match {

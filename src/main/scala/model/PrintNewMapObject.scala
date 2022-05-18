@@ -24,7 +24,12 @@ object PrintNewMapObject {
     case UndefinedT => s"UndefinedType"
     //case AnyT => s"Any"
     case IdentifierT => "Identifier"
-    case BooleanT => "BooleanT"
+    case BooleanT => "Boolean"
+    case ByteT => "Byte"
+    case CharacterT  => "Character"
+    case StringT => "String"
+    case LongT => "Long"
+    case DoubleT => "Double"
     case MapT(key, value, config) => {
       printMapT(newMapType(key), newMapType(value), config)
     }
@@ -132,6 +137,11 @@ object PrintNewMapObject {
       val typeParametersStr = s"[${typeParameterNames.mkString(", ")}]"
       s"Case${typeParametersStr}${mapToString(caseT.cases)}"
     }
+    case UByte(value: Byte) => s"$value"
+    case UCharacter(value: Char) => s"$value"
+    case UString(value: String) => s"$value"
+    case ULong(value: Long) => s"$value"
+    case UDouble(value: Double) => s"$value"
   }
 
   def mapToString(values: Vector[(NewMapPattern, NewMapExpression)]): String = {
