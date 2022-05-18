@@ -24,6 +24,7 @@ object Evaluator {
       case ParamId(s) => {
         env.lookup(s) match {
           case None => {
+            //throw new Exception(s"Unbound identifier: $s")
             Failure(s"Unbound identifier: $s")
           }
           case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
@@ -192,10 +193,11 @@ object Evaluator {
         } yield {
           // TODO - rethink about "when to evaluate" what's inside a map
           // - We probably should not evaluate if it's not a simple function
-          val newV = Evaluator(v, env) match {
+          /*val newV = Evaluator(v, env) match {
             case Success(vObj) => ObjectExpression(vObj)
             case _ => v
-          }
+          }*/
+          val newV = v
 
           (k -> newV) +: evalRest
         }
@@ -316,6 +318,14 @@ object Evaluator {
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
+      case (CasePattern(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
+        // TODO - merge with above
+        for {
+          constructor <- removeTypeTag(constructorObj)
+          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
+          result <- attemptPatternMatch(inputP, cInput, env)
+        } yield result
+      }
       case _ => {
         Failure("Failed Pattern Match")
       }
@@ -337,6 +347,27 @@ object Evaluator {
         }
       }
       case _ => Success(Map.empty) // No patterns to match
+    }
+  }
+
+  def attemptPatternMatchInOrderOnPattern(
+    remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
+    input: NewMapPattern,
+    env: Environment
+  ): Outcome[NewMapExpression, String] = {
+    remainingPatterns match {
+      case (pattern, answer) +: addlPatterns => {
+        attemptPatternMatchOnPattern(pattern, input, env) match {
+          case Success(paramsToSubsitute) => {
+            val paramsAsExpressions = paramsToSubsitute.toVector.map(x => (x._1 -> TypeChecker.patternToExpression(x._2))).toMap
+            Success(MakeSubstitution(answer, paramsAsExpressions, env))
+          }
+          case Failure(_) => attemptPatternMatchInOrderOnPattern(addlPatterns, input, env)
+        }
+      }
+      case _ => Failure(
+        s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there",
+      )
     }
   }
 
@@ -408,6 +439,9 @@ object Evaluator {
     case CasePattern(constructor, input) => {
       newParametersFromPattern(input)
     }
+    case MapTPattern(input, output, config) => {
+      newParametersFromPattern(input) ++ newParametersFromPattern(output)
+    }
   }
 
   def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
@@ -433,6 +467,13 @@ object Evaluator {
       case UIndex(j) => Success(IndexT(j))
       case UCase(ULink(key), input) => {
         Success(ConstructedType(VersionedObjectLink(key), input))
+      }
+      case UMap(values) => {
+        Failure(s"Not a type (map): $values")
+      }
+      case UInit => {
+        throw new Exception("Found undefined type")
+        Success(UndefinedT)
       }
       case other => {
         Failure(s"Not a type: $other")

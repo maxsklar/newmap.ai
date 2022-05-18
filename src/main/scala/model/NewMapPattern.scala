@@ -5,12 +5,13 @@ package ai.newmap.model
  */
 sealed abstract class NewMapPattern
 
-
 case class ObjectPattern(
   uObject: UntaggedObject
 ) extends NewMapPattern
 
-case class WildcardPattern(name: String) extends NewMapPattern
+case class WildcardPattern(
+  name: String
+) extends NewMapPattern
 
 case class StructPattern(
   params: Vector[NewMapPattern]
@@ -21,13 +22,10 @@ case class CasePattern(
   input: NewMapPattern
 ) extends NewMapPattern
 
-/*case class MapTPattern(
-  keyType: NewMapPattern,
-  valueType: NewMapPattern,
+
+// This is a temporary pattern until types are stored as cases, in which case we'll use casePattern
+case class MapTPattern(
+  input: NewMapPattern,
+  outputType: NewMapPattern,
   config: MapConfig
-) extends NewMapPattern*/
-
-// Type Patterns
-
-// Match if I am dealing with an index type
-//case class IndexTPattern(name: String) extends NewMapPattern
+) extends NewMapPattern

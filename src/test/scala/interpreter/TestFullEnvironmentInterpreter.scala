@@ -451,7 +451,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " keep constant and updatable key type" in {
     testCodeScript(Vector(
-      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("data n = 0", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("val m: ReqMap(n, 5) = (0: 3, 1: 4)", GeneralSuccessCheck),
@@ -560,7 +560,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   it should " be allowed to have members" in {
     testCodeScript(Vector(
-      CodeExpectation("ver n = new Count", GeneralSuccessCheck),
+      CodeExpectation("data n = 0", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("update n()", GeneralSuccessCheck),
       CodeExpectation("val p: n = 1", GeneralSuccessCheck),

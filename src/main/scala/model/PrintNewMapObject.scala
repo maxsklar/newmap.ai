@@ -18,7 +18,7 @@ object PrintNewMapObject {
 
   def newMapType(nType: NewMapType): String = nType match {
     case CountT => "Count"
-    case IndexT(i) => i.toString
+    case IndexT(i) => "Index." + i.toString
     case CustomT(uuid, nType) => s"Type:$uuid:${newMapType(nType)}"
     case TypeT => s"Type"
     case UndefinedT => s"UndefinedType"
@@ -165,5 +165,6 @@ object PrintNewMapObject {
     case WildcardPattern(name) => "W~" + name
     case StructPattern(params) => s"(${params.map(patternToString(_)).mkString(", ")})"
     case CasePattern(constructor, input) => s"(${untagged(constructor)}.${patternToString(input)})"
+    case MapTPattern(input, output, config) => printMapT(patternToString(input), patternToString(output), config)
   }
 }

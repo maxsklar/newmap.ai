@@ -279,6 +279,15 @@ object NewMapParser extends Parsers {
     }
   }
 
+  // New Statment for defining a function
+  /*private def defFunctionStatment: Parser[DefineFunctionStatment] = {
+    Lexer.Identifier("def") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
+        FullStatementParse(ValStatement, id, typeExp, exp)
+      }
+    }
+  }*/
+
   def apply(
     tokens: Seq[Lexer.Token]
   ): Outcome[ParseTree, String] = {

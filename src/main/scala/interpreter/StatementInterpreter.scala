@@ -66,7 +66,7 @@ object StatementInterpreter {
         }
 
         for {
-          mapValues <- TypeChecker.typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, FullFunction)
+          mapValues <- TypeChecker.typeCheckMap(values, ObjectPattern(UType(IdentifierT)), ObjectPattern(UType(TypeT)), BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           val paramType = TaggedObject(

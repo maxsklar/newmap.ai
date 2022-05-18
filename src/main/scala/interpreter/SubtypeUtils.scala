@@ -10,7 +10,7 @@ object SubtypeUtils {
   // For Maps, we want to know that the default value is never used
   def doPatternsCoverType(
     keys: Vector[NewMapPattern],
-    nType: NewMapType,
+    nType: NewMapPattern,
     env: Environment
   ): Outcome[Boolean, String] = {
     val objectKeys: Set[UntaggedObject] = keys.flatMap(_ match {
@@ -28,12 +28,12 @@ object SubtypeUtils {
     }
     else {
       val piecemealCompletenessOutcome = nType match {
-        case CaseT(cases, _, _) => checkCaseComplete(keys, cases, env)
+        case ObjectPattern(UType(CaseT(cases, _, _))) => checkCaseComplete(keys, cases, env)
         /*case UMap(values) => {
           checkCaseComplete(keys, UMap(values), env)
         }*/
-        case StructT(params, _, _, _) => checkStructComplete(keys, params, env)
-        case CustomT(_, underlying) => doPatternsCoverType(keys, underlying, env)
+        case ObjectPattern(UType(StructT(params, _, _, _))) => checkStructComplete(keys, params, env)
+        case ObjectPattern(UType(CustomT(_, underlying))) => doPatternsCoverType(keys, ObjectPattern(UType(underlying)), env)
         /*case ULink(key) => {
           for {
             state <- Evaluator.indicatedState(key, env)
@@ -85,7 +85,7 @@ object SubtypeUtils {
             Evaluator.asType(inputType, env) match {
               case Failure(_) => returnVal = false
               case Success(inputTypeT) => {
-                doPatternsCoverType(patternsWithThisConstructor, inputTypeT, env) match {
+                doPatternsCoverType(patternsWithThisConstructor, ObjectPattern(UType(inputTypeT)), env) match {
                   case Success(false) | Failure(_) => returnVal = false
                   case _ => ()
                 }
@@ -112,7 +112,8 @@ object SubtypeUtils {
   }
 
   // Returns true if the object is a pattern that will match everything in the type
-  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapType, env: Environment): Boolean = {
+  // nType is a pattern that represents a type
+  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapPattern, env: Environment): Boolean = {
     pattern match {
       case ObjectPattern(_) => false
       case WildcardPattern(_) => true
@@ -120,10 +121,10 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case StructT(params, _, _, _) if (params.length == patterns.length) => {
+          case ObjectPattern(UType(StructT(params, _, _, _))) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
+                isCatchallPattern(x._1, ObjectPattern(UType(Evaluator.asType(nObject, env).toOption.get)), env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }
@@ -131,24 +132,25 @@ object SubtypeUtils {
         }
       }
       case CasePattern(_, _) => false
+      case MapTPattern(_, _, _) => false
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapType, env: Environment): Outcome[Set[UntaggedObject], String] = {
+  def enumerateAllValuesIfPossible(nType: NewMapPattern, env: Environment): Outcome[Set[UntaggedObject], String] = {
     nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case SubtypeT(UMap(values), parentType, _) => {
+      case ObjectPattern(UType(SubtypeT(UMap(values), parentType, _))) => {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case CaseT(values, parentType, BasicMap) => {
+      /*case ObjectPattern(UType(CaseT(values, parentType, BasicMap))) => {
         ???
       }*/
-      case IndexT(i) => {
+      case ObjectPattern(UType(IndexT(i))) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
-      case BooleanT => {
+      case ObjectPattern(UType(BooleanT)) => {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
       case _ => {
@@ -183,7 +185,7 @@ object SubtypeUtils {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(Vector.empty)
       //case (_, AnyT) => Success(Vector.empty)
-      case (CountT, TypeT) => Success(Vector.empty)
+      //case (CountT, TypeT) => Success(Vector.empty)
       case (SubtypeT(isMember, parentType, featureSet), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
