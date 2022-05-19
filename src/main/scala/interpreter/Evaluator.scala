@@ -49,6 +49,11 @@ object Evaluator {
           evalOutputType <- this(outputType, env)
           outputT <- asType(evalOutputType, env)
         } yield {
+          val typeTransform = Vector(ObjectPattern(UType(inputT)) -> ObjectExpression(UType(outputT)))
+          
+          // TODO - put this in when we are ready!!
+          //UType(GenericMapT(typeTransform, config))
+          
           UType(MapT(inputT, outputT, config))
         }
       }

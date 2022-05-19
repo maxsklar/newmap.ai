@@ -107,6 +107,56 @@ object TypeChecker {
             }
             case None => {
               expectedType match {
+                case ObjectPattern(UType(CaseT(cases, IdentifierT, featureSet))) => {
+                  for {
+                    caseType <- Evaluator.applyFunctionAttempt(UMap(cases), UIdentifier(s), env)
+
+                    // TODO - of course, we can formulize this better!
+                    caseTypeIsEmptyStruct = caseType match {
+                      case UType(StructT(params, _, _, _)) => params.isEmpty
+                      case _ => false
+                    }
+
+                    isSingularType = (caseTypeIsEmptyStruct || (caseType == UType(IndexT(1))))
+                    _ <- Outcome.failWhen(!isSingularType, s"Type Value cannot be inferred: $caseType")
+                  } yield {
+                    if (caseType == UType(IndexT(1))) {
+                      TypeCheckResponse(ObjectExpression(UCase(UIdentifier(s), UIndex(0))), expectedType)
+                    } else {
+                      TypeCheckResponse(ObjectExpression(UCase(UIdentifier(s), UMap(Vector.empty))), expectedType)
+                    }
+                  }
+                }
+                case ObjectPattern(UType(ConstructedType(genericType, params))) => {
+                  // TODO - copied from above - this should be collapsed in the next refactor
+                  val genericTypeObj = Evaluator.stripVersioning(genericType, env)
+
+                  genericTypeObj match {
+                    case TaggedObject(UParametrizedCaseT(parameters, CaseT(cases, IdentifierT, featureSet)), _) => {
+                      for {
+                        caseType <- Evaluator.applyFunctionAttempt(UMap(cases), UIdentifier(s), env)
+
+                        // TODO - of course, we can formulize this better!
+                        caseTypeIsEmptyStruct = caseType match {
+                          case UType(StructT(params, _, _, _)) => params.isEmpty
+                          case _ => false
+                        }
+
+                        isSingularType = (caseTypeIsEmptyStruct || (caseType == UType(IndexT(1))))
+                        _ <- Outcome.failWhen(!isSingularType, s"Type Value cannot be inferred: $caseType")
+                      } yield {
+                        if (caseType == UType(IndexT(1))) {
+                          TypeCheckResponse(ObjectExpression(UCase(UIdentifier(s), UIndex(0))), expectedType)
+                        } else {
+                          TypeCheckResponse(ObjectExpression(UCase(UIdentifier(s), UMap(Vector.empty))), expectedType)
+                        }
+                      }
+                    }
+                    case _ => {
+                      Failure(s"Unexpected generic type: $genericTypeObj")
+                    }
+                  }
+                }
                 case WildcardPattern(t) => {
                   // TODO - this is in here temporarily to get some generic stuff to work
                   // eventually, take it out!

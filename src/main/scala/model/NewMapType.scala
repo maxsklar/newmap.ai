@@ -87,7 +87,7 @@ object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only sim
 object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
 object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
 
-case class TypeParameter(
+/*case class TypeParameter(
   name: String,
   upperBound: Vector[NewMapType] = Vector.empty,
   lowerBound: Vector[NewMapType] = Vector.empty,
@@ -97,7 +97,7 @@ case class TypeParameter(
 case class TypeParameterVariance(
   isCovariant: Boolean,
   isContravariant: Boolean
-)
+)*/
 
 // Params should be connected to a NewMapObject which are of type
 //  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)

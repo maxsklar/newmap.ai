@@ -622,8 +622,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data Bool = CaseType", GeneralSuccessCheck),
       CodeExpectation("update Bool (False, ())", GeneralSuccessCheck),
       CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
-      CodeExpectation("val t: Bool = True.()", GeneralSuccessCheck),
-      CodeExpectation("val f: Bool = False.()", GeneralSuccessCheck)
+      CodeExpectation("val t: Bool = True", GeneralSuccessCheck),
+      CodeExpectation("val f: Bool = False", GeneralSuccessCheck)
     ))
   }
 
@@ -653,7 +653,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
-      CodeExpectation("val a: ListOfCounts = Empty.()", GeneralSuccessCheck),
+      CodeExpectation("val a: ListOfCounts = Empty", GeneralSuccessCheck),
       CodeExpectation("val b: ListOfCounts = Node.(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: ListOfCounts = Node.(1, b)", GeneralSuccessCheck),
       CodeExpectation("val b2: ListOfCounts = Node.(3, a)", GeneralSuccessCheck)
@@ -676,7 +676,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
       CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option.6", GeneralSuccessCheck),
-      CodeExpectation("val x: maybeSix = None.()", GeneralSuccessCheck),
+      CodeExpectation("val x: maybeSix = None", GeneralSuccessCheck),
       CodeExpectation("val y: maybeSix = Some.1", GeneralSuccessCheck),
       CodeExpectation("val y: maybeSix = Some.10", FailureCheck),
       CodeExpectation("val z: maybeSix = None.3", FailureCheck),
@@ -689,6 +689,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
       CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
+      CodeExpectation("val x: Option.Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
       CodeExpectation("val z: Option.Count = None.0", FailureCheck),
     ))
@@ -700,7 +701,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
       CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val getOrElse: GenericMap (Option.T: ReqMap(T, T)) = (None.(): (t: t), Some.t: (_: t))", GeneralSuccessCheck),
-      CodeExpectation("val x: Option.Count = None.()", GeneralSuccessCheck),
+      CodeExpectation("val x: Option.Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
       CodeExpectation("getOrElse x 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
       CodeExpectation("getOrElse y 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(20, CountT))))
@@ -712,7 +713,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data List (T: Type)", GeneralSuccessCheck),
       CodeExpectation("update List (Empty, ())", GeneralSuccessCheck),
       CodeExpectation("update List (Node, (head: T, tail: List.T))", GeneralSuccessCheck),
-      CodeExpectation("val a: List.Count = Empty.()", GeneralSuccessCheck),
+      CodeExpectation("val a: List.Count = Empty", GeneralSuccessCheck),
       CodeExpectation("val b: List.Count = Node.(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: List.Count = Node.(1, b)", GeneralSuccessCheck),
       CodeExpectation("val b2: List.Count = Node.(3, a)", GeneralSuccessCheck)
