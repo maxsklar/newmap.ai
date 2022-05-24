@@ -29,8 +29,9 @@ object Evaluator {
           }
           case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
           case Some(EnvironmentParameter(nObject)) => {
+            Success(UParamId(s))
             //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
-            Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
+            //Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
           }
         }
       }
@@ -311,7 +312,7 @@ object Evaluator {
       }
       case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
-          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
+          _ <- Outcome.failWhen(attemptPatternMatch(constructorP, constructor, env).isFailure, "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
@@ -319,7 +320,7 @@ object Evaluator {
         // TODO - merge with above
         for {
           constructor <- removeTypeTag(constructorObj)
-          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
+          _ <- Outcome.failWhen(attemptPatternMatch(constructorP, constructor, env).isFailure, "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
@@ -327,7 +328,8 @@ object Evaluator {
         Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")
       }
       case (oPattern, _) => {
-        if (SubtypeUtils.checkEqual(oPattern, input)) {
+        // TODO - instead of checking for equality here - go through each untagged object configuration
+        if (oPattern == input) {
           Success(Map.empty)
         } else Failure("Patterns didn't match")
       }
@@ -404,7 +406,7 @@ object Evaluator {
         Failure(s"Not a type (map): $values")
       }
       case UInit => {
-        throw new Exception("Found undefined type")
+        //throw new Exception("Found undefined type")
         Success(UndefinedT)
       }
       case other => {

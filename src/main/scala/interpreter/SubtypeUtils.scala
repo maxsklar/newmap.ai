@@ -30,19 +30,21 @@ object SubtypeUtils {
               // 1) use inputPattern and parameters to update the encironment
               // 2) call checkCaseComplete(keys, caseT, newEnv)
 
-              val parametersAsPattern = UStruct(parameters.map(x => UWildcardPattern(x._1)))
-              val patternMatchResult = Evaluator.attemptPatternMatch(parametersAsPattern, inputPattern, env)
+              val newEnv = env.newParams(parameters)
               // patternMatchResult: Success(Map(T -> WildcardPattern(T)))
               // Problem is that the environment is going to contain a wildcard??
 
-              val ccc = checkCaseComplete(keys, caseT.cases, env)
+              //throw new Exception(s"doPatternsCoverType: $inputPattern -- $parameters -- $caseT\n --- $parametersAsPattern\n -- $patternMatchResult")
+
+              val ccc = checkCaseComplete(keys, caseT.cases, newEnv)
 
 
               // keys: Vector(UCase(None,StructPattern(Vector())), UCase(Some,WildcardPattern(t)))
               // parameters: Vector((T,Type))
               // caseT: Case(Some: T~pi, None: Struct ())
               // inputPattern:  WildcardPattern(T)
-              throw new Exception(s"in case pattern: $keys -- $parameters -- $caseT -- $inputPattern\n -- $patternMatchResult\n -- $ccc")
+              //throw new Exception(s"in case pattern: $keys -- $parameters -- $caseT -- $inputPattern\n --\n -- $ccc")
+              Failure("Unimplemented UParametrizedCaseT reqmap")
             }
             case _ => Success(false)
           }
@@ -93,11 +95,13 @@ object SubtypeUtils {
       // TODO - cleanup this pattern matching!!!
       Evaluator.attemptPatternMatchInOrder(cases, constructor, env) match {
         case Success(inputTypeExpression) => {
-          //println(s"$constructor --- $inputTypeExpression")
+          //println(s"$constructor --- $inputTypeExpression -- $returnVal")
           val inputType = Evaluator(inputTypeExpression, env).toOption.get
           // TODO - we need to be able to convert an expression to a pattern
           // - Some of the parameters in the expression with map to patterns instead of objects
           // - Whole new Evaluator line!!
+
+          //println(s"inputType: $inputType\n --- ${Evaluator.asType(inputType, env)}")
 
           Evaluator.asType(inputType, env) match {
             case Failure(_) => returnVal = false
@@ -402,10 +406,5 @@ object SubtypeUtils {
     } else {
       Failure("Function did not have singular input")
     }
-  }
-
-  // In the future - replace this with a type class (implementing equals)
-  def checkEqual(a: UntaggedObject, b: UntaggedObject): Boolean = {
-    a == b
   }
 }

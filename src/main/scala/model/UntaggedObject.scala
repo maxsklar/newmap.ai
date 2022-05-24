@@ -17,8 +17,11 @@ case class UMap(values: Vector[(UntaggedObject, NewMapExpression)]) extends Unta
 // This is equivalent to UMap where the keys are indecies
 case class UStruct(values: Vector[UntaggedObject]) extends UntaggedObject
 
-// Unleash the craziness!!
+// Represents any object (of a given type)
 case class UWildcardPattern(s: String) extends UntaggedObject
+
+// Represents a parametrized object (this can only exist in environments with parameters)
+case class UParamId(s: String) extends UntaggedObject
 
 // This can't be a map/struct because here the type of the input depends on the constructor
 case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends UntaggedObject

@@ -154,6 +154,7 @@ object PrintNewMapObject {
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
     case UWildcardPattern(name) => "W~" + name
+    case UParamId(name) => s"$name~pi"
     case UMapTPattern(input, output, config) => printMapT(untagged(input), untagged(output), config)
   }
 

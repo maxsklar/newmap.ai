@@ -65,5 +65,4 @@ case class BuildMapInstance(
 
 // This is an object that stands for something else in the environment
 // Very important so that we don't repeat code
-// TODO - perhaps in the future, every NewMapObject will actually be a pointer to a hash table, and these will be irrelevant
 case class ParamId(name: String) extends NewMapExpression

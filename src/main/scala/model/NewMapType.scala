@@ -28,10 +28,8 @@ case object TypeT extends NewMapType
 
 // This is the "bottom" type
 // It's equivalent to type 0 or type Case()
-// Difference here is that we disallow any function to ever return this. This is truly the "base type"
+// Difference here is that we disallow any function to ever return this through the type checker. This is truly the "base type"
 case object UndefinedT extends NewMapType
-
-//case object AnyT extends NewMapType
 
 // Todo - replace with "user defined type" in prelude
 case object IdentifierT extends NewMapType
