@@ -7,8 +7,8 @@ import ai.newmap.util.{Outcome, Success, Failure}
 class TestSubtypeUtils extends FlatSpec {
   "Subtype " should " be convertible into the parent type" in {
     val isMember = UMap(Vector(
-      ObjectPattern(UIdentifier("key")) -> ObjectExpression(UIndex(1)),
-      ObjectPattern(UIdentifier("value")) -> ObjectExpression(UIndex(1))
+      UIdentifier("key") -> ObjectExpression(UIndex(1)),
+      UIdentifier("value") -> ObjectExpression(UIndex(1))
     ))
 
     val convertInstructionOutcome = SubtypeUtils.isTypeConvertible(SubtypeT(isMember, IdentifierT, BasicMap), IdentifierT, Environment.Base)

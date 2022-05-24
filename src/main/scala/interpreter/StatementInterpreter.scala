@@ -11,7 +11,7 @@ object StatementInterpreter {
   )
 
   /*
-   * @param sParse The statement parse
+   * @param sParse The statement parses
    * @param env This is a map of identifiers which at this point are supposed to be subsituted.
    */
   def apply(
@@ -21,15 +21,15 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          tcType <- TypeChecker.typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          tcType <- TypeChecker.typeCheck(typeExpression, UType(TypeT), env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
 
           nType <- Evaluator.asType(nTypeObj, env)
-          tc <- TypeChecker.typeCheck(objExpression, ObjectPattern(UType(nType)), env, FullFunction)
+          tc <- TypeChecker.typeCheck(objExpression, UType(nType), env, FullFunction)
           evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
 
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, ObjectPattern(UType(nType)), env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, UType(nType), env)
         } yield {
           val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
@@ -37,7 +37,7 @@ object StatementInterpreter {
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          tcType <- typeCheck(typeExpression, UType(TypeT), env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
@@ -51,7 +51,7 @@ object StatementInterpreter {
       }
       case NewTypeStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, ObjectPattern(UType(TypeT)), env, FullFunction)
+          tcType <- typeCheck(typeExpression, UType(TypeT), env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
@@ -66,7 +66,7 @@ object StatementInterpreter {
         }
 
         for {
-          mapValues <- TypeChecker.typeCheckMap(values, ObjectPattern(UType(IdentifierT)), ObjectPattern(UType(TypeT)), BasicMap, env, FullFunction)
+          mapValues <- TypeChecker.typeCheckMap(values, UType(IdentifierT), UType(TypeT), BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           val paramType = TaggedObject(
@@ -75,8 +75,10 @@ object StatementInterpreter {
               CaseT(Vector.empty, IdentifierT)
             ),
             MapT(
-              StructT(mapValues, IdentifierT), // TODO: if mapValues has length 1 - should we simplify to the single value?
-              TypeT,
+              Environment.toTypeTransform(
+                StructT(mapValues, IdentifierT), // TODO: if mapValues has length 1 - should we simplify to the single value?
+                TypeT
+              ),
               MapConfig(RequireCompleteness, SimpleFunction)
             )
           )
@@ -124,7 +126,7 @@ object StatementInterpreter {
             case _ => env
           }
 
-          commandExp <- typeCheck(command, ObjectPattern(UType(inputT)), newEnv, FullFunction)
+          commandExp <- typeCheck(command, UType(inputT), newEnv, FullFunction)
 
           commandObj <- Evaluator(commandExp.nExpression, newEnv)
         } yield {
@@ -162,14 +164,14 @@ object StatementInterpreter {
   }
 
   def convertMapValuesToParamList(
-    mapValues: Vector[(NewMapPattern, NewMapExpression)],
+    mapValues: Vector[(UntaggedObject, NewMapExpression)],
     env: Environment
   ): Outcome[Vector[(String, NewMapType)], String] = {
     mapValues match {
       case (pattern, expression) +: restOfMapValues => {
         for {
           k <- pattern match {
-            case ObjectPattern(UIdentifier(s)) => Success(s)
+            case UIdentifier(s) => Success(s)
             case _ => Failure(s"Pattern $pattern should have been an identifier")
           }
 

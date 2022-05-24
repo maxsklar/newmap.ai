@@ -32,15 +32,15 @@ object MakeSubstitution {
       case BuildCase(constructor, input) => {
         BuildCase(constructor, this(input, parameters, env))
       }
-      case BuildMapT(inputType, outputType, config) => {
-        BuildMapT(
-          this(inputType, parameters, env),
-          this(outputType, parameters, env),
+      case BuildSimpleMapT(inputExp, outputExp, config) => {
+        BuildSimpleMapT(
+          this(inputExp, parameters, env),
+          this(outputExp, parameters, env),
           config
         )
       }
-      case BuildGenericMapT(typeTransform, config) => {
-        BuildGenericMapT(this(typeTransform, parameters, env), config)
+      case BuildMapT(typeTransform, config) => {
+        BuildMapT(this(typeTransform, parameters, env), config)
       }
       case BuildTableT(keyType, requiredValues) => {
         BuildTableT(

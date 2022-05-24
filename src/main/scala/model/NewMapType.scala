@@ -21,6 +21,7 @@ case object CharacterT extends NewMapType
 case object StringT extends NewMapType
 case object LongT extends NewMapType
 case object DoubleT extends NewMapType
+case object UuidT extends NewMapType
 
 // Type of types!
 case object TypeT extends NewMapType
@@ -56,13 +57,7 @@ case object IdentifierT extends NewMapType
  * TODO - should we subsume struct type in here??
  */
 case class MapT(
-  inputType: NewMapType,
-  outputType: NewMapType,
-  config: MapConfig
-) extends NewMapType
-
-case class GenericMapT(
-  typeTransform: Vector[(NewMapPattern, NewMapExpression)],
+  typeTransform: Vector[(UntaggedObject, NewMapExpression)],
   config: MapConfig
 ) extends NewMapType
 
@@ -100,7 +95,7 @@ case class TypeParameterVariance(
 )*/
 
 // Params should be connected to a NewMapObject which are of type
-//  MapT(fieldType, TypeT, RequireCompleteness, SimpleFunction)
+//  ReqMap(fieldType, TypeT)
 // They might also be a paramObj, to be filled in later
 // TODO(2022): once generics are introduced, fieldType might be unneccesary
 // TODO: What about simpler product types (no identifiers) based on MapT(TypeT, Count, CommandOutput, BasicMap)
@@ -108,7 +103,7 @@ case class TypeParameterVariance(
 // Params is a map from the fields of the struct to the Types (all the same level)
 // TODO: We also need a feature set!
 case class StructT(
-  params: Vector[(NewMapPattern, NewMapExpression)],
+  params: Vector[(UntaggedObject, NewMapExpression)],
   fieldParentType: NewMapType,
   completeness: MapCompleteness = RequireCompleteness,
   featureSet: MapFeatureSet = BasicMap
@@ -119,16 +114,16 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransform: Vector[(NewMapPattern, NewMapExpression)],
+  typeTransform: Vector[(UntaggedObject, NewMapExpression)],
 
   // List of the actual types in the class, but not their implementations - that's in the actual object (with a UMap)
-  typesInTypeClass: Vector[NewMapPattern],
+  typesInTypeClass: Vector[UntaggedObject],
 ) extends NewMapType
 
 // cases: input type is the case constructors, output type is the field types per constructor
 // TODO - this is not really a type because of the existance of type parameters. This is more of a type constructor
 case class CaseT(
-  cases: Vector[(NewMapPattern, NewMapExpression)],
+  cases: Vector[(UntaggedObject, NewMapExpression)],
   fieldParentType: NewMapType,
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType

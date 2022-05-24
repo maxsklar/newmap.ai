@@ -64,7 +64,7 @@ case class ForkEnvironmentCommand(
 
 case class ParameterEnvironmentCommand(
   id: String,
-  nType: NewMapPattern // Pattern representing a type
+  nType: UntaggedObject // Pattern representing a type
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"parameter $id: ${nType}"
@@ -80,7 +80,7 @@ case class ExpOnlyEnvironmentCommand(
 sealed abstract class EnvironmentValue
 
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
-case class EnvironmentParameter(nTypeClass: NewMapPattern) extends EnvironmentValue
+case class EnvironmentParameter(nTypeClass: UntaggedObject) extends EnvironmentValue
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
@@ -252,15 +252,15 @@ case class Environment(
 
   // TODO - should we ensure that nType is actually a type?
   def newParam(id: String, nType: NewMapType): Environment = {
-    newCommand(ParameterEnvironmentCommand(id, ObjectPattern(UType(nType))))
+    newCommand(ParameterEnvironmentCommand(id, UType(nType)))
   }
 
-  def newParamTypeClass(id: String, nTypeClass: NewMapPattern): Environment = {
+  def newParamTypeClass(id: String, nTypeClass: UntaggedObject): Environment = {
     newCommand(ParameterEnvironmentCommand(id, nTypeClass))
   }
 
   def newParams(xs: Vector[(String, NewMapType)]) = {
-    newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, ObjectPattern(UType(x._2)))))
+    newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, UType(x._2))))
   }
 }
 
@@ -269,17 +269,24 @@ object Environment {
     FullEnvironmentCommand(id, nObject)
   }
 
+  def toTypeTransform(
+    inputT: NewMapType,
+    outputT: NewMapType
+  ): Vector[(UntaggedObject, NewMapExpression)] = {
+    Vector(UType(inputT) -> ObjectExpression(UType(outputT)))
+  }
+
   def simpleFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
-    MapT(inputType, outputType, MapConfig(RequireCompleteness, BasicMap))
+    MapT(toTypeTransform(inputType, outputType), MapConfig(RequireCompleteness, BasicMap))
   }
 
   def fullFuncT(inputType: NewMapType, outputType: NewMapType): NewMapType = {
-    MapT(inputType, outputType, MapConfig(RequireCompleteness, FullFunction))
+    MapT(toTypeTransform(inputType, outputType), MapConfig(RequireCompleteness, FullFunction))
   }
 
   def structTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(UType(x._2)))
+      params.map(x => UIdentifier(x._1) -> ObjectExpression(UType(x._2)))
     }
 
     StructT(paramsToObject, IdentifierT)
@@ -287,7 +294,7 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => ObjectPattern(UIdentifier(x._1)) -> ObjectExpression(UType(x._2)))
+      params.map(x => UIdentifier(x._1) -> ObjectExpression(UType(x._2)))
     }
 
     CaseT(paramsToObject, IdentifierT)
@@ -313,15 +320,15 @@ object Environment {
     expression: NewMapExpression
   ): NewMapObject = {
     val structT = StructT(
-      inputs.zipWithIndex.map(x => ObjectPattern(UIndex(x._2)) -> ObjectExpression(UType(x._1._2))),
+      inputs.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(UType(x._1._2))),
       IndexT(inputs.length)
     )
 
-    val structP = StructPattern(inputs.map(x => WildcardPattern(x._1)))
+    val structP = UStruct(inputs.map(x => UWildcardPattern(x._1)))
 
     TaggedObject(
       UMap(Vector(structP -> expression)),
-      MapT(structT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
+      MapT(toTypeTransform(structT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )
   }
 
@@ -332,31 +339,33 @@ object Environment {
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
-    eCommand("Increment", TaggedObject(IncrementFunc, MapT(CountT, CountT, MapConfig(RequireCompleteness, SimpleFunction)))),
+    eCommand("Increment", TaggedObject(IncrementFunc, MapT(toTypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction)))),
     eCommand("IsCommand", TaggedObject(
       IsCommandFunc,
-      MapT(TypeT, IndexT(2), MapConfig(CommandOutput, SimpleFunction))
+      MapT(toTypeTransform(TypeT, IndexT(2)), MapConfig(CommandOutput, SimpleFunction))
     )),
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", TaggedObject(
-      UMap(Vector(WildcardPattern("key") -> BuildTableT(ObjectExpression(UIndex(0)), ParamId("key")))),
-      MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
+      UMap(Vector(UWildcardPattern("key") -> BuildTableT(ObjectExpression(UIndex(0)), ParamId("key")))),
+      MapT(toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
-      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap))
+      BuildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap))
     )),
     eCommand("GenericMap", TaggedObject(
-      UMap(Vector(WildcardPattern("typeTransform") -> BuildGenericMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction)))),
+      UMap(Vector(UWildcardPattern("typeTransform") -> BuildMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction)))),
       MapT(
-        MapT(TypeT, TypeT, MapConfig(CommandOutput, SimpleFunction)),
-        TypeT,
+        toTypeTransform(
+          MapT(toTypeTransform(TypeT, TypeT), MapConfig(CommandOutput, SimpleFunction)),
+          TypeT
+        ),
         MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
     eCommand("ReqMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      BuildMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction))
+      BuildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Table", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
@@ -366,19 +375,18 @@ object Environment {
     eCommand("ParametrizedCaseType", TaggedObject(
       UParametrizedCaseT(Vector.empty, CaseT(Vector.empty, IdentifierT)),
       MapT(
-        NewMapO.emptyStruct,
-        TypeT,
+        toTypeTransform(NewMapO.emptyStruct, TypeT),
         MapConfig(RequireCompleteness, SimpleFunction)
       )
     )),
     eCommand("Subtype", TaggedObject(
-      UMap(Vector(WildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
-      MapT(TypeT, TypeT, MapConfig(RequireCompleteness, SimpleFunction))
+      UMap(Vector(UWildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
+      MapT(toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewVersionedStatementCommand("_default", TypeClassT(Vector(WildcardPattern("t") -> ParamId("t")), Vector.empty)),
+    NewVersionedStatementCommand("_default", TypeClassT(Vector(UWildcardPattern("t") -> ParamId("t")), Vector.empty)),
     NewVersionedStatementCommand("_typeOf", 
       TypeClassT(
-        Vector(WildcardPattern("t") -> BuildMapT(ParamId("t"), ObjectExpression(UType(TypeT)), MapConfig(RequireCompleteness, SimpleFunction))),
+        Vector(UWildcardPattern("t") -> BuildSimpleMapT(ParamId("t"), ObjectExpression(UType(TypeT)), MapConfig(RequireCompleteness, SimpleFunction))),
         Vector.empty
       )
     ),

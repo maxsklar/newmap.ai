@@ -41,23 +41,19 @@ object Evaluator {
           UCase(constructor, evalInput)
         }
       }
-      case BuildMapT(inputType, outputType, config) => {
+      case BuildSimpleMapT(inputExp, outputExp, config) => {
         for {
-          evalInputType <- this(inputType, env)
-          inputT <- asType(evalInputType, env)
+          inputType <- this(inputExp, env)
+          inputT <- asType(inputType, env)
 
-          evalOutputType <- this(outputType, env)
-          outputT <- asType(evalOutputType, env)
+          outputType <- this(outputExp, env)
+          outputT <- asType(outputType, env)
         } yield {
-          val typeTransform = Vector(ObjectPattern(UType(inputT)) -> ObjectExpression(UType(outputT)))
-          
-          // TODO - put this in when we are ready!!
-          //UType(GenericMapT(typeTransform, config))
-          
-          UType(MapT(inputT, outputT, config))
+          val typeTransform = Environment.toTypeTransform(inputT, outputT)
+          UType(MapT(typeTransform, config))
         }
       }
-      case BuildGenericMapT(typeTransform, config) => {
+      case BuildMapT(typeTransform, config) => {
         for {
           evalTypeTransform <- this(typeTransform, env)
 
@@ -66,7 +62,7 @@ object Evaluator {
             case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
           }
         } yield {
-          UType(GenericMapT(evalTypeTransformM, config))
+          UType(MapT(evalTypeTransformM, config))
         }
       }
       case BuildTableT(keyType, requiredValues) => {
@@ -79,9 +75,9 @@ object Evaluator {
         } yield {
           // TODO - are we going to know that this is an expandable type?
           // - I think so because startingType is tagged!!
+          val typeTransform = Vector(UType(startingT) -> ObjectExpression(UType(valueT)))
           UType(MapT(
-            startingT,
-            valueT,
+            typeTransform,
             MapConfig(RequireCompleteness, SimpleFunction)
           ))
         }
@@ -129,7 +125,7 @@ object Evaluator {
       case BuildMapInstance(values) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
-        } yield UMap(values)
+        } yield UMap(evalValues)
       }
     }
   }
@@ -188,9 +184,9 @@ object Evaluator {
   }
 
   def evalMapInstanceVals(
-    values: Vector[(NewMapPattern, NewMapExpression)],
+    values: Vector[(UntaggedObject, NewMapExpression)],
     env: Environment
-  ): Outcome[Vector[(NewMapPattern, NewMapExpression)], String] = {
+  ): Outcome[Vector[(UntaggedObject, NewMapExpression)], String] = {
     values match {
       case (k, v) +: restOfValues => {
         for {
@@ -269,7 +265,7 @@ object Evaluator {
   }
 
   def attemptPatternMatchInOrder(
-    remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
+    remainingPatterns: Vector[(UntaggedObject, NewMapExpression)],
     input: UntaggedObject,
     env: Environment
   ): Outcome[NewMapExpression, String] = {
@@ -290,7 +286,7 @@ object Evaluator {
   }
 
   def attemptPatternMatch(
-    pattern: NewMapPattern,
+    pattern: UntaggedObject,
     input: UntaggedObject,
     env: Environment
   ): Outcome[Map[String, UntaggedObject], String] = {
@@ -298,38 +294,42 @@ object Evaluator {
     // We must be able to deal with using the same variable in a pattern, like StructPattern(x, x) to
     //  denote that these are the same
     (pattern, stripVersioningU(input, env)) match {
-      case (StructPattern(params), UMap(paramValues)) => {
+      case (UStruct(params), UMap(paramValues)) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
           result <- patternMatchOnStruct(params, inputs, env)
         } yield result 
       }
-      case (StructPattern(params), singleValue) if (params.length == 1) => {
+      case (UStruct(params), UStruct(inputParams)) => {
+        patternMatchOnStruct(params, inputParams, env)
+      }
+      case (UStruct(params), singleValue) if (params.length == 1) => {
         attemptPatternMatch(params.head, singleValue, env)
       }
-      case (WildcardPattern(name), _) => {
+      case (UWildcardPattern(name), _) => {
         Success(Map(name -> input))
       }
-      // TODO - eventually instead of checking equality, we'll check for "convertability"
-      //  For example between different type versions
-      case (ObjectPattern(oPattern), _) => {
-        if (SubtypeUtils.checkEqual(oPattern, input)) {
-          Success(Map.empty)
-        } else Failure("ObjectPattern didn't match")
-      }
-      case (CasePattern(constructorP, inputP), UCase(constructor, cInput)) => {
+      case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
           _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
-      case (CasePattern(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
+      case (UCase(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
         // TODO - merge with above
         for {
           constructor <- removeTypeTag(constructorObj)
           _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
+      }
+      case (_, UWildcardPattern(wildcard)) => {
+        Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")
+      }
+      case (oPattern, _) => {
+        if (SubtypeUtils.checkEqual(oPattern, input)) {
+          Success(Map.empty)
+        } else Failure("Patterns didn't match")
       }
       case _ => {
         Failure("Failed Pattern Match")
@@ -338,7 +338,7 @@ object Evaluator {
   }
 
   def patternMatchOnStruct(
-    structPattern: Vector[NewMapPattern],
+    structPattern: Vector[UntaggedObject],
     inputs: Vector[UntaggedObject],
     env: Environment
   ): Outcome[Map[String, UntaggedObject], String] = {
@@ -351,102 +351,29 @@ object Evaluator {
           newParameters ++ otherParameters
         }
       }
-      case _ => Success(Map.empty) // No patterns to match
-    }
-  }
-
-  def attemptPatternMatchInOrderOnPattern(
-    remainingPatterns: Vector[(NewMapPattern, NewMapExpression)],
-    input: NewMapPattern,
-    env: Environment
-  ): Outcome[NewMapExpression, String] = {
-    remainingPatterns match {
-      case (pattern, answer) +: addlPatterns => {
-        attemptPatternMatchOnPattern(pattern, input, env) match {
-          case Success(paramsToSubsitute) => {
-            val paramsAsExpressions = paramsToSubsitute.toVector.map(x => (x._1 -> TypeChecker.patternToExpression(x._2))).toMap
-            Success(MakeSubstitution(answer, paramsAsExpressions, env))
-          }
-          case Failure(_) => attemptPatternMatchInOrderOnPattern(addlPatterns, input, env)
-        }
-      }
-      case _ => Failure(
-        s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there",
-      )
-    }
-  }
-
-  def attemptPatternMatchOnPattern(
-    pattern: NewMapPattern,
-    input: NewMapPattern,
-    env: Environment
-  ): Outcome[Map[String, NewMapPattern], String] = {
-    (pattern, input) match {
-      case (_, ObjectPattern(inputObj)) => {
-        for {
-          result <- attemptPatternMatch(pattern, inputObj, env)
-        } yield result.toVector.map(x => x._1 -> ObjectPattern(x._2)).toMap
-      }
-      case (StructPattern(params), StructPattern(inputParams)) => {
-        patternMatchOnStructPattern(params, inputParams, env)
-      }
-      case (StructPattern(params), singleValue) if (params.length == 1) => {
-        attemptPatternMatchOnPattern(params.head, singleValue, env)
-      }
-      case (WildcardPattern(name), WildcardPattern(inputName)) => {
-        Success(Map(name -> WildcardPattern(inputName)))
-      }
-      case (CasePattern(constructorP, inputP), CasePattern(constructor, cInput)) => {
-        for {
-          _ <- Outcome.failWhen(!SubtypeUtils.checkEqual(constructorP, constructor), "Constructors didn't match")
-          result <- attemptPatternMatchOnPattern(inputP, cInput, env)
-        } yield result
-      }
+      case _ if (structPattern.isEmpty && inputs.isEmpty) => Success(Map.empty) // No patterns to match
       case _ => {
-        Failure("Failed Pattern Match on Pattern")
-      }
-    }
-  }
-
-  def patternMatchOnStructPattern(
-    structPattern: Vector[NewMapPattern],
-    inputPatterns: Vector[NewMapPattern],
-    env: Environment
-  ): Outcome[Map[String, NewMapPattern], String] = {
-    (structPattern, inputPatterns) match {
-      case (firstPattern +: restOfPatterns, firstInput +: restOfInputs) => {
-        for {
-          newParameters <- attemptPatternMatchOnPattern(firstPattern, firstInput, env)
-          otherParameters <- patternMatchOnStructPattern(restOfPatterns, restOfInputs, env)
-        } yield {
-          newParameters ++ otherParameters
-        }
-      }
-      case _ if (structPattern.isEmpty && inputPatterns.isEmpty) => {
-        Success(Map.empty) // No patterns to match
-      }
-      case _ => {
-        Failure("patternMatchOnStructPattern: structPattern and inputPattern are of different length. Leftovers: $structPattern -- $inputPatterns")
-      }
+        Failure(s"patternMatchOnStruct: structPattern and inputPattern are of different length. Leftovers: $structPattern -- $inputs")
+      }  
     }
   }
 
   // TODO - move this elsewhere, maybe to environment!
-  def newParametersFromPattern(pattern: NewMapPattern): Vector[String] = pattern match {
-    case ObjectPattern(_) => Vector.empty
-    case WildcardPattern(name) => Vector(name)
-    case StructPattern(patterns) => patterns match {
+  def newParametersFromPattern(pattern: UntaggedObject): Vector[String] = pattern match {
+    case UWildcardPattern(name) => Vector(name)
+    case UStruct(patterns) => patterns match {
       case firstPattern +: otherPatterns => {
-        newParametersFromPattern(firstPattern) ++ newParametersFromPattern(StructPattern(otherPatterns))
+        newParametersFromPattern(firstPattern) ++ newParametersFromPattern(UStruct(otherPatterns))
       }
       case _ => Vector.empty
     }
-    case CasePattern(constructor, input) => {
+    case UCase(constructor, input) => {
       newParametersFromPattern(input)
     }
-    case MapTPattern(input, output, config) => {
+    case UMapTPattern(input, output, config) => {
       newParametersFromPattern(input) ++ newParametersFromPattern(output)
     }
+    case _ => Vector.empty
   }
 
   def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
@@ -482,26 +409,6 @@ object Evaluator {
       }
       case other => {
         Failure(s"Not a type: $other")
-      }
-    }
-  }
-
-  def asTypePattern(nExpression: NewMapExpression, env: Environment): Outcome[NewMapPattern, String] = {
-    nExpression match {
-      case ObjectExpression(uObject) => Success(ObjectPattern(uObject))
-      case BuildCase(constructor, value) => {
-        for {
-          valuePattern <- asTypePattern(value, env)
-        } yield CasePattern(constructor, valuePattern)
-      }
-      case ParamId(s) => {
-        env.lookup(s) match {
-          case Some(EnvironmentParameter(nType)) => Success(nType)
-          case _ => Failure(s"Param $s not a known parameter")
-        }
-      }
-      case _ => {
-        Failure("Cannot interpret expression as a type pattern: $nExpression")
       }
     }
   }

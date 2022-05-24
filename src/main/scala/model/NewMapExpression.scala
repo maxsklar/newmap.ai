@@ -19,14 +19,13 @@ case class BuildCase(
   input: NewMapExpression
 ) extends NewMapExpression
 
-// Future: Replace with Buildcase when MapT is a Case Instance
-case class BuildMapT(
+case class BuildSimpleMapT(
   inputType: NewMapExpression,
   outputType: NewMapExpression,
   config: MapConfig
 ) extends NewMapExpression
 
-case class BuildGenericMapT(
+case class BuildMapT(
   typeTransform: NewMapExpression,
   config: MapConfig
 ) extends NewMapExpression
@@ -61,7 +60,7 @@ case class BuildNewTypeClassT(
 ) extends NewMapExpression
 
 case class BuildMapInstance(
-  values: Vector[(NewMapPattern, NewMapExpression)]
+  values: Vector[(UntaggedObject, NewMapExpression)]
 ) extends NewMapExpression
 
 // This is an object that stands for something else in the environment

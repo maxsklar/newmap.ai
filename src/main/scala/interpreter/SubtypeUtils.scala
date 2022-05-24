@@ -9,15 +9,10 @@ object SubtypeUtils {
   // For ReqMaps, we need to ensure that all of the values are accounted for.
   // For Maps, we want to know that the default value is never used
   def doPatternsCoverType(
-    keys: Vector[NewMapPattern],
-    nType: NewMapPattern,
+    keys: Vector[UntaggedObject],
+    nType: UntaggedObject,
     env: Environment
   ): Outcome[Boolean, String] = {
-    val objectKeys: Set[UntaggedObject] = keys.flatMap(_ match {
-      case ObjectPattern(o) => Some(o)
-      case _ => None
-    }).toSet
-
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
@@ -28,29 +23,46 @@ object SubtypeUtils {
     }
     else {
       val piecemealCompletenessOutcome = nType match {
-        case ObjectPattern(UType(CaseT(cases, _, _))) => checkCaseComplete(keys, cases, env)
-        /*case UMap(values) => {
-          checkCaseComplete(keys, UMap(values), env)
-        }*/
-        case ObjectPattern(UType(StructT(params, _, _, _))) => checkStructComplete(keys, params, env)
-        case ObjectPattern(UType(CustomT(_, underlying))) => doPatternsCoverType(keys, ObjectPattern(UType(underlying)), env)
-        /*case ULink(key) => {
-          for {
-            state <- Evaluator.indicatedState(key, env)
-            untaggedState <- Evaluator.removeTypeTag(state)
-            result <- doPatternsCoverType(keys, untaggedState, env)
-          } yield result
-        }*/ // TODO - add custom type here
+        case UType(CaseT(cases, _, _)) => Success(checkCaseComplete(keys, cases, env))
+        case UCase(constructor, inputPattern) => {
+          Evaluator.stripVersioningU(constructor, env) match {
+            case UParametrizedCaseT(parameters, caseT) => {
+              // 1) use inputPattern and parameters to update the encironment
+              // 2) call checkCaseComplete(keys, caseT, newEnv)
+
+              val parametersAsPattern = UStruct(parameters.map(x => UWildcardPattern(x._1)))
+              val patternMatchResult = Evaluator.attemptPatternMatch(parametersAsPattern, inputPattern, env)
+              // patternMatchResult: Success(Map(T -> WildcardPattern(T)))
+              // Problem is that the environment is going to contain a wildcard??
+
+              val ccc = checkCaseComplete(keys, caseT.cases, env)
+
+
+              // keys: Vector(UCase(None,StructPattern(Vector())), UCase(Some,WildcardPattern(t)))
+              // parameters: Vector((T,Type))
+              // caseT: Case(Some: T~pi, None: Struct ())
+              // inputPattern:  WildcardPattern(T)
+              throw new Exception(s"in case pattern: $keys -- $parameters -- $caseT -- $inputPattern\n -- $patternMatchResult\n -- $ccc")
+            }
+            case _ => Success(false)
+          }
+        }
+        case UType(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
+        case UType(CustomT(_, underlying)) => doPatternsCoverType(keys, UType(underlying), env)
         case _ => Success(false)
       }
 
       piecemealCompletenessOutcome match {
         case Success(true) => Success(true)
         case _ => {
+          val patternsMap = keys.map(key => key -> ObjectExpression(UIndex(1)))
+
           for {
             keysToMatch <- enumerateAllValuesIfPossible(nType, env)
           } yield {
-            (keysToMatch -- objectKeys).isEmpty && (objectKeys -- keysToMatch).isEmpty
+            keysToMatch.forall(uKey => {
+              Evaluator.attemptPatternMatchInOrder(patternsMap, uKey, env).isSuccess
+            })
           }
         }
       }
@@ -58,53 +70,55 @@ object SubtypeUtils {
   }
 
   def checkCaseComplete(
-    keys: Vector[NewMapPattern],
-    cases: Vector[(NewMapPattern, NewMapExpression)],
+    keys: Vector[UntaggedObject],
+    cases: Vector[(UntaggedObject, NewMapExpression)],
     env: Environment
-  ): Outcome[Boolean, String] = {
+  ): Boolean = {
+    // For each case key, we want to make sure that this case key is completely covered
+    val constructors = cases.map(_._1)
+
+    var returnVal = true
+
     for {
-      // For each case key, we want to make sure that this case key is completely covered
-      constructors <- enumerateMapKeys(cases.map(_._1))
+      constructor <- constructors
     } yield {
-      var returnVal = true
+      
+      // Look at our keys, and find the ones that are only for this case key, and save those patterns
+      val patternsWithThisConstructor = keys.flatMap(key => key match {
+        case UCase(untaggedConstructor, pattern) => Some(pattern)
+        case _ => None
+      })
 
-      for {
-        untaggedConstructor <- constructors
-      } yield {
-        // Look at our keys, and find the ones that are only for this case key, and save those patterns
-        val patternsWithThisConstructor = keys.flatMap(key => key match {
-          case CasePattern(untaggedConstructor, pattern) => Some(pattern)
-          case ObjectPattern(UCase(untaggedConstructor, input)) => Some(ObjectPattern(input))
-          case _ => None
-        })
+      // Find the input type for this constructor, and make sure that all of THOSE inputs are accounted for
+      // TODO - cleanup this pattern matching!!!
+      Evaluator.attemptPatternMatchInOrder(cases, constructor, env) match {
+        case Success(inputTypeExpression) => {
+          //println(s"$constructor --- $inputTypeExpression")
+          val inputType = Evaluator(inputTypeExpression, env).toOption.get
+          // TODO - we need to be able to convert an expression to a pattern
+          // - Some of the parameters in the expression with map to patterns instead of objects
+          // - Whole new Evaluator line!!
 
-        // Find the input type for this constructor, and make sure that all of THOSE inputs are accounted for
-        // TODO - cleanup this pattern matching!!!
-        Evaluator.applyFunctionAttempt(UMap(cases), untaggedConstructor, env) match {
-          case Success(inputType) => {
-            Evaluator.asType(inputType, env) match {
-              case Failure(_) => returnVal = false
-              case Success(inputTypeT) => {
-                doPatternsCoverType(patternsWithThisConstructor, ObjectPattern(UType(inputTypeT)), env) match {
-                  case Success(false) | Failure(_) => returnVal = false
-                  case _ => ()
-                }
+          Evaluator.asType(inputType, env) match {
+            case Failure(_) => returnVal = false
+            case Success(inputTypeT) => {
+              doPatternsCoverType(patternsWithThisConstructor, UType(inputTypeT), env) match {
+                case Success(false) | Failure(_) => returnVal = false
+                case _ => ()
               }
             }
           }
-          case _ => {
-            returnVal = false
-          }
         }
+        case _ => returnVal = false
       }
-
-      returnVal
     }
+
+    returnVal
   }
 
   def checkStructComplete(
-    keys: Vector[NewMapPattern],
-    params: Vector[(NewMapPattern, NewMapExpression)],
+    keys: Vector[UntaggedObject],
+    params: Vector[(UntaggedObject, NewMapExpression)],
     env: Environment
   ): Outcome[Boolean, String] = {
     // TODO: Implement
@@ -113,44 +127,42 @@ object SubtypeUtils {
 
   // Returns true if the object is a pattern that will match everything in the type
   // nType is a pattern that represents a type
-  def isCatchallPattern(pattern: NewMapPattern, nType: NewMapPattern, env: Environment): Boolean = {
+  def isCatchallPattern(pattern: UntaggedObject, nType: UntaggedObject, env: Environment): Boolean = {
     pattern match {
-      case ObjectPattern(_) => false
-      case WildcardPattern(_) => true
-      case StructPattern(patterns)  => {
+      case UWildcardPattern(_) => true
+      case UStruct(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
-          // - That would require isCatchallPattern to match an nType that's a NewMapPattern, not just a NewMapObject
-          case ObjectPattern(UType(StructT(params, _, _, _))) if (params.length == patterns.length) => {
+          // - That would require isCatchallPattern to match an nType that's a UntaggedObject, not just a NewMapObject
+          case UType(StructT(params, _, _, _)) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, ObjectPattern(UType(Evaluator.asType(nObject, env).toOption.get)), env)
+                isCatchallPattern(x._1, UType(Evaluator.asType(nObject, env).toOption.get), env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }
           case _ => false 
         }
       }
-      case CasePattern(_, _) => false
-      case MapTPattern(_, _, _) => false
+      case _ => false
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapPattern, env: Environment): Outcome[Set[UntaggedObject], String] = {
+  def enumerateAllValuesIfPossible(nType: UntaggedObject, env: Environment): Outcome[Set[UntaggedObject], String] = {
     nType match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case ObjectPattern(UType(SubtypeT(UMap(values), parentType, _))) => {
+      case UType(SubtypeT(UMap(values), parentType, _)) => {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case ObjectPattern(UType(CaseT(values, parentType, BasicMap))) => {
+      /*case UType(CaseT(values, parentType, BasicMap)) => {
         ???
       }*/
-      case ObjectPattern(UType(IndexT(i))) => {
+      case UType(IndexT(i)) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
-      case ObjectPattern(UType(BooleanT)) => {
+      case UType(BooleanT) => {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
       case _ => {
@@ -160,16 +172,15 @@ object SubtypeUtils {
     }
   }
 
-  def enumerateMapKeys(values: Vector[NewMapPattern]): Outcome[Set[UntaggedObject], String] = {
+  def enumerateMapKeys(values: Vector[UntaggedObject]): Outcome[Set[UntaggedObject], String] = {
     values match {
       case value +: additionalValues => {
-        value match {
-          case ObjectPattern(o) => {
-            for {
-              addlValues <- enumerateMapKeys(additionalValues)
-            } yield addlValues + o
-          }
-          case _ => Failure(s"Found non-ObjectPattern: $value")
+        if (RetrieveType.isTermPatternFree(value)) {
+          for {
+            addlValues <- enumerateMapKeys(additionalValues)
+          } yield addlValues + value
+        } else {
+          Failure(s"Found non-ObjectPattern: $value")
         }
       }
       case _ => Success(Set.empty) 
@@ -184,8 +195,6 @@ object SubtypeUtils {
   ): Outcome[Vector[NewMapObject], String] = {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(Vector.empty)
-      //case (_, AnyT) => Success(Vector.empty)
-      //case (CountT, TypeT) => Success(Vector.empty)
       case (SubtypeT(isMember, parentType, featureSet), _) => {
         for {
           convertInstructions <- isTypeConvertible(parentType, endingType, env)
@@ -195,8 +204,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(startingInputType, startingOutputType, MapConfig(startingCompleteness, startingFeatureSet, _)),
-        MapT(endingInputType, endingOutputType, MapConfig(endingCompleteness, endingFeatureSet, _))
+        MapT(startingTypeTransform, MapConfig(startingCompleteness, startingFeatureSet, _)),
+        MapT(endingTypeTransform, MapConfig(endingCompleteness, endingFeatureSet, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -204,6 +213,36 @@ object SubtypeUtils {
         val isMapCompletenessConvertible = true
 
         for {
+          _ <- Outcome.failWhen(startingTypeTransform.length != 1, s"map conversions only available for type transforms of length 1. StartingTypeTransform was $startingTypeTransform")
+          _ <- Outcome.failWhen(endingTypeTransform.length != 1, s"map conversions only available for type transforms of length 1. endingTypeTransform was $endingTypeTransform")
+
+          startingTypePair <- startingTypeTransform.head match {
+            case (inputT, ObjectExpression(outputT)) => {
+              for {
+                inT <- Evaluator.asType(inputT, env)
+                ouT <- Evaluator.asType(outputT, env)
+              } yield (inT, ouT)
+            }
+            case _ => {
+              Failure(s"Not implement for generic type transform: $startingTypeTransform")
+            }
+          }
+
+          endingTypePair <- endingTypeTransform.head match {
+            case (inputT, ObjectExpression(outputT)) => {
+              for {
+                inT <- Evaluator.asType(inputT, env)
+                ouT <- Evaluator.asType(outputT, env)
+              } yield (inT, ouT)
+            }
+            case _ => {
+              Failure(s"Not implement for generic type transform: $endingTypeTransform")
+            }
+          }
+
+          (startingInputType, startingOutputType) = startingTypePair
+          (endingInputType, endingOutputType) = endingTypePair
+
           // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
           // Eventually, we'll have to implement covariance in generic types
 
@@ -357,7 +396,7 @@ object SubtypeUtils {
   }
 
   // If this function only allows one input, then return the output for that input
-  def outputIfFunctionHasSingularInput(mapValues: Vector[(NewMapPattern, NewMapExpression)]): Outcome[NewMapExpression, String] = {
+  def outputIfFunctionHasSingularInput(mapValues: Vector[(UntaggedObject, NewMapExpression)]): Outcome[NewMapExpression, String] = {
     if (mapValues.length == 1) {
       Success(mapValues.head._2)
     } else {

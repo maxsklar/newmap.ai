@@ -12,6 +12,13 @@ object RetrieveType {
     }
   }
 
+  def isTermPatternFree(untaggedObject: UntaggedObject): Boolean = untaggedObject match {
+    case UWildcardPattern(_) => false
+    case UCase(_, input) => isTermPatternFree(input)
+    case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
+    case _ => true
+  }
+
   // Ensures that there are no free variables in this term
   // TODO: Return a NewMapObject if this is the case?
   // TODO: This can be handled by a specialized type-checker on NewMapExpression (ripe for removing this code)
@@ -27,11 +34,7 @@ object RetrieveType {
         isTermClosedLiteral(input, knownVariables)
     }
     case BuildCase(_, input) => isTermClosedLiteral(input, knownVariables)
-    case BuildMapT(inputType, outputType, _) => {
-      isTermClosedLiteral(inputType, knownVariables) &&
-        isTermClosedLiteral(outputType, knownVariables)
-    }
-    case BuildGenericMapT(typeTransform, config) => isTermClosedLiteral(typeTransform, knownVariables)
+    case BuildMapT(typeTransform, config) => isTermClosedLiteral(typeTransform, knownVariables)
     case BuildTableT(keyType, requiredValues) => {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }
@@ -45,7 +48,7 @@ object RetrieveType {
   }
 
   def isMapValuesClosed(
-    mapValues: Vector[(NewMapPattern, NewMapExpression)],
+    mapValues: Vector[(UntaggedObject, NewMapExpression)],
     knownVariables: Vector[String]
   ): Boolean = {
     mapValues match {

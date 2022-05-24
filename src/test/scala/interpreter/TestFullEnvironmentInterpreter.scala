@@ -28,6 +28,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
   def IndexValue(i: Long, nType: NewMapType): NewMapObject = TaggedObject(UIndex(i), nType)
 
+  def toTypeTransform(
+    inputT: NewMapType,
+    outputT: NewMapType
+  ): Vector[(UntaggedObject, NewMapExpression)] = {
+    Vector(UType(inputT) -> ObjectExpression(UType(outputT)))
+  }
+
   /**
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 
@@ -67,8 +74,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(line, FailureCheck))
   }
 
-  def bind(key: UntaggedObject, value: UntaggedObject): (NewMapPattern, NewMapExpression) = {
-    ObjectPattern(key) -> ObjectExpression(value)
+  def bind(key: UntaggedObject, value: UntaggedObject): (UntaggedObject, NewMapExpression) = {
+    key -> ObjectExpression(value)
   }
 
   "A number " should " be allowed if it's one less than the type" in {
@@ -98,7 +105,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(1), UIndex(43)),
           bind(UIndex(2), UIndex(67))
         )),
-        MapT(IndexT(3), IndexT(100), MapConfig(CommandOutput, BasicMap))
+        MapT(
+          toTypeTransform(IndexT(3), IndexT(100)),
+          MapConfig(CommandOutput, BasicMap)
+        )
       )
     )
 
@@ -110,7 +120,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "m",
-      Environment.typeAsObject(MapT(IndexT(3), IndexT(100), MapConfig(CommandOutput, BasicMap)))
+      Environment.typeAsObject(MapT(toTypeTransform(IndexT(3), IndexT(100)), MapConfig(CommandOutput, BasicMap)))
     )
 
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
@@ -145,7 +155,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(0), UIndex(10)),
           bind(UIndex(2), UIndex(3))
         )),
-        MapT(IndexT(3), IndexT(100), MapConfig(CommandOutput, BasicMap))
+        MapT(toTypeTransform(IndexT(3), IndexT(100)), MapConfig(CommandOutput, BasicMap))
       )
     )
 
@@ -207,13 +217,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "testType",
       Environment.typeAsObject(MapT(
-        Environment.structTypeFromParams(
-          Vector(
-            "a" -> IndexT(3),
-            "b" -> IndexT(3)
-          )
+        toTypeTransform(
+          Environment.structTypeFromParams(
+            Vector(
+              "a" -> IndexT(3),
+              "b" -> IndexT(3)
+            )
+          ),
+          IndexT(100)
         ),
-        IndexT(100),
         MapConfig(CommandOutput, BasicMap)
       ))
     )
@@ -258,7 +270,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "f",
       TaggedObject(
         UMap(Vector(
-          WildcardPattern("a") ->
+          UWildcardPattern("a") ->
           ApplyFunction(
             ObjectExpression(
               UMap(Vector(
@@ -270,7 +282,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
             ParamId("a")
           )
         )),
-        MapT(IndexT(3), IndexT(4), MapConfig(RequireCompleteness, FullFunction))
+        MapT(toTypeTransform(IndexT(3), IndexT(4)), MapConfig(RequireCompleteness, FullFunction))
       )
     )
 
@@ -431,15 +443,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   // This test exists because of a bug which got this wrong
   // The solution to this was avoiding variable capture
   it should " be able to handle a nested ReqMap properly" in {
-    val expectedResult = Environment.typeAsObject(MapT(
-      IndexT(2),
+    val expectedResult = Environment.typeAsObject(
       MapT(
-        IndexT(4),
-        CountT,
+        toTypeTransform(
+          IndexT(2),
+          MapT(
+            toTypeTransform(IndexT(4), CountT),
+            MapConfig(RequireCompleteness, SimpleFunction)
+          )
+        ),
         MapConfig(RequireCompleteness, SimpleFunction)
-      ),
-      MapConfig(RequireCompleteness, SimpleFunction)
-    ))
+      )
+    )
 
     testCodeScript(Vector(
       CodeExpectation(
