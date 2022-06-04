@@ -70,7 +70,6 @@ object TypeChecker {
               // TODO: Execute convert instructions?
             } yield {
               val uType = env.typeSystem.typeToUntaggedObject(t)
-              println(s"About to respond $$uType")
               TypeCheckResponse(ObjectExpression(UIdentifier(s)), uType)
             }
           }
@@ -87,7 +86,7 @@ object TypeChecker {
             case _ => None
           }
 
-          _ <- TypeClassUtils.typeClassIsExpectingAnIdentifier(expectedT, s, env).toOption
+          convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(UIdentifier(s), IdentifierT), expectedT, env).toOption
         } yield ()
 
         if (useLiteralIdentifier.nonEmpty) {
@@ -104,7 +103,7 @@ object TypeChecker {
               val nType = RetrieveType.fromNewMapObject(nObject, env)
               for { 
                 convertInstructions <- TypeClassUtils.isObjectConvertibleToPattern(nObject, expectedType, env)
-                
+
                 // TODO - execute convert instructions on nObject
                 uObject <- Evaluator.removeTypeTag(nObject)
               } yield {
@@ -197,6 +196,7 @@ object TypeChecker {
       }
       case ApplyParse(function, input) => {
         for {
+          // TODO! We need to use the type transform in here
           result <- typeCheckUnknownFunction(function, input, env)
 
           // Is member of Subtype check here?
@@ -958,7 +958,6 @@ object TypeChecker {
         case UType(MapT(typeTransform, config)) => {
           for {
             typeAsObj <- Evaluator.applyFunctionAttempt(UMap(typeTransform), inputType, env)
-
             nType <- Evaluator.asType(typeAsObj, env)
           } yield {
             nType

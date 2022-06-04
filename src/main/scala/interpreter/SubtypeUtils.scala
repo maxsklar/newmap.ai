@@ -371,9 +371,9 @@ object SubtypeUtils {
         Success(Vector.empty)
       }
       case _ => {
-        /*if (startingType != CountT && startingType != BooleanT) {
+        if (startingType == WildcardPatternT("t")) {
           throw new Exception(s"No rule to convert $startingType to $endingType")
-        }*/
+        }
         
         Failure(s"No rule to convert $startingType to $endingType")
       }

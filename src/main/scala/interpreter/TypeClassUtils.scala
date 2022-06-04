@@ -146,6 +146,9 @@ object TypeClassUtils {
     env: Environment
   ): Outcome[Vector[NewMapObject], String] = {
     endingTypePattern match {
+      case UType(WildcardPatternT(_)) => {
+        Success(Vector.empty)
+      }
       case UType(endingType) => {
         SubtypeUtils.isObjectConvertibleToType(startingObject, endingType, env)
       }
