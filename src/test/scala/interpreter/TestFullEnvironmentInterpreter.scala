@@ -40,7 +40,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * on each line, you can check that it succeeds, fails, or 
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
-    val interp = new EnvironmentInterpreter()
+    val interp = new EnvironmentInterpreter(true, false)
 
     expectations.foreach(expectation => {
       val interpretation = interp(expectation.line)
@@ -201,7 +201,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " not allow fields that cannnot be evaluated to literals " in {
-    val interp = new EnvironmentInterpreter()
     val correctCommand = Environment.eCommand(
       "q",
       Index(1)
@@ -659,7 +658,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
       CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x, (Second.x): 2)", GeneralSuccessCheck),
-      CodeExpectation("val IncompleteeMyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x", FailureCheck),
+      CodeExpectation("val IncompleteMyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x", FailureCheck),
     ))
   }
 

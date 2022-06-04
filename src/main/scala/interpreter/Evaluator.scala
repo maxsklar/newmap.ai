@@ -274,8 +274,7 @@ object Evaluator {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
           case Success(paramsToSubsitute) => {
-            val paramsAsExpressions = paramsToSubsitute.toVector.map(x => (x._1 -> ObjectExpression(x._2))).toMap
-            Success(MakeSubstitution(answer, paramsAsExpressions, env))
+            Success(MakeSubstitution(answer, paramsToSubsitute))
           }
           case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env)
         }
@@ -316,14 +315,14 @@ object Evaluator {
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
-      case (UCase(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
+      /*case (UCase(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
         // TODO - merge with above
         for {
           constructor <- removeTypeTag(constructorObj)
           _ <- Outcome.failWhen(attemptPatternMatch(constructorP, constructor, env).isFailure, "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
-      }
+      }*/
       case (_, UWildcardPattern(wildcard)) => {
         Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")
       }
@@ -396,22 +395,6 @@ object Evaluator {
   }
 
   def asType(uObject: UntaggedObject, env: Environment): Outcome[NewMapType, String] = {
-    stripVersioningU(uObject, env) match {
-      case UType(t) => Success(t)
-      case UIndex(j) => Success(IndexT(j))
-      case UCase(ULink(key), input) => {
-        Success(ConstructedType(VersionedObjectLink(key), input))
-      }
-      case UMap(values) => {
-        Failure(s"Not a type (map): $values")
-      }
-      case UInit => {
-        //throw new Exception("Found undefined type")
-        Success(UndefinedT)
-      }
-      case other => {
-        Failure(s"Not a type: $other")
-      }
-    }
+    env.typeSystem.convertToNewMapType(stripVersioningU(uObject, env))
   }
 }

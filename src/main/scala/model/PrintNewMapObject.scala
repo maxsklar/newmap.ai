@@ -16,11 +16,19 @@ object PrintNewMapObject {
     }
   }
 
+  // TODO - convert nType into an untagged type instead of using this!
   def newMapType(nType: NewMapType): String = nType match {
     case CountT => "Count"
     case IndexT(i) => "Index." + i.toString
-    case CustomT(uuid, nType) => s"Type:$uuid:${newMapType(nType)}"
+    case CustomT(name, params) => {
+      if (isEmptyMap(params)) {
+        name
+      } else {
+        s"$name.${untagged(params)}"
+      }
+    }
     case TypeT => s"Type"
+    case HistoricalTypeT(uuid) => s"HistoricalType($uuid)"
     case UndefinedT => s"UndefinedType"
     //case AnyT => s"Any"
     case IdentifierT => "Identifier"
@@ -53,12 +61,13 @@ object PrintNewMapObject {
     case CaseT(cases, _, _) => {
       s"Case${mapToString(cases)}"
     }
-    case ConstructedType(genericType, params) => {
+    /*case ConstructedType(genericType, params) => {
       s"${this(genericType)}.${untagged(params)}"
-    }
+    }*/
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+    case WildcardPatternT(name) => untagged(UWildcardPattern(name))
   }
 
   def printExpression(
@@ -130,11 +139,23 @@ object PrintNewMapObject {
     }
   }
 
+  def isEmptyMap(value: UntaggedObject): Boolean = value match {
+    case UStruct(v) => v.isEmpty
+    case UMap(v) => v.isEmpty
+    case _ => false
+  }
+
   def untagged(uObject: UntaggedObject): String = uObject match {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
-    case UStruct(values) => mapToString(values.map(v => v -> ObjectExpression(UIndex(1))))
-    case UCase(constructor, value) => "(" + untagged(constructor) + "." + untagged(value) + ")"
+    case UStruct(values) => sequenceToString(values)
+    case UCase(constructor, value) => {
+      if (isEmptyMap(value)) {
+        untagged(constructor)
+      } else {
+        untagged(constructor) + "." + untagged(value)
+      }
+    }
     case UType(nType) => newMapType(nType)
     case UIndex(i) => i.toString
     case UInit => "()"
@@ -150,9 +171,10 @@ object PrintNewMapObject {
     }
     case UByte(value: Byte) => s"$value"
     case UCharacter(value: Char) => s"$value"
-    case UString(value: String) => s"$value"
+    case UString(value: String) => s"$value~str"
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
+    case Uuuid(value) => s"$value"
     case UWildcardPattern(name) => "W~" + name
     case UParamId(name) => s"$name~pi"
     case UMapTPattern(input, output, config) => printMapT(untagged(input), untagged(output), config)
@@ -167,6 +189,22 @@ object PrintNewMapObject {
       (k, v) <- values
     } {
       bindings :+= untagged(k) + ": " + printExpression(v)
+    }
+    sb.append(bindings.mkString(", "))
+
+    sb.append(")")
+    sb.toString
+  }
+
+  def sequenceToString(values: Vector[UntaggedObject]): String = {
+    val sb: StringBuilder = new StringBuilder()
+    sb.append("(")
+
+    var bindings: Vector[String] = Vector.empty
+    for {
+      v <- values
+    } {
+      bindings :+= untagged(v)
     }
     sb.append(bindings.mkString(", "))
 

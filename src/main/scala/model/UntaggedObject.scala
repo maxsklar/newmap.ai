@@ -42,6 +42,7 @@ case class UCharacter(value: Char) extends UntaggedObject
 case class UString(value: String) extends UntaggedObject
 case class ULong(value: Long) extends UntaggedObject
 case class UDouble(value: Double) extends UntaggedObject
+case class Uuuid(value: UUID) extends UntaggedObject
 
 
 // Note this is actually an UntaggedObject with type MapT(??, TypeT, RequireCompleteness, SimpleFunction)

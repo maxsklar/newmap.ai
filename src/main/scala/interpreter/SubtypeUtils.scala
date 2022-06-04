@@ -50,7 +50,25 @@ object SubtypeUtils {
           }
         }
         case UType(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
-        case UType(CustomT(_, underlying)) => doPatternsCoverType(keys, UType(underlying), env)
+        case UType(CustomT(name, inputPattern)) => {
+          val typeSystem = env.typeSystem
+          val currentState = typeSystem.currentState
+
+          for {
+            currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
+            currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
+            currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
+
+            currentParameterPattern = currentUnderlyingType._1
+            currentUnderlyingExp = currentUnderlyingType._2
+
+            underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+
+            // use currentUnderlyingExp instead!
+            // Also update env to take the parameters into account!
+            result <- doPatternsCoverType(keys, UType(underlyingT), env)
+          } yield result
+        }
         case _ => Success(false)
       }
 
@@ -331,10 +349,11 @@ object SubtypeUtils {
           convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
         } yield convertInstructions
       }
-      case (CustomT(uuid, _), CustomT(uuid2, _)) if (uuid == uuid2) => {
+      case (CustomT(name1, _), CustomT(name2, _)) if (name1 == name2) => {
+        // There is where we use the type system to eventually to a graph search
         Success(Vector.empty)
       }
-      case (ConstructedType(VersionedObjectLink(key1), params1), ConstructedType(VersionedObjectLink(key2), params2)) => {
+      /*case (ConstructedType(VersionedObjectLink(key1), params1), ConstructedType(VersionedObjectLink(key2), params2)) => {
         // Todo - we need to work out how this works
         // This is also where the covariance/contravariance information should come in!!
         // We are also not taking versions into account!!!
@@ -344,8 +363,20 @@ object SubtypeUtils {
         } else {
           Failure(s"Cannot convert constructed types: $startingType to $endingType")
         }
+      }*/
+      case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
+        // I feel like more needs to be done here
+        // TypeT requires the uuid as a case?
+        // - Perhaps that's our next step
+        Success(Vector.empty)
       }
-      case _ => Failure(s"No rule to convert $startingType to $endingType")
+      case _ => {
+        /*if (startingType != CountT && startingType != BooleanT) {
+          throw new Exception(s"No rule to convert $startingType to $endingType")
+        }*/
+        
+        Failure(s"No rule to convert $startingType to $endingType")
+      }
     }
   }
 

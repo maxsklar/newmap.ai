@@ -59,16 +59,6 @@ object CommandMaps {
           Failure(s"Can't start off map with key in typeTransform $typeTransform")
         }
       }
-      //case UType(MapT(IndexT(0), _, MapConfig(RequireCompleteness, _, _))) => Success(defaultUMap)
-      /*case UType(MapT(SubtypeT(UMap(m), _, _), _, MapConfig(RequireCompleteness, _, _))) => {
-        // What if instead of UMap it's ULink?
-
-        if (m.isEmpty) {
-          Success(defaultUMap)
-        } else {
-          Failure(s"Can't start off map with key subtype $m")
-        } 
-      }*/
       case UType(StructT(params, _, CommandOutput, _)) => {
         Success(defaultUMap)
       }
@@ -110,7 +100,8 @@ object CommandMaps {
 
   // Shouldn't this be called expand type?
   def getTypeExpansionCommandInput(
-    nType: NewMapType
+    nType: NewMapType,
+    typeSystem: NewMapTypeSystem
   ): Outcome[NewMapType, String] = {
     nType match {
       case IndexT(i) => Success(NewMapO.emptyStruct) // Where to insert the new value?
@@ -133,8 +124,23 @@ object CommandMaps {
         ))
       }
       case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
-      //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType)
-      case CustomT(uuid, nType) => getTypeExpansionCommandInput(nType)
+      //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
+      case CustomT(name, UStruct(params)) => {
+        val currentState = typeSystem.currentState
+
+        for {
+          currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
+          currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
+          currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
+
+          currentParameterPattern = currentUnderlyingType._1
+          currentUnderlyingExp = currentUnderlyingType._2
+
+          underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+
+          commandInput <- getTypeExpansionCommandInput(underlyingT, typeSystem)
+        } yield commandInput
+      }
       case _ => Failure(s"Unable to expand key: $nType")
     }
   }
@@ -231,10 +237,21 @@ object CommandMaps {
           }
         }
       }
-      case CustomT(uuid, nType) => {
-        expandType(nType, command, env)
+      case CustomT(name, params) => {
+        // This only occurs if we have a custom type within a custom type - so this won't be called for a while.
+        // strategy: get underlying type from the type system, turn it into a NewMapType, and then call this on it!
+        val typeSystem = env.typeSystem
+        val currentState = typeSystem.currentState
+        for {
+          currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
+          currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
+          currentUnderlyingTypeInfo <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
 
-        // TODO - store converter in the environment?
+          currentParameterPattern = currentUnderlyingTypeInfo._1
+          currentUnderlyingType = currentUnderlyingTypeInfo._2
+          currentUnderlyingT <- env.typeSystem.convertToNewMapType(currentUnderlyingType)
+          response <- expandType(currentUnderlyingT, command, env)
+        } yield response
       }
       case _ => Failure(s"Unable to expand key: $nType -- with command $command")
     }
@@ -334,7 +351,7 @@ object CommandMaps {
             // Key Expansion + requiredValue expansion
             // What if Key expansion is a case? (for now we don't allow this, only basic map)
             for {
-              keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
+              keyExpansionCommandT <- getTypeExpansionCommandInput(keyType, env.typeSystem)
             } yield {
               keyExpansionCommandT match {
                 case StructT(items, _, _, _) if (items.length == 0) => {
@@ -475,7 +492,7 @@ object CommandMaps {
         typeTransform.head match {
           case (UType(keyType), ObjectExpression(UType(requiredValues))) => {
             for {
-              keyExpansionCommandT <- getTypeExpansionCommandInput(keyType)
+              keyExpansionCommandT <- getTypeExpansionCommandInput(keyType, env.typeSystem)
 
               result <- keyExpansionCommandT match {
                 case StructT(items, _, _, _) if (items.length == 0) => {

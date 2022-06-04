@@ -82,15 +82,15 @@ sealed abstract class EnvironmentValue
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
 case class EnvironmentParameter(nTypeClass: UntaggedObject) extends EnvironmentValue
 
+
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
   idToObject: ListMap[String, EnvironmentValue] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
-  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty
-
-  // TODO - add use-defined types as a special case of latest version number?
+  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
+  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem // Also a stored versioned type, but a special one!
 ) {
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
@@ -103,8 +103,25 @@ case class Environment(
         case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
         case EnvironmentParameter(nTypeClass) => ParameterEnvironmentCommand(id, nTypeClass)
       }
-      builder.append(command.toString)
-      builder.append("\n")
+      builder.append(s"${command.toString}\n")
+    }
+    builder.toString
+  }
+
+  def printTypes: String = {
+    val builder: StringBuilder = new StringBuilder()
+    builder.append(s"Current State: ${typeSystem.currentState}\n")
+
+    for {
+      typeMap <- typeSystem.currentMapping.toVector
+      typeName = typeMap._1
+      typeId = typeMap._2
+
+      parameterTypeOpt = typeSystem.typeToParameterType.get(typeId)
+
+      parameterTypeString = parameterTypeOpt.map(x => "\t" + x.toString).getOrElse("")
+    } {
+      builder.append(s"${typeMap._1}${parameterTypeString}\n")
     }
     builder.toString
   }
@@ -146,67 +163,108 @@ case class Environment(
         )
       }
       case NewTypeCommand(s, nType) => {
-        val uuid = java.util.UUID.randomUUID
-        val key = VersionedObjectKey(0L, uuid)
-        val versionedObject = VersionedObjectLink(key)
-        val envValue = EnvironmentBinding(versionedObject)
+        //val uuid = java.util.UUID.randomUUID
+        //val key = VersionedObjectKey(0L, uuid)
+        //val versionedObject = VersionedObjectLink(key)
+        //val envValue = EnvironmentBinding(versionedObject)
+
+        val uType = typeSystem.typeToUntaggedObject(nType)
+
+        //val typeAsObject = TaggedObject(uType, HistoricalTypeT(typeSystem.currentState))
+
+        //val envValue = EnvironmentBinding(typeAsObject)
+
+        val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
+        val parameterPattern = UStruct(Vector.empty)
+
+        val newTypeSystem = NewMapTypeSystem.createNewCustomType(this.typeSystem, s, parameterType, parameterPattern, uType) match {
+          case Success(s) => s
+          case Failure(f) => throw new Exception(f)
+        }
+        
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> envValue),
-          latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(UType(CustomT(uuid, nType)), TypeT))
+          //idToObject = idToObject + (s -> envValue),
+          //latestVersionNumber = latestVersionNumber + (uuid -> 0L),
+          //storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(UType(CustomT(uuid, nType)), TypeT))
+          typeSystem = newTypeSystem
         )
       }
       case NewParamTypeCommand(id, nObject) => {
         val uuid = java.util.UUID.randomUUID
         val key = VersionedObjectKey(0L, uuid)
-        val versionedObject = VersionedObjectLink(key)
-        val envValue = EnvironmentBinding(versionedObject)
+        //val versionedObject = VersionedObjectLink(key)
+        //val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (id -> envValue),
+          //idToObject = idToObject + (id -> envValue),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
           storedVersionedTypes = storedVersionedTypes + (key -> nObject)
         )
       }
       case ApplyIndividualCommand(s, command) => {
-        val retVal = for {
-          versionLink <- Evaluator.lookupVersionedObject(s, this)
-          latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
-          currentState <- Evaluator.currentState(versionLink.key.uuid, this)
-          nType = RetrieveType.fromNewMapObject(currentState, this)
-          newValue <- if (nType == TypeT) {
-            for {  
-              currentUntagged <- Evaluator.removeTypeTag(currentState)
-              currentAsType <- Evaluator.asType(currentUntagged, this)
-              response <- CommandMaps.expandType(currentAsType, command, this)
-              // TODO - we must contend with expandedKeyResponse.converter
-              // - This will allow us to convert objects from one type to another - needs to be stored in the environment!
-            } yield TaggedObject(UType(response.newType), TypeT)
-          } else {
-            currentState match {
-              case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
-                CommandMaps.expandParametrizedCaseType(currentState, command, this.newParams(parameters))
+        // This split on lookupVersionedObject suggests that we may want to refactor
+        // Code is repeated!!
+
+        val retVal = Evaluator.lookupVersionedObject(s, this) match {
+          case Success(versionLink) => {
+            for {
+              latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
+              currentState <- Evaluator.currentState(versionLink.key.uuid, this)
+              nType = RetrieveType.fromNewMapObject(currentState, this)
+              newValue <- currentState match {
+                case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
+                  CommandMaps.expandParametrizedCaseType(currentState, command, this.newParams(parameters))
+                }
+                case _ => CommandMaps.updateVersionedObject(currentState, command, this)
               }
-              case _ => CommandMaps.updateVersionedObject(currentState, command, this)
+            } yield {
+              val newUuid = versionLink.key.uuid
+              val newVersion = latestVersion + 1
+              val newKey = VersionedObjectKey(newVersion, newUuid)
+
+              // TODO - during this, versions that are no longer in use can be destroyed
+              val newStoredVTypes = storedVersionedTypes + (newKey -> newValue)
+
+              this.copy(
+                commands = newCommands,
+                idToObject = idToObject + (s -> EnvironmentBinding(VersionedObjectLink(newKey))),
+                latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
+                storedVersionedTypes = newStoredVTypes
+              )
             }
           }
-        } yield {
-          val newUuid = versionLink.key.uuid
-          val newVersion = latestVersion + 1
-          val newKey = VersionedObjectKey(newVersion, newUuid)
+          case Failure(objectLookupFailureMessage) => {
+            val currentState = typeSystem.currentState
 
-          // TODO - during this, versions that are no longer in use can be destroyed
-          val newStoredVTypes = storedVersionedTypes + (newKey -> newValue)
+            for {
+              latestNamespace <- Outcome(typeSystem.historicalMapping.get(currentState), s"Type System missing latest namespace $currentState")
+              typeId <- Outcome(latestNamespace.get(s), s"Couldn't apply command to value $s. Not found in object or type namespace. Object space failure: $objectLookupFailureMessage")
+              currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find underlying type for $s")
 
-          this.copy(
-            commands = newCommands,
-            idToObject = idToObject + (s -> EnvironmentBinding(VersionedObjectLink(newKey))),
-            latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
-            storedVersionedTypes = newStoredVTypes
-          )
+              currentParameterPattern = currentUnderlyingType._1
+              currentUnderlyingExp = currentUnderlyingType._2
+
+              underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+
+              response <- CommandMaps.expandType(underlyingT, command, this)
+
+              newUnderlyingType = typeSystem.typeToUntaggedObject(response.newType)
+              
+              newTypeSystem <- NewMapTypeSystem.upgradeCustomType(typeSystem, s, newUnderlyingType, response.converter)
+
+              //typeAsObject = TaggedObject(newUnderlyingType, HistoricalTypeT(newTypeSystem.currentState))
+              //envValue = EnvironmentBinding(typeAsObject)
+            } yield {
+              this.copy(
+                commands = newCommands,
+                //idToObject = idToObject + (s -> envValue),
+                typeSystem = newTypeSystem
+              )
+            }
+          }
         }
 
         retVal match {

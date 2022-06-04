@@ -5,19 +5,23 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 // Handles type classes, and their composition
 object TypeClassUtils {
-  def typeIsExpectingAnIdentifier(
+  def typeClassIsExpectingAnIdentifier(
     nType: NewMapType,
     s: String,
     env: Environment
-  ): Outcome[Unit, String] = nType match {
-    case IdentifierT => Success()
-    case CustomT(_, t) => typeIsExpectingAnIdentifier(t, s, env)
+  ): Outcome[NewMapType, String] = nType match {
+    case IdentifierT => Success(nType)
+    //case CustomT(_, t) => typeIsExpectingAnIdentifier(t, s, env)
     case SubtypeT(isMember, parentType, _) => {
       for {
-        _ <- typeIsExpectingAnIdentifier(parentType, s, env)
+        _ <- typeClassIsExpectingAnIdentifier(parentType, s, env)
         membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIdentifier(s), env)
         _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $s not a member of subtype $nType")
-      } yield ()
+      } yield nType
+    }
+    case WildcardPatternT(_) => {
+      // TODO - really we should be returning the typeclass of all types that accept identifiers
+      Success(IdentifierT)
     }
     case _ => {
       Failure(s"Type couldn't accept identifier $s as value: $nType")
@@ -33,7 +37,25 @@ object TypeClassUtils {
     case CountT => Success()
     case BooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
     case IndexT(j) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
-    case CustomT(_, t) => typeIsExpectingAnIndex(t, i, env)
+    case CustomT(name, params) => {
+      val typeSystem = env.typeSystem
+      val currentState = typeSystem.currentState
+
+      for {
+        currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
+        currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
+        currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
+
+        currentParameterPattern = currentUnderlyingType._1
+        currentUnderlyingExp = currentUnderlyingType._2
+
+        underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+
+        //TODO: The env should. be updated with currentParameterPattern
+        result <- typeIsExpectingAnIndex(underlyingT, i, env)
+      } yield result
+      
+    }
     case SubtypeT(isMember, parentType, _) => {
       for {
         _ <- typeIsExpectingAnIndex(parentType, i, env)

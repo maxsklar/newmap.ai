@@ -23,7 +23,12 @@ case object LongT extends NewMapType
 case object DoubleT extends NewMapType
 case object UuidT extends NewMapType
 
-// Type of types!
+case class WildcardPatternT(s: String) extends NewMapType
+
+// Type of types that exist in the given state
+case class HistoricalTypeT(uuid: UUID) extends NewMapType
+
+// Tytpe of all types that have ever existed!!
 case object TypeT extends NewMapType
 
 // This is the "bottom" type
@@ -65,20 +70,46 @@ case class MapConfig(
   preservationRules: Vector[PreservationRule] = Vector.empty
 )
 
-sealed abstract class PreservationRule
+sealed abstract class PreservationRule {
+  def toUntaggedObject: UntaggedObject = UStruct(Vector.empty)
+}
 // Preservation
 // Preserving Equality: [a == b] == [f(a) == f(b)]
 // First we need equality to be a generic type..
 
-sealed abstract class MapCompleteness
-object RequireCompleteness extends MapCompleteness
-object CommandOutput extends MapCompleteness
+sealed abstract class MapCompleteness {
+  def getName: String
+}
+object RequireCompleteness extends MapCompleteness {
+  override def getName: String = "RequireCompleteness"
+}
 
-sealed abstract class MapFeatureSet
-object BasicMap extends MapFeatureSet
-object SimpleFunction extends MapFeatureSet // Allows Pattern Matching, only simple operations
-object WellFoundedFunction extends MapFeatureSet // Allows recursion only if it provably simplifies the input
-object FullFunction extends MapFeatureSet // Turing Complete - may sometimes go into an infinite loop
+object CommandOutput extends MapCompleteness {
+  override def getName: String = "CommandOutput"
+}
+
+sealed abstract class MapFeatureSet {
+  def getName: String
+}
+
+object BasicMap extends MapFeatureSet {
+  override def getName: String = "BasicMap"
+}
+
+// Allows Pattern Matching, only simple operations
+object SimpleFunction extends MapFeatureSet  {
+  override def getName: String = "SimpleFunction"
+}
+
+// Allows recursion only if it provably simplifies the input
+object WellFoundedFunction extends MapFeatureSet {
+  override def getName: String = "WellFoundedFunction"
+}
+
+// Turing Complete - may sometimes go into an infinite loop
+object FullFunction extends MapFeatureSet {
+  override def getName: String = "FullFunction"
+}
 
 /*case class TypeParameter(
   name: String,
@@ -126,10 +157,10 @@ case class CaseT(
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType
 
-case class ConstructedType(
+/*case class ConstructedType(
   genericType: NewMapObject,
   params: UntaggedObject
-) extends NewMapType
+) extends NewMapType*/
 
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
@@ -142,7 +173,12 @@ case class SubtypeT(
   featureSet: MapFeatureSet = BasicMap
 ) extends NewMapType
 
-case class CustomT(
+/*case class CustomT(
   uuid: UUID, // Should I instead have a name here??
   nType: NewMapType
+) extends NewMapType*/
+
+case class CustomT(
+  name: String,
+  params: UntaggedObject
 ) extends NewMapType

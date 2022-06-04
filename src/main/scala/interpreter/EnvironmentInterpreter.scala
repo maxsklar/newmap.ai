@@ -5,14 +5,15 @@ import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 class EnvironmentInterpreter(
-  useInitialCommands: Boolean = true
+  useInitialCommands: Boolean = true,
+  printInitCommandErrors: Boolean = true
 ) {
   var env: Environment = Environment.Base
 
   for (code <- EnvironmentInterpreter.initialCommands) {
     if (useInitialCommands) {
       apply(code) match {
-        case Failure(f) => println(s"Error: $f\n => $code")
+        case Failure(f) => ()//if (printInitCommandErrors) println(s"Error: $f\n => $code")
         case Success(_) => ()
       }
     }
@@ -40,6 +41,7 @@ class EnvironmentInterpreter(
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
       case ":env" => CommandPrintSomething(env.toString)
+      case ":types" => CommandPrintSomething(env.printTypes)
       case ":exit" | ":quit" => CommandExit
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
@@ -51,8 +53,9 @@ class EnvironmentInterpreter(
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
-        ":parse [Expression]\tPrint how [Expression] is parsed and type checked" ++
-        ":typeOf [Expression]\tPrint out the type of the expression" ++
+        ":types\tPrint the types in the current environment\n" ++
+        ":parse [Expression]\tPrint how [Expression] is parsed and type checked\n" ++
+        ":typeOf [Expression]\tPrint out the type of the expression\n" ++
         ":exit | :quit\tExit this repl\n" ++
         ":help\tPrint this help message\n"
       )

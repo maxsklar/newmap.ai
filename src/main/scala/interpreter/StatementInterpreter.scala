@@ -23,12 +23,10 @@ object StatementInterpreter {
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, UType(TypeT), env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
-
           nType <- Evaluator.asType(nTypeObj, env)
           tc <- TypeChecker.typeCheck(objExpression, UType(nType), env, FullFunction)
           evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-
           nObject <- TypeChecker.tagAndNormalizeObject(constantObject, UType(nType), env)
         } yield {
           val command = FullEnvironmentCommand(id.s, nObject)
@@ -96,42 +94,60 @@ object StatementInterpreter {
         }
       }
       case ApplyCommandStatementParse(id, command) => {
-        for {
-          versionedObjectLink <- Evaluator.lookupVersionedObject(id.s, env)
-          nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
-
-          // TODO - this roundabout way of doing things suggests a refactor
-          currentState = Evaluator.stripVersioning(versionedObjectLink, env)
-
-          inputT <- if (nType == TypeT) {
+        Evaluator.lookupVersionedObject(id.s, env) match {
+          case Success(versionedObjectLink) => {
+            // Now we also need to look this up in the type system!!!
+            val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
+            // TODO - this roundabout way of doing things suggests a refactor
+            val currentState = Evaluator.stripVersioning(versionedObjectLink, env)
+            
             for {
-              // TODO - this roundabout way of doing things suggests a refactor
-              currentUntagged <- Evaluator.removeTypeTag(currentState)
-              currentAsType <- Evaluator.asType(currentUntagged, env)
-              customT = CustomT(versionedObjectLink.key.uuid, currentAsType)
-              result <- CommandMaps.getTypeExpansionCommandInput(customT)
-            } yield result
-          } else {
-            currentState match {
-              case TaggedObject(upct@UParametrizedCaseT(_, _), _) => CommandMaps.expandParametrizedCaseTInput(upct, env)
-              case _ => CommandMaps.getCommandInputOfCommandType(nType, env)
+              inputT <- currentState match {
+                case TaggedObject(upct@UParametrizedCaseT(_, _), _) => CommandMaps.expandParametrizedCaseTInput(upct, env)
+                case _ => CommandMaps.getCommandInputOfCommandType(nType, env)
+              }
+
+              newEnv = currentState match {
+                case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
+                  // Eventually - maybe some of these are type classes, or possible expressions? hmm
+                  env.newParams(parameters)
+                }
+                case _ => env
+              }
+
+              commandExp <- typeCheck(command, UType(inputT), newEnv, FullFunction)
+
+              commandObj <- Evaluator(commandExp.nExpression, newEnv)
+            } yield {
+              val command = ApplyIndividualCommand(id.s, commandObj)
+              Response(Vector(command), command.toString)
             }
           }
+          case Failure(objectLookupFailureMessage) => {
+            val typeSystem = env.typeSystem
+            val currentState = typeSystem.currentState
 
-          newEnv = currentState match {
-            case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
-              // Eventually - maybe some of these are type classes, or possible expressions? hmm
-              env.newParams(parameters)
+            for {
+              latestNamespace <- Outcome(typeSystem.historicalMapping.get(currentState), s"Type System missing latest namespace $currentState")
+              typeId <- Outcome(latestNamespace.get(id.s), s"Couldn't update variable ${id.s}. Not found in object or type namespace. Object space failure: $objectLookupFailureMessage")
+
+              currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find underlying type for ${id.s}")
+
+              currentParameterPattern = currentUnderlyingType._1
+              currentUnderlyingExp = currentUnderlyingType._2
+
+              underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+
+              inputT <- CommandMaps.getTypeExpansionCommandInput(underlyingT, typeSystem)
+
+              commandExp <- typeCheck(command, UType(inputT), env, FullFunction)
+
+              commandObj <- Evaluator(commandExp.nExpression, env)
+            } yield {
+              val command = ApplyIndividualCommand(id.s, commandObj)
+              Response(Vector(command), command.toString)
             }
-            case _ => env
           }
-
-          commandExp <- typeCheck(command, UType(inputT), newEnv, FullFunction)
-
-          commandObj <- Evaluator(commandExp.nExpression, newEnv)
-        } yield {
-          val command = ApplyIndividualCommand(id.s, commandObj)
-          Response(Vector(command), command.toString)
         }
       }
       case ApplyCommandsStatementParse(id, commands) => {
