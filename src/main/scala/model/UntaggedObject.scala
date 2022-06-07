@@ -44,21 +44,6 @@ case class ULong(value: Long) extends UntaggedObject
 case class UDouble(value: Double) extends UntaggedObject
 case class Uuuid(value: UUID) extends UntaggedObject
 
-
-// Note this is actually an UntaggedObject with type MapT(??, TypeT, RequireCompleteness, SimpleFunction)
-// But it's really more associated with being a type
-case class UParametrizedCaseT(
-  parameters: Vector[(String, NewMapType)],
-  caseT: CaseT // This must be an expression because it has parameters
-) extends UntaggedObject
-
-// This is a weird artifact from patterns, remove soon!
-case class UMapTPattern(
-  inputP: UntaggedObject,
-  outputP: UntaggedObject,
-  config: MapConfig
-) extends UntaggedObject
-
 // Built in functions
 
 // This takes as input a member of TypeT and returns true if it's a member

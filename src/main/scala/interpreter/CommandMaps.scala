@@ -88,17 +88,6 @@ object CommandMaps {
     }
   }
 
-  // UParametrizedCaseT is a little different, so we hardcode the input differently
-  def expandParametrizedCaseTInput(currentState: UParametrizedCaseT, env: Environment) = {
-    Success(StructT(
-      Vector(
-        UIndex(0) -> ObjectExpression(UType(currentState.caseT.fieldParentType)),
-        UIndex(1) -> ObjectExpression(UType(TypeT))
-      ),
-      IndexT(2)
-    ))
-  }
-
   // Shouldn't this be called expand type?
   def getTypeExpansionCommandInput(
     nType: NewMapType,
@@ -255,44 +244,6 @@ object CommandMaps {
         } yield response
       }
       case _ => Failure(s"Unable to expand key: $nType -- with command $command")
-    }
-  }
-
-  def expandParametrizedCaseType(
-    current: NewMapObject,
-    command: UntaggedObject,
-    env: Environment
-  ): Outcome[NewMapObject, String] = {
-    current match {
-      case TaggedObject(UParametrizedCaseT(parameters, caseT), mapT) => {
-        val uConstructors = caseT.cases.map(x => x._1 -> ObjectExpression(UIndex(1)))
-        val constructorsSubtype = SubtypeT(UMap(uConstructors), caseT.fieldParentType, caseT.featureSet)
-        val caseMap = TaggedObject(UMap(caseT.cases), MapT(
-          Environment.toTypeTransform(constructorsSubtype, TypeT),
-          MapConfig(RequireCompleteness, BasicMap)
-        ))
-
-        for{
-          newCaseMap <- updateVersionedObject(caseMap, command, env)
-          untaggedNewCaseMap <- Evaluator.removeTypeTag(newCaseMap)
-          newCaseName <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-        } yield {
-          untaggedNewCaseMap match {
-            case UMap(newCases) => {
-              TaggedObject(
-                UParametrizedCaseT(parameters, caseT.copy(cases = newCases)),
-                mapT
-              )
-            }
-            case _ => {
-              throw new Exception("This shouldn't happen!!")
-            }
-          }
-        }
-      }
-      case _ => {
-        Failure(s"Expected ParametrizedCaseT, got $current")
-      }
     }
   }
 

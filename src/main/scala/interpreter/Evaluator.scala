@@ -381,9 +381,6 @@ object Evaluator {
     case UCase(constructor, input) => {
       newParametersFromPattern(input)
     }
-    case UMapTPattern(input, output, config) => {
-      newParametersFromPattern(input) ++ newParametersFromPattern(output)
-    }
     case _ => Vector.empty
   }
 

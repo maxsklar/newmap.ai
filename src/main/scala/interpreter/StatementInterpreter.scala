@@ -88,22 +88,11 @@ object StatementInterpreter {
             val currentState = Evaluator.stripVersioning(versionedObjectLink, env)
             
             for {
-              inputT <- currentState match {
-                case TaggedObject(upct@UParametrizedCaseT(_, _), _) => CommandMaps.expandParametrizedCaseTInput(upct, env)
-                case _ => CommandMaps.getCommandInputOfCommandType(nType, env)
-              }
+              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
 
-              newEnv = currentState match {
-                case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
-                  // Eventually - maybe some of these are type classes, or possible expressions? hmm
-                  env.newParams(parameters)
-                }
-                case _ => env
-              }
+              commandExp <- typeCheck(command, UType(inputT), env, FullFunction)
 
-              commandExp <- typeCheck(command, UType(inputT), newEnv, FullFunction)
-
-              commandObj <- Evaluator(commandExp.nExpression, newEnv)
+              commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
               val command = ApplyIndividualCommand(id.s, commandObj)
               Response(Vector(command), command.toString)

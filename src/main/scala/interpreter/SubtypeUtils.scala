@@ -26,51 +26,7 @@ object SubtypeUtils {
     else {
       val piecemealCompletenessOutcome = nTypeOutcome match {
         case Success(CaseT(cases, _, _)) => Success(checkCaseComplete(keys, cases, env))
-        /*case UCase(constructor, inputPattern) => {
-          Evaluator.stripVersioningU(constructor, env) match {
-            case UParametrizedCaseT(parameters, caseT) => {
-              // 1) use inputPattern and parameters to update the encironment
-              // 2) call checkCaseComplete(keys, caseT, newEnv)
-
-              val newEnv = env.newParams(parameters)
-              // patternMatchResult: Success(Map(T -> WildcardPattern(T)))
-              // Problem is that the environment is going to contain a wildcard??
-
-              //throw new Exception(s"doPatternsCoverType: $inputPattern -- $parameters -- $caseT\n --- $parametersAsPattern\n -- $patternMatchResult")
-
-              val ccc = checkCaseComplete(keys, caseT.cases, newEnv)
-
-
-              // keys: Vector(UCase(None,StructPattern(Vector())), UCase(Some,WildcardPattern(t)))
-              // parameters: Vector((T,Type))
-              // caseT: Case(Some: T~pi, None: Struct ())
-              // inputPattern:  WildcardPattern(T)
-              //throw new Exception(s"in case pattern: $keys -- $parameters -- $caseT -- $inputPattern\n --\n -- $ccc")
-              Failure("Unimplemented UParametrizedCaseT reqmap")
-            }
-            case _ => Success(false)
-          }
-        }*/
         case Success(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
-        /*case UType(CustomT(name, inputPattern)) => {
-          val typeSystem = env.typeSystem
-          val currentState = typeSystem.currentState
-
-          for {
-            currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
-            currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
-            currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
-
-            currentParameterPattern = currentUnderlyingType._1
-            currentUnderlyingExp = currentUnderlyingType._2
-
-            underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
-
-            // use currentUnderlyingExp instead!
-            // Also update env to take the parameters into account!
-            result <- doPatternsCoverType(keys, UType(underlyingT), env)
-          } yield result
-        }*/
         case _ => Success(false)
       }
 

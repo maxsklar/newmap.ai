@@ -160,11 +160,6 @@ object PrintNewMapObject {
     case ULink(key) => {
       s"ULink[${key.toString}]"
     }
-    case UParametrizedCaseT(typeParameters, caseT) => {
-      val typeParameterNames = typeParameters.map(_._1)
-      val typeParametersStr = s"[${typeParameterNames.mkString(", ")}]"
-      s"Case${typeParametersStr}${mapToString(caseT.cases)}"
-    }
     case UByte(value: Byte) => s"$value"
     case UCharacter(value: Char) => s"$value"
     case UString(value: String) => s"$value~str"
@@ -173,7 +168,6 @@ object PrintNewMapObject {
     case Uuuid(value) => s"$value"
     case UWildcardPattern(name) => "W~" + name
     case UParamId(name) => s"$name~pi"
-    case UMapTPattern(input, output, config) => printMapT(untagged(input), untagged(output), config)
   }
 
   def mapToString(values: Vector[(UntaggedObject, NewMapExpression)]): String = {

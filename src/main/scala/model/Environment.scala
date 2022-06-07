@@ -228,12 +228,7 @@ case class Environment(
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
               nType = RetrieveType.fromNewMapObject(currentState, this)
-              newValue <- currentState match {
-                case TaggedObject(UParametrizedCaseT(parameters, _), _) => {
-                  CommandMaps.expandParametrizedCaseType(currentState, command, this.newParams(parameters))
-                }
-                case _ => CommandMaps.updateVersionedObject(currentState, command, this)
-              }
+              newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid
               val newVersion = latestVersion + 1
@@ -444,13 +439,6 @@ object Environment {
       BuildTableT(ParamId("key"), ParamId("value"))
     )),
     eCommand("CaseType", TaggedObject(UType(CaseT(Vector.empty, IdentifierT, BasicMap)), TypeT)),
-    eCommand("ParametrizedCaseType", TaggedObject(
-      UParametrizedCaseT(Vector.empty, CaseT(Vector.empty, IdentifierT)),
-      MapT(
-        toTypeTransform(NewMapO.emptyStruct, TypeT),
-        MapConfig(RequireCompleteness, SimpleFunction)
-      )
-    )),
     eCommand("Subtype", TaggedObject(
       UMap(Vector(UWildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
       MapT(toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
