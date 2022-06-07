@@ -37,10 +37,10 @@ case class NewTypeCommand(
 
 case class NewParamTypeCommand(
   id: String,
-  nObject: NewMapObject
+  paramList: Vector[(String, NewMapType)]
 ) extends EnvironmentCommand {
   override def toString: String = {
-    s"data $id = ${nObject}"
+    s"data $id ${paramList}"
   }
 }
 
@@ -177,7 +177,7 @@ case class Environment(
         val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
         val parameterPattern = UStruct(Vector.empty)
 
-        val newTypeSystem = NewMapTypeSystem.createNewCustomType(this.typeSystem, s, parameterType, parameterPattern, uType) match {
+        val newTypeSystem = this.typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -191,17 +191,31 @@ case class Environment(
           typeSystem = newTypeSystem
         )
       }
-      case NewParamTypeCommand(id, nObject) => {
-        val uuid = java.util.UUID.randomUUID
-        val key = VersionedObjectKey(0L, uuid)
+      case NewParamTypeCommand(s, paramList) => {
+        val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
+        val paramT = StructT(
+          paramList.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(UType(x._1._2))),
+          IndexT(paramList.length)
+        )
+
+        //paramList.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(x._1))
+
+        //val uuid = java.util.UUID.randomUUID
+        //val key = VersionedObjectKey(0L, uuid)
         //val versionedObject = VersionedObjectLink(key)
         //val envValue = EnvironmentBinding(versionedObject)
+
+        val uType = typeSystem.typeToUntaggedObject(CaseT(Vector.empty, IdentifierT))
+
+        val newTypeSystem = this.typeSystem.createNewCustomType(s, typeSystem.typeToUntaggedObject(paramT), parameterPattern, uType) match {
+          case Success(s) => s
+          case Failure(f) => throw new Exception(f)
+        }
 
         this.copy(
           commands = newCommands,
           //idToObject = idToObject + (id -> envValue),
-          latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          storedVersionedTypes = storedVersionedTypes + (key -> nObject)
+          typeSystem = newTypeSystem
         )
       }
       case ApplyIndividualCommand(s, command) => {
@@ -252,8 +266,8 @@ case class Environment(
               response <- CommandMaps.expandType(underlyingT, command, this)
 
               newUnderlyingType = typeSystem.typeToUntaggedObject(response.newType)
-              
-              newTypeSystem <- NewMapTypeSystem.upgradeCustomType(typeSystem, s, newUnderlyingType, response.converter)
+
+              newTypeSystem <- typeSystem.upgradeCustomType(s, newUnderlyingType, response.converter)
 
               //typeAsObject = TaggedObject(newUnderlyingType, HistoricalTypeT(newTypeSystem.currentState))
               //envValue = EnvironmentBinding(typeAsObject)

@@ -44,31 +44,32 @@ object CommandMaps {
 
   val defaultUMap = UMap(Vector.empty)
 
-  def getDefaultValueOfCommandTypeHardcoded(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
-    nType match {
-      // TODO - start removing these in favor of newmap code!
-      case UType(IndexT(i)) if i > 0 => Success(UIndex(0)) //REmove?
-      case UIndex(i) if i > 0 => Success(UIndex(0)) //REmove?
-      case UType(TypeT) => Success(UType(UndefinedT))
-      //case UType(MapT(_, _, MapConfig(CommandOutput, _, _))) => Success(defaultUMap)
-      case UType(MapT(typeTransform, MapConfig(CommandOutput, _, _))) => Success(defaultUMap)
-      case UType(MapT(typeTransform, MapConfig(RequireCompleteness, _, _))) => {
-        if (typeTransformHasEmptyKey(typeTransform)) {
-          Success(defaultUMap)
-        } else {
-          Failure(s"Can't start off map with key in typeTransform $typeTransform")
+  def getDefaultValueOfCommandTypeHardcoded(uType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
+    for {
+      nType <- env.typeSystem.convertToNewMapType(uType)
+
+      result <- nType match {
+        // TODO - start removing these in favor of newmap code!
+        case IndexT(i) if i > 0 => Success(UIndex(0)) //REmove?
+        case TypeT => Success(UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty)))
+        //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
+        case MapT(typeTransform, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
+        case MapT(typeTransform, MapConfig(RequireCompleteness, _, _)) => {
+          if (typeTransformHasEmptyKey(typeTransform)) {
+            Success(defaultUMap)
+          } else {
+            Failure(s"Can't start off map with key in typeTransform $typeTransform")
+          }
         }
+        case StructT(params, _, CommandOutput, _) => {
+          Success(defaultUMap)
+        }
+        case TypeClassT(typeTransform, typesInTypeClass) if (typesInTypeClass.isEmpty) => {
+          Success(defaultUMap)
+        }
+        case _ => Failure(s"Type $nType has no default value")
       }
-      case UType(StructT(params, _, CommandOutput, _)) => {
-        Success(defaultUMap)
-      }
-      case UType(TypeClassT(typeTransform, typesInTypeClass)) if (typesInTypeClass.isEmpty) => {
-        Success(defaultUMap)
-      }
-      case _ => {
-        Failure(s"A) $nType is not a command type, error in type checker.")
-      }
-    }
+    } yield result
   }
 
   def typeTransformHasEmptyKey(typeTransform: Vector[(UntaggedObject, NewMapExpression)]): Boolean = {
@@ -109,7 +110,7 @@ object CommandMaps {
         Success(StructT(
           Vector(
             UIndex(0) -> ObjectExpression(UType(parentType)),
-            UIndex(1) -> ObjectExpression(UType(TypeT))
+            UIndex(1) -> ObjectExpression(UType(HistoricalTypeT(typeSystem.currentState)))
           ),
           IndexT(2)
         ))
@@ -118,7 +119,7 @@ object CommandMaps {
         Success(StructT(
           Vector(
             UIndex(0) -> ObjectExpression(UType(parentType)),
-            UIndex(1) -> ObjectExpression(UType(SubtypeT(IsCommandFunc, TypeT)))
+            UIndex(1) -> ObjectExpression(UType(SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState))))
           ),
           IndexT(2)
         ))

@@ -173,12 +173,15 @@ case class SubtypeT(
   featureSet: MapFeatureSet = BasicMap
 ) extends NewMapType
 
-/*case class CustomT(
-  uuid: UUID, // Should I instead have a name here??
-  nType: NewMapType
-) extends NewMapType*/
-
 case class CustomT(
   name: String,
   params: UntaggedObject
+) extends NewMapType
+
+// Inside should be a UCase(Uuuid(id), t)
+// where id is the type system id that created the type
+// and t is the actual type
+case class WithStateT(
+  typeSystemId: UUID,
+  nType: NewMapType 
 ) extends NewMapType

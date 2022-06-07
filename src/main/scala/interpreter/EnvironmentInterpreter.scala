@@ -13,7 +13,7 @@ class EnvironmentInterpreter(
   for (code <- EnvironmentInterpreter.initialCommands) {
     if (useInitialCommands) {
       apply(code) match {
-        case Failure(f) => ()//if (printInitCommandErrors) println(s"Error: $f\n => $code")
+        case Failure(f) => if (printInitCommandErrors) println(s"Error: $f\n => $code")
         case Success(_) => ()
       }
     }
@@ -46,8 +46,11 @@ class EnvironmentInterpreter(
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
       }
+      case _ if (code.startsWith(":underlyingType ")) => {
+        CommandPrintSomething(evaluateAndUnderlying(code.drop(16)))
+      }
       case _ if (code.startsWith(":typeOf ")) => {
-        CommandPrintSomething(evaluateAndTypeOf(code.drop(8)))
+        CommandPrintSomething(getTypeOf(code.drop(8)))
       }
       case ":uuid" => CommandPrintSomething(java.util.UUID.randomUUID.toString)
       case ":help" => CommandPrintSomething(
@@ -63,17 +66,31 @@ class EnvironmentInterpreter(
     }
   }
 
-  private def evaluateAndTypeOf(code: String): String = {
+  private def getTypeOf(code: String): String = {
     val result = for {
       tokens <- Lexer(code)
       parseTree <- NewMapParser(tokens)
       tc <- TypeChecker.typeCheckUnknownType(parseTree, env)
       nObject <- Evaluator(tc.nExpression, env)
     } yield {
-      //val nType = RetrieveType.fromNewMapObject(nObject, env)
-      //nType.toString
-      // TODO - reimplement this! There should be a typing system here
-      s"TypeChecker temporarily down: $nObject"
+      tc.refinedTypeClass
+    }
+
+    result match {
+      case Success(s) => s.toString
+      case Failure(reason) => reason
+    }
+  }
+
+  private def evaluateAndUnderlying(code: String): String = {
+    val result = for {
+      tokens <- Lexer(code)
+      parseTree <- NewMapParser(tokens)
+      tc <- TypeChecker.typeCheck(parseTree, env.typeSystem.typeToUntaggedObject(TypeT), env, FullFunction)
+      nObject <- Evaluator(tc.nExpression, env)
+      underlyingType <- TypeChecker.getFinalUnderlyingType(nObject, env, env.typeSystem.currentState)
+    } yield {
+      underlyingType.toString
     }
 
     result match {
@@ -121,8 +138,8 @@ object EnvironmentInterpreter {
     "update _typeOf Identifier.(_: Identifier)",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
-    "data Option (T: Type)",
-    "update Option (None, ())",
-    "update Option (Some, T)"
+    //"data Option (T: Type)",
+    //"update Option (None, ())",
+    //"update Option (Some, T)"
   )
 }

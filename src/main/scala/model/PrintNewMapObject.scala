@@ -41,14 +41,9 @@ object PrintNewMapObject {
     case UuidT => "UUID"
     case MapT(typeTransform, config) => {
       if (typeTransform.length == 1) {
-        typeTransform.head match {
-          case (UType(inputT), ObjectExpression(UType(outputT))) => {
-            printMapT(newMapType(inputT), newMapType(outputT), config)
-          }
-          case _ => {
-            s"Generic(${mapToString(typeTransform)})"
-          }
-        }
+        val inputType = typeTransform.head._1
+        val outputTypeExp = typeTransform.head._2
+        printMapT(untagged(inputType), printExpression(outputTypeExp), config)
       } else {
         s"Generic(${mapToString(typeTransform)})"
       }
@@ -67,6 +62,7 @@ object PrintNewMapObject {
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+    case WithStateT(uuid, nType) => s"WithState:$uuid:${newMapType(nType)}" 
     case WildcardPatternT(name) => untagged(UWildcardPattern(name))
   }
 

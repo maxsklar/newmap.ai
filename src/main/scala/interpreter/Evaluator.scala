@@ -45,12 +45,9 @@ object Evaluator {
       case BuildSimpleMapT(inputExp, outputExp, config) => {
         for {
           inputType <- this(inputExp, env)
-          inputT <- asType(inputType, env)
-
           outputType <- this(outputExp, env)
-          outputT <- asType(outputType, env)
         } yield {
-          val typeTransform = Environment.toTypeTransform(inputT, outputT)
+          val typeTransform = Vector(inputType -> ObjectExpression(outputType))
           UType(MapT(typeTransform, config))
         }
       }
@@ -326,14 +323,27 @@ object Evaluator {
       case (_, UWildcardPattern(wildcard)) => {
         Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")
       }
-      case (oPattern, _) => {
+      case (UType(pattern1), p2) => {
+        attemptPatternMatch(
+          env.typeSystem.typeToUntaggedObject(pattern1),
+          p2,
+          env
+        )
+      }
+      case (p1, UType(pattern2)) => {
+        attemptPatternMatch(
+          p1,
+          env.typeSystem.typeToUntaggedObject(pattern2),
+          env
+        )
+      }
+      case (oPattern, strippedInput) => {
         // TODO - instead of checking for equality here - go through each untagged object configuration
         if (oPattern == input) {
           Success(Map.empty)
-        } else Failure("Patterns didn't match")
-      }
-      case _ => {
-        Failure("Failed Pattern Match")
+        } else {
+          Failure("Failed Pattern Match")
+        }
       }
     }
   }

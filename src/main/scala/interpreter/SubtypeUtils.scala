@@ -13,6 +13,8 @@ object SubtypeUtils {
     nType: UntaggedObject,
     env: Environment
   ): Outcome[Boolean, String] = {
+    val nTypeOutcome = TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
+
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
@@ -22,9 +24,9 @@ object SubtypeUtils {
       Success(true)
     }
     else {
-      val piecemealCompletenessOutcome = nType match {
-        case UType(CaseT(cases, _, _)) => Success(checkCaseComplete(keys, cases, env))
-        case UCase(constructor, inputPattern) => {
+      val piecemealCompletenessOutcome = nTypeOutcome match {
+        case Success(CaseT(cases, _, _)) => Success(checkCaseComplete(keys, cases, env))
+        /*case UCase(constructor, inputPattern) => {
           Evaluator.stripVersioningU(constructor, env) match {
             case UParametrizedCaseT(parameters, caseT) => {
               // 1) use inputPattern and parameters to update the encironment
@@ -48,9 +50,9 @@ object SubtypeUtils {
             }
             case _ => Success(false)
           }
-        }
-        case UType(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
-        case UType(CustomT(name, inputPattern)) => {
+        }*/
+        case Success(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
+        /*case UType(CustomT(name, inputPattern)) => {
           val typeSystem = env.typeSystem
           val currentState = typeSystem.currentState
 
@@ -68,7 +70,7 @@ object SubtypeUtils {
             // Also update env to take the parameters into account!
             result <- doPatternsCoverType(keys, UType(underlyingT), env)
           } yield result
-        }
+        }*/
         case _ => Success(false)
       }
 
@@ -171,26 +173,27 @@ object SubtypeUtils {
   }
 
   def enumerateAllValuesIfPossible(nType: UntaggedObject, env: Environment): Outcome[Set[UntaggedObject], String] = {
-    nType match {
+    TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case UType(SubtypeT(UMap(values), parentType, _)) => {
+      case Success(SubtypeT(UMap(values), parentType, _)) => {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
       /*case UType(CaseT(values, parentType, BasicMap)) => {
         ???
       }*/
-      case UType(IndexT(i)) => {
+      case Success(IndexT(i)) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
-      case UType(BooleanT) => {
+      case Success(BooleanT) => {
         Success(Vector(UIndex(0), UIndex(1)).toSet)
       }
-      case _ => {
-        throw new Exception(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
-        Failure(s"Can't enumerate the allowed values of $nType -- could be unimplemented")
+      case Success(undertype) => {
+        throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
+        Failure(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
       }
+      case Failure(f) => Failure(f)
     }
   }
 
@@ -214,7 +217,7 @@ object SubtypeUtils {
     startingType: NewMapType,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
+  ): Outcome[Vector[UntaggedObject], String] = {
     (startingType, endingType) match {
       case _ if (startingType == endingType) => Success(Vector.empty)
       case (SubtypeT(isMember, parentType, featureSet), _) => {
@@ -370,11 +373,67 @@ object SubtypeUtils {
         // - Perhaps that's our next step
         Success(Vector.empty)
       }
-      case _ => {
-        if (startingType == WildcardPatternT("t")) {
-          throw new Exception(s"No rule to convert $startingType to $endingType")
+      case (TypeT, HistoricalTypeT(uuid)) if (uuid == env.typeSystem.currentState) => {
+        Success(Vector.empty)
+      }
+      case (WithStateT(typeSystemId1, CustomT(name1, params1)), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
+        for {
+          typeId1 <- env.typeSystem.getTypeIdFromName(typeSystemId1, name1)
+          typeId2 <- env.typeSystem.getTypeIdFromName(typeSystemId2, name2)
+
+          _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
+
+          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+        } yield {
+          conversionRules
         }
-        
+      }
+      case (WithStateT(typeSystemId1, CustomT(name1, params1)), CustomT(name2, params2)) => {
+        for {
+          typeId1 <- env.typeSystem.getTypeIdFromName(typeSystemId1, name1)
+          typeId2 <- env.typeSystem.getTypeIdFromName(env.typeSystem.currentState, name2)
+
+          _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
+
+          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+        } yield {
+          conversionRules
+        }
+      }
+      case (CustomT(name1, params1), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
+        for {
+          typeId1 <- env.typeSystem.getTypeIdFromName(env.typeSystem.currentState, name1)
+          typeId2 <- env.typeSystem.getTypeIdFromName(typeSystemId2, name2)
+          
+          _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
+
+          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+        } yield {
+          conversionRules
+        }
+      }
+      case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
+        for {
+          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(env.typeSystem.typeToUntaggedObject(startingType), env, typeSystemId)
+          
+          _ <- underlyingStartingType match {
+            case SubtypeT(_, _, _) => Success()
+            case _ => {
+              throw new Exception(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
+              Failure(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
+            }
+          }
+
+          conversionRules <- isTypeConvertible(underlyingStartingType, endingType, env)
+        } yield {
+          conversionRules
+        }
+      }
+      case _ => {
+        startingType match {
+          case WildcardPatternT(_) => throw new Exception(s"No rule to convert $startingType to $endingType")
+          case _ => ()
+        }
         Failure(s"No rule to convert $startingType to $endingType")
       }
     }
@@ -388,7 +447,7 @@ object SubtypeUtils {
     startingObject: NewMapObject,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
+  ): Outcome[Vector[UntaggedObject], String] = {
     endingType match {
       // What to do about this??? For some reason we can't put it in
       // Eventually - CustomT
@@ -411,6 +470,9 @@ object SubtypeUtils {
         } yield {
           convertInstructions
         }
+      }
+      case WildcardPatternT(_) => {
+        Success(Vector.empty)
       }
       case _ => {
         val nType = RetrieveType.fromNewMapObject(startingObject, env)

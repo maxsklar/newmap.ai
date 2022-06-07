@@ -34,6 +34,7 @@ object TypeClassUtils {
     env: Environment
   ): Outcome[Unit, String] = nType match {
     case TypeT => Success()
+    case HistoricalTypeT(_) => Success()
     case CountT => Success()
     case BooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
     case IndexT(j) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
@@ -79,30 +80,12 @@ object TypeClassUtils {
     }
   }
 
-  def intersectTypeClasses(
-    typeClassA: Vector[UntaggedObject],
-    typeClassB: Vector[UntaggedObject],
-    env: Environment
-  ): Vector[UntaggedObject] = {
-    var retVal: Vector[UntaggedObject] = Vector.empty
-
-    for {
-      patternA <- typeClassA
-      patternB <- typeClassB
-    } {
-      val remainingPatterns = intersectTypeClassPatterns(patternA, patternB, env)
-      retVal = retVal ++ remainingPatterns
-    }
-
-    retVal
-  }
-
   // Return conversion instructions
   def isTypeConvertibleToPattern(
     startingType: NewMapType,
     endingTypePattern: UntaggedObject,
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
+  ): Outcome[Vector[UntaggedObject], String] = {
     endingTypePattern match {
       case UType(endingType) => {
         SubtypeUtils.isTypeConvertible(startingType, endingType, env)
@@ -120,7 +103,7 @@ object TypeClassUtils {
     startingTypePattern: UntaggedObject,
     endingTypePattern: UntaggedObject,
     env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
+  ): Outcome[Vector[UntaggedObject], String] = {
     startingTypePattern match {
       case UType(startingType) => {
         isTypeConvertibleToPattern(startingType, endingTypePattern, env)
@@ -137,53 +120,6 @@ object TypeClassUtils {
           }
         }
       }
-    }
-  }
-
-  def isObjectConvertibleToPattern(
-    startingObject: NewMapObject,
-    endingTypePattern: UntaggedObject,
-    env: Environment
-  ): Outcome[Vector[NewMapObject], String] = {
-    endingTypePattern match {
-      case UType(WildcardPatternT(_)) => {
-        Success(Vector.empty)
-      }
-      case UType(endingType) => {
-        SubtypeUtils.isObjectConvertibleToType(startingObject, endingType, env)
-      }
-      case UWildcardPattern(_) => {
-        Success(Vector.empty)
-      }
-      case _ => {
-        Failure(s"Unimplemented isObjectConvertibleToPattern: $startingObject --> $endingTypePattern")
-      }
-    }
-  }
-
-  def intersectTypeClassPatterns(
-    typePatternA: UntaggedObject,
-    typePatternB: UntaggedObject,
-    env: Environment
-  ): Vector[UntaggedObject] = {
-    (typePatternA, typePatternB) match {
-      case (UWildcardPattern(_), _) => Vector(typePatternB)
-      case (_, UWildcardPattern(_)) => Vector(typePatternA)
-      // TODO - deal with case/struct/map patterns
-      case (objA, objB) => {
-        for {
-          aT <- Evaluator.asType(objA, env)
-          bT <- Evaluator.asType(objB, env)
-        } yield {
-          val aAllowed = SubtypeUtils.isTypeConvertible(aT, bT, env).toOption.nonEmpty
-          val bAllowed = SubtypeUtils.isTypeConvertible(bT, aT, env).toOption.nonEmpty
-
-          var retVal = Vector.empty
-          if (aAllowed) retVal :+ typePatternA
-          if (bAllowed) retVal :+ typePatternB
-          retVal
-        }
-      }.toOption.getOrElse(Vector.empty)
     }
   }
 }

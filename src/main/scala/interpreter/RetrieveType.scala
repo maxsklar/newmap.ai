@@ -63,4 +63,75 @@ object RetrieveType {
       case _ => true
     }
   }
+
+  def getParameterValues(
+    identifier: String,
+    env: Environment
+  ): Outcome[Map[String, NewMapType], String] = {
+    for {
+      parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentState, identifier)
+      parameterPattern <- env.typeSystem.getParameterPattern(env.typeSystem.currentState, identifier)
+      paramValues <- fetchParamsFromPattern(parameterType, parameterPattern, env)
+    } yield paramValues
+  }
+
+  def fetchParamsFromPattern(
+    nType: NewMapType,
+    pattern: UntaggedObject,
+    env: Environment
+  ): Outcome[Map[String, NewMapType], String] = {
+    val expectedTypeOutcome = TypeChecker.getFinalUnderlyingType(
+      env.typeSystem.typeToUntaggedObject(nType),
+      env,
+      env.typeSystem.currentState
+    )
+
+    for {
+      expectedType <- expectedTypeOutcome
+
+      answer <- (expectedType, pattern) match {
+        case (_, UWildcardPattern(x)) => Success(Map(x -> nType))
+        case (CaseT(cases, _, _), UCase(constructor, resultPattern)) => {
+          for {
+            valueTypeExpression <- Evaluator.attemptPatternMatchInOrder(cases, constructor, env)
+            valueType <- Evaluator(valueTypeExpression, env)
+            valueT <- env.typeSystem.convertToNewMapType(valueType)
+            result <- fetchParamsFromPattern(valueT, resultPattern, env)
+          } yield result
+        }
+        case (StructT(params, _, _, BasicMap), UStruct(values)) => {
+          if (params.length == values.length) {
+            var resultMap: Map[String, NewMapType] = Map.empty
+
+            for {
+              i <- (0 until params.length)
+            } {
+              for {
+                uType <- Evaluator(params(i)._2, env)
+                nType <- env.typeSystem.convertToNewMapType(uType)
+                patterns <- fetchParamsFromPattern(nType, values(i), env)
+              } {
+                resultMap = resultMap ++ patterns.toVector
+              }
+            }
+
+            Success(resultMap)
+          } else {
+            Failure(s"params and values don't match in length: $params --- $values")
+          }
+        }
+        case (StructT(params, _, _, BasicMap), UMap(values)) => {
+          Failure("not implemented - fetchParamsFromPattern on StructT with Map pattern")
+        }
+        case (MapT(typeTransform, config), UMap(values)) => {
+          Failure("not implemented - fetchParamsFromPattern on MapT")
+        }
+        case (SubtypeT(_, parentType, _), _) => fetchParamsFromPattern(parentType, pattern, env)
+        case _ => {
+          val resultMap: Map[String, NewMapType] = Map.empty
+          Success(resultMap)
+        }
+      }
+    } yield answer
+  }
 }

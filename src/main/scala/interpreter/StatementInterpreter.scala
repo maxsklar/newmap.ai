@@ -67,21 +67,7 @@ object StatementInterpreter {
           mapValues <- TypeChecker.typeCheckMap(values, UType(IdentifierT), UType(TypeT), BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
-          val paramType = TaggedObject(
-            UParametrizedCaseT(
-              paramList,
-              CaseT(Vector.empty, IdentifierT)
-            ),
-            MapT(
-              Environment.toTypeTransform(
-                StructT(mapValues, IdentifierT), // TODO: if mapValues has length 1 - should we simplify to the single value?
-                TypeT
-              ),
-              MapConfig(RequireCompleteness, SimpleFunction)
-            )
-          )
-
-          val command = NewParamTypeCommand(id.s, paramType)
+          val command = NewParamTypeCommand(id.s, paramList)
           Response(Vector(command), command.toString)
         }
       }
@@ -140,9 +126,13 @@ object StatementInterpreter {
 
               inputT <- CommandMaps.getTypeExpansionCommandInput(underlyingT, typeSystem)
 
-              commandExp <- typeCheck(command, UType(inputT), env, FullFunction)
+              newParameterMap <- RetrieveType.getParameterValues(id.s, env)
 
-              commandObj <- Evaluator(commandExp.nExpression, env)
+              newEnv = env.newParams(newParameterMap.toVector)
+
+              commandExp <- typeCheck(command, env.typeSystem.typeToUntaggedObject(inputT), newEnv, FullFunction)
+
+              commandObj <- Evaluator(commandExp.nExpression, newEnv)
             } yield {
               val command = ApplyIndividualCommand(id.s, commandObj)
               Response(Vector(command), command.toString)
