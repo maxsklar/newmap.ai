@@ -430,10 +430,6 @@ object SubtypeUtils {
         }
       }
       case _ => {
-        startingType match {
-          case WildcardPatternT(_) => throw new Exception(s"No rule to convert $startingType to $endingType")
-          case _ => ()
-        }
         Failure(s"No rule to convert $startingType to $endingType")
       }
     }

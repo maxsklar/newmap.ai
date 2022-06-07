@@ -493,7 +493,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update Funny (FunMap, (Funny => 2))", GeneralSuccessCheck),
       CodeExpectation("val funnyMap: ReqMap(Funny, 2) = (_: 1)", GeneralSuccessCheck),  
       CodeExpectation("val funnyItem: Funny = FunMap.funnyMap", GeneralSuccessCheck),      
-      CodeExpectation("val m: ReqMap(Funny, 2) = (FunMap.f: funnyMap f)", GeneralSuccessCheck),
+      CodeExpectation("val m: ReqMap(Funny, 2) = (f: funnyMap f)", GeneralSuccessCheck),
       CodeExpectation("val m: ReqMap(Funny, 2) = (FunMap.f: f funnyItem)", FailureCheck)
     ))
   }

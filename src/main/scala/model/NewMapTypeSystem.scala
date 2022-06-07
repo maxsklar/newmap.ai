@@ -231,6 +231,35 @@ case class NewMapTypeSystem(
       }
       case "Identifier" => Success(IdentifierT)
       case "Map" => params match {
+        case UStruct(items) if (items.length == 2) => {
+          for {
+            typeTransform <- items(0) match {
+              case UMap(v) => Success(v)
+              case _ => Failure(s"Incorrect type transform: ${items(0)}")
+            }
+
+            config <- items(1) match {
+              case UStruct(v) if (v.length == 3) => Success(v)
+              case _ => Failure(s"Incorrect config: ${items(1)}")
+            }
+
+            completeness <- config(0) match {
+              case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
+              case UIdentifier("CommandOutput") => Success(CommandOutput)
+              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
+            }
+
+            featureSet <- config(1) match {
+              case UIdentifier("BasicMap") => Success(BasicMap)
+              case UIdentifier("SimpleFunction") => Success(SimpleFunction)
+              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
+            }
+
+            // TODO: config(2) for the preservation rules
+          } yield {
+            MapT(typeTransform, MapConfig(completeness, featureSet))
+          }
+        }
         case _ => Failure(s"Couldn't convert Map to NewMapType with params: $params")
       }
       case "Struct" => params match {

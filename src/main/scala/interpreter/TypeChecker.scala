@@ -100,7 +100,14 @@ object TypeChecker {
           env.lookup(s) match {
             case Some(EnvironmentParameter(nType)) => {
               for {
-                convertInstructions <- TypeClassUtils.isPatternConvertibleToPattern(nType, expectedType, env)
+                nT <- env.typeSystem.convertToNewMapType(nType)
+                expectedT <- env.typeSystem.convertToNewMapType(expectedType)
+
+                //convertInstructions <- TypeClassUtils.isPatternConvertibleToPattern(nType, expectedType, env)
+                convertInstructions <- expectedT match {
+                  case WildcardPatternT(_) => Success(Vector.empty)
+                  case _ => SubtypeUtils.isTypeConvertible(nT, expectedT, env)
+                }
                 // TODO - execute convert instructions?
               } yield TypeCheckResponse(ParamId(s), nType)
             }
@@ -117,6 +124,7 @@ object TypeChecker {
             }
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
               for {
+                //// THIS IS A PROBLEM WITH OPTION!!!!
                 tcResult <- typeCheck(
                   ConstructCaseParse(expression, CommandList(Vector.empty)),
                   UCase(UIdentifier("HistoricalType"), Uuuid(env.typeSystem.currentState)),
@@ -359,7 +367,7 @@ object TypeChecker {
             }
           }*/
           case _ => {
-            Failure(s"CommandLists not working yet with this expected type: $values exp: $expectedType")
+            Failure(s"CommandLists not working yet with this expected type: $values exp: $expectedType -- $expectedTypeOutcome")
           }
         }
       }
@@ -747,7 +755,10 @@ object TypeChecker {
         for {
           inputP <- typeExpressionToPattern(inputExp, env)
           outputP <- typeExpressionToPattern(outputExp, env)
-        } yield UMapTPattern(inputP, outputP, config)
+        } yield {
+          val typeTransform = Vector(inputP -> ObjectExpression(outputP))
+          env.typeSystem.typeToUntaggedObject(MapT(typeTransform, config))
+        }
       }
       case _ => {
         Failure(s"type expression to pattern unimplemented: $nExpression")
@@ -809,30 +820,32 @@ object TypeChecker {
       case (ConstructCaseParse(constructorP, input), Success(TypeT)) if (patternMatchingAllowed) => {
         for {
           // For now, the constructor will explicitly point to a generic case type
-          constructorTC <- typeCheckUnknownType(constructorP, env)
-
-          constructor <- Evaluator(constructorTC.nExpression, env)
-
-          parametrizedCaseT <- Evaluator.stripVersioningU(constructor, env) match {
-            case pcase@UParametrizedCaseT(_, _) => Success(pcase) 
-            case _ => Failure(s"unexpected type constructo $constructor")
+          // This is a problem with Option!!!
+          // This is not an unknown type!!!
+          name <- constructorP match {
+            case IdentifierParse(typeConstructor, _) => Success(typeConstructor)
+            case _ => Failure("type constructor must be an identifier")
           }
 
-          parameters = parametrizedCaseT.parameters
+          typeId <- Outcome(env.typeSystem.currentMapping.get(name), s"$name is not defined in the type system")
 
-          params = parameters.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(UType(x._1._2)))
-          inputTypePatternExpected = StructT(params, IndexT(parameters.length))
+          parameterType <- Outcome(env.typeSystem.typeToParameterType.get(typeId), s"Couldn't find parameter type for $name")
+
+          //parameters = parametrizedCaseT.parameters
+
+          //params = parameters.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(UType(x._1._2)))
+          //inputTypePatternExpected = StructT(params, IndexT(parameters.length))
 
           result <- typeCheckWithPatternMatching(
             input,
-            UType(inputTypePatternExpected),
+            parameterType,
             env,
             externalFeatureSet,
             internalFeatureSet
           )
         } yield {
           TypeCheckWithPatternMatchingResult(
-            UCase(constructor, result.typeCheckResult),
+            UCase(UIdentifier(name), result.typeCheckResult),
             expectedType,
             result.newEnvironment
           )
