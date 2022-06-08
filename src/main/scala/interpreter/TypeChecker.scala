@@ -118,7 +118,6 @@ object TypeChecker {
             }
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
               for {
-                //// THIS IS A PROBLEM WITH OPTION!!!!
                 tcResult <- typeCheck(
                   ConstructCaseParse(expression, CommandList(Vector.empty)),
                   HistoricalTypeT(env.typeSystem.currentState),
@@ -173,11 +172,8 @@ object TypeChecker {
                     }
                   }
                 }
-                case Success(WildcardPatternT(t)) => {
-                  // TODO - this is in here temporarily to get some generic stuff to work
-                  // eventually, take it out!
-                  //throw new Exception(s"Identifier $s is unknown, expecting type class $expectedType")
-                  Success(TypeCheckResponse(ParamId(s), expectedType))
+                case Success(WildcardPatternT(_)) => {
+                  Failure(s"Identifier $s is unknown")
                 }
                 case Success(nType) => {
                   val trialObject = TaggedObject(UIdentifier(s), IdentifierT)
@@ -417,8 +413,6 @@ object TypeChecker {
     }
 
     val outputExpression = typeTransform.head._2
-
-    //println(s"In typeCheckGenericMap: $values -- $typeTransform")
     
     values match {
       case BindingCommandItem(k, v) +: restOfValues => {
@@ -446,8 +440,6 @@ object TypeChecker {
             resultKey.newEnvironment,
             featureSet = internalFeatureSet
           )
-
-          //_ = println(s"objectFoundValue: $objectFoundValue")
 
           restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, internalFeatureSet, env, externalFeatureSet)
         } yield {
@@ -761,7 +753,7 @@ object TypeChecker {
             nType <- Evaluator.asType(typeAsObj, env)
           } yield nType
         }
-        case _ => Failure(s"Cannot get resulting type from function type ${functionTypeChecked.refinedTypeClass}")
+        case _ => Failure(s"Cannot get resulting type from function type $typeOfFunction -- $function -- $input")
       }
     } yield {
       TypeCheckUnknownFunctionResult(functionTypeChecked.nExpression, typeOfFunction, inputTC, resultingType)
