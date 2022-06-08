@@ -50,8 +50,8 @@ object CommandMaps {
       case IndexT(i) if i > 0 => Success(UIndex(0)) //REmove?
       case TypeT => Success(UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty)))
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
-      case MapT(typeTransform, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
-      case MapT(typeTransform, MapConfig(RequireCompleteness, _, _)) => {
+      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
+      case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _)) => {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
           Success(defaultUMap)
         } else {
@@ -69,7 +69,7 @@ object CommandMaps {
   }
 
   def typeTransformHasEmptyKey(
-    typeTransform: Vector[(UntaggedObject, NewMapExpression)],
+    typeTransform: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
   ): Boolean = {
     val patterns = typeTransform.map(_._1)
@@ -100,8 +100,8 @@ object CommandMaps {
       case CaseT(cases, parentType, featureSet) => {
         Success(StructT(
           Vector(
-            UIndex(0) -> ObjectExpression(typeSystem.typeToUntaggedObject(parentType)),
-            UIndex(1) -> ObjectExpression(typeSystem.typeToUntaggedObject(HistoricalTypeT(typeSystem.currentState)))
+            UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
+            UIndex(1) -> typeSystem.typeToUntaggedObject(HistoricalTypeT(typeSystem.currentState))
           ),
           IndexT(2)
         ))
@@ -109,8 +109,8 @@ object CommandMaps {
       case StructT(cases, parentType, _, featureSet) => {
         Success(StructT(
           Vector(
-            UIndex(0) -> ObjectExpression(typeSystem.typeToUntaggedObject(parentType)),
-            UIndex(1) -> ObjectExpression(typeSystem.typeToUntaggedObject(SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState))))
+            UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
+            UIndex(1) -> typeSystem.typeToUntaggedObject(SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState)))
           ),
           IndexT(2)
         ))
@@ -156,7 +156,7 @@ object CommandMaps {
         Success(ExpandKeyResponse(IndexT(i + 1), Some(UIndex(i)), untaggedIdentity))
       }
       case CaseT(cases, parentType, featureSet) => {
-        val uConstructors = cases.map(x => x._1 -> ObjectExpression(UIndex(1)))
+        val uConstructors = cases.map(x => x._1 -> UIndex(1))
         val constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
         val caseMap = TaggedObject(UMap(cases), MapT(
           env.toTypeTransform(constructorsSubtype, TypeT), 
@@ -190,8 +190,8 @@ object CommandMaps {
         ))
 
         val adjustedCommand = UMap(Vector(
-          UIndex(0) -> ObjectExpression(command),
-          UIndex(1) -> ObjectExpression(UIndex(1))
+          UIndex(0) -> command,
+          UIndex(1) -> UIndex(1)
         ))
 
         for {
@@ -205,13 +205,13 @@ object CommandMaps {
           )
         }
       }
-      case MapT(typeTransform, config) => {
+      case MapT(UMap(typeTransform), config) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
         }
 
         typeTransform.head match {
-          case (keyType, ObjectExpression(valueType)) => {
+          case (keyType, valueType) => {
             for {
               keyT <- env.typeSystem.convertToNewMapType(keyType)
               valueT <- env.typeSystem.convertToNewMapType(valueType)
@@ -260,7 +260,7 @@ object CommandMaps {
         NewMapO.emptyStruct
       )
       case BooleanT => Success(IndexT(2))
-      case MapT(typeTransform, MapConfig(CommandOutput, _, _)) => {
+      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
         // we have typeTransform
         // we need a pair (a, b) that satisfies the type transform
@@ -274,15 +274,15 @@ object CommandMaps {
         }
 
         typeTransform.head match {
-          case (keyType, ObjectExpression(valuesType)) => {
+          case (keyType, valuesType) => {
             for {
               valuesT <- Evaluator.asType(valuesType, env)
               outputCommandT <- getCommandInputOfCommandType(valuesT, env)
             } yield {
               StructT(
                 Vector(
-                  UIndex(0) -> ObjectExpression(keyType),
-                  UIndex(1) -> ObjectExpression(env.typeSystem.typeToUntaggedObject(outputCommandT))
+                  UIndex(0) -> keyType,
+                  UIndex(1) -> env.typeSystem.typeToUntaggedObject(outputCommandT)
                 ),
                 IndexT(2)
               )
@@ -293,13 +293,13 @@ object CommandMaps {
           }
         }
       }
-      case MapT(typeTransform, _) => {
+      case MapT(UMap(typeTransform), _) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
         }
 
         typeTransform.head match {
-          case (keyType, ObjectExpression(requiredValuesType)) => {
+          case (keyType, requiredValuesType) => {
             // In this case, there must be a key expansion type
             // TODO: enforce this?
 
@@ -319,8 +319,8 @@ object CommandMaps {
                 case _ => {
                   StructT(
                     Vector(
-                      UIndex(0) -> ObjectExpression(env.typeSystem.typeToUntaggedObject(keyExpansionCommandT)),
-                      UIndex(1) -> ObjectExpression(requiredValuesType)
+                      UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
+                      UIndex(1) -> requiredValuesType
                     ),
                     IndexT(2)
                   )
@@ -399,14 +399,14 @@ object CommandMaps {
           TaggedObject(UIndex(result), BooleanT)
         }
       }
-      case mapT@MapT(typeTransform, MapConfig(CommandOutput, featureSet, _)) => {
+      case mapT@MapT(UMap(typeTransform), MapConfig(CommandOutput, featureSet, _)) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Not implemented: type transform must have exactly 1 mapping: $typeTransform")
         }
 
         for {
           outputType <- typeTransform.head match {
-            case (inputPattern, ObjectExpression(outputT)) => {
+            case (inputPattern, outputT) => {
               for {
                 ouT <- Evaluator.asType(outputT, env)
               } yield ouT
@@ -436,18 +436,18 @@ object CommandMaps {
 
           untaggedNewState <- Evaluator.removeTypeTag(newResultForInput)
 
-          newMapValues = (input -> ObjectExpression(untaggedNewState)) +: mapValues.filter(x => x._1 != input)
+          newMapValues = (input -> untaggedNewState) +: mapValues.filter(x => x._1 != input)
         } yield {
           TaggedObject(UMap(newMapValues), mapT)
         }
       }
-      case MapT(typeTransform, MapConfig(style, features, _)) => {
+      case MapT(UMap(typeTransform), MapConfig(style, features, _)) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
         }
 
         typeTransform.head match {
-          case (keyType, ObjectExpression(requiredValuesType)) => {
+          case (keyType, requiredValuesType) => {
             for {
               keyT <- env.typeSystem.convertToNewMapType(keyType)
               requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
@@ -458,7 +458,7 @@ object CommandMaps {
                 case StructT(items, _, _, _) if (items.length == 0) => {
                   // TODO - this is an ugle exception.. we need a better way to add fields to a struct
                   // (particularly an empty struct like in this case)
-                  Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), ObjectExpression(command)))
+                  Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), command))
                 }
                 case _ => {
 
@@ -528,7 +528,7 @@ object CommandMaps {
               // Params need to be updated!!
               newParams = params
             } yield {
-              val newMapValues = (constructor -> ObjectExpression(input)) +: mapValues.filter(x => x._1 != constructor)
+              val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
               TaggedObject(UMap(newMapValues), StructT(newParams, parentFieldType))
             }
           }
@@ -547,7 +547,7 @@ object CommandMaps {
               }
             } yield {
               val newTypesInClass = constructor +: typesInTypeClass.filter(x => x != constructor)
-              val newMapValues = (constructor -> ObjectExpression(input)) +: mapValues.filter(x => x._1 != constructor)
+              val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
               TaggedObject(UMap(newMapValues), TypeClassT(typeTransform, newTypesInClass))
             }
           }
@@ -563,9 +563,9 @@ object CommandMaps {
   }
 
   def getDefaultValueFromStructParams(
-    params: Vector[(UntaggedObject, NewMapExpression)],
+    params: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
-  ): Outcome[Vector[(UntaggedObject, NewMapExpression)], String] = {
+  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     params match {
       case (fieldName, typeOfFieldExp) +: restOfParams => {
         for {
@@ -574,7 +574,7 @@ object CommandMaps {
           paramDefault <- getDefaultValueOfCommandType(typeOfFieldT, env)
           restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
         } yield {
-          (fieldName -> ObjectExpression(paramDefault)) +: restOfParamsDefault
+          (fieldName -> paramDefault) +: restOfParamsDefault
         }
       }
       case _ => Success(Vector.empty)

@@ -39,19 +39,22 @@ object PrintNewMapObject {
     case LongT => "Long"
     case DoubleT => "Double"
     case UuidT => "UUID"
-    case MapT(typeTransform, config) => {
+    case MapT(UMap(typeTransform), config) => {
       if (typeTransform.length == 1) {
         val inputType = typeTransform.head._1
         val outputTypeExp = typeTransform.head._2
-        printMapT(untagged(inputType), printExpression(outputTypeExp), config)
+        printMapT(untagged(inputType), untagged(outputTypeExp), config)
       } else {
         s"Generic(${mapToString(typeTransform)})"
       }
     }
+    case MapT(typeTransform, config) => {
+      s"Generic(${untagged(typeTransform)})"
+    }
     //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
     case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
     case TypeClassT(typeTransform, implementation) => {
-      s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> ObjectExpression(UIndex(0)))))})"
+      s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> UIndex(0))))})"
     }
     case CaseT(cases, _, _) => {
       s"Case${mapToString(cases)}"
@@ -64,17 +67,18 @@ object PrintNewMapObject {
     case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
     case WithStateT(uuid, nType) => s"WithState:$uuid:${newMapType(nType)}" 
     case WildcardPatternT(name) => untagged(UWildcardPattern(name))
+    case ParamIdT(name) => untagged(ParamId(name))
   }
 
-  def printExpression(
-    nExpression: NewMapExpression
+  /*def printExpression(
+    nExpression: UntaggedObject
   ): String = nExpression match {
     case ObjectExpression(nObject) => untagged(nObject)
     case ApplyFunction(func, input) => {
       printExpression(func) + " " + printExpression(input)
     }
     case ParamId(name) => s"$name~pi"
-    case BuildCase(constructor, input) => {
+    case UCase(constructor, input) => {
       untagged(constructor) + "." + printExpression(input)
     }
     case BuildSimpleMapT(inputType, outputType, config) => {
@@ -87,7 +91,7 @@ object PrintNewMapObject {
       val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
       s"Table(${mapTString})"
     }
-    case BuildCaseT(cases, _, _) => {
+    case UCaseT(cases, _, _) => {
       "Case " + printExpression(cases)
     }
     case BuildStructT(params, _, _, _) => {
@@ -99,10 +103,10 @@ object PrintNewMapObject {
     case BuildNewTypeClassT(typeTransform) => {
       s"new TypeClassT(${printExpression(typeTransform)})}"
     }
-    case BuildMapInstance(values) => {
+    case UMap(values) => {
       mapToString(values)
     }
-  }
+  }*/
 
   def printMapT(
     key: String,
@@ -166,10 +170,13 @@ object PrintNewMapObject {
     case UDouble(value: Double) => s"$value"
     case Uuuid(value) => s"$value"
     case UWildcardPattern(name) => "W~" + name
-    case UParamId(name) => s"$name~pi"
+    case ParamId(name) => s"$name~pi"
+    case ApplyFunction(func, input) => {
+      "(" + untagged(func) + " " + untagged(input) + ")"
+    }
   }
 
-  def mapToString(values: Vector[(UntaggedObject, NewMapExpression)]): String = {
+  def mapToString(values: Vector[(UntaggedObject, UntaggedObject)]): String = {
     val sb: StringBuilder = new StringBuilder()
     sb.append("(")
 
@@ -177,7 +184,7 @@ object PrintNewMapObject {
     for {
       (k, v) <- values
     } {
-      bindings :+= untagged(k) + ": " + printExpression(v)
+      bindings :+= untagged(k) + ": " + untagged(v)
     }
     sb.append(bindings.mkString(", "))
 

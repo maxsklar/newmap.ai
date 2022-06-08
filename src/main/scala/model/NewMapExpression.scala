@@ -3,7 +3,7 @@
 /**
  * The expressions in the NewMapLanguage
  */
-sealed abstract class NewMapExpression
+/*sealed abstract class NewMapExpression
 
 case class ObjectExpression(
   uObject: UntaggedObject
@@ -14,7 +14,7 @@ case class ApplyFunction(
   input: NewMapExpression
 ) extends NewMapExpression
 
-case class BuildCase(
+case class UCase(
   constructor: UntaggedObject,
   input: NewMapExpression
 ) extends NewMapExpression
@@ -41,7 +41,7 @@ case class BuildSubtypeT(
   featureSet: MapFeatureSet = BasicMap
 ) extends NewMapExpression
 
-case class BuildCaseT(
+case class UCaseT(
   cases: NewMapExpression,
   parentFieldType: NewMapType,
   featureSet: MapFeatureSet
@@ -59,10 +59,10 @@ case class BuildNewTypeClassT(
   params: NewMapExpression
 ) extends NewMapExpression
 
-case class BuildMapInstance(
+case class UMap(
   values: Vector[(UntaggedObject, NewMapExpression)]
 ) extends NewMapExpression
 
 // This is an object that stands for something else in the environment
 // Very important so that we don't repeat code
-case class ParamId(name: String) extends NewMapExpression
+case class ParamId(name: String) extends NewMapExpression*/

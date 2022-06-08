@@ -21,20 +21,19 @@ object RetrieveType {
 
   // Ensures that there are no free variables in this term
   // TODO: Return a NewMapObject if this is the case?
-  // TODO: This can be handled by a specialized type-checker on NewMapExpression (ripe for removing this code)
+  // TODO: This can be handled by a specialized type-checker on UntaggedObject (ripe for removing this code)
   // - But it's not that simple yet
   def isTermClosedLiteral(
-    nExpression: NewMapExpression,
+    nExpression: UntaggedObject,
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nExpression match {
-    case ObjectExpression(_) => true
     case ParamId(name) => knownVariables.contains(name)
     case ApplyFunction(func, input) => {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
     }
-    case BuildCase(_, input) => isTermClosedLiteral(input, knownVariables)
-    case BuildSimpleMapT(inputExp, outputExp, env) => {
+    case UCase(_, input) => isTermClosedLiteral(input, knownVariables)
+    /*case BuildSimpleMapT(inputExp, outputExp, env) => {
       isTermClosedLiteral(inputExp, knownVariables) && isTermClosedLiteral(outputExp, knownVariables)
     }
     case BuildMapT(typeTransform, config) => isTermClosedLiteral(typeTransform, knownVariables)
@@ -42,16 +41,18 @@ object RetrieveType {
       isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
     }
     case BuildSubtypeT(isMember, _, _) => isTermClosedLiteral(isMember, knownVariables)
-    case BuildCaseT(cases, _, _) => isTermClosedLiteral(cases, knownVariables)
+    case UCaseT(cases, _, _) => isTermClosedLiteral(cases, knownVariables)
     case BuildStructT(params, _, _, _) => isTermClosedLiteral(params, knownVariables)
-    case BuildNewTypeClassT(typeTransform) => isTermClosedLiteral(typeTransform)
-    case BuildMapInstance(values) => {
+    case BuildNewTypeClassT(typeTransform) => isTermClosedLiteral(typeTransform)*/
+    case UMap(values) => {
       isMapValuesClosed(values, knownVariables)
     }
+    case UStruct(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
+    case constant => true
   }
 
   def isMapValuesClosed(
-    mapValues: Vector[(UntaggedObject, NewMapExpression)],
+    mapValues: Vector[(UntaggedObject, UntaggedObject)],
     knownVariables: Vector[String]
   ): Boolean = {
     mapValues match {

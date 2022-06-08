@@ -7,11 +7,10 @@ import java.util.UUID
 // Evaluates an expression that's already been type checked
 object Evaluator {
   def apply(
-    nExpression: NewMapExpression,
+    nExpression: UntaggedObject,
     env: Environment
   ): Outcome[UntaggedObject, String] = {
     nExpression match {
-      case ObjectExpression(uObject) => Success(uObject)
       case ApplyFunction(func, input) => {
         for {
           evalFunc <- this(func, env)
@@ -29,25 +28,25 @@ object Evaluator {
           }
           case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
           case Some(EnvironmentParameter(nObject)) => {
-            Success(UParamId(s))
+            Success(ParamId(s))
             //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
             //Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
           }
         }
       }
-      case BuildCase(constructor, input) => {
+      case UCase(constructor, input) => {
         for {
           evalInput <- this(input, env)
         } yield {
           UCase(constructor, evalInput)
         }
       }
-      case BuildSimpleMapT(inputExp, outputExp, config) => {
+      /*case BuildSimpleMapT(inputExp, outputExp, config) => {
         for {
           inputType <- this(inputExp, env)
           outputType <- this(outputExp, env)
         } yield {
-          val typeTransform = Vector(inputType -> ObjectExpression(outputType))
+          val typeTransform = Vector(inputType -> outputType)
           env.typeSystem.typeToUntaggedObject(MapT(typeTransform, config))
         }
       }
@@ -74,7 +73,7 @@ object Evaluator {
           // TODO - are we going to know that this is an expandable type?
           // - I think so because startingType is tagged!!
           val typeTransform = Vector(
-            env.typeSystem.typeToUntaggedObject(startingT) -> ObjectExpression(env.typeSystem.typeToUntaggedObject(valueT))
+            env.typeSystem.typeToUntaggedObject(startingT) -> env.typeSystem.typeToUntaggedObject(valueT)
           )
           env.typeSystem.typeToUntaggedObject(MapT(
             typeTransform,
@@ -89,7 +88,7 @@ object Evaluator {
           evalParentT <- asType(evalParentType, env)
         } yield env.typeSystem.typeToUntaggedObject(SubtypeT(evalIsMember, evalParentT, featureSet))
       }
-      case BuildCaseT(cases, parentFieldType, featureSet) => {
+      case UCaseT(cases, parentFieldType, featureSet) => {
         for {
           evalCases <- this(cases, env)
           evalCasesM <- evalCases match {
@@ -121,12 +120,18 @@ object Evaluator {
         } yield {
           env.typeSystem.typeToUntaggedObject(TypeClassT(evalTypeTransformM, Vector.empty))
         }
-      }
-      case BuildMapInstance(values) => {
+      }*/
+      case UMap(values) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
         } yield UMap(evalValues)
       }
+      case UStruct(values) => {
+        for {
+          evalValues <- evalStructVals(values, env)
+        } yield UStruct(evalValues)
+      }
+      case constant => Success(constant)
     }
   }
 
@@ -184,9 +189,9 @@ object Evaluator {
   }
 
   def evalMapInstanceVals(
-    values: Vector[(UntaggedObject, NewMapExpression)],
+    values: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
-  ): Outcome[Vector[(UntaggedObject, NewMapExpression)], String] = {
+  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     values match {
       case (k, v) +: restOfValues => {
         for {
@@ -195,7 +200,7 @@ object Evaluator {
           // TODO - rethink about "when to evaluate" what's inside a map
           // - We probably should not evaluate if it's not a simple function
           /*val newV = Evaluator(v, env) match {
-            case Success(vObj) => ObjectExpression(vObj)
+            case Success(vObj) => vObj
             case _ => v
           }*/
           val newV = v
@@ -207,8 +212,25 @@ object Evaluator {
     }
   }
 
+  def evalStructVals(
+    values: Vector[UntaggedObject],
+    env: Environment
+  ): Outcome[Vector[UntaggedObject], String] = {
+    values match {
+      case v +: restOfValues => {
+        for {
+          evalRest <- evalStructVals(restOfValues, env)
+          evalV <- this(v, env)
+        } yield {
+          evalV +: evalRest
+        }
+      }
+      case _ => Success(Vector.empty)
+    }
+  }
+
   def expressionListToObjects(
-    nExpressions: Vector[NewMapExpression],
+    nExpressions: Vector[UntaggedObject],
     env: Environment
   ): Outcome[Vector[UntaggedObject], String] = {
     nExpressions match {
@@ -236,7 +258,7 @@ object Evaluator {
           case Failure(_) => {
             // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
             // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-            ObjectExpression(UInit)
+            UInit
           }
         }
 
@@ -266,10 +288,10 @@ object Evaluator {
   }
 
   def attemptPatternMatchInOrder(
-    remainingPatterns: Vector[(UntaggedObject, NewMapExpression)],
+    remainingPatterns: Vector[(UntaggedObject, UntaggedObject)],
     input: UntaggedObject,
     env: Environment
-  ): Outcome[NewMapExpression, String] = {
+  ): Outcome[UntaggedObject, String] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
         attemptPatternMatch(pattern, input, env) match {
@@ -383,6 +405,6 @@ object Evaluator {
   }
 
   def asType(uObject: UntaggedObject, env: Environment): Outcome[NewMapType, String] = {
-    env.typeSystem.convertToNewMapType(stripVersioningU(uObject, env))
+    env.typeSystem.convertToNewMapType(uObject)
   }
 }

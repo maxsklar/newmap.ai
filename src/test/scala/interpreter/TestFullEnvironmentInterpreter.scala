@@ -31,9 +31,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   def toTypeTransform(
     inputT: NewMapType,
     outputT: NewMapType
-  ): Vector[(UntaggedObject, NewMapExpression)] = {
+  ): UntaggedObject = {
     val typeSystem = Environment.Base.typeSystem
-    Vector(typeSystem.typeToUntaggedObject(inputT) -> ObjectExpression(typeSystem.typeToUntaggedObject(outputT)))
+    UMap(Vector(typeSystem.typeToUntaggedObject(inputT) -> typeSystem.typeToUntaggedObject(outputT)))
   }
 
   /**
@@ -75,8 +75,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeLine(CodeExpectation(line, FailureCheck))
   }
 
-  def bind(key: UntaggedObject, value: UntaggedObject): (UntaggedObject, NewMapExpression) = {
-    key -> ObjectExpression(value)
+  def bind(key: UntaggedObject, value: UntaggedObject): (UntaggedObject, UntaggedObject) = {
+    key -> value
   }
 
   "A number " should " be allowed if it's one less than the type" in {
@@ -272,13 +272,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
         UMap(Vector(
           UWildcardPattern("a") ->
           ApplyFunction(
-            ObjectExpression(
-              UMap(Vector(
-                bind(UIndex(0), UIndex(2)),
-                bind(UIndex(1), UIndex(3)),
-                bind(UIndex(2), UIndex(1))
-              ))
-            ),
+            UMap(Vector(
+              bind(UIndex(0), UIndex(2)),
+              bind(UIndex(1), UIndex(3)),
+              bind(UIndex(2), UIndex(1))
+            )),
             ParamId("a")
           )
         )),

@@ -75,6 +75,9 @@ object TypeClassUtils {
         Failure(s"Struct Type couldn't accept index $i as value: $nType")
       }
     }
+    case ParamIdT(name) => {
+      Success() // Is this right?
+    }
     case _ => {
       Failure(s"Type couldn't accept index $i as value: $nType")
     }

@@ -12,7 +12,7 @@ sealed abstract class UntaggedObject {
 // Todo - replace with "user defined type" in prelude
 case class UIdentifier(s: String) extends UntaggedObject
 
-case class UMap(values: Vector[(UntaggedObject, NewMapExpression)]) extends UntaggedObject
+case class UMap(values: Vector[(UntaggedObject, UntaggedObject)]) extends UntaggedObject
 
 // This is equivalent to UMap where the keys are indecies
 case class UStruct(values: Vector[UntaggedObject]) extends UntaggedObject
@@ -21,16 +21,17 @@ case class UStruct(values: Vector[UntaggedObject]) extends UntaggedObject
 case class UWildcardPattern(s: String) extends UntaggedObject
 
 // Represents a parametrized object (this can only exist in environments with parameters)
-case class UParamId(s: String) extends UntaggedObject
+case class ParamId(s: String) extends UntaggedObject
 
 // This can't be a map/struct because here the type of the input depends on the constructor
 case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends UntaggedObject
 
 case class UIndex(i: Long) extends UntaggedObject
 
+
+
 // Set to the initial value of a command type
 case object UInit extends UntaggedObject
-
 case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
 // To be moved into user-defined types soon
@@ -50,3 +51,9 @@ case object IsCommandFunc extends UntaggedObject
 
 // A basic function to increment a count
 case object IncrementFunc extends UntaggedObject
+
+// Only for Expressions
+case class ApplyFunction(
+  func: UntaggedObject,
+  input: UntaggedObject
+) extends UntaggedObject

@@ -37,7 +37,7 @@ case class NewMapTypeSystem(
 
   // First item is the pattern for the parameter, and the second item is the type
   typeToUnderlyingType: Map[NewMapTypeSystem.TypeId, (UntaggedObject, UntaggedObject)] = Map(
-    NewMapTypeSystem.indexTid -> (UWildcardPattern("i"), UCase(UIdentifier("Index"), UParamId("i"))) 
+    NewMapTypeSystem.indexTid -> (UWildcardPattern("i"), UCase(UIdentifier("Index"), ParamId("i"))) 
   ),
 
   // For each type constructor, I want to know which other type constructors are using this in their parameter
@@ -71,7 +71,7 @@ case class NewMapTypeSystem(
     case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
     case IdentifierT => UCase(UIdentifier("Identifier"), UStruct(Vector.empty))
     case MapT(typeTransform, config) => UCase(UIdentifier("Map"), UStruct(Vector(
-      UMap(typeTransform),
+      typeTransform,
       UStruct(Vector(
         UIdentifier(config.completeness.getName),
         UIdentifier(config.featureSet.getName),
@@ -109,6 +109,7 @@ case class NewMapTypeSystem(
       )
     }
     case WildcardPatternT(name) => UWildcardPattern(name)
+    case ParamIdT(name) => ParamId(name)
   }
 
   def emptyStructType = StructT(Vector.empty, IndexT(0), RequireCompleteness, BasicMap)
@@ -133,7 +134,7 @@ case class NewMapTypeSystem(
     case "Map" => {
       Failure("Map not implemented")
       /*val uTypeT = typeToUntaggedObject(TypeT)
-      val standardTypeTransform = Vector(uTypeT -> ObjectExpression(uTypeT))
+      val standardTypeTransform = Vector(uTypeT -> uTypeT)
       Success(buildStructTypeFromParamList(Vector(
         typeToUntaggedObject(MapT(standardTypeTransform, MapConfig(CommandOutput, SimpleFunction))),
         /// config???
@@ -145,7 +146,7 @@ case class NewMapTypeSystem(
     case "Subtype" => Failure("Subtype not implemented")
     case "WithState" => Success(
       CaseT(
-        Vector(UWildcardPattern("tsid") -> BuildCase(UIdentifier("HistoricalType"), ParamId("tsid"))),
+        Vector(UWildcardPattern("tsid") -> UCase(UIdentifier("HistoricalType"), ParamId("tsid"))),
         UuidT,
         SimpleFunction
       )
@@ -179,7 +180,7 @@ case class NewMapTypeSystem(
     case "Map" => {
       Failure("Map not implemented")
       /*val uTypeT = typeToUntaggedObject(TypeT)
-      val standardTypeTransform = Vector(uTypeT -> ObjectExpression(uTypeT))
+      val standardTypeTransform = Vector(uTypeT -> uTypeT)
       Success(buildStructTypeFromParamList(Vector(
         typeToUntaggedObject(MapT(standardTypeTransform, MapConfig(CommandOutput, SimpleFunction))),
         /// config???
@@ -201,7 +202,7 @@ case class NewMapTypeSystem(
 
   def buildStructTypeFromParamList(paramList: Vector[UntaggedObject]): NewMapType = {
     StructT(
-      paramList.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(x._1)),
+      paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1),
       IndexT(paramList.length)
     )
   }
@@ -233,11 +234,6 @@ case class NewMapTypeSystem(
       case "Map" => params match {
         case UStruct(items) if (items.length == 2) => {
           for {
-            typeTransform <- items(0) match {
-              case UMap(v) => Success(v)
-              case _ => Failure(s"Incorrect type transform: ${items(0)}")
-            }
-
             config <- items(1) match {
               case UStruct(v) if (v.length == 3) => Success(v)
               case _ => Failure(s"Incorrect config: ${items(1)}")
@@ -253,7 +249,7 @@ case class NewMapTypeSystem(
 
             // TODO: config(2) for the preservation rules
           } yield {
-            MapT(typeTransform, MapConfig(completeness, featureSet))
+            MapT(items(0), MapConfig(completeness, featureSet))
           }
         }
         case _ => Failure(s"Couldn't convert Map to NewMapType with params: $params")
@@ -329,7 +325,9 @@ case class NewMapTypeSystem(
     case UIndex(i) => Success(IndexT(i))
     case UIdentifier(name) => convertToNewMapType(UCase(UIdentifier(name), UInit))
     case UWildcardPattern(name) => Success(WildcardPatternT(name))
+    case ParamId(name) => Success(ParamIdT(name))
     case _ => {
+      throw new Exception(s"Couldn't convert to NewMapType: $uType")
       Failure(s"Couldn't convert to NewMapType: $uType")
     }
   }

@@ -24,6 +24,7 @@ case object DoubleT extends NewMapType
 case object UuidT extends NewMapType
 
 case class WildcardPatternT(s: String) extends NewMapType
+case class ParamIdT(s: String) extends NewMapType
 
 // Type of types that exist in the given state
 case class HistoricalTypeT(uuid: UUID) extends NewMapType
@@ -60,7 +61,7 @@ case object IdentifierT extends NewMapType
  * TODO - should we subsume struct type in here??
  */
 case class MapT(
-  typeTransform: Vector[(UntaggedObject, NewMapExpression)],
+  typeTransform: UntaggedObject, //typeTransform: Vector[(UntaggedObject, UntaggedObject)],
   config: MapConfig
 ) extends NewMapType
 
@@ -132,7 +133,7 @@ case class TypeParameterVariance(
 // Params is a map from the fields of the struct to the Types (all the same level)
 // TODO: We also need a feature set!
 case class StructT(
-  params: Vector[(UntaggedObject, NewMapExpression)],
+  params: Vector[(UntaggedObject, UntaggedObject)],
   fieldParentType: NewMapType,
   completeness: MapCompleteness = RequireCompleteness,
   featureSet: MapFeatureSet = BasicMap
@@ -143,7 +144,7 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransform: Vector[(UntaggedObject, NewMapExpression)],
+  typeTransform: Vector[(UntaggedObject, UntaggedObject)],
 
   // List of the actual types in the class, but not their implementations - that's in the actual object (with a UMap)
   typesInTypeClass: Vector[UntaggedObject],
@@ -152,7 +153,7 @@ case class TypeClassT(
 // cases: input type is the case constructors, output type is the field types per constructor
 // TODO - this is not really a type because of the existance of type parameters. This is more of a type constructor
 case class CaseT(
-  cases: Vector[(UntaggedObject, NewMapExpression)],
+  cases: Vector[(UntaggedObject, UntaggedObject)],
   fieldParentType: NewMapType,
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType

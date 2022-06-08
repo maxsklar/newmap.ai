@@ -33,7 +33,7 @@ object SubtypeUtils {
       piecemealCompletenessOutcome match {
         case Success(true) => Success(true)
         case _ => {
-          val patternsMap = keys.map(key => key -> ObjectExpression(UIndex(1)))
+          val patternsMap = keys.map(key => key -> UIndex(1))
 
           for {
             keysToMatch <- enumerateAllValuesIfPossible(nType, env)
@@ -49,7 +49,7 @@ object SubtypeUtils {
 
   def checkCaseComplete(
     keys: Vector[UntaggedObject],
-    cases: Vector[(UntaggedObject, NewMapExpression)],
+    cases: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
   ): Boolean = {
     // For each case key, we want to make sure that this case key is completely covered
@@ -98,7 +98,7 @@ object SubtypeUtils {
 
   def checkStructComplete(
     keys: Vector[UntaggedObject],
-    params: Vector[(UntaggedObject, NewMapExpression)],
+    params: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
   ): Outcome[Boolean, String] = {
     // TODO: Implement
@@ -185,8 +185,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(startingTypeTransform, MapConfig(startingCompleteness, startingFeatureSet, _)),
-        MapT(endingTypeTransform, MapConfig(endingCompleteness, endingFeatureSet, _))
+        MapT(UMap(startingTypeTransform), MapConfig(startingCompleteness, startingFeatureSet, _)),
+        MapT(UMap(endingTypeTransform), MapConfig(endingCompleteness, endingFeatureSet, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -198,7 +198,7 @@ object SubtypeUtils {
           _ <- Outcome.failWhen(endingTypeTransform.length != 1, s"map conversions only available for type transforms of length 1. endingTypeTransform was $endingTypeTransform")
 
           startingTypePair <- startingTypeTransform.head match {
-            case (inputT, ObjectExpression(outputT)) => {
+            case (inputT, outputT) => {
               for {
                 inT <- Evaluator.asType(inputT, env)
                 ouT <- Evaluator.asType(outputT, env)
@@ -210,7 +210,7 @@ object SubtypeUtils {
           }
 
           endingTypePair <- endingTypeTransform.head match {
-            case (inputT, ObjectExpression(outputT)) => {
+            case (inputT, outputT) => {
               for {
                 inT <- Evaluator.asType(inputT, env)
                 ouT <- Evaluator.asType(outputT, env)
@@ -445,7 +445,7 @@ object SubtypeUtils {
   }
 
   // If this function only allows one input, then return the output for that input
-  def outputIfFunctionHasSingularInput(mapValues: Vector[(UntaggedObject, NewMapExpression)]): Outcome[NewMapExpression, String] = {
+  def outputIfFunctionHasSingularInput(mapValues: Vector[(UntaggedObject, UntaggedObject)]): Outcome[UntaggedObject, String] = {
     if (mapValues.length == 1) {
       Success(mapValues.head._2)
     } else {

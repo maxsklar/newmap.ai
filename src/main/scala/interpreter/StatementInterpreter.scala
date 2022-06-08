@@ -159,7 +159,7 @@ object StatementInterpreter {
   }
 
   def convertMapValuesToParamList(
-    mapValues: Vector[(UntaggedObject, NewMapExpression)],
+    mapValues: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
   ): Outcome[Vector[(String, NewMapType)], String] = {
     mapValues match {

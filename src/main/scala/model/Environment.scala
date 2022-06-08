@@ -197,11 +197,11 @@ case class Environment(
       case NewParamTypeCommand(s, paramList) => {
         val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
         val paramT = StructT(
-          paramList.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(typeSystem.typeToUntaggedObject(x._1._2))),
+          paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
           IndexT(paramList.length)
         )
 
-        //paramList.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(x._1))
+        //paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1)
 
         //val uuid = java.util.UUID.randomUUID
         //val key = VersionedObjectKey(0L, uuid)
@@ -336,8 +336,8 @@ case class Environment(
   def toTypeTransform(
     inputT: NewMapType,
     outputT: NewMapType
-  ): Vector[(UntaggedObject, NewMapExpression)] = {
-    Vector(typeSystem.typeToUntaggedObject(inputT) -> ObjectExpression(typeSystem.typeToUntaggedObject(outputT)))
+  ): UntaggedObject = {
+    UMap(Vector(typeSystem.typeToUntaggedObject(inputT) -> typeSystem.typeToUntaggedObject(outputT)))
   }
 }
 
@@ -348,13 +348,13 @@ object Environment {
 
 
 
-  def fullFuncT(typeTransform: Vector[(UntaggedObject, NewMapExpression)]): NewMapType = {
+  def fullFuncT(typeTransform: UntaggedObject): NewMapType = {
     MapT(typeTransform, MapConfig(RequireCompleteness, FullFunction))
   }
 
   def structTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => UIdentifier(x._1) -> ObjectExpression(Base.typeSystem.typeToUntaggedObject(x._2)))
+      params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
     }
 
     StructT(paramsToObject, IdentifierT)
@@ -362,7 +362,7 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => UIdentifier(x._1) -> ObjectExpression(Base.typeSystem.typeToUntaggedObject(x._2)))
+      params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
     }
 
     CaseT(paramsToObject, IdentifierT)
@@ -385,11 +385,11 @@ object Environment {
   // In code, this should be done somewhat automatically
   def buildDefinitionWithParameters(
     inputs: Vector[(String, NewMapType)], // A map from parameters and their type
-    expression: NewMapExpression,
+    expression: UntaggedObject,
     env: Environment
   ): NewMapObject = {
     val structT = StructT(
-      inputs.zipWithIndex.map(x => UIndex(x._2) -> ObjectExpression(Base.typeSystem.typeToUntaggedObject(x._1._2))),
+      inputs.zipWithIndex.map(x => UIndex(x._2) -> Base.typeSystem.typeToUntaggedObject(x._1._2)),
       IndexT(inputs.length)
     )
 
@@ -412,6 +412,28 @@ object Environment {
 
   var Base: Environment = Environment()
 
+  def buildTableT(keyType: UntaggedObject, valueType: UntaggedObject, env: Environment): UntaggedObject = {
+    buildSimpleMapT(keyType, valueType, MapConfig(RequireCompleteness, SimpleFunction), env)
+  }
+
+  def buildSimpleMapT(keyType: UntaggedObject, valueType: UntaggedObject, config: MapConfig, env: Environment): UntaggedObject = {
+    val typeTransform = UMap(Vector(keyType -> valueType))
+    val nType = MapT(typeTransform,  config)
+    typeAsUntaggedObject(nType)
+  }
+
+  def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject, env: Environment): UntaggedObject = {
+    UCase(UIdentifier("Subtype"), UStruct(Vector(
+      isMember,
+      parentType,
+      UIdentifier("BasicMap")
+    )))
+  }
+
+  def buildMapT(typeTransform: UntaggedObject, config: MapConfig, env: Environment): UntaggedObject = {
+    env.typeSystem.typeToUntaggedObject(MapT(typeTransform, config))
+  }
+
   Base = Base.newCommands(Vector(
     //eCommand("Any", typeAsObject(AnyT)),
     eCommand("Type", typeAsObject(TypeT)),
@@ -424,16 +446,16 @@ object Environment {
     )),
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", TaggedObject(
-      UMap(Vector(UWildcardPattern("key") -> BuildTableT(ObjectExpression(UIndex(0)), ParamId("key")))),
+      UMap(Vector(UWildcardPattern("key") -> buildTableT(UIndex(0), ParamId("key"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> NewMapO.commandT),
-      BuildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap)),
+      buildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap), Base),
       Base
     )),
     eCommand("GenericMap", TaggedObject(
-      UMap(Vector(UWildcardPattern("typeTransform") -> BuildMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction)))),
+      UMap(Vector(UWildcardPattern("typeTransform") -> buildMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction), Base))),
       MapT(
         Base.toTypeTransform(
           MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(CommandOutput, SimpleFunction)),
@@ -444,23 +466,23 @@ object Environment {
     )),
     eCommand("ReqMap", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      BuildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction)),
+      buildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(RequireCompleteness, SimpleFunction), Base),
       Base
     )),
     eCommand("Table", buildDefinitionWithParameters(
       Vector("key" -> TypeT, "value" -> TypeT),
-      BuildTableT(ParamId("key"), ParamId("value")),
+      buildTableT(ParamId("key"), ParamId("value"), Base),
       Base
     )),
     eCommand("CaseType", typeAsObject(CaseT(Vector.empty, IdentifierT, BasicMap))),
     eCommand("Subtype", TaggedObject(
-      UMap(Vector(UWildcardPattern("t") -> BuildSubtypeT(ObjectExpression(UMap(Vector.empty)), ParamId("t")))),
+      UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewVersionedStatementCommand("_default", TypeClassT(Vector(UWildcardPattern("t") -> ParamId("t")), Vector.empty)),
     NewVersionedStatementCommand("_typeOf", 
       TypeClassT(
-        Vector(UWildcardPattern("t") -> BuildSimpleMapT(ParamId("t"), ObjectExpression(typeAsUntaggedObject(TypeT)), MapConfig(RequireCompleteness, SimpleFunction))),
+        Vector(UWildcardPattern("t") -> buildSimpleMapT(ParamId("t"), typeAsUntaggedObject(TypeT), MapConfig(RequireCompleteness, SimpleFunction), Base)),
         Vector.empty
       )
     ),
