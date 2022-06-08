@@ -81,7 +81,7 @@ object RetrieveType {
     env: Environment
   ): Outcome[Map[String, NewMapType], String] = {
     val expectedTypeOutcome = TypeChecker.getFinalUnderlyingType(
-      env.typeSystem.typeToUntaggedObject(nType),
+      nType,
       env,
       env.typeSystem.currentState
     )

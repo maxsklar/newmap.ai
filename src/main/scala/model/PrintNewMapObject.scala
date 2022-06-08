@@ -152,7 +152,6 @@ object PrintNewMapObject {
         untagged(constructor) + "." + untagged(value)
       }
     }
-    case UType(nType) => newMapType(nType)
     case UIndex(i) => i.toString
     case UInit => "()"
     case IsCommandFunc => s"IsCommandFunc"

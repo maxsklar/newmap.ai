@@ -83,42 +83,15 @@ object TypeClassUtils {
   // Return conversion instructions
   def isTypeConvertibleToPattern(
     startingType: NewMapType,
-    endingTypePattern: UntaggedObject,
+    endingTypePattern: NewMapType,
     env: Environment
   ): Outcome[Vector[UntaggedObject], String] = {
     endingTypePattern match {
-      case UType(endingType) => {
-        SubtypeUtils.isTypeConvertible(startingType, endingType, env)
-      }
-      case UWildcardPattern(_) => {
+      case WildcardPatternT(_) => {
         Success(Vector.empty)
       }
-      case _ => {
-        Failure(s"Unimplemented isTypeConvertibleToPattern: $startingType --> $endingTypePattern")
-      }
-    }
-  }
-
-  def isPatternConvertibleToPattern(
-    startingTypePattern: UntaggedObject,
-    endingTypePattern: UntaggedObject,
-    env: Environment
-  ): Outcome[Vector[UntaggedObject], String] = {
-    startingTypePattern match {
-      case UType(startingType) => {
-        isTypeConvertibleToPattern(startingType, endingTypePattern, env)
-      }
-      case UInit => {
-        throw new Exception(s"Here: $startingTypePattern --> $endingTypePattern")
-      }
-      case _ => {
-        endingTypePattern match {
-          case UWildcardPattern(_) => Success(Vector.empty)
-          case _ => {
-            throw new Exception(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
-            Failure(s"Unimplemented isPatternConvertibleToPattern: $startingTypePattern --> $endingTypePattern")
-          }
-        }
+      case endingType => {
+        SubtypeUtils.isTypeConvertible(startingType, endingType, env)
       }
     }
   }

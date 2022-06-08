@@ -10,7 +10,7 @@ object SubtypeUtils {
   // For Maps, we want to know that the default value is never used
   def doPatternsCoverType(
     keys: Vector[UntaggedObject],
-    nType: UntaggedObject,
+    nType: NewMapType,
     env: Environment
   ): Outcome[Boolean, String] = {
     val nTypeOutcome = TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
@@ -82,7 +82,7 @@ object SubtypeUtils {
           Evaluator.asType(inputType, env) match {
             case Failure(_) => returnVal = false
             case Success(inputTypeT) => {
-              doPatternsCoverType(patternsWithThisConstructor, UType(inputTypeT), env) match {
+              doPatternsCoverType(patternsWithThisConstructor, inputTypeT, env) match {
                 case Success(false) | Failure(_) => returnVal = false
                 case _ => ()
               }
@@ -107,17 +107,17 @@ object SubtypeUtils {
 
   // Returns true if the object is a pattern that will match everything in the type
   // nType is a pattern that represents a type
-  def isCatchallPattern(pattern: UntaggedObject, nType: UntaggedObject, env: Environment): Boolean = {
+  def isCatchallPattern(pattern: UntaggedObject, nType: NewMapType, env: Environment): Boolean = {
     pattern match {
       case UWildcardPattern(_) => true
       case UStruct(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a UntaggedObject, not just a NewMapObject
-          case UType(StructT(params, _, _, _)) if (params.length == patterns.length) => {
+          case StructT(params, _, _, _) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, UType(Evaluator.asType(nObject, env).toOption.get), env)
+                isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }
@@ -128,7 +128,7 @@ object SubtypeUtils {
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: UntaggedObject, env: Environment): Outcome[Set[UntaggedObject], String] = {
+  def enumerateAllValuesIfPossible(nType: NewMapType, env: Environment): Outcome[Set[UntaggedObject], String] = {
     TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
@@ -136,7 +136,7 @@ object SubtypeUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case UType(CaseT(values, parentType, BasicMap)) => {
+      /*case CaseT(values, parentType, BasicMap) => {
         ???
       }*/
       case Success(IndexT(i)) => {
@@ -370,7 +370,7 @@ object SubtypeUtils {
       }
       case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
         for {
-          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(env.typeSystem.typeToUntaggedObject(startingType), env, typeSystemId)
+          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
           
           _ <- underlyingStartingType match {
             case SubtypeT(_, _, _) => Success()

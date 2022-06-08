@@ -31,9 +31,6 @@ case class UIndex(i: Long) extends UntaggedObject
 // Set to the initial value of a command type
 case object UInit extends UntaggedObject
 
-// We can't yet untag types directly, so we can use this instead
-case class UType(nType: NewMapType) extends UntaggedObject
-
 case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
 // To be moved into user-defined types soon

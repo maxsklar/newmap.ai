@@ -86,9 +86,10 @@ class EnvironmentInterpreter(
     val result = for {
       tokens <- Lexer(code)
       parseTree <- NewMapParser(tokens)
-      tc <- TypeChecker.typeCheck(parseTree, env.typeSystem.typeToUntaggedObject(TypeT), env, FullFunction)
+      tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction)
       nObject <- Evaluator(tc.nExpression, env)
-      underlyingType <- TypeChecker.getFinalUnderlyingType(nObject, env, env.typeSystem.currentState)
+      nType <- env.typeSystem.convertToNewMapType(nObject)
+      underlyingType <- TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
     } yield {
       underlyingType.toString
     }

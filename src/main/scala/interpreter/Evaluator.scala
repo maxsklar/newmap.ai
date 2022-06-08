@@ -48,7 +48,7 @@ object Evaluator {
           outputType <- this(outputExp, env)
         } yield {
           val typeTransform = Vector(inputType -> ObjectExpression(outputType))
-          UType(MapT(typeTransform, config))
+          env.typeSystem.typeToUntaggedObject(MapT(typeTransform, config))
         }
       }
       case BuildMapT(typeTransform, config) => {
@@ -60,7 +60,7 @@ object Evaluator {
             case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
           }
         } yield {
-          UType(MapT(evalTypeTransformM, config))
+          env.typeSystem.typeToUntaggedObject(MapT(evalTypeTransformM, config))
         }
       }
       case BuildTableT(keyType, requiredValues) => {
@@ -73,8 +73,10 @@ object Evaluator {
         } yield {
           // TODO - are we going to know that this is an expandable type?
           // - I think so because startingType is tagged!!
-          val typeTransform = Vector(UType(startingT) -> ObjectExpression(UType(valueT)))
-          UType(MapT(
+          val typeTransform = Vector(
+            env.typeSystem.typeToUntaggedObject(startingT) -> ObjectExpression(env.typeSystem.typeToUntaggedObject(valueT))
+          )
+          env.typeSystem.typeToUntaggedObject(MapT(
             typeTransform,
             MapConfig(RequireCompleteness, SimpleFunction)
           ))
@@ -85,7 +87,7 @@ object Evaluator {
           evalIsMember <- this(isMember, env)
           evalParentType <- this(parentType, env)
           evalParentT <- asType(evalParentType, env)
-        } yield UType(SubtypeT(evalIsMember, evalParentT, featureSet))
+        } yield env.typeSystem.typeToUntaggedObject(SubtypeT(evalIsMember, evalParentT, featureSet))
       }
       case BuildCaseT(cases, parentFieldType, featureSet) => {
         for {
@@ -94,7 +96,7 @@ object Evaluator {
             case UMap(m) => Success(m)
             case _ => Failure(s"Unexpected case map: $evalCases")
           }
-        } yield UType(CaseT(evalCasesM, parentFieldType, featureSet))
+        } yield env.typeSystem.typeToUntaggedObject(CaseT(evalCasesM, parentFieldType, featureSet))
       }
       case BuildStructT(params, parentFieldType, completeness, featureSet) => {
         for {
@@ -105,7 +107,7 @@ object Evaluator {
             case _ => Failure(s"Unexpected struct map: $evalParams")
           }
         } yield {
-          UType(StructT(evalStructM, parentFieldType, completeness, featureSet))
+          env.typeSystem.typeToUntaggedObject(StructT(evalStructM, parentFieldType, completeness, featureSet))
         }
       }
       case BuildNewTypeClassT(typeTransform) => {
@@ -117,7 +119,7 @@ object Evaluator {
             case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
           }
         } yield {
-          UType(TypeClassT(evalTypeTransformM, Vector.empty))
+          env.typeSystem.typeToUntaggedObject(TypeClassT(evalTypeTransformM, Vector.empty))
         }
       }
       case BuildMapInstance(values) => {
@@ -242,7 +244,8 @@ object Evaluator {
       }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
-          defaultValue <- CommandMaps.getDefaultValueOfCommandType(input, env)
+          inputT <- env.typeSystem.convertToNewMapType(input)
+          defaultValue <- CommandMaps.getDefaultValueOfCommandType(inputT, env)
         } yield defaultValue
 
         val isCommand: Boolean = defaultValueOutcome.isSuccess
@@ -312,30 +315,8 @@ object Evaluator {
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
       }
-      /*case (UCase(constructorP, inputP), UType(ConstructedType(constructorObj, cInput))) => {
-        // TODO - merge with above
-        for {
-          constructor <- removeTypeTag(constructorObj)
-          _ <- Outcome.failWhen(attemptPatternMatch(constructorP, constructor, env).isFailure, "Constructors didn't match")
-          result <- attemptPatternMatch(inputP, cInput, env)
-        } yield result
-      }*/
       case (_, UWildcardPattern(wildcard)) => {
         Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")
-      }
-      case (UType(pattern1), p2) => {
-        attemptPatternMatch(
-          env.typeSystem.typeToUntaggedObject(pattern1),
-          p2,
-          env
-        )
-      }
-      case (p1, UType(pattern2)) => {
-        attemptPatternMatch(
-          p1,
-          env.typeSystem.typeToUntaggedObject(pattern2),
-          env
-        )
       }
       case (oPattern, strippedInput) => {
         // TODO - instead of checking for equality here - go through each untagged object configuration

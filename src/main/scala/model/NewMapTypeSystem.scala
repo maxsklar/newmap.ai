@@ -246,14 +246,10 @@ case class NewMapTypeSystem(
             completeness <- config(0) match {
               case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
               case UIdentifier("CommandOutput") => Success(CommandOutput)
-              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
+              case _ => Failure(s"Can't allow feature set in struct type: ${items(1)}")
             }
 
-            featureSet <- config(1) match {
-              case UIdentifier("BasicMap") => Success(BasicMap)
-              case UIdentifier("SimpleFunction") => Success(SimpleFunction)
-              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
-            }
+            featureSet <- convertFeatureSet(config(1))
 
             // TODO: config(2) for the preservation rules
           } yield {
@@ -278,11 +274,7 @@ case class NewMapTypeSystem(
               case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
             }
 
-            featureSet <- items(3) match {
-              case UIdentifier("BasicMap") => Success(BasicMap)
-              case UIdentifier("SimpleFunction") => Success(SimpleFunction)
-              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
-            }
+            featureSet <- convertFeatureSet(items(3))
           } yield {
             StructT(structMap, parentT, completeness, featureSet)
           }
@@ -302,11 +294,7 @@ case class NewMapTypeSystem(
 
             parentT <- convertToNewMapType(items(1))
 
-            featureSet <- items(2) match {
-              case UIdentifier("BasicMap") => Success(BasicMap)
-              case UIdentifier("SimpleFunction") => Success(SimpleFunction)
-              case _ => Failure(s"Can't allow feature set in subtype: ${items(2)}")
-            }
+            featureSet <- convertFeatureSet(items(2))
           } yield CaseT(caseMap, parentT, featureSet)
         }
         case _ => Failure(s"Couldn't convert Case to NewMapType with params: $params")
@@ -337,7 +325,6 @@ case class NewMapTypeSystem(
       }
       case custom => Success(CustomT(custom, params))
     }
-    case UType(t) => Success(t)
     case UInit => Success(UndefinedT)
     case UIndex(i) => Success(IndexT(i))
     case UIdentifier(name) => convertToNewMapType(UCase(UIdentifier(name), UInit))
@@ -345,6 +332,14 @@ case class NewMapTypeSystem(
     case _ => {
       Failure(s"Couldn't convert to NewMapType: $uType")
     }
+  }
+
+  def convertFeatureSet(uObject: UntaggedObject): Outcome[MapFeatureSet, String] = uObject match {
+    case UIdentifier("BasicMap") => Success(BasicMap)
+    case UIdentifier("SimpleFunction") => Success(SimpleFunction)
+    case UIdentifier("WellFoundedFunction") => Success(WellFoundedFunction)
+    case UIdentifier("FullFunction") => Success(FullFunction)
+    case _ => Failure(s"Can't allow feature set in struct type: $uObject")
   }
 
   def getTypeIdFromName(typeSystemId: NewMapTypeSystem.Id, name: String): Outcome[NewMapTypeSystem.TypeId, String] = {

@@ -21,13 +21,13 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(_, id, typeExpression, objExpression) => {
         for {
-          tcType <- TypeChecker.typeCheck(typeExpression, UType(TypeT), env, FullFunction)
+          tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
-          tc <- TypeChecker.typeCheck(objExpression, UType(nType), env, FullFunction)
+          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
           evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, UType(nType), env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
         } yield {
           val command = FullEnvironmentCommand(id.s, nObject)
           Response(Vector(command), command.toString)
@@ -35,13 +35,13 @@ object StatementInterpreter {
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, UType(TypeT), env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
-          initValue <- CommandMaps.getDefaultValueOfCommandType(nTypeObj, env)
+          initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
         } yield {
           val command = NewVersionedStatementCommand(id.s, nType)
           Response(Vector(command), command.toString)
@@ -49,7 +49,7 @@ object StatementInterpreter {
       }
       case NewTypeStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, UType(TypeT), env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
@@ -64,7 +64,7 @@ object StatementInterpreter {
         }
 
         for {
-          mapValues <- TypeChecker.typeCheckMap(values, UType(IdentifierT), UType(TypeT), BasicMap, env, FullFunction)
+          mapValues <- TypeChecker.typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           val command = NewParamTypeCommand(id.s, paramList)
@@ -90,7 +90,7 @@ object StatementInterpreter {
             for {
               inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
 
-              commandExp <- typeCheck(command, UType(inputT), env, FullFunction)
+              commandExp <- typeCheck(command, inputT, env, FullFunction)
 
               commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
@@ -119,7 +119,7 @@ object StatementInterpreter {
 
               newEnv = env.newParams(newParameterMap.toVector)
 
-              commandExp <- typeCheck(command, env.typeSystem.typeToUntaggedObject(inputT), newEnv, FullFunction)
+              commandExp <- typeCheck(command, inputT, newEnv, FullFunction)
 
               commandObj <- Evaluator(commandExp.nExpression, newEnv)
             } yield {

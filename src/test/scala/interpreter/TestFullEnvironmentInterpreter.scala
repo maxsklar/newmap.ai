@@ -32,7 +32,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     inputT: NewMapType,
     outputT: NewMapType
   ): Vector[(UntaggedObject, NewMapExpression)] = {
-    Vector(UType(inputT) -> ObjectExpression(UType(outputT)))
+    val typeSystem = Environment.Base.typeSystem
+    Vector(typeSystem.typeToUntaggedObject(inputT) -> ObjectExpression(typeSystem.typeToUntaggedObject(outputT)))
   }
 
   /**
@@ -303,7 +304,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val fSig: Type = (3 => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
-        Environment.typeAsObject(Environment.fullFuncT(IndexT(3), IndexT(4)))
+        Environment.typeAsObject(Environment.fullFuncT(toTypeTransform(IndexT(3), IndexT(4))))
       ))),
       CodeExpectation("val m: Map(3, 4) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = (a: m a)", SuccessCheck(correctCommandCreateFunc)),
@@ -843,9 +844,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),
       CodeExpectation("val y: Identifier = ~hi", GeneralSuccessCheck),
-      CodeExpectation("typeOf(x)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(IndexT(9)), TypeT)))),
-      CodeExpectation("typeOf(y)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(IdentifierT), TypeT)))),
-      CodeExpectation("typeOf(4)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UType(CountT), TypeT)))),
+      CodeExpectation("typeOf(x)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IndexT(9)), TypeT)))),
+      CodeExpectation("typeOf(y)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IdentifierT), TypeT)))),
+      CodeExpectation("typeOf(4)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(CountT), TypeT)))),
     ))
   }
 
