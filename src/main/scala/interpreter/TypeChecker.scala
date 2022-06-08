@@ -219,14 +219,10 @@ object TypeChecker {
           )
 
           // TODO - execute convertInstructions
-
-          //_ = println(s"about to call isPatternConvertibleToPattern: ${result.resultingType} -- $expectedType")
-
-          convertInstructions <- TypeClassUtils.isTypeConvertibleToPattern(
-            result.resultingType,
-            expectedType,
-            env
-          )
+          convertInstructions <- expectedType match {
+            case WildcardPatternT(_) => Success(Vector.empty)
+            case _ => SubtypeUtils.isTypeConvertible(result.resultingType, expectedType, env)
+          }
         } yield {
           TypeCheckResponse(ApplyFunction(result.functionExpression, result.inputExpression), result.resultingType)
         }
@@ -528,39 +524,6 @@ object TypeChecker {
       case uObject => uObject
     }
   }
-
-  /*def expressionToPattern(nExpression: UntaggedObject): Outcome[UntaggedObject, String] = {
-    nExpression match {
-      case ObjectExpression(uObject) => Success(uObject)
-      case ParamId(name) => Success(UWildcardPattern(name))
-      case UMap(structOrdering) => {
-        for {
-          patternList <- structExpressionToPattern(structOrdering)
-        } yield UStruct(patternList)
-      }
-      case UCase(constructor, inputExpression) => {
-        for {
-          inputPattern <- expressionToPattern(inputExpression)
-        } yield UCase(constructor, inputPattern)
-      }
-      case BuildStructT(values, parentFieldType, completeness, featureSet) => {
-        expressionToPattern(values)
-      }
-      case _ => Failure(s"Couldn't convert expression to pattern $nExpression")
-    }
-  }*/
-
-  /*def structExpressionToPattern(structOrdering: Vector[(UntaggedObject, UntaggedObject)]) : Outcome[Vector[UntaggedObject], String] = {
-    structOrdering match {
-      case first +: rest => {
-        for {
-          firstPattern <- expressionToPattern(first._2)
-          restOfPatterns <- structExpressionToPattern(rest)
-        } yield firstPattern +: restOfPatterns
-      }
-      case _ => Success(Vector.empty)
-    }
-  }*/
 
   case class TypeCheckWithPatternMatchingResult(
     typeCheckResult: UntaggedObject,

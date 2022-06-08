@@ -70,44 +70,6 @@ object PrintNewMapObject {
     case ParamIdT(name) => untagged(ParamId(name))
   }
 
-  /*def printExpression(
-    nExpression: UntaggedObject
-  ): String = nExpression match {
-    case ObjectExpression(nObject) => untagged(nObject)
-    case ApplyFunction(func, input) => {
-      printExpression(func) + " " + printExpression(input)
-    }
-    case ParamId(name) => s"$name~pi"
-    case UCase(constructor, input) => {
-      untagged(constructor) + "." + printExpression(input)
-    }
-    case BuildSimpleMapT(inputType, outputType, config) => {
-      printMapT(printExpression(inputType), printExpression(outputType), config)
-    }
-    case BuildMapT(typeTransform, config) => {
-      s"Generic(${printExpression(typeTransform)})"
-    }
-    case BuildTableT(expandingKeyType, requiredValues) => {
-      val mapTString = printMapT(printExpression(expandingKeyType), printExpression(requiredValues), MapConfig(RequireCompleteness, SimpleFunction))
-      s"Table(${mapTString})"
-    }
-    case UCaseT(cases, _, _) => {
-      "Case " + printExpression(cases)
-    }
-    case BuildStructT(params, _, _, _) => {
-      "Struct " + printExpression(params)
-    }
-    case BuildSubtypeT(isMember, _, _) => {
-      s"Subtype(${printExpression(isMember)})"
-    }
-    case BuildNewTypeClassT(typeTransform) => {
-      s"new TypeClassT(${printExpression(typeTransform)})}"
-    }
-    case UMap(values) => {
-      mapToString(values)
-    }
-  }*/
-
   def printMapT(
     key: String,
     value: String,

@@ -312,17 +312,6 @@ object SubtypeUtils {
         // There is where we use the type system to eventually to a graph search
         Success(Vector.empty)
       }
-      /*case (ConstructedType(VersionedObjectLink(key1), params1), ConstructedType(VersionedObjectLink(key2), params2)) => {
-        // Todo - we need to work out how this works
-        // This is also where the covariance/contravariance information should come in!!
-        // We are also not taking versions into account!!!
-        // Eventually type constructions above (map, case) will be subsumed under this
-        if ((key1.uuid == key2.uuid) && (params1 == params2)) {
-          Success(Vector.empty)
-        } else {
-          Failure(s"Cannot convert constructed types: $startingType to $endingType")
-        }
-      }*/
       case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
         // I feel like more needs to be done here
         // TypeT requires the uuid as a case?
@@ -401,14 +390,6 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[Vector[UntaggedObject], String] = {
     endingType match {
-      // What to do about this??? For some reason we can't put it in
-      // Eventually - CustomT
-      /*case VersionedObjectLink(key, _) => {
-        for {
-          currentEndingState <- Evaluator.currentState(key.uuid, env)
-          result <- isObjectConvertibleToType(startingObject, currentEndingState, env)
-        } yield result
-      }*/
       case SubtypeT(isMember, parentType, featureSet) => {
         for {
           convertInstructions <- isObjectConvertibleToType(startingObject, parentType, env)

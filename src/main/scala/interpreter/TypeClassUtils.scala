@@ -82,20 +82,4 @@ object TypeClassUtils {
       Failure(s"Type couldn't accept index $i as value: $nType")
     }
   }
-
-  // Return conversion instructions
-  def isTypeConvertibleToPattern(
-    startingType: NewMapType,
-    endingTypePattern: NewMapType,
-    env: Environment
-  ): Outcome[Vector[UntaggedObject], String] = {
-    endingTypePattern match {
-      case WildcardPatternT(_) => {
-        Success(Vector.empty)
-      }
-      case endingType => {
-        SubtypeUtils.isTypeConvertible(startingType, endingType, env)
-      }
-    }
-  }
 }

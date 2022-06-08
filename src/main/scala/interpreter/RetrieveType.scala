@@ -16,6 +16,7 @@ object RetrieveType {
     case UWildcardPattern(_) => false
     case UCase(_, input) => isTermPatternFree(input)
     case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
+    case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))
     case _ => true
   }
 
@@ -33,17 +34,6 @@ object RetrieveType {
         isTermClosedLiteral(input, knownVariables)
     }
     case UCase(_, input) => isTermClosedLiteral(input, knownVariables)
-    /*case BuildSimpleMapT(inputExp, outputExp, env) => {
-      isTermClosedLiteral(inputExp, knownVariables) && isTermClosedLiteral(outputExp, knownVariables)
-    }
-    case BuildMapT(typeTransform, config) => isTermClosedLiteral(typeTransform, knownVariables)
-    case BuildTableT(keyType, requiredValues) => {
-      isTermClosedLiteral(keyType, knownVariables) && isTermClosedLiteral(requiredValues, knownVariables)
-    }
-    case BuildSubtypeT(isMember, _, _) => isTermClosedLiteral(isMember, knownVariables)
-    case UCaseT(cases, _, _) => isTermClosedLiteral(cases, knownVariables)
-    case BuildStructT(params, _, _, _) => isTermClosedLiteral(params, knownVariables)
-    case BuildNewTypeClassT(typeTransform) => isTermClosedLiteral(typeTransform)*/
     case UMap(values) => {
       isMapValuesClosed(values, knownVariables)
     }

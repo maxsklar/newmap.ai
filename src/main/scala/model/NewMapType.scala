@@ -158,11 +158,6 @@ case class CaseT(
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType
 
-/*case class ConstructedType(
-  genericType: NewMapObject,
-  params: UntaggedObject
-) extends NewMapType*/
-
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
 // - Anything that's left at the initial value is NOT in the subtype

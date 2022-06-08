@@ -41,86 +41,6 @@ object Evaluator {
           UCase(constructor, evalInput)
         }
       }
-      /*case BuildSimpleMapT(inputExp, outputExp, config) => {
-        for {
-          inputType <- this(inputExp, env)
-          outputType <- this(outputExp, env)
-        } yield {
-          val typeTransform = Vector(inputType -> outputType)
-          env.typeSystem.typeToUntaggedObject(MapT(typeTransform, config))
-        }
-      }
-      case BuildMapT(typeTransform, config) => {
-        for {
-          evalTypeTransform <- this(typeTransform, env)
-
-          evalTypeTransformM <- evalTypeTransform match {
-            case UMap(m) => Success(m)
-            case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
-          }
-        } yield {
-          env.typeSystem.typeToUntaggedObject(MapT(evalTypeTransformM, config))
-        }
-      }
-      case BuildTableT(keyType, requiredValues) => {
-        for {
-          evalKeyType <- this(keyType, env)
-          startingT <- asType(evalKeyType, env)
-
-          evalRequiredValues <- this(requiredValues, env)
-          valueT <- asType(evalRequiredValues, env)
-        } yield {
-          // TODO - are we going to know that this is an expandable type?
-          // - I think so because startingType is tagged!!
-          val typeTransform = Vector(
-            env.typeSystem.typeToUntaggedObject(startingT) -> env.typeSystem.typeToUntaggedObject(valueT)
-          )
-          env.typeSystem.typeToUntaggedObject(MapT(
-            typeTransform,
-            MapConfig(RequireCompleteness, SimpleFunction)
-          ))
-        }
-      }
-      case BuildSubtypeT(isMember, parentType, featureSet) => {
-        for {
-          evalIsMember <- this(isMember, env)
-          evalParentType <- this(parentType, env)
-          evalParentT <- asType(evalParentType, env)
-        } yield env.typeSystem.typeToUntaggedObject(SubtypeT(evalIsMember, evalParentT, featureSet))
-      }
-      case UCaseT(cases, parentFieldType, featureSet) => {
-        for {
-          evalCases <- this(cases, env)
-          evalCasesM <- evalCases match {
-            case UMap(m) => Success(m)
-            case _ => Failure(s"Unexpected case map: $evalCases")
-          }
-        } yield env.typeSystem.typeToUntaggedObject(CaseT(evalCasesM, parentFieldType, featureSet))
-      }
-      case BuildStructT(params, parentFieldType, completeness, featureSet) => {
-        for {
-          evalParams <- this(params, env)
-
-          evalStructM <- evalParams match {
-            case UMap(m) => Success(m)
-            case _ => Failure(s"Unexpected struct map: $evalParams")
-          }
-        } yield {
-          env.typeSystem.typeToUntaggedObject(StructT(evalStructM, parentFieldType, completeness, featureSet))
-        }
-      }
-      case BuildNewTypeClassT(typeTransform) => {
-        for {
-          evalTypeTransform <- this(typeTransform, env)
-
-          evalTypeTransformM <- evalTypeTransform match {
-            case UMap(m) => Success(m)
-            case _ => Failure(s"Unexpected type transform: $evalTypeTransform")
-          }
-        } yield {
-          env.typeSystem.typeToUntaggedObject(TypeClassT(evalTypeTransformM, Vector.empty))
-        }
-      }*/
       case UMap(values) => {
         for {
           evalValues <- evalMapInstanceVals(values, env)
@@ -384,6 +304,7 @@ object Evaluator {
     case UCase(constructor, input) => {
       newParametersFromPattern(input)
     }
+    case UMap(values) => newParametersFromPattern(UStruct(values.map(_._2)))
     case _ => Vector.empty
   }
 
