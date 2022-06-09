@@ -745,6 +745,7 @@ object TypeChecker {
       resultingType <- typeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, typesInTypeClass) => {
+          println(s"In ther right place! $typeTransform -- $typesInTypeClass")
           outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)
         }
         case MapT(typeTransform, config) => {
@@ -834,7 +835,28 @@ object TypeChecker {
           initValue <- CommandMaps.getDefaultValueOfCommandType(nTypeClass, env)
         } yield TaggedObject(initValue, nTypeClass)
       }
-      case _ => Success(TaggedObject(uObject, nTypeClass))
+      case _ => {
+        if (nTypeClass == CountT) {
+          for {
+            i <- normalizeCount(uObject)
+          } yield TaggedObject(UIndex(i), nTypeClass)
+        } else {
+          Success(TaggedObject(uObject, nTypeClass))
+        }
+      }
+    }
+  }
+
+  def normalizeCount(uObject: UntaggedObject): Outcome[Long, String] = {
+    uObject match {
+      case UInit => Success(0)
+      case UCase(UIdentifier("Inc"), internal) => {
+        for {
+          i <- normalizeCount(internal)
+        } yield i + 1
+      }
+      case UIndex(i) => Success(i)
+      case _ => Failure(s"Couldn't normalize count: $uObject")
     }
   }
 

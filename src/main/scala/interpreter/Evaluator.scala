@@ -194,12 +194,6 @@ object Evaluator {
 
         Success(if (isCommand) UIndex(1) else UInit)
       }
-      case IncrementFunc => {
-        input match {
-          case UIndex(i) => Success(UIndex(i + 1))
-          case _ => Failure(s"Cannot increment $input")
-        }
-      }
       case _ => {
         //throw new Exception(s"Not implemented: apply function\nFunction: $func\nInput: $input")
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
@@ -256,6 +250,9 @@ object Evaluator {
           _ <- Outcome.failWhen(attemptPatternMatch(constructorP, constructor, env).isFailure, "Constructors didn't match")
           result <- attemptPatternMatch(inputP, cInput, env)
         } yield result
+      }
+      case (UCase(UIdentifier("Inc"), i), UIndex(j)) if j > 0 => {
+        attemptPatternMatch(i, UIndex(j - 1), env)
       }
       case (_, UWildcardPattern(wildcard)) => {
         Failure("Failed Pattern Match: Split wildcard $wildcard on $pattern")

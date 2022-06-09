@@ -439,7 +439,10 @@ object Environment {
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
-    eCommand("Increment", TaggedObject(IncrementFunc, MapT(Base.toTypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction)))),
+    eCommand("Increment", TaggedObject(
+      UMap(Vector(UWildcardPattern("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),
+      MapT(Base.toTypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction))
+    )),
     eCommand("IsCommand", TaggedObject(
       IsCommandFunc,
       MapT(Base.toTypeTransform(TypeT, IndexT(2)), MapConfig(CommandOutput, SimpleFunction))

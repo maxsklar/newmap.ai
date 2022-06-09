@@ -59,9 +59,6 @@ object PrintNewMapObject {
     case CaseT(cases, _, _) => {
       s"Case${mapToString(cases)}"
     }
-    /*case ConstructedType(genericType, params) => {
-      s"${this(genericType)}.${untagged(params)}"
-    }*/
     //TODO(2022): we might not want to print out the full parent here, because it could be large
     // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
     case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
@@ -121,7 +118,6 @@ object PrintNewMapObject {
     case UIndex(i) => i.toString
     case UInit => "()"
     case IsCommandFunc => s"IsCommandFunc"
-    case IncrementFunc => s"Increment"
     case ULink(key) => {
       s"ULink[${key.toString}]"
     }

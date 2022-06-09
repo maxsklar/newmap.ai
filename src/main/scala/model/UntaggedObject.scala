@@ -49,9 +49,6 @@ case class Uuuid(value: UUID) extends UntaggedObject
 // TODO: making this a basic class is temporary for now
 case object IsCommandFunc extends UntaggedObject
 
-// A basic function to increment a count
-case object IncrementFunc extends UntaggedObject
-
 // Only for Expressions
 case class ApplyFunction(
   func: UntaggedObject,

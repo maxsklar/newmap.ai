@@ -371,10 +371,9 @@ object CommandMaps {
                 case _ => Failure(s"Couldn't interpret count value: $count")
               }
 
-              newState <- Evaluator.applyFunctionAttempt(IncrementFunc, UIndex(c), env)
-            } yield {
-              TaggedObject(newState, nType)
-            }
+              newState = UCase(UIdentifier("Inc"), UIndex(c))
+              result <- TypeChecker.tagAndNormalizeObject(newState, nType, env)
+            } yield result
           }
           case _ => {
             throw new Exception("Invalid count in versioning upgrade")

@@ -842,9 +842,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),
       CodeExpectation("val y: Identifier = ~hi", GeneralSuccessCheck),
-      CodeExpectation("typeOf(x)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IndexT(9)), TypeT)))),
-      CodeExpectation("typeOf(y)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IdentifierT), TypeT)))),
-      CodeExpectation("typeOf(4)", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(CountT), TypeT)))),
+      CodeExpectation("_typeOf x", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IndexT(9)), TypeT)))),
+      CodeExpectation("_typeOf y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(IdentifierT), TypeT)))),
+      CodeExpectation("_typeOf 4", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(Environment.typeAsUntaggedObject(CountT), TypeT)))),
     ))
   }
 
