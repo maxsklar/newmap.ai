@@ -136,8 +136,8 @@ object EnvironmentInterpreter {
     //"update _default Boolean.0",
     //"update _default Type.UndefinedType",
     // todo - _typeOf should be creatable all in one swoop, and as a generic
-    "update _typeOf Count.(_: Count)",
-    "update _typeOf Identifier.(_: Identifier)",
+    //"update _typeOf Count.(_: Count)",
+    //"update _typeOf Identifier.(_: Identifier)",
     "val Byte: Type = 8 => 2",
     "val Char: Type = 16 => 2",
     //"data Option (T: Type)",

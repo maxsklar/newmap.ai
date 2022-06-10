@@ -55,6 +55,7 @@ object CommandMaps {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
           Success(defaultUMap)
         } else {
+          throw new Exception(s"Can't start off map with key in typeTransform $typeTransform")
           Failure(s"Can't start off map with key in typeTransform $typeTransform")
         }
       }

@@ -457,7 +457,7 @@ object Environment {
       buildSimpleMapT(ParamId("key"), ParamId("value"), MapConfig(CommandOutput, BasicMap), Base),
       Base
     )),
-    eCommand("GenericMap", TaggedObject(
+  eCommand("GenericMap", TaggedObject(
       UMap(Vector(UWildcardPattern("typeTransform") -> buildMapT(ParamId("typeTransform"), MapConfig(RequireCompleteness, SimpleFunction), Base))),
       MapT(
         Base.toTypeTransform(
@@ -489,5 +489,6 @@ object Environment {
         Vector.empty
       )
     ),
+    ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t")))))
   ))
 }

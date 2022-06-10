@@ -740,14 +740,14 @@ object TypeChecker {
 
       (inputTC, inputType) = inputTagged
 
+      untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
+
       resultingType <- typeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, typesInTypeClass) => {
-          println(s"In ther right place! $typeTransform -- $typesInTypeClass -- ${outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)}")
-          outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)
+          outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, inputType, env)
         }
         case MapT(typeTransform, config) => {
-          val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
           for {
             typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, untaggedInputType, env, TypeMatcher)
             nType <- Evaluator.asType(typeAsObj, env)
@@ -757,8 +757,24 @@ object TypeChecker {
         }
         case _ => Failure(s"Cannot get resulting type from function type $typeOfFunction -- $function -- $input")
       }
+
+      resultingFunctionExpression <- typeOfFunction match {
+        case TypeClassT(typeTransform, typesInTypeClass) => {
+          val strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+
+          strippedExpression match {
+            case UMap(values) => {
+              Evaluator.attemptPatternMatchInOrder(values, untaggedInputType, env, TypeMatcher)
+            }
+            case _ => {
+              Failure(s"illegal type class: $strippedExpression")
+            }
+          }
+        }
+        case _ => Success(functionTypeChecked.nExpression)
+      }
     } yield {
-      TypeCheckUnknownFunctionResult(functionTypeChecked.nExpression, typeOfFunction, inputTC, resultingType)
+      TypeCheckUnknownFunctionResult(resultingFunctionExpression, typeOfFunction, inputTC, resultingType)
     }    
   }
 
@@ -773,12 +789,7 @@ object TypeChecker {
       }
       case Success(TypeClassT(typeTransform, typesInTypeClass)) => {
         //eventually send typesInTypeClass to the type checker
-        Some(TypeT)
-        /*SubtypeT(
-          UMap(typesInTypeClass.map(x => (x -> UIndex(1)))),
-          TypeT,
-          SimpleFunction
-        )*/
+        None
       }
       case Success(MapT(UMap(typeTransform), config)) => {
         // TODO - this is what has to change!!!
@@ -798,21 +809,33 @@ object TypeChecker {
     params: Vector[(UntaggedObject, UntaggedObject)],
     typesInTypeClass: Vector[UntaggedObject],
     input: UntaggedObject,
+    inputType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
     val uMap = UMap(typesInTypeClass.map(pattern => pattern -> UIndex(1)))
+    val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
     
     for {
-      inputObj <- Evaluator(input, env)
-
       // Ensure that this type is a member of the type class
-      _ <- Evaluator.applyFunctionAttempt(uMap, inputObj, env)
+      _ <- Evaluator.applyFunctionAttempt(uMap, untaggedInputType, env)
 
-      resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
+      resultingFunctionType <- Evaluator.applyFunctionAttempt(UMap(params), untaggedInputType, env)
+      resultingFunctionT <- env.typeSystem.convertToNewMapType(resultingFunctionType)
 
-      // This will (correctly) fail when resultingType == UInit (ie, it's not in params)
-      resultingT <- Evaluator.asType(resultingType, env)
-    } yield resultingT
+      outputT <- resultingFunctionT match {
+        case MapT(typeTransform, config) => {
+          for {
+            typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, untaggedInputType, env, TypeMatcher)
+            nType <- Evaluator.asType(typeAsObj, env)
+            // TODO: This should be uncommented when we can build "convertible to" into the type transform
+            //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
+          } yield nType
+        }
+        case _ => {
+          throw new Exception(s"Couldn't handle function type within typeclass: $resultingFunctionType")
+        }
+      }
+    } yield outputT
   }
 
   def outputTypeFromStructParams(
