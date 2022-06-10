@@ -29,7 +29,7 @@ object RetrieveType {
     knownVariables: Vector[String] = Vector.empty,
   ): Boolean = nExpression match {
     case ParamId(name) => knownVariables.contains(name)
-    case ApplyFunction(func, input) => {
+    case ApplyFunction(func, input, _) => {
       isTermClosedLiteral(func, knownVariables) &&
         isTermClosedLiteral(input, knownVariables)
     }

@@ -133,7 +133,8 @@ object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
     "update _default Count.0",
-    "update _default Boolean.0",
+    //"update _default Boolean.0",
+    //"update _default Type.UndefinedType",
     // todo - _typeOf should be creatable all in one swoop, and as a generic
     "update _typeOf Count.(_: Count)",
     "update _typeOf Identifier.(_: Identifier)",

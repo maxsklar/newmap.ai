@@ -52,5 +52,17 @@ case object IsCommandFunc extends UntaggedObject
 // Only for Expressions
 case class ApplyFunction(
   func: UntaggedObject,
-  input: UntaggedObject
+  input: UntaggedObject,
+  matchingRules: MatchingRules // See Class Comment
 ) extends UntaggedObject
+
+
+/*
+ * This represents our ability to change how the pattern matching algorithm works
+ * depending on the type of data that's being matched.
+ * In the future, this will be represented by a relation within the newmap system (as a newmap object)
+ * - And it'll be required to be a transitive relation
+ */
+sealed abstract class MatchingRules
+object StandardMatcher extends MatchingRules
+object TypeMatcher extends MatchingRules

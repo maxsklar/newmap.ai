@@ -129,7 +129,7 @@ object PrintNewMapObject {
     case Uuuid(value) => s"$value"
     case UWildcardPattern(name) => "W~" + name
     case ParamId(name) => s"$name~pi"
-    case ApplyFunction(func, input) => {
+    case ApplyFunction(func, input, matchingRules) => {
       "(" + untagged(func) + " " + untagged(input) + ")"
     }
   }

@@ -10,10 +10,11 @@ object MakeSubstitution {
     parameters: Map[String, UntaggedObject]
   ): UntaggedObject = {
     expression match {
-      case ApplyFunction(func, input) => {
+      case ApplyFunction(func, input, matchingRules) => {
         ApplyFunction(
           this(func, parameters),
-          this(input, parameters)
+          this(input, parameters),
+          matchingRules
         )
       }
       case ParamId(name) => {

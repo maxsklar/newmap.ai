@@ -168,18 +168,44 @@ object SubtypeUtils {
     }
   }
 
+  case class IsTypeConvertibleResponse(
+    convertInstructions: Vector[UntaggedObject],
+    newParameters: Map[String, UntaggedObject]
+  )
+
   // Return - Instructions in the form of functions for converting from one type to another
   def isTypeConvertible(
     startingType: NewMapType,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[Vector[UntaggedObject], String] = {
+  ): Outcome[IsTypeConvertibleResponse, String] = {
+    //println(s"Calling isTypeConvertible: $startingType -- $endingType")
+    val emptyResponse = IsTypeConvertibleResponse(Vector.empty, Map.empty)
+
     (startingType, endingType) match {
-      case _ if (startingType == endingType) => Success(Vector.empty)
-      case (SubtypeT(isMember, parentType, featureSet), _) => {
+      case (startingType, WildcardPatternT(name)) => {
+        Success(IsTypeConvertibleResponse(
+          Vector.empty,
+          Map(name -> env.typeSystem.typeToUntaggedObject(startingType))
+        ))
+      }
+      case (CustomT(name1, param1), CustomT(name2, param2)) if (name1 == name2) => {
+        //println(s"Found my way here: $name1 -- $param1 --- $name2 --- $param2")
         for {
-          convertInstructions <- isTypeConvertible(parentType, endingType, env)
-        } yield convertInstructions
+          parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentState, name1)
+
+          // TODO: eventually, there should be a general way to convert a type to a matcher
+          matcher = if (isTypeConvertible(parameterType, TypeT, env).isSuccess) TypeMatcher else StandardMatcher
+
+          newParameters <- Evaluator.attemptPatternMatch(param2, param1, matcher, env)
+        } yield {
+          //println(s"newParameters: $newParameters")
+          IsTypeConvertibleResponse(Vector.empty, newParameters)
+        }
+      }
+      case _ if (startingType == endingType) => Success(emptyResponse)
+      case (SubtypeT(isMember, parentType, featureSet), _) => {
+        isTypeConvertible(parentType, endingType, env)
       }
       case (_, SubtypeT(isMember, parentType, featureSet)) => {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
@@ -244,7 +270,7 @@ object SubtypeUtils {
 
         } yield {
           // TODO - utilizing the input/output type converstion instructions
-          Vector.empty
+          emptyResponse
         }
       }
       case(StructT(startingParams, startingFieldType, _, _), StructT(endingParams, endingFieldType, _, _)) => {
@@ -266,27 +292,27 @@ object SubtypeUtils {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
           singularObjT <- Evaluator.asType(singularObj, env)
-          convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
-        } yield convertInstructions
+          response <- isTypeConvertible(singularObjT, endingType, env)
+        } yield response
       }
       case (_, StructT(values, fieldParentType, _, _)) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
           singularObjT <- Evaluator.asType(singularObj, env)
-          convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
-        } yield convertInstructions
+          response <- isTypeConvertible(startingType, singularObjT, env)
+        } yield response
       }
       case (CaseT(startingCases, startingFieldType, _), CaseT(endingCases, endingFieldType, _)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
         /*for {
-          convertInstructions <- isTypeConvertible(
+          response <- isTypeConvertible(
             RetrieveType.retrieveInputTypeFromFunctionObj(endingCases, env),
             RetrieveType.retrieveInputTypeFromFunctionObj(startingCases, env),
             env
           )
-        } yield convertInstructions*/
+        } yield response*/
         // TODO: The outputs have to agree as well
         Failure("Need to implement case conversion")
       }
@@ -296,8 +322,8 @@ object SubtypeUtils {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
           singularObjT <- Evaluator.asType(singularObj, env)
-          convertInstructions <- isTypeConvertible(singularObjT, endingType, env)
-        } yield convertInstructions
+          response <- isTypeConvertible(singularObjT, endingType, env)
+        } yield response
       }
       case (_, CaseT(values, endingFieldType, _)) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
@@ -305,21 +331,17 @@ object SubtypeUtils {
           singularOutput <- outputIfFunctionHasSingularInput(values)
           singularObj <- Evaluator(singularOutput, env)
           singularObjT <- Evaluator.asType(singularObj, env)
-          convertInstructions <- isTypeConvertible(startingType, singularObjT, env)
-        } yield convertInstructions
-      }
-      case (CustomT(name1, _), CustomT(name2, _)) if (name1 == name2) => {
-        // There is where we use the type system to eventually to a graph search
-        Success(Vector.empty)
+          response <- isTypeConvertible(startingType, singularObjT, env)
+        } yield response
       }
       case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
         // I feel like more needs to be done here
         // TypeT requires the uuid as a case?
         // - Perhaps that's our next step
-        Success(Vector.empty)
+        Success(emptyResponse)
       }
       case (TypeT, HistoricalTypeT(uuid)) if (uuid == env.typeSystem.currentState) => {
-        Success(Vector.empty)
+        Success(emptyResponse)
       }
       case (WithStateT(typeSystemId1, CustomT(name1, params1)), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
         for {
@@ -328,9 +350,9 @@ object SubtypeUtils {
 
           _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
 
-          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          conversionRules
+          IsTypeConvertibleResponse(convertInstructions, Map.empty)
         }
       }
       case (WithStateT(typeSystemId1, CustomT(name1, params1)), CustomT(name2, params2)) => {
@@ -340,9 +362,9 @@ object SubtypeUtils {
 
           _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
 
-          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          conversionRules
+          IsTypeConvertibleResponse(convertInstructions, Map.empty)
         }
       }
       case (CustomT(name1, params1), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
@@ -352,9 +374,9 @@ object SubtypeUtils {
           
           _ <- Outcome.failWhen(params1 != params2, s"Params aren't equal: $params1 --- $params2")
 
-          conversionRules <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
+          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          conversionRules
+          IsTypeConvertibleResponse(convertInstructions, Map.empty)
         }
       }
       case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
@@ -369,9 +391,9 @@ object SubtypeUtils {
             }
           }
 
-          conversionRules <- isTypeConvertible(underlyingStartingType, endingType, env)
+          response <- isTypeConvertible(underlyingStartingType, endingType, env)
         } yield {
-          conversionRules
+          response
         }
       }
       case _ => {
@@ -404,12 +426,11 @@ object SubtypeUtils {
           convertInstructions
         }
       }
-      case WildcardPatternT(_) => {
-        Success(Vector.empty)
-      }
       case _ => {
         val nType = RetrieveType.fromNewMapObject(startingObject, env)
-        isTypeConvertible(nType, endingType, env)
+        for {
+          response <- isTypeConvertible(nType, endingType, env)
+        } yield response.convertInstructions
       }
     }
   }

@@ -50,7 +50,7 @@ object CommandMaps {
       case IndexT(i) if i > 0 => Success(UIndex(0)) //REmove?
       case TypeT => Success(UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty)))
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
-      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
+      case MapT(_, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _)) => {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
           Success(defaultUMap)

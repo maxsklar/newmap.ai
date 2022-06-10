@@ -12,8 +12,8 @@ object TypeChecker {
 
   /*
    * @param expression The literal expression that needs to be type-checked
-   * @param expectedType This represents the typeClass that we expect the object to be
-   *  If it's a single ObjectPattern - then that represents the common case where we are expecting a specific type
+   * @param expectedType This represents the type that we expect the object to be
+   *  It may be a specific type, or it may be a pattern of a type
    *  The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
    * @param env This is the environment of values upon which we are working
    */
@@ -99,11 +99,9 @@ object TypeChecker {
           env.lookup(s) match {
             case Some(EnvironmentParameter(nType)) => {
               for {
-                convertInstructions <- expectedType match {
-                  case WildcardPatternT(_) => Success(Vector.empty)
-                  case _ => SubtypeUtils.isTypeConvertible(nType, expectedType, env)
-                }
+                response <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
                 // TODO - execute convert instructions?
+                // response.convertInstructions
               } yield TypeCheckResponse(ParamId(s), nType)
             }
             case Some(EnvironmentBinding(nObject)) => {
@@ -214,13 +212,10 @@ object TypeChecker {
             s"Function ${result.functionExpression} is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet"
           )
 
-          // TODO - execute convertInstructions
-          convertInstructions <- expectedType match {
-            case WildcardPatternT(_) => Success(Vector.empty)
-            case _ => SubtypeUtils.isTypeConvertible(result.resultingType, expectedType, env)
-          }
+          response <- SubtypeUtils.isTypeConvertible(result.resultingType, expectedType, env)
+          // TODO - execute response.convertInstructions
         } yield {
-          TypeCheckResponse(ApplyFunction(result.functionExpression, result.inputExpression), result.resultingType)
+          TypeCheckResponse(ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher), result.resultingType)
         }
       }
       case CommandList(values: Vector[ParseTree]) => {
@@ -427,7 +422,8 @@ object TypeChecker {
           valueTypePatternUntagged <- Evaluator.applyFunctionAttempt(
             UMap(typeTransform),
             env.typeSystem.typeToUntaggedObject(resultKey.expectedTypeRefinement),
-            env
+            env,
+            TypeMatcher
           )
 
           valueTypePattern <- env.typeSystem.convertToNewMapType(valueTypePatternUntagged)
@@ -463,7 +459,7 @@ object TypeChecker {
       parameterPattern = underlyingTypeInfo._1
       genericUnderlyingType = underlyingTypeInfo._2
 
-      substitutions <- Evaluator.attemptPatternMatch(parameterPattern, params, env)
+      substitutions <- Evaluator.attemptPatternMatch(parameterPattern, params, StandardMatcher, env)
 
       underlyingType = MakeSubstitution(genericUnderlyingType, substitutions)
     } yield underlyingType
@@ -650,7 +646,7 @@ object TypeChecker {
           valueId <- typeCheck(valueIdentifier, nTypeForStructFieldName, env, featureSet)
           valueIdObj <- Evaluator(valueId.nExpression, env)
 
-          newParams <- Evaluator.attemptPatternMatch(paramId, valueIdObj, env)
+          newParams <- Evaluator.attemptPatternMatch(paramId, valueIdObj, StandardMatcher, env)
 
           // Is this substitution neccesary??
           typeOfIdentifierObj <- Evaluator(MakeSubstitution(typeOfIdentifier, newParams), env)
@@ -729,6 +725,8 @@ object TypeChecker {
 
       inputTypeOption = inputTypeCheckFromFunctionType(typeOfFunction, env)
 
+      //_ = println(s"inputType: $inputTypeOption -- $input")
+
       inputTagged <- inputTypeOption match {
         case Some(inputT) => for {
           inputTypeChecked <- typeCheck(input, inputT, env, FullFunction)
@@ -745,13 +743,16 @@ object TypeChecker {
       resultingType <- typeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, typesInTypeClass) => {
-          println(s"In ther right place! $typeTransform -- $typesInTypeClass")
+          println(s"In ther right place! $typeTransform -- $typesInTypeClass -- ${outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)}")
           outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, env)
         }
         case MapT(typeTransform, config) => {
+          val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
           for {
-            typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, env.typeSystem.typeToUntaggedObject(inputType), env)
+            typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, untaggedInputType, env, TypeMatcher)
             nType <- Evaluator.asType(typeAsObj, env)
+            // TODO: This should be uncommented when we can build "convertible to" into the type transform
+            //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
           } yield nType
         }
         case _ => Failure(s"Cannot get resulting type from function type $typeOfFunction -- $function -- $input")

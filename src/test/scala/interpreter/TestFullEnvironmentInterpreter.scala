@@ -277,7 +277,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
               bind(UIndex(1), UIndex(3)),
               bind(UIndex(2), UIndex(1))
             )),
-            ParamId("a")
+            ParamId("a"),
+            StandardMatcher
           )
         )),
         MapT(toTypeTransform(IndexT(3), IndexT(4)), MapConfig(RequireCompleteness, FullFunction))
@@ -718,6 +719,38 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val y: Option.Count = Some.20", GeneralSuccessCheck),
       CodeExpectation("getOrElse x 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
       CodeExpectation("getOrElse y 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(20, CountT))))
+    ))
+  }
+
+  it should " be covariant" in {
+    testCodeScript(Vector(
+      CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
+      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("data MyType = Subtype(Count)", GeneralSuccessCheck),
+      CodeExpectation("update MyType 3", GeneralSuccessCheck),
+      CodeExpectation("val myValue: Option.MyType = Some.3", GeneralSuccessCheck),
+      CodeExpectation(
+        "val myFunction: ReqMap(Option.Count, Identifier) = (_: ~hello)",
+        GeneralSuccessCheck
+      ),
+      // In order to get this working, we'll have to let pattern matching look at convertibility
+      // not just equality!!!
+      CodeExpectation("myFunction myValue", SuccessCheck(ExpOnlyEnvironmentCommand(
+        TaggedObject(
+          UIdentifier("hello"),
+          IdentifierT
+        )
+      ))),
+      CodeExpectation(
+        "val myOtherFunction: ReqMap(Option.MyType, Identifier) = (_: ~hi)",
+        GeneralSuccessCheck
+      ),
+      CodeExpectation("val myCount: Option.Count = Some.3", GeneralSuccessCheck),
+      CodeExpectation("val myBadCount: Option.Count = Some.4", GeneralSuccessCheck),
+      CodeExpectation("myOtherFunction myBadCount", FailureCheck),
+      // TODO: Perhaps this next one should succeed because the object is convertible into the type
+      CodeExpectation("myOtherFunction myCount", FailureCheck)
     ))
   }
 
