@@ -883,9 +883,30 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "An Array " should " be creatable" in {
     testCodeScript(Vector(
-      CodeExpectation("val x: Array.Identifier = 3.(0: ~zero, 1: ~one, 2: ~two)", GeneralSuccessCheck)
+      CodeExpectation("val x: Array.Identifier = 3.(0: ~zero, 1: ~one, 2: ~two)", GeneralSuccessCheck),
     ))
   }
+
+  it should " come with a length function" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Array.Identifier = 5.(0: ~zero, 1: ~one, 2: ~two, 3: ~three, 4: ~four)", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array.T: Type) = (i._: i)", GeneralSuccessCheck),
+      CodeExpectation("len x", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+    ))
+  }
+
+  it should " be creatable without specifying length or keys" in {
+    testCodeScript(Vector(
+      CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
+    ))
+  }
+
+  /*it should " come with a length function 2" in {
+    testCodeScript(Vector(
+      CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
+      CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+    ))
+  }*/
 
   /**
    * 

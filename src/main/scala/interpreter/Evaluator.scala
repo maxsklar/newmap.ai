@@ -272,7 +272,7 @@ object Evaluator {
       }
       case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
-          resultConstructors <- attemptStandardPatternMatch(constructorP, constructor, env)
+          resultConstructors <- attemptPatternMatch(constructorP, constructor, StandardMatcher, env)
           result <- attemptPatternMatch(inputP, cInput, StandardMatcher, env)
         } yield (resultConstructors ++ result)
       }

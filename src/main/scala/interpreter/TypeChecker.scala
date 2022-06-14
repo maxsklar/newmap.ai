@@ -417,8 +417,6 @@ object TypeChecker {
 
           foundKeyPattern = resultKey.typeCheckResult
 
-          //_ = println(s"k: $k\n -- resultKey: ${resultKey}\n --outputExpression: $outputExpression")
-
           valueTypePatternUntagged <- Evaluator.applyFunctionAttempt(
             UMap(typeTransform),
             env.typeSystem.typeToUntaggedObject(resultKey.expectedTypeRefinement),
@@ -527,12 +525,14 @@ object TypeChecker {
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
     val patternMatchingAllowed = internalFeatureSet != BasicMap
-    //val parentTypeIsIdentifier = typeIsExpectingAnIdentifier(expectedType, env)
+    
+    // Use this??
+    //val parentTypeIsIdentifier = TypeClassUtils.typeIsExpectingAnIdentifier(expectedType, s, env)
 
     val expectedTypeOutcome = getFinalUnderlyingType(expectedType, env, env.typeSystem.currentState)
 
     (expression, expectedTypeOutcome) match {
-      case (IdentifierParse(s, false), _) if (patternMatchingAllowed /*&& !parentTypeIsIdentifier*/) => {
+      case (IdentifierParse(s, false), _) if (patternMatchingAllowed) => {
         Success(
           TypeCheckWithPatternMatchingResult(UWildcardPattern(s), expectedType, env.newParam(s, expectedType))
         )
@@ -547,12 +547,14 @@ object TypeChecker {
       }
       case (ConstructCaseParse(constructorP, input), Success(CaseT(cases, parentFieldType, _))) if (patternMatchingAllowed) => {
         for {
-          constructorTC <- typeCheck(constructorP, parentFieldType, env, BasicMap)
-          constructor <- Evaluator(constructorTC.nExpression, env)
-          inputTypeExpected <- Evaluator.applyFunctionAttempt(UMap(cases), constructor, env)
-          inputTExpected <- Evaluator.asType(inputTypeExpected, env)
+          // TODO - update environment here
+          constructorTC <- typeCheckWithPatternMatching(constructorP, parentFieldType, env, externalFeatureSet, if (parentFieldType == IdentifierT) BasicMap else internalFeatureSet)
+          constructor <- Evaluator(constructorTC.typeCheckResult, env)
 
-          result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet)
+          inputTypeExpected <- Evaluator.applyFunctionAttempt(UMap(cases), constructor, constructorTC.newEnvironment)
+          inputTExpected <- Evaluator.asType(inputTypeExpected, constructorTC.newEnvironment)
+
+          result <- typeCheckWithPatternMatching(input, inputTExpected, constructorTC.newEnvironment, externalFeatureSet, internalFeatureSet)
         } yield {
           TypeCheckWithPatternMatchingResult(
             UCase(constructor, result.typeCheckResult),
@@ -679,7 +681,6 @@ object TypeChecker {
           parameterList.head._1 match {
             case UWildcardPattern(_) => Success(Vector.empty)
             case _ => {
-              throw new Exception("A) Additional parameters not specified " + parameterList.toString)
               Failure("A) Additional parameters not specified " + parameterList.toString)
             }
           }
@@ -725,7 +726,6 @@ object TypeChecker {
 
       inputTypeOption = inputTypeCheckFromFunctionType(typeOfFunction, env)
 
-      //_ = println(s"inputType: $inputTypeOption -- $input")
 
       inputTagged <- inputTypeOption match {
         case Some(inputT) => for {

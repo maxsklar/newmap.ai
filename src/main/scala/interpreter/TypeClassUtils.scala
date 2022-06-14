@@ -5,7 +5,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 // Handles type classes, and their composition
 object TypeClassUtils {
-  def typeClassIsExpectingAnIdentifier(
+  def isExpectingAnIdentifier(
     nType: NewMapType,
     s: String,
     env: Environment
@@ -14,7 +14,7 @@ object TypeClassUtils {
     //case CustomT(_, t) => typeIsExpectingAnIdentifier(t, s, env)
     case SubtypeT(isMember, parentType, _) => {
       for {
-        _ <- typeClassIsExpectingAnIdentifier(parentType, s, env)
+        _ <- isExpectingAnIdentifier(parentType, s, env)
         membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIdentifier(s), env)
         _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $s not a member of subtype $nType")
       } yield nType

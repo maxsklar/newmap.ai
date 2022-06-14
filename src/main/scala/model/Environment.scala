@@ -489,7 +489,7 @@ object Environment {
       Vector("T" -> TypeT),
       CaseT(
         Vector(UWildcardPattern("i") -> typeAsUntaggedObject(MapT(Base.toTypeTransform(ParamIdT("i"), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction)))),
-        CountT,
+        TypeT, //TODO: Change to countT!
         SimpleFunction
       )
     )
