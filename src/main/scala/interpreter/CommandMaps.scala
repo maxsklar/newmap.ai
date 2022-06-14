@@ -6,8 +6,6 @@ import java.util.UUID
 
 // Evaluates an expression that's already been type checked
 object CommandMaps {
-  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
-
   /*
    * This is getDefaultValueOfCommandType being slowly written into newmap code
    */

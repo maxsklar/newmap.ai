@@ -67,7 +67,7 @@ object StatementInterpreter {
           mapValues <- TypeChecker.typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
-          val command = NewParamTypeCommand(id.s, paramList)
+          val command = NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT))
           Response(Vector(command), command.toString)
         }
       }

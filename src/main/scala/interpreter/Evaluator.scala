@@ -223,74 +223,77 @@ object Evaluator {
     }
   }
 
+
   def attemptPatternMatch(
     pattern: UntaggedObject,
     input: UntaggedObject,
     matchingRules: MatchingRules, // See comment in type definition
     env: Environment
   ): Outcome[Map[String, UntaggedObject], String] = {
-    // TODO: IMPORTANT
-    // We must be able to deal with using the same variable in a pattern, like StructPattern(x, x) to
-    //  denote that these are the same
-    matchingRules match {
-      case StandardMatcher => {
-        (pattern, stripVersioningU(input, env)) match {
-          case (UStruct(params), UMap(paramValues)) => {
-            for {
-              inputs <- expressionListToObjects(paramValues.map(_._2), env)
-              result <- patternMatchOnStruct(params, inputs, env)
-            } yield result 
+    pattern match {
+      // Always look for wildcard first, no matter what the matching rules are!
+      case UWildcardPattern(name) => Success(Map(name -> input))
+      case _ => matchingRules match {
+        case StandardMatcher => attemptStandardPatternMatch(pattern, input, env)
+        case TypeMatcher => {
+          for {
+            patternT <- env.typeSystem.convertToNewMapType(pattern)
+            inputT <- env.typeSystem.convertToNewMapType(input)
+            response <- SubtypeUtils.isTypeConvertible(inputT, patternT, env)
+          } yield {
+            // Do we make use of the conversion rules at all?
+            response.newParameters
           }
-          case (UStruct(params), UStruct(inputParams)) => {
-            patternMatchOnStruct(params, inputParams, env)
-          }
-          case (UStruct(params), singleValue) if (params.length == 1) => {
-            attemptPatternMatch(params.head, singleValue, StandardMatcher, env)
-          }
-          case (UWildcardPattern(name), _) => {
-            Success(Map(name -> input))
-          }
-          case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
-            for {
-              _ <- Outcome.failWhen(
-                attemptPatternMatch(constructorP, constructor, StandardMatcher, env).isFailure,
-                s"Constructors didn't match: $constructorP -- $constructor"
-              )
-
-              result <- attemptPatternMatch(inputP, cInput, StandardMatcher, env)
-            } yield result
-          }
-          case (UCase(UIdentifier("Inc"), i), UIndex(j)) if j > 0 => {
-            // This is the kind of thing that needs to be in a custom matcher for counts!!
-            attemptPatternMatch(i, UIndex(j - 1), StandardMatcher, env)
-          }
-          case (_, UWildcardPattern(wildcard)) => {
-            //throw new Exception(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
-            Failure(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
-          }
-          case (oPattern, strippedInput) => {
-            // TODO - instead of checking for equality here - go through each untagged object configuration
-            if (oPattern == input) {
-              Success(Map.empty)
-            } else {
-              Failure("Failed Pattern Match")
-            }
-          }
-        }
-      }
-      case TypeMatcher => {
-        for {
-          patternT <- env.typeSystem.convertToNewMapType(pattern)
-          inputT <- env.typeSystem.convertToNewMapType(input)
-          response <- SubtypeUtils.isTypeConvertible(inputT, patternT, env)
-        } yield {
-          // Do we make use of the conversion rules at all?
-          response.newParameters
         }
       }
     }
   }
 
+  // TODO: IMPORTANT
+  // We must be able to deal with using the same variable in a pattern, like StructPattern(x, x) to
+  //  denote that these are the same... Should only be available in struct and map patterns
+  def attemptStandardPatternMatch(
+    pattern: UntaggedObject,
+    input: UntaggedObject,
+    env: Environment
+  ): Outcome[Map[String, UntaggedObject], String] = {
+    (pattern, stripVersioningU(input, env)) match {
+      case (UStruct(params), UMap(paramValues)) => {
+        for {
+          inputs <- expressionListToObjects(paramValues.map(_._2), env)
+          result <- patternMatchOnStruct(params, inputs, env)
+        } yield result 
+      }
+      case (UStruct(params), UStruct(inputParams)) => {
+        patternMatchOnStruct(params, inputParams, env)
+      }
+      case (UStruct(params), singleValue) if (params.length == 1) => {
+        attemptPatternMatch(params.head, singleValue, StandardMatcher, env)
+      }
+      case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
+        for {
+          resultConstructors <- attemptStandardPatternMatch(constructorP, constructor, env)
+          result <- attemptPatternMatch(inputP, cInput, StandardMatcher, env)
+        } yield (resultConstructors ++ result)
+      }
+      case (UCase(UIdentifier("Inc"), i), UIndex(j)) if j > 0 => {
+        // This is the kind of thing that needs to be in a custom matcher for counts!!
+        attemptPatternMatch(i, UIndex(j - 1), StandardMatcher, env)
+      }
+      case (_, UWildcardPattern(wildcard)) => {
+        //throw new Exception(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
+        Failure(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
+      }
+      case (oPattern, strippedInput) => {
+        // TODO - instead of checking for equality here - go through each untagged object configuration
+        if (oPattern == input) {
+          Success(Map.empty)
+        } else {
+          Failure("Failed Pattern Match")
+        }
+      }
+    }
+  }
 
   def patternMatchOnStruct(
     structPattern: Vector[UntaggedObject],

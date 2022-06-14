@@ -881,6 +881,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "An Array " should " be creatable" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Array.Identifier = 3.(0: ~zero, 1: ~one, 2: ~two)", GeneralSuccessCheck)
+    ))
+  }
+
   /**
    * 
    * 

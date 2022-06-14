@@ -37,7 +37,8 @@ case class NewTypeCommand(
 
 case class NewParamTypeCommand(
   id: String,
-  paramList: Vector[(String, NewMapType)]
+  paramList: Vector[(String, NewMapType)],
+  nType: NewMapType
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"data $id ${paramList}"
@@ -180,7 +181,7 @@ case class Environment(
         val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
         val parameterPattern = UStruct(Vector.empty)
 
-        val newTypeSystem = this.typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -194,23 +195,16 @@ case class Environment(
           typeSystem = newTypeSystem
         )
       }
-      case NewParamTypeCommand(s, paramList) => {
+      case NewParamTypeCommand(s, paramList, nType) => {
         val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
         val paramT = StructT(
           paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
           IndexT(paramList.length)
         )
 
-        //paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1)
+        val uType = typeSystem.typeToUntaggedObject(nType)
 
-        //val uuid = java.util.UUID.randomUUID
-        //val key = VersionedObjectKey(0L, uuid)
-        //val versionedObject = VersionedObjectLink(key)
-        //val envValue = EnvironmentBinding(versionedObject)
-
-        val uType = typeSystem.typeToUntaggedObject(CaseT(Vector.empty, IdentifierT))
-
-        val newTypeSystem = this.typeSystem.createNewCustomType(s, typeSystem.typeToUntaggedObject(paramT), parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, typeSystem.typeToUntaggedObject(paramT), parameterPattern, uType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -489,6 +483,15 @@ object Environment {
         Vector.empty
       )
     ),
-    ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t")))))
+    ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t"))))),
+    NewParamTypeCommand(
+      "Array",
+      Vector("T" -> TypeT),
+      CaseT(
+        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(MapT(Base.toTypeTransform(ParamIdT("i"), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction)))),
+        CountT,
+        SimpleFunction
+      )
+    )
   ))
 }
