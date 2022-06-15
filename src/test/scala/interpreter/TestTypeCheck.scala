@@ -155,7 +155,7 @@ class TestTypeCheck extends FlatSpec {
       case Success(result) => {
         assert(result.commands.length == 1)
         val com = result.commands(0)
-        assert(com == Environment.eCommand("x",TaggedObject(UIndex(0), IndexT(1))))
+        assert(com == Environment.eCommand("x",TaggedObject(UIndex(0), IndexT(UIndex(1)))))
       }
       case Failure(reason) => fail(reason)
     }

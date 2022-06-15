@@ -42,7 +42,7 @@ object TypeChecker {
               _ <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
             } yield {
               if (expectingType) {
-                val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(i))
+                val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(UIndex(i)))
                 TypeCheckResponse(untaggedValue, expectedType)
               } else {
                 TypeCheckResponse(UIndex(i), expectedType)
@@ -160,10 +160,10 @@ object TypeChecker {
                       case _ => false
                     }
 
-                    isSingularType = (caseTypeIsEmptyStruct || (caseT == IndexT(1)))
+                    isSingularType = (caseTypeIsEmptyStruct || (caseT == IndexT(UIndex(1))))
                     _ <- Outcome.failWhen(!isSingularType, s"Type Value cannot be inferred: $caseType")
                   } yield {
-                    if (caseT == IndexT(1)) {
+                    if (caseT == IndexT(UIndex(1))) {
                       TypeCheckResponse(UCase(UIdentifier(s), UIndex(0)), expectedType)
                     } else {
                       TypeCheckResponse(UCase(UIdentifier(s), UMap(Vector.empty)), expectedType)
@@ -278,7 +278,7 @@ object TypeChecker {
               for {
                 expressions <- typeCheckSequence(values, typeT, env)
               } yield {
-                val indexType = IndexT(expressions.length)
+                val indexType = IndexT(UIndex(expressions.length))
                 TypeCheckResponse(
                   env.typeSystem.typeToUntaggedObject(StructT(
                     expressions.zipWithIndex.map(x => UIndex(x._2) -> x._1),

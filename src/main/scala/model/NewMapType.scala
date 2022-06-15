@@ -12,7 +12,8 @@ sealed abstract class NewMapType {
  */
 case object CountT extends NewMapType
 
-case class IndexT(i: Long) extends NewMapType
+// The value of "i" should be a Count
+case class IndexT(i: UntaggedObject) extends NewMapType
 
 // Base types (will later be equated to derived/userdefined types)
 case object BooleanT extends NewMapType

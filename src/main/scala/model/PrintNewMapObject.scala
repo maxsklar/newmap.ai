@@ -19,7 +19,7 @@ object PrintNewMapObject {
   // TODO - convert nType into an untagged type instead of using this!
   def newMapType(nType: NewMapType): String = nType match {
     case CountT => "Count"
-    case IndexT(i) => "Index." + i.toString
+    case IndexT(i) => "Index." + untagged(i)
     case CustomT(name, params) => {
       if (isEmptyMap(params)) {
         name

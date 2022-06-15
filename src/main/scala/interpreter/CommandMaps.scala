@@ -6,6 +6,8 @@ import java.util.UUID
 
 // Evaluates an expression that's already been type checked
 object CommandMaps {
+  def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
+
   /*
    * This is getDefaultValueOfCommandType being slowly written into newmap code
    */
@@ -45,7 +47,7 @@ object CommandMaps {
   def getDefaultValueOfCommandTypeHardcoded(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     nType match {
       // TODO - start removing these in favor of newmap code!
-      case IndexT(i) if i > 0 => Success(UIndex(0)) //REmove?
+      case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
       case TypeT => Success(UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty)))
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(_, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
@@ -79,7 +81,7 @@ object CommandMaps {
       env.typeSystem.convertToNewMapType(patterns.head) match {
         case Failure(_) => false
         case Success(nType) => nType match {
-          case IndexT(0) => true
+          case IndexT(UIndex(0)) | IndexT(UInit) => true
           case SubtypeT(UMap(m), _, _) => m.isEmpty
           case _ => false // TODO - unimplemented
         }
@@ -95,14 +97,14 @@ object CommandMaps {
     typeSystem: NewMapTypeSystem
   ): Outcome[NewMapType, String] = {
     nType match {
-      case IndexT(i) => Success(NewMapO.emptyStruct) // Where to insert the new value?
+      case IndexT(_) => Success(NewMapO.emptyStruct) // Where to insert the new value?
       case CaseT(cases, parentType, featureSet) => {
         Success(StructT(
           Vector(
             UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
             UIndex(1) -> typeSystem.typeToUntaggedObject(HistoricalTypeT(typeSystem.currentState))
           ),
-          IndexT(2)
+          IndexTN(2)
         ))
       }
       case StructT(cases, parentType, _, featureSet) => {
@@ -111,7 +113,7 @@ object CommandMaps {
             UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
             UIndex(1) -> typeSystem.typeToUntaggedObject(SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState)))
           ),
-          IndexT(2)
+          IndexTN(2)
         ))
       }
       case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
@@ -150,9 +152,9 @@ object CommandMaps {
     env: Environment
   ): Outcome[ExpandKeyResponse, String] = {
     nType match {
-      case IndexT(i) => {
-        val newType = IndexT(i + 1)
-        Success(ExpandKeyResponse(IndexT(i + 1), Some(UIndex(i)), untaggedIdentity))
+      case IndexT(UIndex(i)) => {
+        val newType = IndexTN(i + 1)
+        Success(ExpandKeyResponse(newType, Some(UIndex(i)), untaggedIdentity))
       }
       case CaseT(cases, parentType, featureSet) => {
         val uConstructors = cases.map(x => x._1 -> UIndex(1))
@@ -258,7 +260,7 @@ object CommandMaps {
       case CountT => Success(
         NewMapO.emptyStruct
       )
-      case BooleanT => Success(IndexT(2))
+      case BooleanT => Success(IndexTN(2))
       case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
         // we have typeTransform
@@ -283,7 +285,7 @@ object CommandMaps {
                   UIndex(0) -> keyType,
                   UIndex(1) -> env.typeSystem.typeToUntaggedObject(outputCommandT)
                 ),
-                IndexT(2)
+                IndexTN(2)
               )
             }
           }
@@ -321,7 +323,7 @@ object CommandMaps {
                       UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
                       UIndex(1) -> requiredValuesType
                     ),
-                    IndexT(2)
+                    IndexTN(2)
                   )
                 }
               }

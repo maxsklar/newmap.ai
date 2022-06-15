@@ -5,29 +5,6 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 // Handles type classes, and their composition
 object TypeClassUtils {
-  def isExpectingAnIdentifier(
-    nType: NewMapType,
-    s: String,
-    env: Environment
-  ): Outcome[NewMapType, String] = nType match {
-    case IdentifierT => Success(nType)
-    //case CustomT(_, t) => typeIsExpectingAnIdentifier(t, s, env)
-    case SubtypeT(isMember, parentType, _) => {
-      for {
-        _ <- isExpectingAnIdentifier(parentType, s, env)
-        membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIdentifier(s), env)
-        _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $s not a member of subtype $nType")
-      } yield nType
-    }
-    case WildcardPatternT(_) => {
-      // TODO - really we should be returning the typeclass of all types that accept identifiers
-      Success(IdentifierT)
-    }
-    case _ => {
-      Failure(s"Type couldn't accept identifier $s as value: $nType")
-    }
-  }
-
   def typeIsExpectingAnIndex(
     nType: NewMapType,
     i: Long,
@@ -37,7 +14,7 @@ object TypeClassUtils {
     case HistoricalTypeT(_) => Success()
     case CountT => Success()
     case BooleanT => Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")
-    case IndexT(j) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
+    case IndexT(UIndex(j)) => Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
     case CustomT(name, params) => {
       val typeSystem = env.typeSystem
       val currentState = typeSystem.currentState

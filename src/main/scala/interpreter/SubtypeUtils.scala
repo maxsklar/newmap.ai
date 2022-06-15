@@ -139,7 +139,7 @@ object SubtypeUtils {
       /*case CaseT(values, parentType, BasicMap) => {
         ???
       }*/
-      case Success(IndexT(i)) => {
+      case Success(IndexT(UIndex(i))) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
       }
       case Success(BooleanT) => {

@@ -40,5 +40,5 @@ object NewMapO {
 
   def identifier(s: String): NewMapObject = TaggedObject(UIdentifier(s), IdentifierT)
 
-  def emptyStruct: NewMapType = StructT(Vector.empty, IndexT(0), RequireCompleteness, BasicMap)
+  def emptyStruct: NewMapType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 }

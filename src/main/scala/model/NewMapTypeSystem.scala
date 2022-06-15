@@ -58,7 +58,7 @@ case class NewMapTypeSystem(
 
   def typeToUntaggedObject(nType: NewMapType): UntaggedObject = nType match {
     case CountT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
-    case IndexT(i) => UCase(UIdentifier("Index"), UIndex(i))
+    case IndexT(i) => UCase(UIdentifier("Index"), i)
     case BooleanT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
     case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
     case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
@@ -112,7 +112,7 @@ case class NewMapTypeSystem(
     case ParamIdT(name) => ParamId(name)
   }
 
-  def emptyStructType = StructT(Vector.empty, IndexT(0), RequireCompleteness, BasicMap)
+  def emptyStructType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
   def emptyStructPattern = UStruct(Vector.empty)
 
   def getParameterType(
@@ -203,7 +203,7 @@ case class NewMapTypeSystem(
   def buildStructTypeFromParamList(paramList: Vector[UntaggedObject]): NewMapType = {
     StructT(
       paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1),
-      IndexT(paramList.length)
+      IndexT(UIndex(paramList.length))
     )
   }
 
@@ -213,10 +213,7 @@ case class NewMapTypeSystem(
   ): Outcome[NewMapType, String] = uType match {
     case UCase(UIdentifier(identifier), params) => identifier match {
       case "Count" => Success(CountT)
-      case "Index" => params match {
-        case UIndex(i) => Success(IndexT(i))
-        case _ => Failure(s"Couldn't convert index to NewMapType with params: $params")
-      }
+      case "Index" => Success(IndexT(params))
       case "Boolean" => Success(BooleanT)
       case "Byte" => Success(ByteT)
       case "Character" => Success(CharacterT)
@@ -322,7 +319,7 @@ case class NewMapTypeSystem(
       case custom => Success(CustomT(custom, params))
     }
     case UInit => Success(UndefinedT)
-    case UIndex(i) => Success(IndexT(i))
+    case UIndex(i) => Success(IndexT(UIndex(i)))
     case UIdentifier(name) => convertToNewMapType(UCase(UIdentifier(name), UInit))
     case UWildcardPattern(name) => Success(WildcardPatternT(name))
     case ParamId(name) => Success(ParamIdT(name))
@@ -490,5 +487,5 @@ object NewMapTypeSystem {
     ),
   )
 
-  val emptyStruct: NewMapType = StructT(Vector.empty, IndexT(0), RequireCompleteness, BasicMap)
+  val emptyStruct: NewMapType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 }

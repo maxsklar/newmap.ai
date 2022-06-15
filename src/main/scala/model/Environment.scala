@@ -199,7 +199,7 @@ case class Environment(
         val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
         val paramT = StructT(
           paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
-          IndexT(paramList.length)
+          IndexT(UIndex(paramList.length))
         )
 
         val uType = typeSystem.typeToUntaggedObject(nType)
@@ -384,7 +384,7 @@ object Environment {
   ): NewMapObject = {
     val structT = StructT(
       inputs.zipWithIndex.map(x => UIndex(x._2) -> Base.typeSystem.typeToUntaggedObject(x._1._2)),
-      IndexT(inputs.length)
+      IndexT(UIndex(inputs.length))
     )
 
     val structP = UStruct(inputs.map(x => UWildcardPattern(x._1)))
@@ -439,7 +439,7 @@ object Environment {
     )),
     eCommand("IsCommand", TaggedObject(
       IsCommandFunc,
-      MapT(Base.toTypeTransform(TypeT, IndexT(2)), MapConfig(CommandOutput, SimpleFunction))
+      MapT(Base.toTypeTransform(TypeT, BooleanT), MapConfig(CommandOutput, SimpleFunction))
     )),
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", TaggedObject(
@@ -488,8 +488,8 @@ object Environment {
       "Array",
       Vector("T" -> TypeT),
       CaseT(
-        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(MapT(Base.toTypeTransform(ParamIdT("i"), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction)))),
-        TypeT, //TODO: Change to countT!
+        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(MapT(Base.toTypeTransform(IndexT(ParamId("i")), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction)))),
+        CountT,
         SimpleFunction
       )
     )
