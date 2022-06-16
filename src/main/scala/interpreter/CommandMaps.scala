@@ -363,24 +363,19 @@ object CommandMaps {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     RetrieveType.fromNewMapObject(current, env) match {
-      case CountT => {
-        current match {
-          case TaggedObject(count, nType) => {
-            for {
-              c <- count match {
-                case UIndex(i) => Success(i)
-                case UInit => Success(0L)
-                case _ => Failure(s"Couldn't interpret count value: $count")
-              }
+      case nType@CountT => {
+        for {
+          untaggedCurrent <- Evaluator.removeTypeTag(current)
 
-              newState = UCase(UIdentifier("Inc"), UIndex(c))
-              result <- TypeChecker.tagAndNormalizeObject(newState, nType, env)
-            } yield result
+          c <- untaggedCurrent match {
+            case UIndex(i) => Success(i)
+            case UInit => Success(0L)
+            case _ => Failure(s"Couldn't interpret count value: $untaggedCurrent")
           }
-          case _ => {
-            throw new Exception("Invalid count in versioning upgrade")
-          }
-        }
+
+          newState = UCase(UIdentifier("Inc"), UIndex(c))
+          result <- TypeChecker.tagAndNormalizeObject(newState, nType, env)
+        } yield result
       }
       case BooleanT => {
         for {
@@ -557,8 +552,22 @@ object CommandMaps {
           }
         }
       }
-      case CustomT("Array", uType) => {
-        Failure(s"Not implemented: Array expansion: $uType -- $current -- $command")
+      case nType@CustomT("Array", uType) => {
+        for {
+          untaggedCurrent <- Evaluator.removeTypeTag(current)
+
+          untaggedResult <- untaggedCurrent match {
+            case UCase(UIndex(length), UStruct(values)) => {
+              Success(UCase(UIndex(length + 1), UStruct(values :+ command)))
+            }
+            case UCase(UIndex(length), UMap(values)) => {
+              Success(UCase(UIndex(length + 1), UMap(values :+ (UIndex(length), command))))
+            }
+            case _ => Failure(s"Unknown array data: $current")
+          }
+
+          result <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
+        } yield result
       }
       case _ => {
         Failure(s"C) $current is not a command type, error in type checker")

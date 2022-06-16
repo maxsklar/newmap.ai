@@ -896,6 +896,23 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be updatable with new values" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver myArray = new Array.10", GeneralSuccessCheck),
+      CodeExpectation("update myArray 1", GeneralSuccessCheck),
+      CodeExpectation("update myArray 3", GeneralSuccessCheck),
+      CodeExpectation("update myArray 1", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array.T: Count) = (i._: i)", GeneralSuccessCheck),
+      CodeExpectation("len myArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(3), CountT)))),
+      CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
+        TaggedObject(
+          UCase(UIndex(3), UStruct(Vector(UIndex(1), UIndex(3), UIndex(1)))),
+          CustomT("Array", UCase(UIdentifier("Index"), UIndex(10)))
+        )
+      ))),
+    )) 
+  }
+
   /*it should " be creatable without specifying length or keys" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
@@ -911,8 +928,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   /*
   TODOs with the arrays:
-  - Alternate way of representing (maybe with brackets)
   - create histogram from array
+  - Alternate way of representing (maybe with brackets)
   - startsWith function (or general regular expression?)
   - Commands (replace sequence)
   - append arrays
