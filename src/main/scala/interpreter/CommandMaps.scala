@@ -48,7 +48,6 @@ object CommandMaps {
     nType match {
       // TODO - start removing these in favor of newmap code!
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
-      case TypeT => Success(UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty)))
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(_, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _)) => {
@@ -65,6 +64,7 @@ object CommandMaps {
       case TypeClassT(typeTransform, typesInTypeClass) if (typesInTypeClass.isEmpty) => {
         Success(defaultUMap)
       }
+      case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       case _ => Failure(s"Type $nType has no default value")
     }
   }
@@ -344,14 +344,15 @@ object CommandMaps {
         // Are we allowed to change an old parameter? Let's say sure.
         Success(CaseT(parameterList, parentFieldType, featureSet))
       }
-      case CaseT(cases, _, _) => {
-        Failure("Cases as commands haven't been implemented yet")
-      }
       case TypeClassT(typeTransform, typesInTypeClass) => {
         Success(CaseT(typeTransform, TypeT, SimpleFunction))
       }
+      case CustomT("Array", nType) => env.typeSystem.convertToNewMapType(nType)
+      /*case CaseT(cases, _, _) => {
+        Success(UndefinedT)
+      }*/
       case _ => {
-        Failure(s"B) $nType is not a command type, error in type checker")
+        Success(UndefinedT)        
       }
     }
   }
@@ -555,6 +556,9 @@ object CommandMaps {
             Failure(s"Wrong input for typeClassT -- $current -- $command")
           }
         }
+      }
+      case CustomT("Array", uType) => {
+        Failure(s"Not implemented: Array expansion: $uType -- $current -- $command")
       }
       case _ => {
         Failure(s"C) $current is not a command type, error in type checker")

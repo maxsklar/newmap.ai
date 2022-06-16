@@ -170,6 +170,21 @@ object TypeChecker {
                     }
                   }
                 }
+                case Success(TypeT) => {
+                  for {
+                    parameterT <- env.typeSystem.getParameterType(env.typeSystem.currentState, s)
+
+                    // TODO - of course, we can formulize this better!
+                    parameterTypeIsEmptyStruct = parameterT match {
+                      case StructT(params, _, _, _) => params.isEmpty
+                      case _ => false
+                    }
+
+                    _ <- Outcome.failWhen(!parameterTypeIsEmptyStruct, s"No parameter specified for type $s")
+                  } yield {
+                    TypeCheckResponse(UCase(UIdentifier(s), UMap(Vector.empty)), expectedType)
+                  }
+                }
                 case Success(WildcardPatternT(_)) => {
                   Failure(s"Identifier $s is unknown")
                 }

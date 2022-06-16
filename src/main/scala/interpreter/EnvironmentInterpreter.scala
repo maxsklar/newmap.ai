@@ -133,8 +133,11 @@ object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
     "update _default Count.0",
-    //"update _default Boolean.0",
-    //"update _default Type.UndefinedType",
+    "update _default Boolean.0",
+    "update _default Type.UndefinedType",
+    //"update _default (Array.T).(0.())", // TODO - this can't work yet because it has a pattern!
+    //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
+      
     // todo - _typeOf should be creatable all in one swoop, and as a generic
     //"update _typeOf Count.(_: Count)",
     //"update _typeOf Identifier.(_: Identifier)",

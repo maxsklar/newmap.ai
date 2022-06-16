@@ -896,18 +896,33 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be creatable without specifying length or keys" in {
+  /*it should " be creatable without specifying length or keys" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
     ))
   }
 
-  /*it should " come with a length function 2" in {
+  it should " come with a length function 2" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
       CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
     ))
   }*/
+
+  /*
+  TODOs with the arrays:
+  - Alternate way of representing (maybe with brackets)
+  - create histogram from array
+  - startsWith function (or general regular expression?)
+  - Commands (replace sequence)
+  - append arrays
+  - Strings as arrays
+  - mapValue function (could this be done with maps too?)
+  - Convert to LinkedList?
+
+  Regular Expressions?
+  - Better on LinkedLists?
+  */
 
   /**
    * 

@@ -59,7 +59,7 @@ case class NewMapTypeSystem(
   def typeToUntaggedObject(nType: NewMapType): UntaggedObject = nType match {
     case CountT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
     case IndexT(i) => UCase(UIdentifier("Index"), i)
-    case BooleanT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
+    case BooleanT => UCase(UIdentifier("Boolean"), UStruct(Vector.empty))
     case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
     case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
     case StringT => UCase(UIdentifier("String"), UStruct(Vector.empty))
