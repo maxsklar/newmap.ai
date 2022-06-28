@@ -331,8 +331,10 @@ object TypeChecker {
         } yield {
           val typeTransform = UMap(Vector(evalInputType -> outputType.nExpression))
           // TODO - how do we indicate completeness and featureSet in the LambdaParse Symbol?
+          val mapConfig = MapConfig(RequireCompleteness, FullFunction)
+
           TypeCheckResponse(
-            env.typeSystem.typeToUntaggedObject(MapT(typeTransform, MapConfig(RequireCompleteness, FullFunction))),
+            env.typeSystem.typeToUntaggedObject(MapT(typeTransform, mapConfig)),
             TypeT
           )
         }

@@ -28,7 +28,7 @@ case class UCase(constructor: UntaggedObject, input: UntaggedObject) extends Unt
 
 case class UIndex(i: Long) extends UntaggedObject
 
-
+case class ULet(commands: Vector[EnvironmentCommand], output: UntaggedObject) extends UntaggedObject
 
 // Set to the initial value of a command type
 case object UInit extends UntaggedObject

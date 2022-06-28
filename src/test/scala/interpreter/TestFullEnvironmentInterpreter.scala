@@ -941,6 +941,24 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   - Better on LinkedLists?
   */
 
+  /*
+  Code proposed for side effects, channels.
+
+  A "pattern" is a regular expression with a state (which is a regular expression)
+  When you feed it data, it changes state
+
+  What happens when it finds a pattern?
+  - it emits a side effect, pattern found "result"
+  - this includes some environment updates (new variables?)
+  - What does this look like?
+
+  val pattern: RegularExpression = r"hello"
+  
+  connect pattern result to found
+  s.listChars to pattern
+  ???
+  */
+
   /**
    * 
    * 

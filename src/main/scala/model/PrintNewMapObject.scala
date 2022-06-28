@@ -123,7 +123,8 @@ object PrintNewMapObject {
     }
     case UByte(value: Byte) => s"$value"
     case UCharacter(value: Char) => s"$value"
-    case UString(value: String) => s"$value~str"
+    case UString(value) => s"$value~str"
+    case ULet(envCommands, nObject) => s"{${envCommands.mkString("; ")}; ${untagged(nObject)}"
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
     case Uuuid(value) => s"$value"

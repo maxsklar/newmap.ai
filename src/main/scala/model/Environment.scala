@@ -78,6 +78,16 @@ case class ExpOnlyEnvironmentCommand(
   override def toString: String = nObject.toString
 }
 
+
+// These are "side effects"
+// Channels must be created!
+case class OutputToChannel(
+  nObject: UntaggedObject,
+  channel: UntaggedObject
+) extends EnvironmentCommand {
+  override def toString: String = s"Output to channel $channel: $nObject"
+}
+
 sealed abstract class EnvironmentValue
 
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
@@ -301,6 +311,10 @@ case class Environment(
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
         // TODO: save this in the result list
+        this
+      }
+      case OutputToChannel(nObject, channel) => {
+        // TODO: the side effects must be executed!
         this
       }
     }

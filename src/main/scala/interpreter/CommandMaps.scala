@@ -49,8 +49,8 @@ object CommandMaps {
       // TODO - start removing these in favor of newmap code!
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
-      case MapT(_, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
-      case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _)) => {
+      case MapT(_, MapConfig(CommandOutput, _, _, _, _)) => Success(defaultUMap)
+      case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _, _, _)) => {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
           Success(defaultUMap)
         } else {
@@ -159,9 +159,11 @@ object CommandMaps {
       case CaseT(cases, parentType, featureSet) => {
         val uConstructors = cases.map(x => x._1 -> UIndex(1))
         val constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
+        val mapConfig = MapConfig(RequireCompleteness, BasicMap)
+
         val caseMap = TaggedObject(UMap(cases), MapT(
           env.toTypeTransform(constructorsSubtype, TypeT), 
-          MapConfig(RequireCompleteness, BasicMap)
+          mapConfig
         ))
 
         for {
@@ -261,7 +263,7 @@ object CommandMaps {
         NewMapO.emptyStruct
       )
       case BooleanT => Success(IndexTN(2))
-      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _)) => {
+      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
         // we have typeTransform
         // we need a pair (a, b) that satisfies the type transform
@@ -395,7 +397,7 @@ object CommandMaps {
           TaggedObject(UIndex(result), BooleanT)
         }
       }
-      case mapT@MapT(UMap(typeTransform), MapConfig(CommandOutput, featureSet, _)) => {
+      case mapT@MapT(UMap(typeTransform), MapConfig(CommandOutput, featureSet, _, _, _)) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Not implemented: type transform must have exactly 1 mapping: $typeTransform")
         }
@@ -437,7 +439,7 @@ object CommandMaps {
           TaggedObject(UMap(newMapValues), mapT)
         }
       }
-      case MapT(UMap(typeTransform), MapConfig(style, features, _)) => {
+      case MapT(UMap(typeTransform), MapConfig(style, features, _, _, _)) => {
         if (typeTransform.length != 1) {
           throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
         }

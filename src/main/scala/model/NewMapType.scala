@@ -69,7 +69,9 @@ case class MapT(
 case class MapConfig(
   completeness: MapCompleteness,
   featureSet: MapFeatureSet,
-  preservationRules: Vector[PreservationRule] = Vector.empty
+  preservationRules: Vector[PreservationRule] = Vector.empty,
+  channels: Vector[(UntaggedObject, NewMapType)] = Vector.empty,
+  channelParentType: NewMapType = IdentifierT
 )
 
 sealed abstract class PreservationRule {

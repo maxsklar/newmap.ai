@@ -75,7 +75,9 @@ case class NewMapTypeSystem(
       UStruct(Vector(
         UIdentifier(config.completeness.getName),
         UIdentifier(config.featureSet.getName),
-        UStruct(config.preservationRules.map(_.toUntaggedObject)) // This should be a map in the future, not a struct
+        UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
+        UMap(config.channels.map(x => (x._1 -> typeToUntaggedObject(x._2)))),
+        typeToUntaggedObject(config.channelParentType)
       ))
     )))
     case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
@@ -232,7 +234,7 @@ case class NewMapTypeSystem(
         case UStruct(items) if (items.length == 2) => {
           for {
             config <- items(1) match {
-              case UStruct(v) if (v.length == 3) => Success(v)
+              case UStruct(v) if (v.length == 5) => Success(v)
               case _ => Failure(s"Incorrect config: ${items(1)}")
             }
 
@@ -245,6 +247,8 @@ case class NewMapTypeSystem(
             featureSet <- convertFeatureSet(config(1))
 
             // TODO: config(2) for the preservation rules
+            // TODO: config(3) for channels
+            // TODO: config(4) for parent of channel names
           } yield {
             MapT(items(0), MapConfig(completeness, featureSet))
           }
