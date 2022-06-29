@@ -71,6 +71,21 @@ object StatementInterpreter {
           Response(Vector(command), command.toString)
         }
       }
+      case IterateIntoStatementParse(id, destination) => {
+        for {
+          iterableObject <- env.lookup(id.s) match {
+            case Some(EnvironmentBinding(nObject)) => Success(nObject)
+            case _ => Failure(s"Could not lookup $id in environment")
+          }
+
+          vDestination <- Evaluator.lookupVersionedObject(destination.s, env)
+        } yield {
+          println(s"Iterated $iterableObject")
+
+          val command = IterateIntoCommand(iterableObject, vDestination)
+          Response(Vector(command), command.toString)
+        }
+      }
       case ForkedVersionedStatementParse(id, forkId) => {
         for {
           vObject <- Evaluator.lookupVersionedObject(forkId.s, env)

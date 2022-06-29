@@ -913,6 +913,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )) 
   }
 
+  "Iterations " should " work from an array into a histogram" in {
+    testCodeScript(Vector(
+      CodeExpectation("val myArray: Array.Count = 6.(0: 5, 1: 5, 2: 10, 3: 10, 4: 10, 5: 1)", GeneralSuccessCheck),
+      CodeExpectation("ver hist = new Map(Count, Count)", GeneralSuccessCheck),
+      CodeExpectation("iterate myArray into hist", GeneralSuccessCheck),
+      CodeExpectation("hist 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(2), CountT)))),
+    ))
+  }
+
   /*it should " be creatable without specifying length or keys" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
@@ -927,6 +936,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }*/
 
   /*
+  FIRST - do iterators
+
+
+
+
   TODOs with the arrays:
   - create histogram from array
   - Alternate way of representing (maybe with brackets)

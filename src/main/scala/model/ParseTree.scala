@@ -85,6 +85,11 @@ case class NewParamTypeStatementParse(
   parameters: ParseTree
 ) extends EnvStatementParse
 
+case class IterateIntoStatementParse(
+  iterableObject: IdentifierParse, // This should be a parseTree - but our parser doesn't allow this yet!
+  destinationObject: IdentifierParse
+) extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
 

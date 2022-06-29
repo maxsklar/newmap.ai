@@ -45,6 +45,15 @@ case class NewParamTypeCommand(
   }
 }
 
+case class IterateIntoCommand(
+  iterableObject: NewMapObject,
+  destinationObject: NewMapObject
+) extends EnvironmentCommand {
+  override def toString: String = {
+    s"iterate $iterableObject into ${destinationObject}"
+  }
+}
+
 case class ApplyIndividualCommand(
   id: String,
   nObject: UntaggedObject
@@ -224,6 +233,10 @@ case class Environment(
           //idToObject = idToObject + (id -> envValue),
           typeSystem = newTypeSystem
         )
+      }
+      case IterateIntoCommand(iterableObject, destinationObject) => {
+        // TODO: Implement
+        this
       }
       case ApplyIndividualCommand(s, command) => {
         // This split on lookupVersionedObject suggests that we may want to refactor
