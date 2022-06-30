@@ -35,12 +35,13 @@ object TypeChecker {
             // BUT - the type will be abridged!!!
             Success(TypeCheckResponse(UIndex(i), CountT))
           }
-          case Success(t) => {
-            val expectingType = SubtypeUtils.isTypeConvertible(t, TypeT, env).isSuccess
-
+          case _ => {
             for {
+              t <- expectedTypeOutcome
               _ <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
             } yield {
+              val expectingType = SubtypeUtils.isTypeConvertible(t, TypeT, env).isSuccess
+
               if (expectingType) {
                 val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(UIndex(i)))
                 TypeCheckResponse(untaggedValue, expectedType)
@@ -49,12 +50,29 @@ object TypeChecker {
               }
             }
           }
-          case _ => {
-            // This is required if we recieve an "Any" type - which in the future won't happen
-            // because this is going to be a type class and not an actual type
-            Failure(s"Unexpected type with number: $expectedType")
-            //Success(UIndex(i))
+        }
+      }
+      case CharacterParse(s: String) => {
+        if (s.length == 1) {
+          val uObject = UCharacter(s(0))
+
+          expectedTypeOutcome match {
+            case Success(WildcardPatternT(_)) => {
+              // BUT - the type will be abridged!!!
+              Success(TypeCheckResponse(uObject, CharacterT))
+            }
+            case _ => {
+              for {
+                expectedType <- expectedTypeOutcome
+                convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(uObject, CharacterT), expectedType, env)
+                result <- Evaluator.applyListOfFunctions(uObject, convertInstructions, env)
+              } yield {
+                TypeCheckResponse(uObject, expectedType)
+              }
+            }
           }
+        } else {
+          Failure(s"Character not recognized because it has length > 1: $s")
         }
       }
       case IdentifierParse(s: String, true) => {

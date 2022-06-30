@@ -494,6 +494,7 @@ object Environment {
     //eCommand("Any", typeAsObject(AnyT)),
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
+    eCommand("Char", typeAsObject(CharacterT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", TaggedObject(
       UMap(Vector(UWildcardPattern("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),

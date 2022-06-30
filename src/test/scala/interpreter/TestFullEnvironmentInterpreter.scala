@@ -96,6 +96,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testLineFails("val x: 2 = 13")
   }
 
+  "A Character " should " be creatable" in testLineWorks("val x: Char = `a")
+  it should " not work for multiple letters" in testLineFails("val x: Char = `ax")
+  it should " work for numbers" in testLineWorks("val x: Char = `3")
+  it should " not be convertible to Count" in testLineFails("val x: Count = `c")
+
   "A static map " should " be creatable" in {
     val code = "val m: Map (3, 100) = (0: 20, 1: 43, 2: 67)"
 

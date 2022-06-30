@@ -67,6 +67,7 @@ object CommandMaps {
       case TypeClassT(typeTransform, typesInTypeClass) if (typesInTypeClass.isEmpty) => {
         Success(defaultUMap)
       }
+      case CharacterT => Success(UCharacter('\0'))
       case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       case _ => Failure(s"Type $nType has no default value")
     }

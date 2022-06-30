@@ -36,6 +36,10 @@ case class LambdaParse(
   expression: ParseTree
 ) extends ParseTree
 
+case class CharacterParse(
+  char: String
+) extends ParseTree
+
 abstract class EnvStatementParse
 
 case class FullStatementParse(

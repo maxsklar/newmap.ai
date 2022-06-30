@@ -16,6 +16,7 @@ object Lexer extends RegexParsers {
   case class Tilda() extends Token
   case class Arrow() extends Token
   case class Period() extends Token
+  case class TikMark() extends Token
 
   override def skipWhitespace = true
   override val whiteSpace = "[ \t\r\f]+".r
@@ -34,6 +35,10 @@ object Lexer extends RegexParsers {
 
   def colon: Parser[Colon] = {
     ":" ^^ { str => Colon() }
+  }
+
+  def tik: Parser[TikMark] = {
+    "`" ^^ { str => TikMark() }
   }
 
   def equals: Parser[Equals] = {
@@ -66,7 +71,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | comma | colon | arrow | equals | tilda | period | enclosure )) ^^ { rawTokens =>
+    phrase(rep1(identifier | number | comma | colon | tik | arrow | equals | tilda | period | enclosure )) ^^ { rawTokens =>
       rawTokens
     }
   }
