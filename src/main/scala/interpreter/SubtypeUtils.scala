@@ -36,7 +36,7 @@ object SubtypeUtils {
           val patternsMap = keys.map(key => key -> UIndex(1))
 
           for {
-            keysToMatch <- enumerateAllValuesIfPossible(nType, env)
+            keysToMatch <- IterationUtils.enumerateAllValuesIfPossible(nType, env)
           } yield {
             keysToMatch.forall(uKey => {
               Evaluator.attemptPatternMatchInOrder(patternsMap, uKey, env).isSuccess
@@ -128,46 +128,6 @@ object SubtypeUtils {
     }
   }
 
-  def enumerateAllValuesIfPossible(nType: NewMapType, env: Environment): Outcome[Set[UntaggedObject], String] = {
-    TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState) match {
-      // TODO: What if values is too large? Should we make some restrictions here?
-      // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case Success(SubtypeT(UMap(values), parentType, _)) => {
-        // TODO - remove this case!
-        enumerateMapKeys(values.map(_._1))
-      }
-      /*case CaseT(values, parentType, BasicMap) => {
-        ???
-      }*/
-      case Success(IndexT(UIndex(i))) => {
-        Success((0 until i.toInt).map(j => UIndex(j.toLong)).toSet)
-      }
-      case Success(BooleanT) => {
-        Success(Vector(UIndex(0), UIndex(1)).toSet)
-      }
-      case Success(undertype) => {
-        throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
-        Failure(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
-      }
-      case Failure(f) => Failure(f)
-    }
-  }
-
-  def enumerateMapKeys(values: Vector[UntaggedObject]): Outcome[Set[UntaggedObject], String] = {
-    values match {
-      case value +: additionalValues => {
-        if (RetrieveType.isTermPatternFree(value)) {
-          for {
-            addlValues <- enumerateMapKeys(additionalValues)
-          } yield addlValues + value
-        } else {
-          Failure(s"Found non-ObjectPattern: $value")
-        }
-      }
-      case _ => Success(Set.empty) 
-    }
-  }
-
   case class IsTypeConvertibleResponse(
     convertInstructions: Vector[UntaggedObject],
     newParameters: Map[String, UntaggedObject]
@@ -211,8 +171,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(UMap(startingTypeTransform), MapConfig(startingCompleteness, startingFeatureSet, _)),
-        MapT(UMap(endingTypeTransform), MapConfig(endingCompleteness, endingFeatureSet, _))
+        MapT(UMap(startingTypeTransform), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
+        MapT(UMap(endingTypeTransform), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -295,13 +255,13 @@ object SubtypeUtils {
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
-      case (_, StructT(values, fieldParentType, _, _)) if (values.length == 1) => {
+      case (_, StructT(values, fieldParentType, _, _)) => {
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(values)
-          singularObj <- Evaluator(singularOutput, env)
+          singularOutputResponse <- convertToStructWithSingleValue(values, env)
+          singularObj <- Evaluator(singularOutputResponse.inputType, env)
           singularObjT <- Evaluator.asType(singularObj, env)
           response <- isTypeConvertible(startingType, singularObjT, env)
-        } yield response
+        } yield response.copy(convertInstructions = singularOutputResponse.conversionRules ++ response.convertInstructions)
       }
       case (CaseT(startingCases, startingFieldType, _), CaseT(endingCases, endingFieldType, _)) => {
         // Note the contravariance (ending cases first)
@@ -450,6 +410,35 @@ object SubtypeUtils {
   def outputIfFunctionHasSingularInput(mapValues: Vector[(UntaggedObject, UntaggedObject)]): Outcome[UntaggedObject, String] = {
     if (mapValues.length == 1) {
       Success(mapValues.head._2)
+    } else {
+      Failure("Function did not have singular input")
+    }
+  }
+
+  case class StructWithSingleValueResponse(
+    inputType: UntaggedObject,
+    conversionRules: Vector[UntaggedObject]
+  )
+
+  // If this is a struct with a single (non-defaulted) value, then figure out that type, and have a conversion function
+  def convertToStructWithSingleValue(
+    mapValues: Vector[(UntaggedObject, UntaggedObject)],
+    env: Environment
+  ): Outcome[StructWithSingleValueResponse, String] = {
+    if (mapValues.length >= 1) {
+      // In this case, make sure that all the other values have a default
+      for {
+        defaultStruct <- CommandMaps.getDefaultValueFromStructParams(mapValues.tail, env)
+      } yield {
+        // How do I convert this?
+
+        val conversionRule = UMap(Vector(
+          UWildcardPattern("item") ->
+            UMap(Vector(mapValues.head._1 -> ParamId("item")) ++ defaultStruct)
+        ))
+
+        StructWithSingleValueResponse(mapValues.head._2, Vector(conversionRule))
+      }
     } else {
       Failure("Function did not have singular input")
     }

@@ -61,6 +61,9 @@ object CommandMaps {
       case StructT(params, _, CommandOutput, _) => {
         Success(defaultUMap)
       }
+      case StructT(params, _, _, _) if (params.length == 0) => {
+        Success(defaultUMap)
+      }
       case TypeClassT(typeTransform, typesInTypeClass) if (typesInTypeClass.isEmpty) => {
         Success(defaultUMap)
       }
@@ -228,9 +231,6 @@ object CommandMaps {
               
               ExpandKeyResponse(nType, None, untaggedIdentity)
             }
-          }
-          case _ => {
-            Failure(s"Cannot yet handle commands for generic map $typeTransform")
           }
         }
       }

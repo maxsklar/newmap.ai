@@ -80,9 +80,7 @@ object StatementInterpreter {
 
           vDestination <- Evaluator.lookupVersionedObject(destination.s, env)
         } yield {
-          println(s"Iterated $iterableObject")
-
-          val command = IterateIntoCommand(iterableObject, vDestination)
+          val command = IterateIntoCommand(iterableObject, destination.s)
           Response(Vector(command), command.toString)
         }
       }

@@ -332,6 +332,22 @@ object Evaluator {
     case _ => Vector.empty
   }
 
+  def applyListOfFunctions(
+    original: UntaggedObject,
+    listOfFunctions: Vector[UntaggedObject],
+    env: Environment
+  ): Outcome[UntaggedObject, String] = {
+    listOfFunctions match {
+      case instruction +: followingInstructions => {
+        for {
+          newObject <- applyFunctionAttempt(instruction, original, env)
+          result <- applyListOfFunctions(newObject, followingInstructions, env)
+        } yield result
+      }
+      case _ => Success(original)
+    }
+  }
+
   def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
     nObject match {
       case VersionedObjectLink(key) => {

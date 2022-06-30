@@ -47,7 +47,7 @@ case class NewParamTypeCommand(
 
 case class IterateIntoCommand(
   iterableObject: NewMapObject,
-  destinationObject: NewMapObject
+  destinationObject: String
 ) extends EnvironmentCommand {
   override def toString: String = {
     s"iterate $iterableObject into ${destinationObject}"
@@ -235,19 +235,54 @@ case class Environment(
         )
       }
       case IterateIntoCommand(iterableObject, destinationObject) => {
-        // TODO: Implement
-        this
+        IterationUtils.iterateObject(iterableObject, this) match {
+          case Success(commandList) => {
+            var returnedEnv = this
+            for {
+              command <- commandList
+            } {
+              val convertedCommandO = for {
+                versionedObjectLink <- Evaluator.lookupVersionedObject(destinationObject, this)
+                nType = RetrieveType.fromNewMapObject(versionedObjectLink, this)
+                itemType <- IterationUtils.iterationItemType(nType, this)
+
+                commandObj = TaggedObject(command, itemType)
+
+                inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
+
+                conversionRules <- SubtypeUtils.isObjectConvertibleToType(commandObj, inputT, this)
+
+                convertedCommand <- Evaluator.applyListOfFunctions(command, conversionRules, this)
+              } yield {
+                convertedCommand
+              }
+
+              convertedCommandO match {
+                case Failure(reason) => throw new Exception(reason)
+                case Success(convertedCommand) => {
+                  returnedEnv = returnedEnv.newCommand(ApplyIndividualCommand(destinationObject, convertedCommand))
+                }
+              }
+            }
+
+            returnedEnv
+          }
+          case Failure(reason) => {
+            throw new Exception(s"Iterate into command failed: $reason")
+          }
+        }
       }
       case ApplyIndividualCommand(s, command) => {
         // This split on lookupVersionedObject suggests that we may want to refactor
         // Code is repeated!!
+
+        //println(s"In ApplyIndividualCommand - $s -- $command -- ${Evaluator.lookupVersionedObject(s, this)}")
 
         val retVal = Evaluator.lookupVersionedObject(s, this) match {
           case Success(versionLink) => {
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
-              nType = RetrieveType.fromNewMapObject(currentState, this)
               newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid
