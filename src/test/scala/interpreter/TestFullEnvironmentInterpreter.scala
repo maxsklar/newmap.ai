@@ -922,6 +922,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Iterations " should " be usable to append arrays" in {
+    testCodeScript(Vector(
+      CodeExpectation("val myArray1: Array.Identifier = 3.(0: a, 1: b, 2: c)", GeneralSuccessCheck),
+      CodeExpectation("val myArray2: Array.Identifier = 2.(0: d, 1: e)", GeneralSuccessCheck),
+      CodeExpectation("ver appendedArray = new Array.Identifier", GeneralSuccessCheck),
+      CodeExpectation("iterate myArray1 into appendedArray", GeneralSuccessCheck),
+      CodeExpectation("iterate myArray2 into appendedArray", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array.T: Count) = (i._: i)", GeneralSuccessCheck),
+      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+    ))
+  }
+
   /*it should " be creatable without specifying length or keys" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
