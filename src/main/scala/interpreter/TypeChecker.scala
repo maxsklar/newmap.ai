@@ -75,6 +75,28 @@ object TypeChecker {
           Failure(s"Character not recognized because it has length > 1: $s")
         }
       }
+      case StringParse(s: String) => {
+        val uObject = UCase(UIndex(s.length), UStruct(s.toCharArray().toVector.map(c => UCharacter(c))))
+        val stringType = CustomT("String", UStruct(Vector.empty))
+
+        expectedTypeOutcome match {
+          case Success(WildcardPatternT(_)) => {
+            Success(TypeCheckResponse(uObject, stringType))
+          }
+          case _ => {
+            for {
+              underlyingExpectedT <- expectedTypeOutcome
+
+              convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(uObject, stringType), expectedType, env)
+              
+              _ = println(s"convertInstructions: $convertInstructions")
+              result <- Evaluator.applyListOfFunctions(uObject, convertInstructions, env)
+            } yield {
+              TypeCheckResponse(uObject, expectedType)
+            }
+          }
+        }
+      }
       case IdentifierParse(s: String, true) => {
         // We need to check that the expectedType allows an identifier!!
         expectedTypeOutcome match {

@@ -39,6 +39,12 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def string: Parser[StringParse] = {
+    accept("string", { case Lexer.DQuote(s) => {
+      StringParse(s)
+    }})
+  }
+
   private def characterForNumber: Parser[CharacterParse] = {
     Lexer.TikMark() ~ naturalNumber ^^ {
       case _ ~ NaturalNumberParse(n) => CharacterParse(n.toString)
@@ -187,7 +193,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpression: Parser[ParseTree] = {
-    expressionInParens | emptyParens | naturalNumber | identifier | forcedId | character | characterForNumber
+    expressionInParens | emptyParens | naturalNumber | identifier | forcedId | character | characterForNumber | string
   }
 
   private def baseExpressionWithFieldAccess: Parser[ParseTree] = {

@@ -555,6 +555,6 @@ object Environment {
         CountT,
         SimpleFunction
       )
-    )
+    ),
   ))
 }

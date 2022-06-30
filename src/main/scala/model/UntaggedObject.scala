@@ -37,7 +37,7 @@ case class ULink(key: VersionedObjectKey) extends UntaggedObject
 // To be moved into user-defined types soon
 case class UByte(value: Byte) extends UntaggedObject
 case class UCharacter(value: Char) extends UntaggedObject
-case class UString(value: String) extends UntaggedObject
+//case class UString(length: Long, value: String) extends UntaggedObject
 case class ULong(value: Long) extends UntaggedObject
 case class UDouble(value: Double) extends UntaggedObject
 case class Uuuid(value: UUID) extends UntaggedObject

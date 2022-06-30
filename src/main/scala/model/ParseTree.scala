@@ -40,6 +40,10 @@ case class CharacterParse(
   char: String
 ) extends ParseTree
 
+case class StringParse(
+  s: String
+) extends ParseTree
+
 abstract class EnvStatementParse
 
 case class FullStatementParse(

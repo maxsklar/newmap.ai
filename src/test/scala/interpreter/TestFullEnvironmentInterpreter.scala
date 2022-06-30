@@ -927,7 +927,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "Iterations " should " be usable to append arrays" in {
+  it should " be usable to append arrays" in {
     testCodeScript(Vector(
       CodeExpectation("val myArray1: Array.Identifier = 3.(0: a, 1: b, 2: c)", GeneralSuccessCheck),
       CodeExpectation("val myArray2: Array.Identifier = 2.(0: d, 1: e)", GeneralSuccessCheck),

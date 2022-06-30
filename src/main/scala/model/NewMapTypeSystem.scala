@@ -62,7 +62,7 @@ case class NewMapTypeSystem(
     case BooleanT => UCase(UIdentifier("Boolean"), UStruct(Vector.empty))
     case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
     case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
-    case StringT => UCase(UIdentifier("String"), UStruct(Vector.empty))
+    //case StringT => UCase(UIdentifier("String"), UStruct(Vector.empty))
     case LongT => UCase(UIdentifier("Long"), UStruct(Vector.empty))
     case DoubleT => UCase(UIdentifier("Double"), UStruct(Vector.empty))
     case UuidT => UCase(UIdentifier("Uuid"), UStruct(Vector.empty))
@@ -125,7 +125,7 @@ case class NewMapTypeSystem(
     case "Boolean" => Success(emptyStructType)
     case "Byte" => Success(emptyStructType)
     case "Character" => Success(emptyStructType)
-    case "String" => Success(emptyStructType)
+    //case "String" => Success(emptyStructType)
     case "Long" => Success(emptyStructType)
     case "Double" => Success(emptyStructType)
     case "Uuid" => Success(emptyStructType)
@@ -171,7 +171,7 @@ case class NewMapTypeSystem(
     case "Boolean" => Success(emptyStructPattern)
     case "Byte" => Success(emptyStructPattern)
     case "Character" => Success(emptyStructPattern)
-    case "String" => Success(emptyStructPattern)
+    //case "String" => Success(emptyStructPattern)
     case "Long" => Success(emptyStructPattern)
     case "Double" => Success(emptyStructPattern)
     case "Uuid" => Success(emptyStructPattern)
@@ -219,7 +219,7 @@ case class NewMapTypeSystem(
       case "Boolean" => Success(BooleanT)
       case "Byte" => Success(ByteT)
       case "Character" => Success(CharacterT)
-      case "String" => Success(StringT)
+      //case "String" => Success(StringT)
       case "Long" => Success(LongT)
       case "Double" => Success(DoubleT)
       case "Uuid" => Success(UuidT)
@@ -473,7 +473,7 @@ object NewMapTypeSystem {
         "Boolean" -> java.util.UUID.randomUUID,
         "Byte" -> java.util.UUID.randomUUID,
         "Character" -> java.util.UUID.randomUUID,
-        "String" -> java.util.UUID.randomUUID,
+        //"String" -> java.util.UUID.randomUUID,
         "Long" -> java.util.UUID.randomUUID,
         "Double" -> java.util.UUID.randomUUID,
         "Uuit" -> java.util.UUID.randomUUID,
