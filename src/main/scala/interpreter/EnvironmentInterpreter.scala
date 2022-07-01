@@ -118,13 +118,13 @@ class EnvironmentInterpreter(
     for {
       tokens <- Lexer(code)
       statementParse <- NewMapParser.statementParse(tokens)
-      response <- StatementInterpreter(statementParse, env)
+      command <- StatementInterpreter(statementParse, env)
     } yield {
       // TODO - when the environment is a newmap object in it's own right, it'll give an output from this
       // new command.. this is the output that we actually want to return here.
       // remove reponse.output!
-      env = env.newCommands(response.commands)
-      response.output
+      env = env.newCommand(command)
+      command.displayString(env)
     }
   }
 }

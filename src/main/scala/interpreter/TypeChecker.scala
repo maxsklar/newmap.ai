@@ -76,7 +76,11 @@ object TypeChecker {
         }
       }
       case StringParse(s: String) => {
-        val uObject = UCase(UIndex(s.length), UStruct(s.toCharArray().toVector.map(c => UCharacter(c))))
+        val uObject = UCase(
+          UIndex(s.length - 2),
+          UStruct(s.toCharArray().toVector.drop(1).dropRight(1).map(c => UCharacter(c)))
+        )
+
         val stringType = CustomT("String", UStruct(Vector.empty))
 
         expectedTypeOutcome match {
@@ -89,10 +93,9 @@ object TypeChecker {
 
               convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(uObject, stringType), expectedType, env)
               
-              _ = println(s"convertInstructions: $convertInstructions")
               result <- Evaluator.applyListOfFunctions(uObject, convertInstructions, env)
             } yield {
-              TypeCheckResponse(uObject, expectedType)
+              TypeCheckResponse(result, expectedType)
             }
           }
         }

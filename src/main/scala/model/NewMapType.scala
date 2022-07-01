@@ -3,7 +3,8 @@ package ai.newmap.model
 import java.util.UUID
 
 sealed abstract class NewMapType {
-  override def toString = PrintNewMapObject.newMapType(this)
+  override def toString = PrintNewMapObject.newMapType(this, Environment.Base.typeSystem)
+  def displayString(env: Environment) = PrintNewMapObject.newMapType(this, env.typeSystem)
 }
 
 /*

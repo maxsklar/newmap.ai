@@ -6,14 +6,17 @@ import ai.newmap.interpreter._
 import ai.newmap.util.{Outcome, Success, Failure}
 import java.util.UUID
 
-sealed abstract class EnvironmentCommand
+sealed abstract class EnvironmentCommand {
+  def displayString(env: Environment): String
+  override def toString(): String = displayString(Environment.Base)
+}
 
 case class FullEnvironmentCommand(
   id: String,
   nObject: NewMapObject
 ) extends EnvironmentCommand {
-  override def toString: String = {
-    s"val $id = ${nObject}"
+  override def displayString(env: Environment): String = {
+    s"val $id = ${nObject.displayString(env)}"
   }
 }
 
@@ -21,8 +24,8 @@ case class NewVersionedStatementCommand(
   id: String,
   nType: NewMapType
 ) extends EnvironmentCommand {
-  override def toString: String = {
-    s"ver $id = new ${nType}"
+  override def displayString(env: Environment): String = {
+    s"ver $id = new ${PrintNewMapObject.newMapType(nType, env.typeSystem)}"
   }
 }
 
@@ -30,8 +33,8 @@ case class NewTypeCommand(
   id: String,
   nType: NewMapType
 ) extends EnvironmentCommand {
-  override def toString: String = {
-    s"data $id = ${nType}"
+  override def displayString(env: Environment): String = {
+    s"data $id = ${PrintNewMapObject.newMapType(nType, env.typeSystem)}"
   }
 }
 
@@ -40,7 +43,7 @@ case class NewParamTypeCommand(
   paramList: Vector[(String, NewMapType)],
   nType: NewMapType
 ) extends EnvironmentCommand {
-  override def toString: String = {
+  override def displayString(env: Environment): String = {
     s"data $id ${paramList}"
   }
 }
@@ -49,7 +52,7 @@ case class IterateIntoCommand(
   iterableObject: NewMapObject,
   destinationObject: String
 ) extends EnvironmentCommand {
-  override def toString: String = {
+  override def displayString(env: Environment): String = {
     s"iterate $iterableObject into ${destinationObject}"
   }
 }
@@ -58,7 +61,7 @@ case class ApplyIndividualCommand(
   id: String,
   nObject: UntaggedObject
 ) extends EnvironmentCommand {
-  override def toString: String = {
+  override def displayString(env: Environment): String = {
     "" //s"update $id $nObject"
   }
 }
@@ -67,7 +70,7 @@ case class ForkEnvironmentCommand(
   id: String,
   vObject: VersionedObjectLink
 ) extends EnvironmentCommand {
-  override def toString: String = {
+  override def displayString(env: Environment): String = {
     s"ver $id = fork ${vObject}"
   }
 }
@@ -76,7 +79,7 @@ case class ParameterEnvironmentCommand(
   id: String,
   nType: NewMapType
 ) extends EnvironmentCommand {
-  override def toString: String = {
+  override def displayString(env: Environment): String = {
     s"parameter $id: ${nType}"
   }
 }
@@ -84,7 +87,7 @@ case class ParameterEnvironmentCommand(
 case class ExpOnlyEnvironmentCommand(
   nObject: NewMapObject
 ) extends EnvironmentCommand {
-  override def toString: String = nObject.toString
+  override def displayString(env: Environment): String = nObject.displayString(env)
 }
 
 
@@ -94,7 +97,7 @@ case class OutputToChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
 ) extends EnvironmentCommand {
-  override def toString: String = s"Output to channel $channel: $nObject"
+  override def displayString(env: Environment): String = s"Output to channel $channel: ${nObject}"
 }
 
 sealed abstract class EnvironmentValue

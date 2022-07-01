@@ -6,7 +6,8 @@ import java.util.UUID
  * The objects in the NewMap Language
  */
 sealed abstract class NewMapObject {
-  override def toString = PrintNewMapObject(this)
+  override def toString = PrintNewMapObject(this, Environment.Base)
+  def displayString(env: Environment) = PrintNewMapObject(this, env)
 }
 
 case class TaggedObject(

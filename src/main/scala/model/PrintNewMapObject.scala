@@ -5,8 +5,8 @@ import ai.newmap.model._
 import java.util.UUID
 
 object PrintNewMapObject {
-  def apply(obj: NewMapObject): String = obj match {
-    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + newMapType(nType)
+  def apply(obj: NewMapObject, env: Environment): String = obj match {
+    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + newMapType(nType, env.typeSystem)
     case VersionedObjectLink(key) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
@@ -17,54 +17,83 @@ object PrintNewMapObject {
   }
 
   // TODO - convert nType into an untagged type instead of using this!
-  def newMapType(nType: NewMapType): String = nType match {
-    case CountT => "Count"
-    case IndexT(i) => "Index." + untagged(i)
-    case CustomT(name, params) => {
-      if (isEmptyMap(params)) {
-        name
-      } else {
-        s"$name.${untagged(params)}"
+  def newMapType(
+    nType: NewMapType,
+    typeSystem: NewMapTypeSystem,
+    typeSystemStateOpt: Option[UUID] = None
+  ): String = {
+    val typeSystemState = typeSystemStateOpt.getOrElse(typeSystem.currentState)
+
+    nType match {
+      case CountT => "Count"
+      case IndexT(i) => "Index." + untagged(i)
+      case CustomT(name, params) => {
+        val resultOpt: Option[String] = for {
+          currentId <- typeSystem.currentMapping.get(name)
+          referencedId <- typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)
+        } yield {
+          val legacyIndicator = if (currentId == referencedId) "" else s"[OLD:$referencedId]"
+          val includedParams = if (isEmptyMap(params)) "" else s".${untagged(params)}"
+
+          s"${legacyIndicator}${name}$includedParams"
+        }
+
+        resultOpt match {
+          case Some(result) => result
+          case None => {
+            throw new Exception(s"[Failed to print type: $name -- $typeSystemState -- ${typeSystem.currentMapping} -- ${typeSystem.currentMapping.get(name)} -- ${typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)}]")
+            s"[Failed to print type: $name -- $typeSystemState -- ${typeSystem.currentMapping} -- ${typeSystem.currentMapping.get(name)} -- ${typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)}]"
+          }
+        }
       }
-    }
-    case TypeT => s"Type"
-    case HistoricalTypeT(uuid) => s"HistoricalType($uuid)"
-    case UndefinedT => s"UndefinedType"
-    //case AnyT => s"Any"
-    case IdentifierT => "Identifier"
-    case BooleanT => "Boolean"
-    case ByteT => "Byte"
-    case CharacterT  => "Character"
-    //case StringT => "String"
-    case LongT => "Long"
-    case DoubleT => "Double"
-    case UuidT => "UUID"
-    case MapT(UMap(typeTransform), config) => {
-      if (typeTransform.length == 1) {
-        val inputType = typeTransform.head._1
-        val outputTypeExp = typeTransform.head._2
-        printMapT(untagged(inputType), untagged(outputTypeExp), config)
-      } else {
-        s"Generic(${mapToString(typeTransform)})"
+      case TypeT => s"Type"
+      case HistoricalTypeT(uuid) => s"HistoricalType($uuid)"
+      case UndefinedT => s"UndefinedType"
+      //case AnyT => s"Any"
+      case IdentifierT => "Identifier"
+      case BooleanT => "Boolean"
+      case ByteT => "Byte"
+      case CharacterT  => "Character"
+      //case StringT => "String"
+      case LongT => "Long"
+      case DoubleT => "Double"
+      case UuidT => "UUID"
+      case MapT(UMap(typeTransform), config) => {
+        if (typeTransform.length == 1) {
+          val inputType = typeTransform.head._1
+          val outputTypeExp = typeTransform.head._2
+          printMapT(untagged(inputType), untagged(outputTypeExp), config)
+        } else {
+          s"Generic(${mapToString(typeTransform)})"
+        }
       }
+      case MapT(typeTransform, config) => {
+        s"Generic(${untagged(typeTransform)})"
+      }
+      //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
+      case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
+      case TypeClassT(typeTransform, implementation) => {
+        s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> UIndex(0))))})"
+      }
+      case CaseT(cases, _, _) => {
+        s"Case${mapToString(cases)}"
+      }
+      //TODO(2022): we might not want to print out the full parent here, because it could be large
+      // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
+      case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+      case WithStateT(uuid, nType) => {
+        newMapType(nType, typeSystem, Some(uuid))
+        /*if (typeSystem.currentState == uuid) {
+          newMapType(nType, typeSystem)
+        } else {
+          println(s"*** type system uuid: ${typeSystem.currentState}")
+
+          s"WithState:$uuid:${newMapType(nType, typeSystem)}" 
+        }*/
+      }
+      case WildcardPatternT(name) => untagged(UWildcardPattern(name))
+      case ParamIdT(name) => untagged(ParamId(name))
     }
-    case MapT(typeTransform, config) => {
-      s"Generic(${untagged(typeTransform)})"
-    }
-    //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
-    case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
-    case TypeClassT(typeTransform, implementation) => {
-      s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> UIndex(0))))})"
-    }
-    case CaseT(cases, _, _) => {
-      s"Case${mapToString(cases)}"
-    }
-    //TODO(2022): we might not want to print out the full parent here, because it could be large
-    // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
-    case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
-    case WithStateT(uuid, nType) => s"WithState:$uuid:${newMapType(nType)}" 
-    case WildcardPatternT(name) => untagged(UWildcardPattern(name))
-    case ParamIdT(name) => untagged(ParamId(name))
   }
 
   def printMapT(

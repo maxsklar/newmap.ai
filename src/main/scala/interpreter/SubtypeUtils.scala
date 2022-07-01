@@ -307,7 +307,7 @@ object SubtypeUtils {
         for {
           typeId1 <- env.typeSystem.getTypeIdFromName(typeSystemId1, name1)
           typeId2 <- env.typeSystem.getTypeIdFromName(typeSystemId2, name2)
-          
+
           _ <- Evaluator.attemptStandardPatternMatch(params1, params2, env)
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
@@ -357,7 +357,7 @@ object SubtypeUtils {
         }
       }
       case _ => {
-        Failure(s"No rule to convert $startingType to $endingType")
+        Failure(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
       }
     }
   }
