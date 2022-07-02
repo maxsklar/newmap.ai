@@ -56,6 +56,10 @@ case class ApplyFunction(
   matchingRules: MatchingRules // See Class Comment
 ) extends UntaggedObject
 
+case class FunctionWithMatchingRules(
+  func: UntaggedObject,
+  matchingRules: MatchingRules
+)
 
 /*
  * This represents our ability to change how the pattern matching algorithm works

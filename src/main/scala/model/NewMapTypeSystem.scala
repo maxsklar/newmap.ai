@@ -50,7 +50,7 @@ case class NewMapTypeSystem(
   // Parameters: Starting Type, Ending Type
   // Result: Partial Function: Starting Parameter => (Ending Parameter => ConvertibilityRules)
   // Convertibility rule is a complete function from StartingType => EndingType (must be 1:1)
-  customConvertibilityRules: Map[(NewMapTypeSystem.TypeId, NewMapTypeSystem.TypeId), UntaggedObject] = Map.empty
+  customConvertibilityRules: Map[(NewMapTypeSystem.TypeId, NewMapTypeSystem.TypeId), FunctionWithMatchingRules] = Map.empty
 ) {
   def currentMapping: Map[String, NewMapTypeSystem.TypeId] = {
     historicalMapping.getOrElse(currentState, Map.empty)
@@ -403,12 +403,16 @@ case class NewMapTypeSystem(
       // TODO: implement
       val newTypesThatAreUsed = typesThatUseType
 
+      // TODO - this should change based on the input type
+      // there needs to be a mapping between the type and the "matcher" it uses
+      val matcher = StandardMatcher
+
       copy(
         currentState = newTypeSystemId,
         historicalMapping = historicalMapping + (newTypeSystemId -> newMapping),
         typeToParameterType = typeToParameterType + (newTypeId -> currentParameterType),
         typeToUnderlyingType = typeToUnderlyingType + (newTypeId -> (currentParameterPattern -> newUnderlyingType)),
-        customConvertibilityRules = customConvertibilityRules + ((currentTypeId -> newTypeId) -> converter),
+        customConvertibilityRules = customConvertibilityRules + ((currentTypeId -> newTypeId) -> FunctionWithMatchingRules(converter, matcher)),
         typesThatUseType = newTypesThatAreUsed
       )
     }
@@ -419,15 +423,15 @@ case class NewMapTypeSystem(
   def searchForConvertibility(
     typeId1: NewMapTypeSystem.TypeId,
     typeId2: NewMapTypeSystem.TypeId
-  ): Outcome[Vector[UntaggedObject], String] = {
-    val convertibilityRules: Vector[(NewMapTypeSystem.TypeId, NewMapTypeSystem.TypeId, UntaggedObject)] = {
+  ): Outcome[Vector[FunctionWithMatchingRules], String] = {
+    val convertibilityRules: Vector[(NewMapTypeSystem.TypeId, NewMapTypeSystem.TypeId, FunctionWithMatchingRules)] = {
       customConvertibilityRules.toVector.map(x => {
         (x._1._1, x._1._2, x._2)
       })
     }
 
     // DO A BFS
-    var foundConversions: Map[NewMapTypeSystem.TypeId, Vector[UntaggedObject]] = Map(typeId1 -> Vector.empty)
+    var foundConversions: Map[NewMapTypeSystem.TypeId, Vector[FunctionWithMatchingRules]] = Map(typeId1 -> Vector.empty)
 
     var processedTypes: Vector[NewMapTypeSystem.TypeId] = Vector.empty
     var unprocessedTypes: Vector[NewMapTypeSystem.TypeId] = Vector(typeId1)
@@ -442,7 +446,7 @@ case class NewMapTypeSystem(
         if (!processedTypes.contains(foundType))
         if (!unprocessedTypes.contains(foundType))
       } {
-        val oldConversionRule: Vector[UntaggedObject] = foundConversions.get(firstType).get
+        val oldConversionRule: Vector[FunctionWithMatchingRules] = foundConversions.get(firstType).get
         val newConversionRule = oldConversionRule :+ applicableRule._3
         foundConversions = foundConversions + (foundType -> newConversionRule)
         unprocessedTypes = unprocessedTypes :+ foundType

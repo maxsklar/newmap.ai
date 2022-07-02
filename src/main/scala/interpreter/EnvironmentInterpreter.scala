@@ -146,5 +146,8 @@ object EnvironmentInterpreter {
     //"data Option (T: Type)",
     //"update Option (None, ())",
     //"update Option (Some, T)"
+    "val myArray1: Array.Identifier = 3.(0: a, 1: b, 2: c)",
+    "val myArray2: Array.Identifier = 2.(0: d, 1: e)",
+    "ver appendedArray = new Array.Identifier",
   )
 }

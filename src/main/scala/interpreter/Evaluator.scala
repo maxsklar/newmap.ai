@@ -334,13 +334,13 @@ object Evaluator {
 
   def applyListOfFunctions(
     original: UntaggedObject,
-    listOfFunctions: Vector[UntaggedObject],
+    listOfFunctions: Vector[FunctionWithMatchingRules],
     env: Environment
   ): Outcome[UntaggedObject, String] = {
     listOfFunctions match {
       case instruction +: followingInstructions => {
         for {
-          newObject <- applyFunctionAttempt(instruction, original, env)
+          newObject <- applyFunctionAttempt(instruction.func, original, env, instruction.matchingRules)
           result <- applyListOfFunctions(newObject, followingInstructions, env)
         } yield result
       }

@@ -64,10 +64,9 @@ object TypeChecker {
             case _ => {
               for {
                 expectedType <- expectedTypeOutcome
-                convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(uObject, CharacterT), expectedType, env)
-                result <- Evaluator.applyListOfFunctions(uObject, convertInstructions, env)
+                result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, CharacterT), expectedType, env)
               } yield {
-                TypeCheckResponse(uObject, expectedType)
+                TypeCheckResponse(result, expectedType)
               }
             }
           }
@@ -91,9 +90,7 @@ object TypeChecker {
             for {
               underlyingExpectedT <- expectedTypeOutcome
 
-              convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(uObject, stringType), expectedType, env)
-              
-              result <- Evaluator.applyListOfFunctions(uObject, convertInstructions, env)
+              result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, stringType), expectedType, env)
             } yield {
               TypeCheckResponse(result, expectedType)
             }
@@ -108,11 +105,9 @@ object TypeChecker {
           }
           case Success(t) => {
             for {
-              convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(UIdentifier(s), IdentifierT), t, env)
-              
-              // TODO: Execute convert instructions?
+              uObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), t, env)
             } yield {
-              TypeCheckResponse(UIdentifier(s), t)
+              TypeCheckResponse(uObject, t)
             }
           }
           case _ => {
@@ -125,7 +120,7 @@ object TypeChecker {
         val useLiteralIdentifier = for {
           underlyingExpectedT <- expectedTypeOutcome.toOption
 
-          // TODO: This exception is awkward - maybe find some way to account for this in "isObjectConvertibleToType"
+          // TODO: This exception is awkward - maybe find some way to account for this in "attemptConvertObjectToType"
           // - we are looking for types that ONLY include identifiers.
           _ <- underlyingExpectedT match {
             case WildcardPatternT(_) => None
@@ -133,7 +128,7 @@ object TypeChecker {
           }
 
           // Herin Lies the problem!!!
-          convertInstructions <- SubtypeUtils.isObjectConvertibleToType(TaggedObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
+          result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
         } yield ()
 
         if (useLiteralIdentifier.nonEmpty) {
@@ -150,9 +145,7 @@ object TypeChecker {
             case Some(EnvironmentBinding(nObject)) => {
               val nType = RetrieveType.fromNewMapObject(nObject, env)
               for { 
-                convertInstructions <- SubtypeUtils.isObjectConvertibleToType(nObject, expectedType, env)
-                // TODO - execute convert instructions on nObject
-                uObject <- Evaluator.removeTypeTag(nObject)
+                uObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
               } yield {
                 TypeCheckResponse(uObject, nType)
               }
@@ -234,11 +227,9 @@ object TypeChecker {
                 case Success(nType) => {
                   val trialObject = TaggedObject(UIdentifier(s), IdentifierT)
                   for {
-                    convertInstructions <- SubtypeUtils.isObjectConvertibleToType(trialObject, nType, env)
-                    
-                    // TODO: execute convertInstructions?
+                    result <- SubtypeUtils.attemptConvertObjectToType(trialObject, nType, env)
                   } yield {
-                    TypeCheckResponse(UIdentifier(s), expectedType)
+                    TypeCheckResponse(result, expectedType)
                   }
                 }
                 case _ => {
@@ -551,7 +542,9 @@ object TypeChecker {
         case IdentifierParse(s, false) => Success(s)
         case _ => Failure(s"Constructor for type must be an identifier, it was $first")
       }
+    
       typeOfParameter <- env.typeSystem.getParameterType(env.typeSystem.currentState, firstAsString)
+
       paramValue <- typeCheck(second, typeOfParameter, env, featureSet)
     } yield UCase(UIdentifier(firstAsString), paramValue.nExpression)
   }

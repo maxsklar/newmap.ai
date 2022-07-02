@@ -129,7 +129,7 @@ object SubtypeUtils {
   }
 
   case class IsTypeConvertibleResponse(
-    convertInstructions: Vector[UntaggedObject],
+    convertInstructions: Vector[FunctionWithMatchingRules],
     newParameters: Map[String, UntaggedObject]
   )
 
@@ -365,32 +365,34 @@ object SubtypeUtils {
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
   // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
-  // @return a list of simple function if the conversion requires application in order to convert
-  def isObjectConvertibleToType(
+  // @return if the object is convertible, return the untagged object that represents its data in the new type
+  def attemptConvertObjectToType(
     startingObject: NewMapObject,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[Vector[UntaggedObject], String] = {
+  ): Outcome[UntaggedObject, String] = {
     endingType match {
       case SubtypeT(isMember, parentType, featureSet) => {
         for {
-          convertInstructions <- isObjectConvertibleToType(startingObject, parentType, env)
-
-          // TODO - make explicit conversion
-          convertedObject = startingObject
-
-          soUntagged <- Evaluator.removeTypeTag(startingObject)
-          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, soUntagged, env)
+          uObject <- attemptConvertObjectToType(startingObject, parentType, env)
+          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, uObject, env)
           _ <- Outcome.failWhen(membershipCheck == UInit, s"Not member of subtype: $startingObject, $endingType")
         } yield {
-          convertInstructions
+          uObject
         }
       }
       case _ => {
         val nType = RetrieveType.fromNewMapObject(startingObject, env)
+
         for {
           response <- isTypeConvertible(nType, endingType, env)
-        } yield response.convertInstructions
+          uObject <- Evaluator.removeTypeTag(startingObject)
+
+          // We're not taking into account the type!!!
+          result <- Evaluator.applyListOfFunctions(uObject, response.convertInstructions, env)
+        } yield {
+          result
+        }
       }
     }
   }
@@ -417,7 +419,7 @@ object SubtypeUtils {
 
   case class StructWithSingleValueResponse(
     inputType: UntaggedObject,
-    conversionRules: Vector[UntaggedObject]
+    conversionRules: Vector[FunctionWithMatchingRules]
   )
 
   // If this is a struct with a single (non-defaulted) value, then figure out that type, and have a conversion function
@@ -437,7 +439,11 @@ object SubtypeUtils {
             UMap(Vector(mapValues.head._1 -> ParamId("item")) ++ defaultStruct)
         ))
 
-        StructWithSingleValueResponse(mapValues.head._2, Vector(conversionRule))
+        // The "standardMatcher" always works here because we only have a Wildcard Pattern
+        // - And all matchers treat the wildcard pattern the same way
+        val matcher = StandardMatcher
+
+        StructWithSingleValueResponse(mapValues.head._2, Vector(FunctionWithMatchingRules(conversionRule, matcher)))
       }
     } else {
       Failure("Function did not have singular input")

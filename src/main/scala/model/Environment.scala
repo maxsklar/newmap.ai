@@ -218,11 +218,20 @@ case class Environment(
         )
       }
       case NewParamTypeCommand(s, paramList, nType) => {
-        val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
-        val paramT = StructT(
-          paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
-          IndexT(UIndex(paramList.length))
-        )
+        val parameterPattern = if (paramList.length == 1) {
+          UWildcardPattern(paramList.head._1)
+        } else {
+          UStruct(paramList.map(param => UWildcardPattern(param._1)))
+        }
+
+        val paramT = if (paramList.length == 1) {
+          paramList.head._2
+        } else {
+          StructT(
+            paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
+            IndexT(UIndex(paramList.length))
+          )
+        }
 
         val uType = typeSystem.typeToUntaggedObject(nType)
 
@@ -247,15 +256,12 @@ case class Environment(
               val convertedCommandO = for {
                 versionedObjectLink <- Evaluator.lookupVersionedObject(destinationObject, this)
                 nType = RetrieveType.fromNewMapObject(versionedObjectLink, this)
+
                 itemType <- IterationUtils.iterationItemType(nType, this)
-
                 commandObj = TaggedObject(command, itemType)
-
+                
                 inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
-
-                conversionRules <- SubtypeUtils.isObjectConvertibleToType(commandObj, inputT, this)
-
-                convertedCommand <- Evaluator.applyListOfFunctions(command, conversionRules, this)
+                convertedCommand <- SubtypeUtils.attemptConvertObjectToType(commandObj, inputT, this)
               } yield {
                 convertedCommand
               }
