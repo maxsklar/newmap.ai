@@ -2,6 +2,7 @@ package ai.newmap.interpreter
 
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
+import java.util.UUID
 
 // Provides libraries for iterating type and object
 // - to be replaced by internal newmap.ai code
@@ -46,7 +47,11 @@ object IterationUtils {
     }
   }
 
-  def iterateObject(nObject: NewMapObject, env: Environment): Outcome[Vector[UntaggedObject], String] = {
+  def iterateObject(
+    nObject: NewMapObject,
+    env: Environment,
+    typeSystemIdOpt: Option[UUID] = None
+  ): Outcome[Vector[UntaggedObject], String] = {
     Evaluator.stripVersioning(nObject, env) match {
       case TaggedObject(UMap(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
         Success(values.map(_._1))
@@ -70,7 +75,33 @@ object IterationUtils {
         // We should be more careful about the ordering here!!
         Success(values.map(_._2))
       }
-      case _ => Failure(s"Unable to iterate over object: $nObject")
+      case TaggedObject(untaggedCurrent, CustomT(typeName, params)) => {
+        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
+        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
+
+        for {
+          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+
+          (underlyingPattern, underlyingExp) = underlyingTypeInfo
+
+          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+
+          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+
+          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
+
+          result <- iterateObject(currentResolved, env, typeSystemIdOpt)
+        } yield result
+      }
+      case TaggedObject(untaggedCurrent, WithStateT(typeSystemId, nType)) => {
+        for {
+          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
+          result <- iterateObject(retaggedCurrent, env, Some(typeSystemId))
+        } yield result
+      }
+      case _ => Failure(s"Unable to iterate over object: ${nObject.displayString(env)}")
     }
   }
 
@@ -95,7 +126,7 @@ object IterationUtils {
   }
 
   // Give a type, what's going to come out of the iteration?
-  def iterationItemType(nType: NewMapType, env: Environment): Outcome[NewMapType, String] = {
+  def iterationItemType(nType: NewMapType, env: Environment, typeSystemIdOpt: Option[UUID] = None): Outcome[NewMapType, String] = {
     nType match {
       case MapT(UMap(typeTransform), MapConfig(CommandOutput, BasicMap, _, _, _)) => {
         for {
@@ -114,7 +145,28 @@ object IterationUtils {
       case CustomT("Array", itemType) => {
         env.typeSystem.convertToNewMapType(itemType)
       }
-      case _ => Failure(s"Unable to get iteration item type: $nType")
+      case CustomT(typeName, params) => {
+        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
+        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
+
+        for {
+          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+
+          (underlyingPattern, underlyingExp) = underlyingTypeInfo
+
+          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+
+          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+
+          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          result <- iterationItemType(underlyingT, env, typeSystemIdOpt)
+        } yield result
+      }
+      case WithStateT(typeSystemId, nType) => {
+        iterationItemType(nType, env, Some(typeSystemId))
+      }
+      case _ => Failure(s"Unable to get iteration item type: ${nType.displayString(env)}")
     }
   }
 }

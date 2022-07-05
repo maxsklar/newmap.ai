@@ -53,7 +53,7 @@ case class IterateIntoCommand(
   destinationObject: String
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    s"iterate $iterableObject into ${destinationObject}"
+    s"iterate ${iterableObject.displayString(env)} into ${destinationObject}"
   }
 }
 
@@ -292,6 +292,7 @@ case class Environment(
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
+
               newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid

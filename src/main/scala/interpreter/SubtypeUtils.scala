@@ -345,6 +345,7 @@ object SubtypeUtils {
           
           _ <- underlyingStartingType match {
             case SubtypeT(_, _, _) => Success()
+            case CustomT(_, _) => Success()
             case _ => {
               throw new Exception(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
               Failure(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
@@ -357,6 +358,10 @@ object SubtypeUtils {
         }
       }
       case _ => {
+        if (endingType == UndefinedT) {
+          throw new Exception(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
+        }
+
         Failure(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
       }
     }

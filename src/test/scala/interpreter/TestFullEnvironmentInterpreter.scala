@@ -939,15 +939,33 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Strings " should " be creatable and updatable" in {
+    testCodeScript(Vector(
+      CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
+      CodeExpectation("val emptyString: String = \"\"", GeneralSuccessCheck),
+      CodeExpectation("ver updatedString = new String", GeneralSuccessCheck),
+      CodeExpectation("update updatedString `a", GeneralSuccessCheck),
+      CodeExpectation("update updatedString `b", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " be iterable" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver x = new String", GeneralSuccessCheck),
+      CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
+      CodeExpectation("iterate s into x", GeneralSuccessCheck)
+    ))
+  }
+
   /*it should " be creatable without specifying length or keys" in {
     testCodeScript(Vector(
-      CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
+      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
     ))
   }
 
   it should " come with a length function 2" in {
     testCodeScript(Vector(
-      CodeExpectation("val y: Array.Count = (2, 3, 5, 7, 11)", GeneralSuccessCheck),
+      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
       CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
     ))
   }*/

@@ -33,6 +33,8 @@ object StatementInterpreter {
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
+          // Problem is WITH_TYPE!!
+
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
           initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
@@ -86,9 +88,7 @@ object StatementInterpreter {
           case Success(versionedObjectLink) => {
             // Now we also need to look this up in the type system!!!
             val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
-            // TODO - this roundabout way of doing things suggests a refactor
-            val currentState = Evaluator.stripVersioning(versionedObjectLink, env)
-            
+
             for {
               inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
 

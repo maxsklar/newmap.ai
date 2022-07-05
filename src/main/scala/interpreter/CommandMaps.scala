@@ -69,7 +69,11 @@ object CommandMaps {
       }
       case CharacterT => Success(UCharacter('\0'))
       case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
-      case _ => Failure(s"Type $nType has no default value")
+      case CustomT("String", _) => Success(UCase(UIndex(0), UStruct(Vector.empty))) // Replace this line with a conversion!
+      case WithStateT(uuid, underlying) => {
+        getDefaultValueOfCommandTypeHardcoded(underlying, env)
+      }
+      case _ => Failure(s"Type ${nType.displayString(env)} has no default value")
     }
   }
 
@@ -257,7 +261,8 @@ object CommandMaps {
 
   def getCommandInputOfCommandType(
     nType: NewMapType,
-    env: Environment
+    env: Environment,
+    typeSystemIdOpt: Option[UUID] = None
   ): Outcome[NewMapType, String] = {
     nType match {
       case CountT => Success(
@@ -350,11 +355,36 @@ object CommandMaps {
       case TypeClassT(typeTransform, typesInTypeClass) => {
         Success(CaseT(typeTransform, TypeT, SimpleFunction))
       }
+      // This should be custom defined
       case CustomT("Array", nType) => env.typeSystem.convertToNewMapType(nType)
+      case CustomT(typeName, params) => {
+        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
+        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
+
+        for {
+          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+
+          (underlyingPattern, underlyingExp) = underlyingTypeInfo
+
+          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+
+          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+
+          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          result <- getCommandInputOfCommandType(underlyingT, env)
+        } yield {
+          result
+        }
+      }
+      case WithStateT(typeSystemId, nType) => {
+        getCommandInputOfCommandType(nType, env, Some(typeSystemId))
+      }
       /*case CaseT(cases, _, _) => {
         Success(UndefinedT)
       }*/
       case _ => {
+        println(s"Got undefined for ${nType.displayString(env)}")
         Success(UndefinedT)        
       }
     }
@@ -363,7 +393,8 @@ object CommandMaps {
   def updateVersionedObject(
     current: NewMapObject,
     command: UntaggedObject,
-    env: Environment
+    env: Environment,
+    typeSystemIdOpt: Option[UUID] = None
   ): Outcome[NewMapObject, String] = {
     RetrieveType.fromNewMapObject(current, env) match {
       case nType@CountT => {
@@ -572,8 +603,42 @@ object CommandMaps {
           result <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
         } yield result
       }
+      case nType@CustomT(typeName, params) => {
+        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
+        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
+
+        for {
+          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+
+          (underlyingPattern, underlyingExp) = underlyingTypeInfo
+
+          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+
+          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+
+          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          untaggedCurrent <- Evaluator.removeTypeTag(current)
+          currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
+
+          result <- updateVersionedObject(currentResolved, command, env)
+          untaggedResult <- Evaluator.removeTypeTag(result)
+          resultResolved <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
+        } yield resultResolved
+      }
+      case WithStateT(typeSystemId, nType) => {
+        for {
+          untaggedCurrent <- Evaluator.removeTypeTag(current)
+          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
+
+          result <- updateVersionedObject(retaggedCurrent, command, env, Some(typeSystemId))
+        } yield result
+      }
       case _ => {
-        Failure(s"C) $current is not a command type, error in type checker")
+        if (s"${current.displayString(env)}" == "0\\Character") {
+          throw new Exception(s"C) ${current.displayString(env)} is not a command type, error in type checker")
+        }
+        Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")
       }
     }
   }
