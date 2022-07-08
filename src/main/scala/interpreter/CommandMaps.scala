@@ -8,34 +8,6 @@ import java.util.UUID
 object CommandMaps {
   def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
 
-  /*
-   * This is getDefaultValueOfCommandType being slowly written into newmap code
-   */
-  def getDefaultValueOfCommandTypeFromEnv(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
-    env.lookup("_default") match {
-      case Some(EnvironmentBinding(defaultMap)) => {
-        for {
-          mapValues <- Evaluator.stripVersioning(defaultMap, env) match {
-            case TaggedObject(UMap(values), _) => Success(values)
-            case _ => Failure("_default doesn't look the way we expect")
-          }
-          
-          // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
-          // otherwise, we get an infinite loop
-          result <- Evaluator.attemptPatternMatchInOrder(mapValues, nType, env) match {
-            case Success(s) => Success(s)
-            case Failure(f) => Failure(f.toString)
-          }
-
-          uObject <- Evaluator(result, env)
-        } yield uObject
-      }
-      case _ => {
-        Failure("_default doesn't exist yet")
-      }
-    }
-  }
-
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     getDefaultValueOfCommandTypeFromEnv(env.typeSystem.typeToUntaggedObject(nType), env).rescue(f => {
       getDefaultValueOfCommandTypeHardcoded(nType, env)
@@ -43,6 +15,36 @@ object CommandMaps {
   }
 
   val defaultUMap = UMap(Vector.empty)
+
+  /*
+   * This is getDefaultValueOfCommandType being slowly written into newmap code
+   */
+  def getDefaultValueOfCommandTypeFromEnv(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
+    for {
+      defaultTypeId <- Outcome(env.typeSystem.currentMapping.get("_default"), "Couldn't find _default typeClass")
+
+      defaultUnderlyingType <- Outcome(env.typeSystem.typeToUnderlyingType.get(defaultTypeId), "Couldn't find _default underlying typeclass")
+
+      defaultParameterPattern = defaultUnderlyingType._1
+      defaultUnderlyingExp = defaultUnderlyingType._2
+
+      defaultUnderlyingExpT <- env.typeSystem.convertToNewMapType(defaultUnderlyingExp)
+
+      mapValues <- defaultUnderlyingExpT match {
+        case TypeClassT(_, values) => Success(values)
+        case _ => Failure(s"Not a type class: ${defaultUnderlyingExpT.displayString(env)}")
+      }
+
+      // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
+      // otherwise, we get an infinite loop
+      result <- Evaluator.attemptPatternMatchInOrder(mapValues, nType, env, TypeMatcher) match {
+        case Success(s) => Success(s)
+        case Failure(f) => Failure(f.toString)
+      }
+
+      uObject <- Evaluator(result, env)
+    } yield uObject
+  }
 
   def getDefaultValueOfCommandTypeHardcoded(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     nType match {
@@ -64,9 +66,9 @@ object CommandMaps {
       case StructT(params, _, _, _) if (params.length == 0) => {
         Success(defaultUMap)
       }
-      case TypeClassT(typeTransform, typesInTypeClass) if (typesInTypeClass.isEmpty) => {
+      /*case TypeClassT(typeTransform, implementation) if (implementation.isEmpty) => {
         Success(defaultUMap)
-      }
+      }*/
       case CharacterT => Success(UCharacter('\0'))
       case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       case CustomT("String", _) => Success(UCase(UIndex(0), UStruct(Vector.empty))) // Replace this line with a conversion!
@@ -125,6 +127,7 @@ object CommandMaps {
         ))
       }
       case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
+      case TypeClassT(typeTransform, implementation) => Success(CaseT(typeTransform, TypeT, SimpleFunction))
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
       case CustomT(name, UStruct(params)) => {
         val currentState = typeSystem.currentState
@@ -236,6 +239,21 @@ object CommandMaps {
               
               ExpandKeyResponse(nType, None, untaggedIdentity)
             }
+          }
+        }
+      }
+      case TypeClassT(typeTransform, implementation) => {
+        command match {
+          case UCase(constructor, input) => {
+            val newImplementation = (constructor -> input) +: implementation.filter(x => x._1 != constructor)
+            Success(ExpandKeyResponse(
+              TypeClassT(typeTransform, newImplementation),
+              Some(constructor),
+              untaggedIdentity
+            ))
+          }
+          case _ => {
+            Failure(s"Wrong input for typeClassT -- ${nType.displayString(env)} -- $command")
           }
         }
       }
@@ -351,9 +369,6 @@ object CommandMaps {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
         Success(CaseT(parameterList, parentFieldType, featureSet))
-      }
-      case TypeClassT(typeTransform, typesInTypeClass) => {
-        Success(CaseT(typeTransform, TypeT, SimpleFunction))
       }
       // This should be custom defined
       case CustomT("Array", nType) => env.typeSystem.convertToNewMapType(nType)
@@ -564,25 +579,6 @@ object CommandMaps {
           }
           case _ => {
             Failure(s"A) Structs as commands haven't been implemented yet -- $params -- $command")
-          }
-        }
-      }
-      case TypeClassT(typeTransform, typesInTypeClass) => {
-        command match {
-          case UCase(constructor, input) => {
-            for {
-              mapValues <- current match {
-                case TaggedObject(UMap(values), _) => Success(values)
-                case _ => Failure(s"Couldn't get map values from $current")
-              }
-            } yield {
-              val newTypesInClass = constructor +: typesInTypeClass.filter(x => x != constructor)
-              val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
-              TaggedObject(UMap(newMapValues), TypeClassT(typeTransform, newTypesInClass))
-            }
-          }
-          case _ => {
-            Failure(s"Wrong input for typeClassT -- $current -- $command")
           }
         }
       }

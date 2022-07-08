@@ -88,7 +88,7 @@ case class NewMapTypeSystem(
     )))
     case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UStruct(Vector(
       UMap(typeTransform),
-      UStruct(typesInTypeClass)
+      UMap(typesInTypeClass)
     )))
     case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UStruct(Vector(
       UMap(cases),
@@ -279,6 +279,21 @@ case class NewMapTypeSystem(
         case _ => Failure(s"Couldn't convert Struct to NewMapType with params: $params")
       }
       case "TypeClass" => params match {
+        case UStruct(items) if (items.length == 2) => {
+          for {
+            typeTransform <- items(0) match {
+              case UMap(uMap) => Success(uMap)
+              case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
+            }
+
+            implementation <- items(1) match {
+              case UMap(uMap) => Success(uMap)
+              case _ => Failure(s"Invalid implementation map in TypeClass: ${items(0)}")
+            }
+          } yield {
+            TypeClassT(typeTransform, implementation)
+          }
+        }
         case _ => Failure(s"Couldn't convert TypeClass to NewMapType with params: $params")
       }
       case "Case" => params match {

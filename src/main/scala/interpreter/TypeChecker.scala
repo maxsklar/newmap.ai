@@ -779,7 +779,6 @@ object TypeChecker {
 
       inputTypeOption = inputTypeCheckFromFunctionType(typeOfFunction, env)
 
-
       inputTagged <- inputTypeOption match {
         case Some(inputT) => for {
           inputTypeChecked <- typeCheck(input, inputT, env, FullFunction)
@@ -797,8 +796,8 @@ object TypeChecker {
 
       resultingType <- typeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
-        case TypeClassT(typeTransform, typesInTypeClass) => {
-          outputTypeFromTypeClassParams(typeTransform, typesInTypeClass, inputTC, inputType, env)
+        case TypeClassT(typeTransform, implementation) => {
+          outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
         }
         case MapT(typeTransform, config) => {
           for {
@@ -808,20 +807,41 @@ object TypeChecker {
             //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
           } yield nType
         }
+        case TypeT => {
+          for {
+            typeCheckedT <- env.typeSystem.convertToNewMapType(functionTypeChecked.nExpression)
+
+            underlingT <- getFinalUnderlyingType(typeCheckedT, env, env.typeSystem.currentState)
+
+            result <- underlingT match {
+              case TypeClassT(typeTransform, implementation) => {
+                outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
+              }
+              case _ => Failure(s"Cannot get resulting type from function of Type ${functionTypeChecked.nExpression} -- $function -- $input")
+            }
+          } yield result
+        }
         case _ => Failure(s"Cannot get resulting type from function type $typeOfFunction -- $function -- $input")
       }
 
       resultingFunctionExpression <- typeOfFunction match {
-        case TypeClassT(typeTransform, typesInTypeClass) => {
-          val strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+        case TypeT => {
+          for {
+            typeCheckedT <- env.typeSystem.convertToNewMapType(functionTypeChecked.nExpression)
+            underlingT <- getFinalUnderlyingType(typeCheckedT, env, env.typeSystem.currentState)
 
-          strippedExpression match {
-            case UMap(values) => {
-              Evaluator.attemptPatternMatchInOrder(values, untaggedInputType, env, TypeMatcher)
+            impl <- underlingT match {
+              case TypeClassT(_, implementation) => {
+                Success(implementation)
+              }
+              case _ => Failure(s"Cannot get resulting type from function of Type ${underlingT}")
             }
-            case _ => {
-              Failure(s"illegal type class: $strippedExpression")
-            }
+
+            strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+
+            patternMatchAttempted <- Evaluator.attemptPatternMatchInOrder(impl, untaggedInputType, env, TypeMatcher)
+          } yield {
+            patternMatchAttempted
           }
         }
         case _ => Success(functionTypeChecked.nExpression)
@@ -840,7 +860,7 @@ object TypeChecker {
       case Success(StructT(params, parentFieldType, _, _)) => {
         Some(parentFieldType)
       }
-      case Success(TypeClassT(typeTransform, typesInTypeClass)) => {
+      case Success(TypeClassT(typeTransform, implementation)) => {
         //eventually send typesInTypeClass to the type checker
         None
       }
@@ -860,12 +880,12 @@ object TypeChecker {
 
   def outputTypeFromTypeClassParams(
     params: Vector[(UntaggedObject, UntaggedObject)],
-    typesInTypeClass: Vector[UntaggedObject],
+    implementation: Vector[(UntaggedObject, UntaggedObject)],
     input: UntaggedObject,
     inputType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
-    val uMap = UMap(typesInTypeClass.map(pattern => pattern -> UIndex(1)))
+    val uMap = UMap(implementation)
     val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
     
     for {
@@ -942,6 +962,7 @@ object TypeChecker {
       case StructT(_, _, _, featureSet) => Success(featureSet)
       case TypeClassT(_, _) => Success(SimpleFunction)
       case MapT(_, config) => Success(config.featureSet)
+      case TypeT => Success(SimpleFunction) // This is for type classes
       case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nTypeClass")
     }
   }

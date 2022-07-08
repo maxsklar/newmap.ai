@@ -23,6 +23,9 @@ case object GeneralSuccessCheck extends ResultExpectation
 // Expect a success from this line of code, with the environment command given
 case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 
+// Expect a success from this line of code, with output given as this string
+case class SuccessCheckStr(s: String) extends ResultExpectation
+
 
 class TestFullEnvironmentInterpreter extends FlatSpec {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
@@ -57,6 +60,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
         case SuccessCheck(com) => {
           interpretation match {
             case Success(msg) => assert(msg == com.toString)
+            case Failure(msg) => fail(msg)
+          }
+        }
+        case SuccessCheckStr(s) => {
+          interpretation match {
+            case Success(msg) => assert(msg == s)
             case Failure(msg) => fail(msg)
           }
         }
@@ -954,6 +963,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver x = new String", GeneralSuccessCheck),
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
       CodeExpectation("iterate s into x", GeneralSuccessCheck)
+    ))
+  }
+
+  it should " be printed nicely" in {
+    testCodeScript(Vector(
+      CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
+      CodeExpectation("s", SuccessCheckStr("asdf"))
     ))
   }
 

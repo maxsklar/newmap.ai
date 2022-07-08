@@ -48,6 +48,15 @@ case class NewParamTypeCommand(
   }
 }
 
+case class NewTypeClassCommand(
+  id: String,
+  typeTransform: Vector[(UntaggedObject, UntaggedObject)]
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = {
+    s"typeclass $id ${typeTransform}"
+  }
+}
+
 case class IterateIntoCommand(
   iterableObject: NewMapObject,
   destinationObject: String
@@ -92,7 +101,7 @@ case class ExpOnlyEnvironmentCommand(
 
 
 // These are "side effects"
-// Channels must be created!
+// In some environments, these sides effect are "piped" to other objects
 case class OutputToChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
@@ -189,16 +198,7 @@ case class Environment(
         )
       }
       case NewTypeCommand(s, nType) => {
-        //val uuid = java.util.UUID.randomUUID
-        //val key = VersionedObjectKey(0L, uuid)
-        //val versionedObject = VersionedObjectLink(key)
-        //val envValue = EnvironmentBinding(versionedObject)
-
         val uType = typeSystem.typeToUntaggedObject(nType)
-
-        //val typeAsObject = TaggedObject(uType, HistoricalTypeT(typeSystem.currentState))
-
-        //val envValue = EnvironmentBinding(typeAsObject)
 
         val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
         val parameterPattern = UStruct(Vector.empty)
@@ -207,13 +207,9 @@ case class Environment(
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
-        
 
         this.copy(
           commands = newCommands,
-          //idToObject = idToObject + (s -> envValue),
-          //latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          //storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(typeSystem.typeToUntaggedObject(CustomT(uuid, nType)), TypeT))
           typeSystem = newTypeSystem
         )
       }
@@ -243,6 +239,23 @@ case class Environment(
         this.copy(
           commands = newCommands,
           //idToObject = idToObject + (id -> envValue),
+          typeSystem = newTypeSystem
+        )
+      }
+      case NewTypeClassCommand(s, typeTransform) => {
+        val nType = TypeClassT(typeTransform, Vector.empty)
+        val uType = typeSystem.typeToUntaggedObject(nType)
+
+        val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
+        val parameterPattern = UStruct(Vector.empty)
+
+        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
+          case Success(s) => s
+          case Failure(f) => throw new Exception(f)
+        }
+
+        this.copy(
+          commands = newCommands,
           typeSystem = newTypeSystem
         )
       }
@@ -549,12 +562,9 @@ object Environment {
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewVersionedStatementCommand("_default", TypeClassT(Vector(UWildcardPattern("t") -> ParamId("t")), Vector.empty)),
-    NewVersionedStatementCommand("_typeOf", 
-      TypeClassT(
-        Vector(UWildcardPattern("t") -> buildSimpleMapT(ParamId("t"), typeAsUntaggedObject(TypeT), MapConfig(RequireCompleteness, SimpleFunction), Base)),
-        Vector.empty
-      )
+    NewTypeClassCommand("_default", Vector(UWildcardPattern("t") -> ParamId("t"))),
+    NewTypeClassCommand("_typeOf", 
+      Vector(UWildcardPattern("t") -> buildSimpleMapT(ParamId("t"), typeAsUntaggedObject(TypeT), MapConfig(RequireCompleteness, SimpleFunction), Base))
     ),
     ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t"))))),
     NewParamTypeCommand(

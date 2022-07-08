@@ -3,10 +3,21 @@ package ai.newmap.model
 import scala.collection.mutable.StringBuilder
 import ai.newmap.model._
 import java.util.UUID
+import ai.newmap.util.{Outcome, Success, Failure}
+
+// CAREFUL! This should not be imported here, need to move some things around
+import ai.newmap.interpreter.Evaluator
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject, env: Environment): String = obj match {
-    case TaggedObject(uObject, nType) => untagged(uObject) + "\\" + newMapType(nType, env.typeSystem)
+    case TaggedObject(uObject, nType) => {
+      val defaultString = untagged(uObject) + "\\" + newMapType(nType, env.typeSystem)
+
+      printObjectFromEnv(uObject, env.typeSystem.typeToUntaggedObject(nType), env) match {
+        case Success(s) => s
+        case _ => defaultString
+      }
+    }
     case VersionedObjectLink(key) => {
       // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
       // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
@@ -14,6 +25,45 @@ object PrintNewMapObject {
 
       //this(currentState) + s"v$v"
     }
+  }
+
+  /*
+   * This is the "display" code from a type class being built into newmap.ai
+   */
+  def printObjectFromEnv(
+    uObject: UntaggedObject,
+    nType: UntaggedObject,
+    env: Environment
+  ): Outcome[String, String] = {
+    for {
+      displayTypeId <- Outcome(env.typeSystem.currentMapping.get("_display"), "Couldn't find _display typeClass")
+
+      displayUnderlyingType <- Outcome(env.typeSystem.typeToUnderlyingType.get(displayTypeId), "Couldn't find _display underlying typeclass")
+
+      displayParameterPattern = displayUnderlyingType._1
+      displayUnderlyingExp = displayUnderlyingType._2
+
+      dislayUnderlyingExpT <- env.typeSystem.convertToNewMapType(displayUnderlyingExp)
+
+      mapValues <- dislayUnderlyingExpT match {
+        case TypeClassT(_, values) => Success(values)
+        case _ => Failure(s"Not a type class: ${dislayUnderlyingExpT.displayString(env)}")
+      }
+
+      result <- Evaluator.applyFunctionAttempt(UMap(mapValues), nType, env, TypeMatcher) match {
+        case Success(s) => Success(s)
+        case Failure(f) => Failure(f.toString)
+      }
+
+      evalResult <- Evaluator(ApplyFunction(result, uObject, StandardMatcher), env)
+
+      finalString <-  evalResult match {
+        case UCase(_, UStruct(chars)) => {
+          Success(chars.mkString)
+        }
+        case _ => Failure(s"Couldn't interpret result as string: $evalResult")
+      }
+    } yield finalString
   }
 
   // TODO - convert nType into an untagged type instead of using this!
@@ -73,7 +123,7 @@ object PrintNewMapObject {
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
       case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
       case TypeClassT(typeTransform, implementation) => {
-        s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation.map(x => (x -> UIndex(0))))})"
+        s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation)})"
       }
       case CaseT(cases, _, _) => {
         s"Case${mapToString(cases)}"
@@ -151,7 +201,7 @@ object PrintNewMapObject {
       s"ULink[${key.toString}]"
     }
     case UByte(value: Byte) => s"$value"
-    case UCharacter(value: Char) => s"`$value"
+    case UCharacter(value: Char) => s"$value"
     //case UString(value) => s"$value~str"
     case ULet(envCommands, nObject) => s"{${envCommands.mkString("; ")}; ${untagged(nObject)}"
     case ULong(value: Long) => s"$value"

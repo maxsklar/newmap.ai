@@ -347,7 +347,7 @@ object SubtypeUtils {
             case SubtypeT(_, _, _) => Success()
             case CustomT(_, _) => Success()
             case _ => {
-              throw new Exception(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
+              //throw new Exception(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
               Failure(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
             }
           }

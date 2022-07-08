@@ -150,8 +150,9 @@ case class TypeClassT(
   // Note that this value isn't named, but its'
   typeTransform: Vector[(UntaggedObject, UntaggedObject)],
 
-  // List of the actual types in the class, but not their implementations - that's in the actual object (with a UMap)
-  typesInTypeClass: Vector[UntaggedObject],
+  // List of the actual types in the class
+  // Along with their implementation
+  typesInTypeClass: Vector[(UntaggedObject, UntaggedObject)],
 ) extends NewMapType
 
 // cases: input type is the case constructors, output type is the field types per constructor

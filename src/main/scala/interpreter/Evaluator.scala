@@ -289,7 +289,7 @@ object Evaluator {
         if (oPattern == input) {
           Success(Map.empty)
         } else {
-          Failure("Failed Pattern Match")
+          Failure(s"Failed Pattern Match: $oPattern -- $input")
         }
       }
     }

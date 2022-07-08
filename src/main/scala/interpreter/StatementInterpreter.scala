@@ -64,6 +64,26 @@ object StatementInterpreter {
           NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT))
         }
       }
+      case NewTypeClassStatementParse(id, typeTransformParse) => {
+        val typeOfTypeTransform = MapT(
+          UMap(Vector(env.typeSystem.typeToUntaggedObject(TypeT) -> env.typeSystem.typeToUntaggedObject(TypeT))),
+          MapConfig(
+            CommandOutput,
+            SimpleFunction
+          )
+        )
+
+        for {
+          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, FullFunction)
+
+          typeTransform <- typeTransformResult.nExpression match {
+            case UMap(values) => Success(values)
+            case _ => Failure("Invalue type transform: ${typeTransformResult.nExpression}")
+          }
+        } yield {
+          NewTypeClassCommand(id.s, typeTransform)
+        }
+      }
       case IterateIntoStatementParse(id, destination) => {
         for {
           iterableObject <- env.lookup(id.s) match {
