@@ -99,6 +99,26 @@ case class ExpOnlyEnvironmentCommand(
   override def displayString(env: Environment): String = nObject.displayString(env)
 }
 
+case class AddChannel(
+  channel: UntaggedObject,
+  nType: NewMapType
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = s"addChannel $channel ${nType.displayString(env)}"
+}
+
+case class ConnectChannel(
+  channel: UntaggedObject,
+  versionedObject: String
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = s"connectChannel $channel $versionedObject}"
+}
+
+case class DisconnectChannel(
+  channel: UntaggedObject,
+  versionedObject: String
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = s"disconnectChannel $channel $versionedObject}"
+}
 
 // These are "side effects"
 // In some environments, these sides effect are "piped" to other objects
@@ -106,7 +126,14 @@ case class OutputToChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
 ) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = s"Output to channel $channel: ${nObject}"
+  override def displayString(env: Environment): String = ""
+}
+
+case class IterateIntoChannel(
+  nObject: UntaggedObject,
+  channel: UntaggedObject
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = ""
 }
 
 sealed abstract class EnvironmentValue
@@ -122,7 +149,10 @@ case class Environment(
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
-  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem // Also a stored versioned type, but a special one!
+  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem, // Also a stored versioned type, but a special one!
+  channelIdToType: Map[String, NewMapType] = Environment.initialChannelToType,
+  channelIdToObjectCommands: Map[String, Set[String]] = Map.empty, // Map representing a list of objects to send commands to from a channelId
+  printStdout: Boolean = true
 ) {
   def lookup(identifier: String): Option[EnvironmentValue] = {
     idToObject.get(identifier)
@@ -154,6 +184,20 @@ case class Environment(
       parameterTypeString = parameterTypeOpt.map(x => "\t" + x.toString).getOrElse("")
     } {
       builder.append(s"${typeMap._1}${parameterTypeString}\n")
+    }
+    builder.toString
+  }
+
+  def printChannels: String = {
+    val builder: StringBuilder = new StringBuilder()
+    builder.append(s"Current Channels\n")
+
+    for {
+      channels <- channelIdToType
+      channelName = channels._1
+      channelType = channels._2
+    } {
+      builder.append(s"${channelName}\t${channelType.displayString(this)}\n")
     }
     builder.toString
   }
@@ -298,7 +342,7 @@ case class Environment(
         // This split on lookupVersionedObject suggests that we may want to refactor
         // Code is repeated!!
 
-        //println(s"In ApplyIndividualCommand - $s -- $command -- ${Evaluator.lookupVersionedObject(s, this)}")
+        // Maybe s is also a stdout (as in println)
 
         val retVal = Evaluator.lookupVersionedObject(s, this) match {
           case Success(versionLink) => {
@@ -384,9 +428,108 @@ case class Environment(
         // TODO: save this in the result list
         this
       }
+      case AddChannel(channel, nType) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        println(s"Add channel $channelName -- ${nType.displayString(this)}")
+
+        // TODO: Check that the channel doesn't already exist!
+        // (and if it does - remove it?)
+
+        this.copy(
+          channelIdToType = this.channelIdToType + (channelName -> nType)
+        )
+      }
+      case ConnectChannel(channel, versionedObject) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+
+        println(s"Connecting channel $channelName -- $versionedObject")
+
+        this.copy(
+          channelIdToObjectCommands = this.channelIdToObjectCommands + (channelName -> (currentConnections + versionedObject))
+        )
+      }
+      case DisconnectChannel(channel, versionedObject) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+        
+        println(s"Disconnecting channel $channelName -- $versionedObject")
+        this.copy(
+          channelIdToObjectCommands = this.channelIdToObjectCommands + (channelName -> (currentConnections - versionedObject))
+        )
+      }
       case OutputToChannel(nObject, channel) => {
-        // TODO: the side effects must be executed!
-        this
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val channelType: NewMapType = channelIdToType.get(channelName).getOrElse(UndefinedT)
+
+        var returnedEnv = this
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+
+        if (channelName == "stdout" && printStdout) {
+          // TODO: obviously this can be way more efficient!
+          for {
+            chars <- IterationUtils.iterateObject(TaggedObject(nObject, channelType), this)
+          } yield {
+            val listOfChars = chars.flatMap(_ match {
+              case UCharacter(c) => Some(c)
+              case _ => None
+            })
+
+            System.out.print(listOfChars.mkString(""))
+          }
+        }
+
+        for {
+          connection <- currentConnections
+        } {
+          returnedEnv = returnedEnv.newCommand(ApplyIndividualCommand(connection, nObject))
+        }
+
+        returnedEnv
+      }
+      case IterateIntoChannel(nObject, channel) => {
+        // TODO - this is repeated code!
+        // Combine channels and objects, and this will be unified
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val channelType: NewMapType = channelIdToType.get(channelName).getOrElse(UndefinedT)
+
+        val taggedObject = TaggedObject(nObject, channelType)
+
+        IterationUtils.iterateObject(taggedObject, this) match {
+          case Success(commandList) => {
+            var returnedEnv = this
+            for {
+              command <- commandList
+            } {
+              returnedEnv = returnedEnv.newCommand(OutputToChannel(command, channel))
+            }
+
+            returnedEnv
+          }
+          case Failure(reason) => {
+            throw new Exception(s"Iterate into command failed: $reason")
+          }
+        }
       }
     }
   }
@@ -424,8 +567,6 @@ object Environment {
   def eCommand(id: String, nObject: NewMapObject): EnvironmentCommand = {
     FullEnvironmentCommand(id, nObject)
   }
-
-
 
   def fullFuncT(typeTransform: UntaggedObject): NewMapType = {
     MapT(typeTransform, MapConfig(RequireCompleteness, FullFunction))
@@ -488,6 +629,11 @@ object Environment {
   def typeAsUntaggedObject(nType: NewMapType): UntaggedObject = {
     Environment().typeSystem.typeToUntaggedObject(nType)
   }
+
+  // TODO - eventually make this empty and add it elsewhere!!
+  val initialChannelToType = Map(
+    "stdout" -> CustomT("String", UStruct(Vector.empty))
+  )
 
   var Base: Environment = Environment()
 

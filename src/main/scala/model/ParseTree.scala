@@ -83,6 +83,26 @@ case class ApplyCommandsStatementParse(
   expression: ParseTree // Represents a list of commands to apply
 ) extends EnvStatementParse
 
+case class AddChannelParse(
+  identifier: IdentifierParse,
+  typeOfChannel: ParseTree
+) extends EnvStatementParse
+
+case class ConnectChannelParse(
+  identifier: IdentifierParse,
+  obj: IdentifierParse
+) extends EnvStatementParse
+
+case class DisconnectChannelParse(
+  identifier: IdentifierParse,
+  obj: IdentifierParse
+) extends EnvStatementParse
+
+case class WriteToChannelParse(
+  identifier: IdentifierParse,
+  expression: ParseTree
+) extends EnvStatementParse
+
 case class NewTypeStatementParse(
   identifier: IdentifierParse, // New Name of the type
   expression: ParseTree // Expression that evaluates to a type

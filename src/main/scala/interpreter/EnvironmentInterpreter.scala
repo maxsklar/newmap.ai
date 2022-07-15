@@ -6,9 +6,12 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 class EnvironmentInterpreter(
   useInitialCommands: Boolean = true,
-  printInitCommandErrors: Boolean = true
+  printInitCommandErrors: Boolean = true,
+  suppressStdout: Boolean = false,
 ) {
   var env: Environment = Environment.Base
+
+  if (suppressStdout) env = env.copy(printStdout = false)
 
   for (code <- EnvironmentInterpreter.initialCommands) {
     if (useInitialCommands) {
@@ -42,6 +45,7 @@ class EnvironmentInterpreter(
     code match {
       case ":env" => CommandPrintSomething(env.toString)
       case ":types" => CommandPrintSomething(env.printTypes)
+      case ":channels" => CommandPrintSomething(env.printChannels)
       case ":exit" | ":quit" => CommandExit
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
@@ -59,6 +63,7 @@ class EnvironmentInterpreter(
         ":types\tPrint the types in the current environment\n" ++
         ":parse [Expression]\tPrint how [Expression] is parsed and type checked\n" ++
         ":typeOf [Expression]\tPrint out the type of the expression\n" ++
+        ":channels\tPrint the channels in this environment" ++
         ":exit | :quit\tExit this repl\n" ++
         ":help\tPrint this help message\n"
       )
@@ -120,12 +125,14 @@ class EnvironmentInterpreter(
       statementParse <- NewMapParser.statementParse(tokens)
       command <- StatementInterpreter(statementParse, env)
     } yield {
-      // TODO - when the environment is a newmap object in it's own right, it'll give an output from this
-      // new command.. this is the output that we actually want to return here.
-      // remove reponse.output!
-      env = env.newCommand(command)
-      command.displayString(env)
+      applyEnvCommand(command)
     }
+  }
+
+  // Directly apply an environment comment
+  def applyEnvCommand(command: EnvironmentCommand): String = {
+    env = env.newCommand(command)
+    command.displayString(env)
   }
 }
 

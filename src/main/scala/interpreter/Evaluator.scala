@@ -264,6 +264,12 @@ object Evaluator {
           result <- patternMatchOnStruct(params, inputs, env)
         } yield result 
       }
+      case (UMap(paramValues), UStruct(params)) => {
+        for {
+          inputs <- expressionListToObjects(paramValues.map(_._2), env)
+          result <- patternMatchOnStruct(inputs, params, env)
+        } yield result 
+      }
       case (UStruct(params), UStruct(inputParams)) => {
         patternMatchOnStruct(params, inputParams, env)
       }
@@ -286,10 +292,10 @@ object Evaluator {
       }
       case (oPattern, strippedInput) => {
         // TODO - instead of checking for equality here - go through each untagged object configuration
-        if (oPattern == input) {
+        if (oPattern == strippedInput) {
           Success(Map.empty)
         } else {
-          Failure(s"Failed Pattern Match: $oPattern -- $input")
+          Failure(s"Failed Pattern Match: $oPatternA $oPattern -- $inputA $strippedInput")
         }
       }
     }

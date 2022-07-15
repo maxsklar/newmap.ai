@@ -297,6 +297,38 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def addChannel: Parser[AddChannelParse] = {
+    Lexer.Identifier("addChannel") ~ identifier ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ obj => {
+        AddChannelParse(id, obj)
+      }
+    }
+  }
+
+  private def connectChannel: Parser[ConnectChannelParse] = {
+    Lexer.Identifier("connectChannel") ~ identifier ~ identifier ^^ {
+      case _ ~ id ~ obj => {
+        ConnectChannelParse(id, obj)
+      }
+    }
+  }
+
+  private def disconnectChannel: Parser[DisconnectChannelParse] = {
+    Lexer.Identifier("disconnectChannel") ~ identifier ~ identifier ^^ {
+      case _ ~ id ~ obj => {
+        DisconnectChannelParse(id, obj)
+      }
+    }
+  }
+
+  private def writeToChannel: Parser[WriteToChannelParse] = {
+    Lexer.Identifier("write") ~ identifier ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ obj => {
+        WriteToChannelParse(id, obj)
+      }
+    }
+  }
+
   private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
     Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
@@ -338,7 +370,7 @@ object NewMapParser extends Parsers {
     tokens: Seq[Lexer.Token]
   ): Outcome[EnvStatementParse, String] = {
     val reader = new TokenReader(tokens)
-    val program = phrase(fullStatement | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
+    val program = phrase(fullStatement | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
 
     program(reader) match {
       case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

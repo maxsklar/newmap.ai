@@ -45,7 +45,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * on each line, you can check that it succeeds, fails, or 
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
-    val interp = new EnvironmentInterpreter(true, false)
+    val interp = new EnvironmentInterpreter(
+      useInitialCommands = true,
+      printInitCommandErrors = false,
+      suppressStdout = true
+    )
 
     expectations.foreach(expectation => {
       val interpretation = interp(expectation.line)
@@ -970,6 +974,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
       CodeExpectation("s", SuccessCheckStr("asdf"))
+    ))
+  }
+
+  "The stdout channel " should " work with strings" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
+      CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
+      CodeExpectation("val myString = \"hello world\"", GeneralSuccessCheck),
+      CodeExpectation("iterate myString into stdout", GeneralSuccessCheck),
+      CodeExpectation("val yo: String = \" yo \"", GeneralSuccessCheck),
+      CodeExpectation("iterate yo into stdout", GeneralSuccessCheck),
+      CodeExpectation("iterate myString into stdout", GeneralSuccessCheck),
+      CodeExpectation("stdoutRecorder", SuccessCheckStr("hello world yo hello world"))
     ))
   }
 

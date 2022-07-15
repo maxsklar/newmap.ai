@@ -16,6 +16,7 @@ object TypeChecker {
    *  It may be a specific type, or it may be a pattern of a type
    *  The object does not have to have this type exactly, but the type of the object must have an automatic conversion to this type.
    * @param env This is the environment of values upon which we are working
+   * @param featureSet This tells us which language features are allowed (usually FullFunction for all features, restricted in certain functions/maps)
    */
   def typeCheck(
     expression: ParseTree,
@@ -75,9 +76,11 @@ object TypeChecker {
         }
       }
       case StringParse(s: String) => {
+        val fixedS = s.replace("\\n", "\n").replace("\\t", "\t")
+
         val uObject = UCase(
-          UIndex(s.length - 2),
-          UStruct(s.toCharArray().toVector.drop(1).dropRight(1).map(c => UCharacter(c)))
+          UIndex(fixedS.length - 2),
+          UStruct(fixedS.toCharArray().toVector.drop(1).dropRight(1).map(c => UCharacter(c)))
         )
 
         val stringType = CustomT("String", UStruct(Vector.empty))

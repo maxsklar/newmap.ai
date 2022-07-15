@@ -91,7 +91,6 @@ object PrintNewMapObject {
         resultOpt match {
           case Some(result) => result
           case None => {
-            throw new Exception(s"[Failed to print type: $name -- $typeSystemState -- ${typeSystem.currentMapping} -- ${typeSystem.currentMapping.get(name)} -- ${typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)}]")
             s"[Failed to print type: $name -- $typeSystemState -- ${typeSystem.currentMapping} -- ${typeSystem.currentMapping.get(name)} -- ${typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)}]"
           }
         }

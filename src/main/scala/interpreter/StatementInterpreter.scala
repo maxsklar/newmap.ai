@@ -91,10 +91,30 @@ object StatementInterpreter {
             case _ => Failure(s"Could not lookup $id in environment")
           }
 
-          vDestination <- Evaluator.lookupVersionedObject(destination.s, env)
-        } yield {
-          IterateIntoCommand(iterableObject, destination.s)
-        }
+          // destination can either be a CHANNEL or it can be a VERSIONED OBJECT
+          // which is it?
+          // TODO - eventually merge the 2 concepts!
+
+          val channelTypeOpt = env.channelIdToType.get(destination.s)
+
+          command <- channelTypeOpt match {
+            case Some(channelType) => {
+              for {
+                uObject <- SubtypeUtils.attemptConvertObjectToType(iterableObject, channelType, env)
+              } yield {
+                IterateIntoChannel(uObject, UIdentifier(destination.s))
+              }
+            }
+            case None => {
+              // IT's an object, not a channel
+              for {
+                vDestination <- Evaluator.lookupVersionedObject(destination.s, env)
+              } yield {
+                IterateIntoCommand(iterableObject, destination.s)
+              }
+            }
+          }
+        } yield command
       }
       case ForkedVersionedStatementParse(id, forkId) => {
         for {
@@ -151,6 +171,66 @@ object StatementInterpreter {
       }
       case ApplyCommandsStatementParse(id, commands) => {
         throw new Exception("Apply multiple commands not yet implemented")
+      }
+      case AddChannelParse(channelId, channelTypeParse) => {
+        val channel = UIdentifier(channelId.s)
+        for {
+          tcType <- TypeChecker.typeCheck(channelTypeParse, TypeT, env, FullFunction)
+          nTypeObj <- Evaluator(tcType.nExpression, env)
+          nType <- Evaluator.asType(nTypeObj, env)
+        } yield {
+          AddChannel(channel, nType)
+        }
+      }
+      case ConnectChannelParse(channelId, obj) => {
+        val channel = UIdentifier(channelId.s)
+        Evaluator.lookupVersionedObject(obj.s, env) match {
+          case Success(versionedObjectLink) => {
+            val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
+
+            for {
+              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
+
+              channelType = env.channelIdToType.get(channelId.s).getOrElse(UndefinedT)
+
+              // So channelType is what's coming from the channel, and inputT is what's required
+              // So we want to make sure that channelType is convertible to inputT
+
+              _ = println(s"channelType: ${channelType.displayString(env)} -- ${inputT.displayString(env)}")
+              
+              // Looks like channelType is String
+              // And inputT is character
+              // Should be doable to connect!
+
+              channelCanBeConnectedToObject <- IterationUtils.isIteratableToType(channelType, inputT, env)
+              _ <- Outcome.failWhen(!channelCanBeConnectedToObject, s"can't connect channel ${channelId.s} of type ${channelType.displayString(env)} to object ${obj.s} of type ${inputT.displayString(env)}")
+            } yield ConnectChannel(channel, obj.s)
+          }
+          case Failure(reason) => {
+            throw new Exception("Cannot yet connect channel to a type")
+          }
+        }
+      }
+      case DisconnectChannelParse(channelId, obj) => {
+        val channel = UIdentifier(channelId.s)
+        Evaluator.lookupVersionedObject(obj.s, env) match {
+          case Success(versionedObjectLink) => {
+            // No need for type checking when we are disconnecting
+            Success(DisconnectChannel(channel, obj.s))
+          }
+          case Failure(reason) => {
+            throw new Exception("Cannot yet disconnect channel from a type")
+          }
+        }
+      }
+      case WriteToChannelParse(channelId, command) => {
+        val channel = UIdentifier(channelId.s)
+        val nType = env.channelIdToType.get(channelId.s).getOrElse(UndefinedT)
+        for {
+          tc <- TypeChecker.typeCheck(command, nType, env, FullFunction)
+        } yield {
+          OutputToChannel(tc.nExpression, channel)
+        }
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
