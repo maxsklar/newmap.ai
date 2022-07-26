@@ -30,6 +30,20 @@ object TypeChecker {
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!
     expression match {
+      case EmptyParse() => {
+        expectedTypeOutcome match {
+          case Success(WildcardPatternT(_)) => {
+            Success(TypeCheckResponse(UStruct(Vector.empty), NewMapO.emptyStruct))
+          }
+          case _ => {
+            for {
+              result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
+            } yield {
+              TypeCheckResponse(result, expectedType)
+            }
+          }
+        }
+      }
       case NaturalNumberParse(i: Long) => {
         expectedTypeOutcome match {
           case Success(WildcardPatternT(_)) => {

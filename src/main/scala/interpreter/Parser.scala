@@ -357,24 +357,41 @@ object NewMapParser extends Parsers {
   def apply(
     tokens: Seq[Lexer.Token]
   ): Outcome[ParseTree, String] = {
-    val reader = new TokenReader(tokens)
-    val program = phrase(expressionListWithOperations)
+    val tokensWithoutComments = tokens.filter(!isComment(_))
 
-    program(reader) match {
-      case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
-      case Success(result, next) => ai.newmap.util.Success(result)
+    if (tokensWithoutComments.isEmpty) {
+      ai.newmap.util.Success(EmptyParse())
+    } else {
+      val reader = new TokenReader(tokensWithoutComments)
+      val program = phrase(expressionListWithOperations)
+
+      program(reader) match {
+        case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
+        case Success(result, next) => ai.newmap.util.Success(result)
+      }
     }
+  }
+
+  def isComment(token: Lexer.Token): Boolean = token match {
+    case Lexer.Comment(_) => true
+    case _ => false
   }
 
   def statementParse(
     tokens: Seq[Lexer.Token]
   ): Outcome[EnvStatementParse, String] = {
-    val reader = new TokenReader(tokens)
-    val program = phrase(fullStatement | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
+    val tokensWithoutComments = tokens.filter(!isComment(_))
 
-    program(reader) match {
-      case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
-      case Success(result, next) => ai.newmap.util.Success(result)
+    if (tokensWithoutComments.isEmpty) {
+      ai.newmap.util.Success(ExpressionOnlyStatementParse(EmptyParse()))
+    } else {
+      val reader = new TokenReader(tokensWithoutComments)
+      val program = phrase(fullStatement | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
+
+      program(reader) match {
+        case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
+        case Success(result, next) => ai.newmap.util.Success(result)
+      }
     }
   }
 }

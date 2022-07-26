@@ -295,7 +295,7 @@ object Evaluator {
         if (oPattern == strippedInput) {
           Success(Map.empty)
         } else {
-          Failure(s"Failed Pattern Match: $oPatternA $oPattern -- $inputA $strippedInput")
+          Failure(s"Failed Pattern Match: $oPattern -- $strippedInput")
         }
       }
     }

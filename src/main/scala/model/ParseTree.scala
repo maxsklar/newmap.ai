@@ -44,6 +44,8 @@ case class StringParse(
   s: String
 ) extends ParseTree
 
+case class EmptyParse() extends ParseTree
+
 abstract class EnvStatementParse
 
 case class FullStatementParse(
