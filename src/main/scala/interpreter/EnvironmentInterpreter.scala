@@ -136,7 +136,7 @@ class EnvironmentInterpreter(
     }
   }
 
-  private def loadFile(filename: String): String = {
+  def loadFile(filename: String): String = {
     val baseDir = "src/main/newmap/"
 
     val fileName = baseDir + filename

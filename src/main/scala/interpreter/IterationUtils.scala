@@ -81,6 +81,7 @@ object IterationUtils {
 
         for {
           typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+
           underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
@@ -90,6 +91,7 @@ object IterationUtils {
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
           underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+
           currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
 
           result <- iterateObject(currentResolved, env, typeSystemIdOpt)
@@ -100,6 +102,9 @@ object IterationUtils {
           retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
           result <- iterateObject(retaggedCurrent, env, Some(typeSystemId))
         } yield result
+      }
+      case TaggedObject(untaggedCurrent, nType) => {
+        Failure(s"Unable to iterate over object: $untaggedCurrent of type ${nType.displayString(env)}")
       }
       case _ => Failure(s"Unable to iterate over object: ${nObject.displayString(env)}")
     }

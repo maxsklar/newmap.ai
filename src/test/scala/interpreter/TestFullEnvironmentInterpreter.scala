@@ -982,10 +982,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
       CodeExpectation("val myString = \"hello world\"", GeneralSuccessCheck),
-      CodeExpectation("iterate myString into stdout", GeneralSuccessCheck),
+      CodeExpectation("write stdout myString", GeneralSuccessCheck),
       CodeExpectation("val yo: String = \" yo \"", GeneralSuccessCheck),
-      CodeExpectation("iterate yo into stdout", GeneralSuccessCheck),
-      CodeExpectation("iterate myString into stdout", GeneralSuccessCheck),
+      CodeExpectation("write stdout yo", GeneralSuccessCheck),
+      CodeExpectation("write stdout myString", GeneralSuccessCheck),
       CodeExpectation("stdoutRecorder", SuccessCheckStr("hello world yo hello world"))
     ))
   }
@@ -1002,6 +1002,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
     ))
   }*/
+
+  "HelloWorld.nm script " should " behave as expected" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
+      CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
+      CodeExpectation(":load TestScripts/HelloWorld.nm", GeneralSuccessCheck),
+      CodeExpectation("stdoutRecorder", SuccessCheckStr("hello world !!\n"))
+    ))
+  }
 
   /*
   FIRST - do iterators

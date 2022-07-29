@@ -583,6 +583,7 @@ object CommandMaps {
         }
       }
       case nType@CustomT("Array", uType) => {
+
         for {
           untaggedCurrent <- Evaluator.removeTypeTag(current)
 

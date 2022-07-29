@@ -481,10 +481,13 @@ case class Environment(
         var returnedEnv = this
         val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
 
+        val taggedObject = TaggedObject(nObject, channelType)
+
         if (channelName == "stdout" && printStdout) {
           // TODO: obviously this can be way more efficient!
+
           for {
-            chars <- IterationUtils.iterateObject(TaggedObject(nObject, channelType), this)
+            chars <- IterationUtils.iterateObject(taggedObject, this)
           } yield {
             val listOfChars = chars.flatMap(_ match {
               case UCharacter(c) => Some(c)
@@ -498,7 +501,7 @@ case class Environment(
         for {
           connection <- currentConnections
         } {
-          returnedEnv = returnedEnv.newCommand(ApplyIndividualCommand(connection, nObject))
+          returnedEnv = returnedEnv.newCommand(IterateIntoCommand(taggedObject, connection))
         }
 
         returnedEnv
