@@ -129,6 +129,15 @@ case class OutputToChannel(
   override def displayString(env: Environment): String = ""
 }
 
+// This should be generalized as "output to a file handle" but for now, just stdout
+// We will not call this directly, only from the stdout channel
+case class OutputToStdout(
+  nObject: UntaggedObject
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = ""
+}
+
+
 case class IterateIntoChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
@@ -484,18 +493,7 @@ case class Environment(
         val taggedObject = TaggedObject(nObject, channelType)
 
         if (channelName == "stdout" && printStdout) {
-          // TODO: obviously this can be way more efficient!
-
-          for {
-            chars <- IterationUtils.iterateObject(taggedObject, this)
-          } yield {
-            val listOfChars = chars.flatMap(_ match {
-              case UCharacter(c) => Some(c)
-              case _ => None
-            })
-
-            System.out.print(listOfChars.mkString(""))
-          }
+          returnedEnv = returnedEnv.newCommand(OutputToStdout(nObject))
         }
 
         for {
@@ -505,6 +503,23 @@ case class Environment(
         }
 
         returnedEnv
+      }
+      case OutputToStdout(nObject) => {
+        val taggedObject = TaggedObject(nObject, CustomT("String", UStruct(Vector.empty)))
+
+        // TODO: obviously this can be way more efficient!
+        for {
+          chars <- IterationUtils.iterateObject(taggedObject, this)
+        } yield {
+          val listOfChars = chars.flatMap(_ match {
+            case UCharacter(c) => Some(c)
+            case _ => None
+          })
+
+          System.out.print(listOfChars.mkString(""))
+        }
+
+        this
       }
       case IterateIntoChannel(nObject, channel) => {
         // TODO - this is repeated code!
