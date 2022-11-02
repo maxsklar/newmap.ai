@@ -25,7 +25,7 @@ object IterationUtils {
         Success(Vector(UIndex(0), UIndex(1)))
       }
       case Success(undertype) => {
-        throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
+        //throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
         Failure(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
       }
       case Failure(f) => Failure(f)

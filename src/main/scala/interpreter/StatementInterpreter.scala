@@ -196,7 +196,7 @@ object StatementInterpreter {
               // So channelType is what's coming from the channel, and inputT is what's required
               // So we want to make sure that channelType is convertible to inputT
 
-              _ = println(s"channelType: ${channelType.displayString(env)} -- ${inputT.displayString(env)}")
+              //_ = println(s"channelType: ${channelType.displayString(env)} -- ${inputT.displayString(env)}")
               
               // Looks like channelType is String
               // And inputT is character

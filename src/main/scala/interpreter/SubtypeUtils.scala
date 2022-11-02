@@ -60,10 +60,11 @@ object SubtypeUtils {
     for {
       constructor <- constructors
     } yield {
-      
       // Look at our keys, and find the ones that are only for this case key, and save those patterns
       val patternsWithThisConstructor = keys.flatMap(key => key match {
-        case UCase(untaggedConstructor, pattern) => Some(pattern)
+        case UCase(untaggedConstructor, pattern) => {
+          if (untaggedConstructor == constructor) Some(pattern) else None
+        }
         case _ => None
       })
 

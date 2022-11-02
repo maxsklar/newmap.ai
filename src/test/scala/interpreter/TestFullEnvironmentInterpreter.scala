@@ -677,7 +677,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
       CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x, (Second.x): 2)", GeneralSuccessCheck),
-      CodeExpectation("val IncompleteMyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x", FailureCheck),
+      CodeExpectation("val IncompleteMyCaseTo5: ReqMap(MyCase, 5) = ((First.x): x)", FailureCheck),
     ))
   }
 
