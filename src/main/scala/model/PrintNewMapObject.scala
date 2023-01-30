@@ -165,6 +165,7 @@ object PrintNewMapObject {
 
         val featureSetStr = config.featureSet match {
           case BasicMap => "BasicMap"
+          case PatternMap => "PatternMap"
           case SimpleFunction => "Simple"
           case WellFoundedFunction => "WellFounded"
           case FullFunction => "FullFunction"

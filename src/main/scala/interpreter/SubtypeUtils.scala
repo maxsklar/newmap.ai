@@ -407,11 +407,8 @@ object SubtypeUtils {
   def isFeatureSetConvertible(
     startingFeatureSet: MapFeatureSet,
     endingFeatureSet: MapFeatureSet
-  ) = startingFeatureSet match {
-    case BasicMap => true
-    case SimpleFunction => (endingFeatureSet != BasicMap)
-    case WellFoundedFunction => (endingFeatureSet != BasicMap && endingFeatureSet != SimpleFunction)
-    case FullFunction => (endingFeatureSet == FullFunction)
+  ) = {
+    startingFeatureSet.getLevel <= endingFeatureSet.getLevel
   }
 
   // If this function only allows one input, then return the output for that input

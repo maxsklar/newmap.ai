@@ -316,11 +316,12 @@ case class NewMapTypeSystem(
           for {
             parentT <- convertToNewMapType(items(1))
 
-            featureSet <- items(2) match {
-              case UIdentifier("BasicMap") => Success(BasicMap)
-              case UIdentifier("SimpleFunction") => Success(SimpleFunction)
-              case _ => Failure(s"Can't allow feature set in subtype: ${items(2)}")
-            }
+            featureSet <- convertFeatureSet(items(2))
+
+            _ <- Outcome.failWhen(
+              featureSet.getLevel > SimpleFunction.getLevel,
+              s"Can't allow feature set in subtype: ${items(2)}"
+            )
           } yield SubtypeT(items(0), parentT, featureSet)
         }
         case _ => Failure(s"Couldn't convert Subtype to NewMapType with params: $params")
@@ -350,6 +351,7 @@ case class NewMapTypeSystem(
 
   def convertFeatureSet(uObject: UntaggedObject): Outcome[MapFeatureSet, String] = uObject match {
     case UIdentifier("BasicMap") => Success(BasicMap)
+    case UIdentifier("PatternMap") => Success(PatternMap)
     case UIdentifier("SimpleFunction") => Success(SimpleFunction)
     case UIdentifier("WellFoundedFunction") => Success(WellFoundedFunction)
     case UIdentifier("FullFunction") => Success(FullFunction)

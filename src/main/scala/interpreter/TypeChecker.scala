@@ -594,7 +594,7 @@ object TypeChecker {
     externalFeatureSet: MapFeatureSet, // Am I inside a map with restricted features already?
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
-    val patternMatchingAllowed = internalFeatureSet != BasicMap
+    val patternMatchingAllowed = internalFeatureSet.getLevel >= PatternMap.getLevel
     
     // Use this??
     //val parentTypeIsIdentifier = TypeClassUtils.typeIsExpectingAnIdentifier(expectedType, s, env)
@@ -977,9 +977,9 @@ object TypeChecker {
   def retrieveFeatureSetFromFunctionTypePattern(nTypeClass: NewMapType, env: Environment): Outcome[MapFeatureSet, String] = {
     nTypeClass match {
       case StructT(_, _, _, featureSet) => Success(featureSet)
-      case TypeClassT(_, _) => Success(SimpleFunction)
+      case TypeClassT(_, _) => Success(PatternMap)
       case MapT(_, config) => Success(config.featureSet)
-      case TypeT => Success(SimpleFunction) // This is for type classes
+      case TypeT => Success(PatternMap) // This is for type classes
       case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nTypeClass")
     }
   }

@@ -59,11 +59,9 @@ case object IdentifierT extends NewMapType
  * - requireAllFields tells us that we are required to specify an output for
  *   all potential inputs. It's smart to turn this on to ensure that functions and maps are checked as complete
  * - commandOutput means that the output types must all be command types, which means they start at an initial value.
- *
- * TODO - should we subsume struct type in here??
  */
 case class MapT(
-  typeTransform: UntaggedObject, //typeTransform: Vector[(UntaggedObject, UntaggedObject)],
+  typeTransform: UntaggedObject, // Must be a PatternMap
   config: MapConfig
 ) extends NewMapType
 
@@ -95,25 +93,35 @@ object CommandOutput extends MapCompleteness {
 
 sealed abstract class MapFeatureSet {
   def getName: String
+  def getLevel: Int
 }
 
 object BasicMap extends MapFeatureSet {
   override def getName: String = "BasicMap"
+  override def getLevel: Int = 0
+}
+
+object PatternMap extends MapFeatureSet {
+  override def getName: String = "PatternMap"
+  override def getLevel: Int = 1
 }
 
 // Allows Pattern Matching, only simple operations
 object SimpleFunction extends MapFeatureSet  {
   override def getName: String = "SimpleFunction"
+  override def getLevel: Int = 2
 }
 
 // Allows recursion only if it provably simplifies the input
 object WellFoundedFunction extends MapFeatureSet {
   override def getName: String = "WellFoundedFunction"
+  override def getLevel: Int = 3
 }
 
 // Turing Complete - may sometimes go into an infinite loop
 object FullFunction extends MapFeatureSet {
   override def getName: String = "FullFunction"
+  override def getLevel: Int = 4
 }
 
 /*case class TypeParameter(

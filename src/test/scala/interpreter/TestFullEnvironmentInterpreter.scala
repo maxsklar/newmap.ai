@@ -931,6 +931,20 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )) 
   }
 
+  it should " be creatable with brackets" in {
+    testCodeScript(Vector(
+      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
+    ))
+  }
+
+  it should " come with a length function that also works with brackets" in {
+    testCodeScript(Vector(
+      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array.T: Count) = (i._: i)", GeneralSuccessCheck),
+      CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+    ))
+  }
+
   "Iterations " should " work from an array into a histogram" in {
     testCodeScript(Vector(
       CodeExpectation("val myArray: Array.Count = 6.(0: 5, 1: 5, 2: 10, 3: 10, 4: 10, 5: 1)", GeneralSuccessCheck),
@@ -989,19 +1003,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("stdoutRecorder", SuccessCheckStr("hello world yo hello world"))
     ))
   }
-
-  /*it should " be creatable without specifying length or keys" in {
-    testCodeScript(Vector(
-      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
-    ))
-  }
-
-  it should " come with a length function 2" in {
-    testCodeScript(Vector(
-      CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),
-      CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
-    ))
-  }*/
 
   "HelloWorld.nm script " should " behave as expected" in {
     testCodeScript(Vector(
