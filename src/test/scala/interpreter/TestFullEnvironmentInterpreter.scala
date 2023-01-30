@@ -937,6 +937,12 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be creatable with empty brackets" in {
+    testCodeScript(Vector(
+      CodeExpectation("val y: Array.Count = []", GeneralSuccessCheck),
+    ))
+  }
+
   it should " come with a length function that also works with brackets" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array.Count = [2, 3, 5, 7, 11]", GeneralSuccessCheck),

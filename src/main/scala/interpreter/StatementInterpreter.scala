@@ -247,6 +247,8 @@ object StatementInterpreter {
           // TODO - we need a type inference here!!
           tc <- TypeChecker.typeCheckUnknownType(exp, env)
           evaluatedObject <- Evaluator(tc.nExpression, env)
+
+
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
           nObject <- TypeChecker.tagAndNormalizeObject(constantObject, tc.refinedTypeClass, env)
         } yield {

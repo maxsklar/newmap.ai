@@ -554,6 +554,7 @@ object TypeChecker {
     featureSet: MapFeatureSet,
     env: Environment
   ): Outcome[UntaggedObject, String] = {
+
     for {
       firstAsString <- first match {
         case IdentifierParse(s, false) => Success(s)

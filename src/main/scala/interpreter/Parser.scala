@@ -67,6 +67,27 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def emptyBrackets: Parser[ParseTree] = {
+    Lexer.Enc(SquareBracket, true) ~ Lexer.Enc(SquareBracket, false) ^^ {
+      case _ ~ _ => {
+        ConstructCaseParse(NaturalNumberParse(0), CommandList(Vector.empty))
+      }
+    }
+  }
+
+  private def nonEmptyBrackets: Parser[ParseTree] = {
+    Lexer.Enc(SquareBracket, true) ~ expressionListWithOperations ~ Lexer.Enc(SquareBracket, false) ^^ {
+      case _ ~ CommandList(values) ~ _ => {
+        ConstructCaseParse(
+          NaturalNumberParse(values.length),
+          CommandList(values.zipWithIndex.map(x => {
+            BindingCommandItem(NaturalNumberParse(x._2), x._1)
+          }))
+        )
+      }
+    }
+  }
+
   private def comma: Parser[BinaryOpParse] = {
     accept("comma", { case Lexer.Comma() => {
       CommaBinaryOpParse()
@@ -193,7 +214,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpression: Parser[ParseTree] = {
-    expressionInParens | emptyParens | naturalNumber | identifier | forcedId | character | characterForNumber | string
+    expressionInParens | emptyParens | nonEmptyBrackets | emptyBrackets | naturalNumber | identifier | forcedId | character | characterForNumber | string
   }
 
   private def baseExpressionWithFieldAccess: Parser[ParseTree] = {
