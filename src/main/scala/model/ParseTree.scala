@@ -11,15 +11,22 @@ case class IdentifierParse(
   force: Boolean = false // If this is true, the identifier is forced to be a raw identifier, and not a keyword or substitute
 ) extends ParseTree
 
-case class BindingCommandItem(
+case class KeyValueBinding(
   key: ParseTree,
   value: ParseTree
 ) extends ParseTree
 
-// TODO - should be a linked list
-case class CommandList(
-  values: Vector[ParseTree]
+sealed abstract class LiteralListType
+case object ArrayType extends LiteralListType
+case object MapType extends LiteralListType
+
+case class LiteralListParse(
+  values: Vector[ParseTree],
+  llType: LiteralListType
 ) extends ParseTree
+
+// TODO - this will be a list of commands enclosed by '{'
+//case class LiteralCode()
 
 case class ApplyParse(
   function: ParseTree,

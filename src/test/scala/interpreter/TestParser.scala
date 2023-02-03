@@ -131,22 +131,23 @@ class TestParser extends FlatSpec {
         FullStatementParse(ValStatement,
           IdentifierParse("a",false),
           ApplyParse(IdentifierParse("Map",false),
-            CommandList(Vector(NaturalNumberParse(3), 
+            LiteralListParse(Vector(NaturalNumberParse(3), 
               NaturalNumberParse(100), 
-              NaturalNumberParse(0)))
+              NaturalNumberParse(0)), MapType)
           ),
-          CommandList(Vector(BindingCommandItem(NaturalNumberParse(0),
+          LiteralListParse(Vector(KeyValueBinding(NaturalNumberParse(0),
             NaturalNumberParse(20)), 
-            BindingCommandItem(NaturalNumberParse(1),
+            KeyValueBinding(NaturalNumberParse(1),
               NaturalNumberParse(43)), 
-              BindingCommandItem(NaturalNumberParse(2),NaturalNumberParse(67)))
+              KeyValueBinding(NaturalNumberParse(2),NaturalNumberParse(67))),
+            MapType
           )
         )
       )
     )
   }
 
-  "A command list " should " be parsed with one element" in {
+  "A literal map " should " be parsed with one element" in {
     val tokens = Vector(
       Enc(Paren, true),
       Identifier("digit"),
@@ -154,7 +155,7 @@ class TestParser extends FlatSpec {
       Number(10),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10))
+      KeyValueBinding(IdentifierParse("digit"), NaturalNumberParse(10))
     ))
   }
 
@@ -170,11 +171,12 @@ class TestParser extends FlatSpec {
       Identifier("Type"),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      CommandList(
+      LiteralListParse(
         Vector(
-          BindingCommandItem(IdentifierParse("digit"), NaturalNumberParse(10)),
-          BindingCommandItem(IdentifierParse("T"), IdentifierParse("Type"))
-        )
+          KeyValueBinding(IdentifierParse("digit"), NaturalNumberParse(10)),
+          KeyValueBinding(IdentifierParse("T"), IdentifierParse("Type"))
+        ),
+        MapType
       )
     ))
   }
@@ -194,11 +196,12 @@ class TestParser extends FlatSpec {
       Number(5),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
-      CommandList(
+      LiteralListParse(
         Vector(
           NaturalNumberParse(10), 
           NaturalNumberParse(5)
-        )
+        ),
+        MapType
       )
     ))
   }
@@ -215,7 +218,7 @@ class TestParser extends FlatSpec {
     )
     assert(NewMapParser(tokens) == Success(
       LambdaParse(
-        BindingCommandItem(IdentifierParse("d"), NaturalNumberParse(5)),
+        KeyValueBinding(IdentifierParse("d"), NaturalNumberParse(5)),
         IdentifierParse("d")
       )
     ))
@@ -243,7 +246,7 @@ class TestParser extends FlatSpec {
       Number(5)
     )
     assert(NewMapParser(tokens) == Success(
-      BindingCommandItem(
+      KeyValueBinding(
         ApplyParse(IdentifierParse("Object"), IdentifierParse("getId")),
         NaturalNumberParse(5)
       )

@@ -54,7 +54,7 @@ object NewMapParser extends Parsers {
   private def emptyParens: Parser[ParseTree] = {
     Lexer.Enc(Paren, true) ~ Lexer.Enc(Paren, false) ^^ {
       case _ ~ _ => {
-        CommandList(Vector.empty)
+        LiteralListParse(Vector.empty, MapType)
       }
     }
   }
@@ -70,19 +70,20 @@ object NewMapParser extends Parsers {
   private def emptyBrackets: Parser[ParseTree] = {
     Lexer.Enc(SquareBracket, true) ~ Lexer.Enc(SquareBracket, false) ^^ {
       case _ ~ _ => {
-        ConstructCaseParse(NaturalNumberParse(0), CommandList(Vector.empty))
+        ConstructCaseParse(NaturalNumberParse(0), LiteralListParse(Vector.empty, ArrayType))
       }
     }
   }
 
   private def nonEmptyBrackets: Parser[ParseTree] = {
     Lexer.Enc(SquareBracket, true) ~ expressionListWithOperations ~ Lexer.Enc(SquareBracket, false) ^^ {
-      case _ ~ CommandList(values) ~ _ => {
+      case _ ~ LiteralListParse(values, _) ~ _ => {
         ConstructCaseParse(
           NaturalNumberParse(values.length),
-          CommandList(values.zipWithIndex.map(x => {
-            BindingCommandItem(NaturalNumberParse(x._2), x._1)
-          }))
+          LiteralListParse(
+            values,
+            ArrayType // Square brackets indicate an array
+          )
         )
       }
     }
@@ -133,15 +134,16 @@ object NewMapParser extends Parsers {
         //  possible to rewrite
 
         val (s2, o2) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, first) => {
-          BindingCommandItem(a, b)
+          KeyValueBinding(a, b)
         })
 
         val (s3, o3) = bindBinaryOpParse(s2, o2, CommaBinaryOpParse(), (a, b, first) => {
-          // CommandList(Vector(a, b))
+          // LiteralListParse(Vector(a, b), _)
           // This part of the parser has been such an annoyance!!
+          // Assumed to be a map and not an array without brackets
           a match {
-            case CommandList(commands) => CommandList(commands :+ b)
-            case _ => CommandList(Vector(a, b))
+            case LiteralListParse(items, t) => LiteralListParse(items :+ b, t)
+            case _ => LiteralListParse(Vector(a, b), MapType)
           }
         })
 

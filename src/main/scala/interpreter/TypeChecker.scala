@@ -170,7 +170,7 @@ object TypeChecker {
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
               for {
                 tcResult <- typeCheck(
-                  ConstructCaseParse(expression, CommandList(Vector.empty)),
+                  ConstructCaseParse(expression, LiteralListParse(Vector.empty, MapType)),
                   HistoricalTypeT(env.typeSystem.currentState),
                   env,
                   featureSet
@@ -284,7 +284,7 @@ object TypeChecker {
           TypeCheckResponse(ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher), result.resultingType)
         }
       }
-      case CommandList(values: Vector[ParseTree]) => {
+      case LiteralListParse(values: Vector[ParseTree], llType: LiteralListType) => {
         expectedTypeOutcome match {
           // TODO: Remove this in favor of other struct T
           case Success(StructT(parameterList, parentFieldType, _, _)) => {
@@ -301,8 +301,15 @@ object TypeChecker {
             }
           }
           case Success(MapT(UMap(typeTransform), config)) => {
+            val isArrayInput = llType == ArrayType
+            val correctedValues = if (isArrayInput) {
+              values.zipWithIndex.map(x => KeyValueBinding(NaturalNumberParse(x._2), x._1))
+            } else {
+              values
+            }
+
             for {
-              mapValues <- typeCheckGenericMap(values, typeTransform, config.featureSet, env, featureSet)
+              mapValues <- typeCheckGenericMap(correctedValues, typeTransform, config.featureSet, env, featureSet)
 
               _ <- Outcome.failWhen(typeTransform.length > 1, s"Could not handle type transform: $typeTransform")
 
@@ -358,18 +365,19 @@ object TypeChecker {
             })
           }
           case Success(WildcardPatternT(_)) => {
-            Failure(s"CommandLists must be explicitly typed - $values")
+            Failure(s"Lists must be explicitly typed - $values")
           }
           case Success(UndefinedT) => {
             throw new Exception(s"our bug: $values")
           }
+
           case _ => {
-            Failure(s"CommandLists not working yet with this expected type: $values exp: $expectedType -- $expectedTypeOutcome")
+            Failure(s"Lists not working yet with this expected type: $values exp: $expectedType -- $expectedTypeOutcome")
           }
         }
       }
-      case BindingCommandItem(key, value) => {
-        typeCheck(CommandList(Vector(expression)), expectedType, env, featureSet)
+      case KeyValueBinding(key, value) => {
+        typeCheck(LiteralListParse(Vector(expression), MapType), expectedType, env, featureSet)
       }
       case LambdaParse(input, output) => {
         // Make sure that this fits expectedType!
@@ -447,7 +455,7 @@ object TypeChecker {
     env: Environment,
   ): Outcome[Vector[UntaggedObject], String] = {
     values match {
-      case BindingCommandItem(k, v) +: _ => {
+      case KeyValueBinding(k, v) +: _ => {
         Failure(s"Sequences don't work with binding command item $k : $v")
       }
       case value +: restOfValues => {
@@ -474,11 +482,9 @@ object TypeChecker {
     } else {
       throw new Exception(s"Can't work with type transform if it doesn't have exactly 1 pattern (because it's unimplemented): $typeTransform")
     }
-
-    val outputExpression = typeTransform.head._2
     
     values match {
-      case BindingCommandItem(k, v) +: restOfValues => {
+      case KeyValueBinding(k, v) +: restOfValues => {
         for {
           inputTypeClassT <- env.typeSystem.convertToNewMapType(inputTypeClass)
           resultKey <- typeCheckWithPatternMatching(k, inputTypeClassT, env, externalFeatureSet, internalFeatureSet)
@@ -509,7 +515,7 @@ object TypeChecker {
         }
       }
       case s +: _ => {
-        Failure(s"No binding found in map for item $s in $values")
+        Failure(s"No binding found in map for item $s in $values -- $typeTransform")
       }
       case _ => Success(Vector.empty)
     }
@@ -609,7 +615,7 @@ object TypeChecker {
         )
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (CommandList(values), Success(StructT(structValues, parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (LiteralListParse(values, _), Success(StructT(structValues, parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env)
         } yield {
@@ -714,7 +720,7 @@ object TypeChecker {
     featureSet: MapFeatureSet
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     (parameterList, valueList) match {
-      case (((paramId, typeOfIdentifier) +: restOfParamList), (BindingCommandItem(valueIdentifier, valueObject) +: restOfValueList)) => {
+      case (((paramId, typeOfIdentifier) +: restOfParamList), (KeyValueBinding(valueIdentifier, valueObject) +: restOfValueList)) => {
         for {
           valueId <- typeCheck(valueIdentifier, nTypeForStructFieldName, env, featureSet)
           valueIdObj <- Evaluator(valueId.nExpression, env)

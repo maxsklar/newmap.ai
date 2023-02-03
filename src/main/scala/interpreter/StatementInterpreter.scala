@@ -53,7 +53,7 @@ object StatementInterpreter {
       }
       case NewParamTypeStatementParse(id, params) => {
         val values = params match {
-          case CommandList(vs) => vs
+          case LiteralListParse(vs, MapType) => vs
           case _ => Vector(params) 
         }
 

@@ -65,10 +65,10 @@ class TestTypeCheck extends FlatSpec {
 
   it should " fail when the order is reversed" in {
     val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x")),
-        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type"))
-      )),
+      LiteralListParse(Vector(
+        KeyValueBinding(IdentifierParse("y"), IdentifierParse("x")),
+        KeyValueBinding(IdentifierParse("x"), IdentifierParse("Type"))
+      ), MapType),
       IdentifierParse("y"),
     )
 
@@ -84,11 +84,11 @@ class TestTypeCheck extends FlatSpec {
 
    it should " fail if another type is extraced" in {
     val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("x"), IdentifierParse("Type")),
-        BindingCommandItem(IdentifierParse("y"), IdentifierParse("x")),
-        BindingCommandItem(IdentifierParse("z"), IdentifierParse("y"))
-      )),
+      LiteralListParse(Vector(
+        KeyValueBinding(IdentifierParse("x"), IdentifierParse("Type")),
+        KeyValueBinding(IdentifierParse("y"), IdentifierParse("x")),
+        KeyValueBinding(IdentifierParse("z"), IdentifierParse("y"))
+      ), MapType),
       IdentifierParse("z"),
     )
 
@@ -105,10 +105,10 @@ class TestTypeCheck extends FlatSpec {
 
   "An index type " should " not allow subtypes" in {
     val expression = LambdaParse(
-      CommandList(Vector(
-        BindingCommandItem(IdentifierParse("a"), NaturalNumberParse(100)),
-        BindingCommandItem(IdentifierParse("b"), IdentifierParse("a"))
-      )),
+      LiteralListParse(Vector(
+        KeyValueBinding(IdentifierParse("a"), NaturalNumberParse(100)),
+        KeyValueBinding(IdentifierParse("b"), IdentifierParse("a"))
+      ), MapType),
       IdentifierParse("g"),
     )
 
@@ -136,7 +136,7 @@ class TestTypeCheck extends FlatSpec {
   "A boolean map " should " be interpreted correctly" in {
   	val booleanMap = ApplyParse(
       IdentifierParse("Map"),
-      CommandList(Vector(NaturalNumberParse(2), NaturalNumberParse(2)))
+      LiteralListParse(Vector(NaturalNumberParse(2), NaturalNumberParse(2)), MapType)
     )
 
     TypeChecker(booleanMap) match {
