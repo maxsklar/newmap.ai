@@ -960,6 +960,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " also work for the bracketed notation" in {
+    testCodeScript(Vector(
+      CodeExpectation("val myArray: Array.Count = [5, 5, 10, 10, 10, 1]", GeneralSuccessCheck),
+      CodeExpectation("ver hist = new Map(Count, Count)", GeneralSuccessCheck),
+      CodeExpectation("iterate myArray into hist", GeneralSuccessCheck),
+      CodeExpectation("hist 5", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(2), CountT)))),
+    ))
+  }
+
   it should " be usable to append arrays" in {
     testCodeScript(Vector(
       CodeExpectation("val myArray1: Array.Identifier = 3.(0: a, 1: b, 2: c)", GeneralSuccessCheck),
@@ -1020,14 +1029,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   /*
-  FIRST - do iterators
-
-
-
-
   TODOs with the arrays:
-  - create histogram from array
-  - Alternate way of representing (maybe with brackets)
   - startsWith function (or general regular expression?)
   - Commands (replace sequence)
   - append arrays
@@ -1036,7 +1038,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   - Convert to LinkedList?
 
   Regular Expressions?
-  - Better on LinkedLists?
+  - These are going to objects that carry "state", and the array is iterated into them
   */
 
   /*
@@ -1058,8 +1060,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   */
 
   /**
-   * 
-   * 
    * 
   Equality preserving Maps.. can these exist?
   -> First there needs to be an equality function (a == b)

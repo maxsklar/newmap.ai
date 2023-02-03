@@ -18,6 +18,8 @@ object CommandMaps {
 
   /*
    * This is getDefaultValueOfCommandType being slowly written into newmap code
+   * It is a map that takes certain types (called command types) and outputs their default, or initial value
+   * The initial value of Count is 0, for example
    */
   def getDefaultValueOfCommandTypeFromEnv(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
     for {
