@@ -86,6 +86,16 @@ object NewMapParser extends Parsers {
           )
         )
       }
+      case _ ~ exp ~ _ => {
+        // Singleton array case
+        ConstructCaseParse(
+          NaturalNumberParse(1),
+          LiteralListParse(
+            Vector(exp),
+            ArrayType
+          )
+        )
+      }
     }
   }
 
@@ -216,7 +226,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpression: Parser[ParseTree] = {
-    expressionInParens | emptyParens | nonEmptyBrackets | emptyBrackets | naturalNumber | identifier | forcedId | character | characterForNumber | string
+    expressionInParens | nonEmptyBrackets | emptyParens | emptyBrackets | naturalNumber | identifier | forcedId | character | characterForNumber | string
   }
 
   private def baseExpressionWithFieldAccess: Parser[ParseTree] = {
