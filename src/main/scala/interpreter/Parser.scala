@@ -70,7 +70,7 @@ object NewMapParser extends Parsers {
   private def emptyBrackets: Parser[ParseTree] = {
     Lexer.Enc(SquareBracket, true) ~ Lexer.Enc(SquareBracket, false) ^^ {
       case _ ~ _ => {
-        ConstructCaseParse(NaturalNumberParse(0), LiteralListParse(Vector.empty, ArrayType))
+        LiteralListParse(Vector.empty, ArrayType)
       }
     }
   }
@@ -78,22 +78,16 @@ object NewMapParser extends Parsers {
   private def nonEmptyBrackets: Parser[ParseTree] = {
     Lexer.Enc(SquareBracket, true) ~ expressionListWithOperations ~ Lexer.Enc(SquareBracket, false) ^^ {
       case _ ~ LiteralListParse(values, _) ~ _ => {
-        ConstructCaseParse(
-          NaturalNumberParse(values.length),
-          LiteralListParse(
-            values,
-            ArrayType // Square brackets indicate an array
-          )
+        LiteralListParse(
+          values,
+          ArrayType // Square brackets indicate an array
         )
       }
       case _ ~ exp ~ _ => {
         // Singleton array case
-        ConstructCaseParse(
-          NaturalNumberParse(1),
-          LiteralListParse(
-            Vector(exp),
-            ArrayType
-          )
+        LiteralListParse(
+          Vector(exp),
+          ArrayType
         )
       }
     }

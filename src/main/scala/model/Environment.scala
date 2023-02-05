@@ -434,8 +434,17 @@ case class Environment(
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
-        // TODO: save this in the result list
-        this
+        nObject match {
+          case TaggedObject(uObject, nType) => {
+            // save this in the result list
+            val uType = typeSystem.typeToUntaggedObject(nType)
+            this.newCommand(ApplyIndividualCommand("res", UCase(uType, uObject)))
+          }
+          case _ => {
+            // Will this be a point of confusion that it's not adding anything to res?
+            this
+          }
+        }
       }
       case AddChannel(channel, nType) => {
         val channelName = channel match {
@@ -740,5 +749,10 @@ object Environment {
         SimpleFunction
       )
     ),
+    NewTypeCommand("Object", CaseT(
+      Vector(UWildcardPattern("t") -> ParamId("t")),
+      fieldParentType = TypeT,
+      featureSet = PatternMap,
+    ))
   ))
 }

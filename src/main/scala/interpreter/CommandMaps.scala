@@ -402,7 +402,7 @@ object CommandMaps {
       }*/
       case _ => {
         println(s"Got undefined for ${nType.displayString(env)}")
-        Success(UndefinedT)        
+        Success(UndefinedT)
       }
     }
   }

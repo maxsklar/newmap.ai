@@ -279,12 +279,9 @@ class TestParser extends FlatSpec {
     val tokens = Vector(Enc(SquareBracket, true), Number(10), Enc(SquareBracket, false))
 
     assert(NewMapParser(tokens) == Success(
-      ConstructCaseParse(
-        NaturalNumberParse(1),
-        LiteralListParse(
-          Vector(NaturalNumberParse(10)),
-          ArrayType
-        )
+      LiteralListParse(
+        Vector(NaturalNumberParse(10)),
+        ArrayType
       )
     ))
   }

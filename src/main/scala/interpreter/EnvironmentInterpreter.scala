@@ -205,6 +205,7 @@ class EnvironmentInterpreter(
 object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
+    "ver res = new ReqMap(0, Object)",
     "update _default Count.0",
     "update _default Boolean.0",
     "update _default Type.UndefinedType",

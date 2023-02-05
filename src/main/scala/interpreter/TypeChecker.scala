@@ -370,7 +370,6 @@ object TypeChecker {
           case Success(UndefinedT) => {
             throw new Exception(s"our bug: $values")
           }
-
           case _ => {
             Failure(s"Lists not working yet with this expected type: $values exp: $expectedType -- $expectedTypeOutcome")
           }
