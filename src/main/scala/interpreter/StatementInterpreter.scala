@@ -57,8 +57,12 @@ object StatementInterpreter {
           case _ => Vector(params) 
         }
 
+        val typeTransform = Vector(
+          env.typeSystem.typeToUntaggedObject(IdentifierT) -> patternToExpression(env.typeSystem.typeToUntaggedObject(TypeT))
+        )
+
         for {
-          mapValues <- TypeChecker.typeCheckMap(values, IdentifierT, TypeT, BasicMap, env, FullFunction)
+          mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT))

@@ -335,12 +335,16 @@ object TypeChecker {
           case Success(TypeT) | Success(HistoricalTypeT(_)) => {
             val typeT = expectedTypeOutcome.toOption.get
 
+            val typeTransform = Vector(
+              env.typeSystem.typeToUntaggedObject(IdentifierT) -> patternToExpression(env.typeSystem.typeToUntaggedObject(typeT))
+            )
+
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // OR we are just being given a list of types
             // TODO - can this be simplified by combining with the MapT section above?
             {
               for {
-                mapValues <- typeCheckMap(values, IdentifierT, typeT, BasicMap, env, featureSet)
+                mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, featureSet)
               } yield {
                 TypeCheckResponse(
                   env.typeSystem.typeToUntaggedObject(StructT(mapValues, IdentifierT, RequireCompleteness, BasicMap)),
@@ -431,21 +435,6 @@ object TypeChecker {
         }
       }
     }
-  }
-
-  // This map could include pattern matching
-  def typeCheckMap(
-    values: Vector[ParseTree],
-    keyTypeP: NewMapType,
-    valueTypeP: NewMapType,
-    internalFeatureSet: MapFeatureSet,
-    env: Environment,
-    externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
-  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
-    val typeTransform = Vector(
-      env.typeSystem.typeToUntaggedObject(keyTypeP) -> patternToExpression(env.typeSystem.typeToUntaggedObject(valueTypeP))
-    )
-    typeCheckGenericMap(values, typeTransform, internalFeatureSet, env, externalFeatureSet)
   }
 
   def typeCheckSequence(
