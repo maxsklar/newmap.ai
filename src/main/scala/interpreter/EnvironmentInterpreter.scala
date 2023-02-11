@@ -206,19 +206,19 @@ object EnvironmentInterpreter {
   // TODO: Turn this into a file to be read!
   val initialCommands: Vector[String] = Vector(
     "ver res = new ReqMap(0, Object)",
-    "update _default Count.0",
-    "update _default Boolean.0",
-    "update _default Type.UndefinedType",
-    "data String = Array.Char",
+    "update _default Count|0",
+    "update _default Boolean|0",
+    "update _default Type|UndefinedType",
+    "data String = Array|Char",
     "typeclass _display (t: (t => String))",
-    "update _display String.(s: s)"
+    "update _display String|(s: s)"
     
     //"update _default (Array.T).(0.())", // TODO - this can't work yet because it has a pattern!
     //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       
     // todo - _typeOf should be creatable all in one swoop, and as a generic
-    //"update _typeOf Count.(_: Count)",
-    //"update _typeOf Identifier.(_: Identifier)",
+    //"update _typeOf Count|(_: Count)",
+    //"update _typeOf Identifier|(_: Identifier)",
 
     //"data Option (T: Type)",
     //"update Option (None, ())",

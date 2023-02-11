@@ -140,4 +140,3 @@ sealed abstract class BinaryOpParse
 case class CommaBinaryOpParse() extends BinaryOpParse
 case class ColonBinaryOpParse() extends BinaryOpParse
 case class ArrowBinaryOpParse() extends BinaryOpParse
-case class PeriodBinaryOpParse() extends BinaryOpParse

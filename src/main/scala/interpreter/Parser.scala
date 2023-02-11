@@ -111,12 +111,6 @@ object NewMapParser extends Parsers {
     }})
   }
 
-  private def period: Parser[BinaryOpParse] = {
-    accept("period", { case Lexer.Symbol(".") => {
-      PeriodBinaryOpParse()
-    }})
-  }
-
   private def binaryOpParse: Parser[BinaryOpParse] = {
     comma | colon | arrow
   }
@@ -224,7 +218,7 @@ object NewMapParser extends Parsers {
   }
 
   private def baseExpressionWithFieldAccess: Parser[ParseTree] = {
-    val pattern = rep(baseExpression ~ period) ~ baseExpression
+    val pattern = rep(baseExpression ~ Lexer.Symbol("|")) ~ baseExpression
     pattern ^^ {
       case startingExps ~ lastExp => {
         val start: Vector[ParseTree] = startingExps.map(_ match {

@@ -42,6 +42,14 @@ class TestLexer extends FlatSpec {
     )))
   }
 
+  "A constructed value " should " be lexed correctly" in {
+    assert(Lexer("a|b") == Success(List(
+      Identifier("a"), 
+      Symbol("|"), 
+      Identifier("b")
+    )))
+  }
+
   "A count statement" should " be lexed correctly" in {
     val code = "val a: Count = 5"
     assert(Lexer(code) == Success(List(
