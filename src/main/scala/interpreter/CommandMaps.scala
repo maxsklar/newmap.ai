@@ -363,10 +363,24 @@ object CommandMaps {
         }
       }
       case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
-        // Change to CaseT because we are adding a single parameter!
-        // Are we allowed to change an old parameter? Let's say sure.
-        Success(CaseT(parameterList, parentFieldType, featureSet))
-      }
+        // We may have the option to wanting to expand this struct!
+        // TODO: This is one of the cases where the type CHANGES when you update the object
+        // - should this be allowed? This may be a problem.
+
+        // Expand the number of fields in this struct like so!
+        val fieldExpansionCommandT = parentFieldType
+        // We are freely adding to an object and changing the type of it's fields
+        // This means that we need to give
+        // A) A field expansion command
+        // B) The tagged object that goes in there (so both type and object)
+        Success(StructT(
+          Vector(
+            UIndex(0) -> env.typeSystem.typeToUntaggedObject(fieldExpansionCommandT),
+            UIndex(1) -> env.typeSystem.typeToUntaggedObject(NewMapO.taggedObjectT)
+          ),
+          IndexTN(2)
+        ))
+    }
       case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
@@ -562,7 +576,32 @@ object CommandMaps {
           }
         }
       }
-      case StructT(params, parentFieldType, _, _) => {
+      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
+        for {
+          mapValues <- current match {
+            case TaggedObject(UMap(values), _) => Success(values)
+            case _ => Failure(s"Couldn't get map values from $current")
+          }
+
+          nameOfField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+          newValueAsTaggedObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+
+          uCaseValue <- newValueAsTaggedObject match {
+            case u@UCase(_, _) => Success(u)
+            case _ => Failure(s"Wrong update for complete struct: $newValueAsTaggedObject")
+          }
+        } yield {
+          val typeOfField = uCaseValue.constructor
+          val valueOfField = uCaseValue.input
+
+          val newMapValues = (nameOfField -> valueOfField) +: mapValues.filter(x => x._1 != nameOfField)
+
+          val newParams = (nameOfField -> typeOfField) +: parameterList.filter(x => x._1 != nameOfField)
+
+          TaggedObject(UMap(newMapValues), StructT(newParams, parentFieldType, RequireCompleteness, featureSet))
+        }
+      }
+      case StructT(params, parentFieldType, CommandOutput, _) => {
         command match {
           case UCase(constructor, input) => {
             for {

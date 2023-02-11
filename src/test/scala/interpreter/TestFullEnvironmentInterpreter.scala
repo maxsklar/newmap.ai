@@ -261,6 +261,21 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be creatable as a versioned object" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver x = new ()", GeneralSuccessCheck),
+      CodeExpectation("update x (myField, Count.3)", GeneralSuccessCheck),
+    ))
+  }
+
+  it should " be updatable with a pre-defined tagged object" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver x = new ()", GeneralSuccessCheck),
+      CodeExpectation("val o: Object = Count.3", GeneralSuccessCheck),
+      CodeExpectation("update x (myField, o)", GeneralSuccessCheck),
+    ))
+  }
+
   "A Map to a non-command type " should " not be creatable" in {
     testLineFails("val m: Map (10, Identifier) = (6: a)")
   }

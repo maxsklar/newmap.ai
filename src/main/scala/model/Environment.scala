@@ -731,6 +731,7 @@ object Environment {
       Base
     )),
     eCommand("CaseType", typeAsObject(CaseT(Vector.empty, IdentifierT, BasicMap))),
+    eCommand("StructSeq", typeAsObject(StructT(Vector.empty, IndexT(UIndex(0))))),
     eCommand("Subtype", TaggedObject(
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
@@ -749,10 +750,6 @@ object Environment {
         SimpleFunction
       )
     ),
-    NewTypeCommand("Object", CaseT(
-      Vector(UWildcardPattern("t") -> ParamId("t")),
-      fieldParentType = TypeT,
-      featureSet = PatternMap,
-    ))
+    NewTypeCommand("Object", NewMapO.taggedObjectT)
   ))
 }

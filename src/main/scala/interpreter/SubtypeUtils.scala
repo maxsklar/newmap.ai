@@ -1,4 +1,4 @@
-package ai.newmap.interpreter
+  package ai.newmap.interpreter
 
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
@@ -250,10 +250,10 @@ object SubtypeUtils {
       }
       case (StructT(values, fieldParentType, _, _), _) if (values.length == 1) => {
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(values)
-          singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
-          response <- isTypeConvertible(singularObjT, endingType, env)
+          singularOutput <- outputIfFunctionHasSingularInput(values, fieldParentType, env)
+          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
+          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
+          response <- isTypeConvertible(singularObjT, endingType, singularOutput.env)
         } yield response
       }
       case (_, StructT(values, fieldParentType, _, _)) => {
@@ -280,19 +280,29 @@ object SubtypeUtils {
       case (CaseT(values, startingFieldType, _), _) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(values)
-          singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
-          response <- isTypeConvertible(singularObjT, endingType, env)
+          singularOutput <- outputIfFunctionHasSingularInput(values, startingFieldType, env)
+          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
+          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
+          response <- isTypeConvertible(singularObjT, endingType, singularOutput.env)
         } yield response
+      }
+      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, endingFieldType, _)) if (values.length == 1) => {
+        // TODO: It's confusing why we would need this, but it prevents the case directly below from firing
+        // -- Eventually this whole method should be refactored.
+        for {
+          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
+          response <- isTypeConvertible(underlyingStartingType, endingType, env)
+        } yield {
+          response
+        }
       }
       case (_, CaseT(values, endingFieldType, _)) if (values.length == 1) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
-          singularOutput <- outputIfFunctionHasSingularInput(values)
-          singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
-          response <- isTypeConvertible(startingType, singularObjT, env)
+          singularOutput <- outputIfFunctionHasSingularInput(values, endingFieldType, env)
+          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
+          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
+          response <- isTypeConvertible(startingType, singularObjT, singularOutput.env)
         } yield response
       }
       case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
@@ -411,10 +421,26 @@ object SubtypeUtils {
     startingFeatureSet.getLevel <= endingFeatureSet.getLevel
   }
 
+  case class SingularOutpotResponse(uObject: UntaggedObject, env: Environment)
+
   // If this function only allows one input, then return the output for that input
-  def outputIfFunctionHasSingularInput(mapValues: Vector[(UntaggedObject, UntaggedObject)]): Outcome[UntaggedObject, String] = {
+  def outputIfFunctionHasSingularInput(
+    mapValues: Vector[(UntaggedObject, UntaggedObject)],
+    fieldType: NewMapType,
+    env: Environment
+  ): Outcome[SingularOutpotResponse, String] = {
     if (mapValues.length == 1) {
-      Success(mapValues.head._2)
+      // THIS IS WHERE WE NEED TO DEAL WITH PATTERNS IN THE MAP VALUE
+      val key = mapValues.head._1
+
+      for {
+        newParameters <- RetrieveType.fetchParamsFromPattern(fieldType, key, env)
+      } yield {
+        SingularOutpotResponse(
+          mapValues.head._2,
+          env.newParams(newParameters.toVector)
+        )
+      }
     } else {
       Failure("Function did not have singular input")
     }

@@ -707,6 +707,7 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
+
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (KeyValueBinding(valueIdentifier, valueObject) +: restOfValueList)) => {
         for {
