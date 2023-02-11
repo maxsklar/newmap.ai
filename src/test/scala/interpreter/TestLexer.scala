@@ -47,9 +47,9 @@ class TestLexer extends FlatSpec {
     assert(Lexer(code) == Success(List(
         Identifier("val"), 
         Identifier("a"), 
-        Colon(), 
+        Symbol(":"), 
         Identifier("Count"), 
-        Equals(), 
+        Symbol("="), 
         Number(5)
     )))
   }
@@ -59,27 +59,27 @@ class TestLexer extends FlatSpec {
     assert(Lexer(code) == Success(List(
         Identifier("val"),
         Identifier("a"),
-        Colon(),
+        Symbol(":"),
         Identifier("Map"),
         Enc(Paren, isOpen = true),
         Number(3),
-        Comma(),
+        Symbol(","),
         Number(100),
-        Comma(),
+        Symbol(","),
         Number(0),
         Enc(Paren, isOpen = false),
-        Equals(),
+        Symbol("="),
         Enc(Paren, isOpen = true),
         Number(0),
-        Colon(),
+        Symbol(":"),
         Number(20),
-        Comma(),
+        Symbol(","),
         Number(1),
-        Colon(),
+        Symbol(":"),
         Number(43),
-        Comma(),
+        Symbol(","),
         Number(2),
-        Colon(),
+        Symbol(":"),
         Number(67),
         Enc(Paren, isOpen = false)
       )))
@@ -90,15 +90,15 @@ class TestLexer extends FlatSpec {
     assert(Lexer(code) == Success(List(
       Enc(Paren, isOpen = true),
       Identifier("a"),
-      Colon(),
+      Symbol(":"),
       Number(6),
-      Comma(),
+      Symbol(","),
       Identifier("b"),
-      Colon(),
+      Symbol(":"),
       Identifier("a"),
-      Comma(),
+      Symbol(","),
       Identifier("c"),
-      Colon(),
+      Symbol(":"),
       Identifier("Type"),
       Enc(Paren, isOpen = false)
     )))
@@ -108,9 +108,9 @@ class TestLexer extends FlatSpec {
     val code = "a: 10 = 6"
     assert(Lexer(code) == Success(List(
       Identifier("a"),
-      Colon(),
+      Symbol(":"),
       Number(10),
-      Equals(),
+      Symbol("="),
       Number(6)
     )))
   }
@@ -120,11 +120,11 @@ class TestLexer extends FlatSpec {
     assert(Lexer(code) == Success(List(
       Identifier("val"),
       Identifier("a"),
-      Colon(),
+      Symbol(":"),
       Number(12),
-      Equals(),
+      Symbol("="),
       Identifier("date"),
-      Period(),
+      Symbol("."),
       Identifier("getMonth")
     )))
   }

@@ -23,7 +23,7 @@ class TestParser extends FlatSpec {
   }
 
   it should " work when forced with a Tilda" in {
-    val tokens = Vector(Tilda(), Identifier("x"))
+    val tokens = Vector(Symbol("~"), Identifier("x"))
     assert(NewMapParser(tokens) == Success(
       IdentifierParse("x", force = true)
     ))
@@ -64,9 +64,9 @@ class TestParser extends FlatSpec {
     val tokens = List(
       Identifier("val"), 
       Identifier("a"), 
-      Colon(), 
+      Symbol(":"), 
       Identifier("Count"), 
-      Equals(), 
+      Symbol("="), 
       Number(5)
     )
     assert(NewMapParser.statementParse(tokens) == 
@@ -84,7 +84,7 @@ class TestParser extends FlatSpec {
     val tokens = List(
       Identifier("ver"),
       Identifier("x"),
-      Equals(),
+      Symbol("="),
       Identifier("new"),
       Identifier("Count")
     )
@@ -102,27 +102,27 @@ class TestParser extends FlatSpec {
     val tokens = List(
       Identifier("val"), 
       Identifier("a"), 
-      Colon(), 
+      Symbol(":"), 
       Identifier("Map"), 
       Enc(Paren,true), 
       Number(3), 
-      Comma(), 
+      Symbol(","), 
       Number(100), 
-      Comma(), 
+      Symbol(","), 
       Number(0), 
       Enc(Paren,false), 
-      Equals(), 
+      Symbol("="), 
       Enc(Paren,true), 
       Number(0), 
-      Colon(), 
+      Symbol(":"), 
       Number(20), 
-      Comma(), 
+      Symbol(","), 
       Number(1), 
-      Colon(), 
+      Symbol(":"), 
       Number(43), 
-      Comma(), 
+      Symbol(","), 
       Number(2), 
-      Colon(), 
+      Symbol(":"), 
       Number(67), 
       Enc(Paren,false)
     )
@@ -151,7 +151,7 @@ class TestParser extends FlatSpec {
     val tokens = Vector(
       Enc(Paren, true),
       Identifier("digit"),
-      Colon(),
+      Symbol(":"),
       Number(10),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
@@ -163,11 +163,11 @@ class TestParser extends FlatSpec {
     val tokens = Vector(
       Enc(Paren, true),
       Identifier("digit"),
-      Colon(),
+      Symbol(":"),
       Number(10),
-      Comma(),
+      Symbol(","),
       Identifier("T"),
-      Colon(),
+      Symbol(":"),
       Identifier("Type"),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
@@ -192,7 +192,7 @@ class TestParser extends FlatSpec {
     val tokens = Vector(
       Enc(Paren, true),
       Number(10),
-      Comma(),
+      Symbol(","),
       Number(5),
       Enc(Paren, false))
     assert(NewMapParser(tokens) == Success(
@@ -210,10 +210,10 @@ class TestParser extends FlatSpec {
     val tokens = Vector(
       Enc(Paren, true),
       Identifier("d"),
-      Colon(),
+      Symbol(":"),
       Number(5),
       Enc(Paren, false),
-      Arrow(),
+      Symbol("=>"),
       Identifier("d")
     )
     assert(NewMapParser(tokens) == Success(
@@ -225,14 +225,14 @@ class TestParser extends FlatSpec {
   }
 
   it should " work correctly for multiple types" in {
-    val tokens = Vector(Number(1), Arrow(), Number(2), Arrow(), Number(3))
+    val tokens = Vector(Number(1), Symbol("=>"), Number(2), Symbol("=>"), Number(3))
     assert(NewMapParser(tokens) == Success(
       LambdaParse(NaturalNumberParse(1), LambdaParse(NaturalNumberParse(2), NaturalNumberParse(3)))
     ))
   }
 
   it should " work correctly when the types are grouped" in {
-    val tokens = Vector(Enc(Paren, true), Number(1), Arrow(), Number(2), Enc(Paren, false), Arrow(), Number(3))
+    val tokens = Vector(Enc(Paren, true), Number(1), Symbol("=>"), Number(2), Enc(Paren, false), Symbol("=>"), Number(3))
     assert(NewMapParser(tokens) == Success(
       LambdaParse(LambdaParse(NaturalNumberParse(1), NaturalNumberParse(2)), NaturalNumberParse(3))
     ))
@@ -242,7 +242,7 @@ class TestParser extends FlatSpec {
     val tokens = Vector(
       Identifier("Object"),
       Identifier("getId"),
-      Colon(),
+      Symbol(":"),
       Number(5)
     )
     assert(NewMapParser(tokens) == Success(

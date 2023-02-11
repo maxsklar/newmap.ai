@@ -28,13 +28,13 @@ object NewMapParser extends Parsers {
   }
 
   private def forcedId: Parser[IdentifierParse] = {
-    Lexer.Tilda() ~ identifier ^^ {
+    Lexer.Symbol("~") ~ identifier ^^ {
       case _ ~ IdentifierParse(s, _) => IdentifierParse(s, force = true)
     }
   }
 
   private def character: Parser[CharacterParse] = {
-    Lexer.TikMark() ~ identifier ^^ {
+    Lexer.Symbol("`") ~ identifier ^^ {
       case _ ~ IdentifierParse(s, _) => CharacterParse(s)
     }
   }
@@ -46,7 +46,7 @@ object NewMapParser extends Parsers {
   }
 
   private def characterForNumber: Parser[CharacterParse] = {
-    Lexer.TikMark() ~ naturalNumber ^^ {
+    Lexer.Symbol("`") ~ naturalNumber ^^ {
       case _ ~ NaturalNumberParse(n) => CharacterParse(n.toString)
     }
   }
@@ -94,25 +94,25 @@ object NewMapParser extends Parsers {
   }
 
   private def comma: Parser[BinaryOpParse] = {
-    accept("comma", { case Lexer.Comma() => {
+    accept("comma", { case Lexer.Symbol(",") => {
       CommaBinaryOpParse()
     }})
   }
 
   private def colon: Parser[BinaryOpParse] = {
-    accept("colon", { case Lexer.Colon() => {
+    accept("colon", { case Lexer.Symbol(":") => {
       ColonBinaryOpParse()
     }})
   }
 
   private def arrow: Parser[BinaryOpParse] = {
-    accept("arrow", { case Lexer.Arrow() => {
+    accept("arrow", { case Lexer.Symbol("=>") => {
       ArrowBinaryOpParse()
     }})
   }
 
   private def period: Parser[BinaryOpParse] = {
-    accept("period", { case Lexer.Period() => {
+    accept("period", { case Lexer.Symbol(".") => {
       PeriodBinaryOpParse()
     }})
   }
@@ -244,7 +244,7 @@ object NewMapParser extends Parsers {
   }
 
   private def fullStatement: Parser[FullStatementParse] = {
-    Lexer.Identifier("val") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+    Lexer.Identifier("val") ~ identifier ~ Lexer.Symbol(":") ~ expressionListWithOperations ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
         FullStatementParse(ValStatement, id, typeExp, exp)
       }
@@ -252,7 +252,7 @@ object NewMapParser extends Parsers {
   }
 
   private def newVersionedStatement: Parser[NewVersionedStatementParse] = {
-    Lexer.Identifier("ver") ~ identifier ~ Lexer.Equals() ~ Lexer.Identifier("new") ~ expressionListWithOperations ^^ {
+    Lexer.Identifier("ver") ~ identifier ~ Lexer.Symbol("=") ~ Lexer.Identifier("new") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ _ ~ exp => {
         NewVersionedStatementParse(id, exp)
       }
@@ -293,7 +293,7 @@ object NewMapParser extends Parsers {
   }
 
   private def newTypeCommand: Parser[NewTypeStatementParse] = {
-    Lexer.Identifier("data") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+    Lexer.Identifier("data") ~ identifier ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
         NewTypeStatementParse(id, exp)
       }
@@ -357,7 +357,7 @@ object NewMapParser extends Parsers {
   }
 
   private def inferredTypeStatement: Parser[InferredTypeStatementParse] = {
-    Lexer.Identifier("val") ~ identifier ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+    Lexer.Identifier("val") ~ identifier ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ exp => {
         InferredTypeStatementParse(ValStatement, id, exp)
       }
@@ -374,7 +374,7 @@ object NewMapParser extends Parsers {
 
   // New Statment for defining a function
   /*private def defFunctionStatment: Parser[DefineFunctionStatment] = {
-    Lexer.Identifier("def") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Equals() ~ expressionListWithOperations ^^ {
+    Lexer.Identifier("def") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
         FullStatementParse(ValStatement, id, typeExp, exp)
       }

@@ -9,13 +9,13 @@ import ai.newmap.util.Success
 
 class TestStatementParser extends FlatSpec {
   "A statement " should " be parsed correctly" in {
-    val tokens = Vector(Identifier("val"), Identifier("x"), Colon(), Number(10), Equals(), Number(100))
+    val tokens = Vector(Identifier("val"), Identifier("x"), Symbol(":"), Number(100), Symbol("="), Number(10))
     assert(NewMapParser.statementParse(tokens) == Success(
       FullStatementParse(
         ValStatement,
         IdentifierParse("x"),
-        NaturalNumberParse(10),
-        NaturalNumberParse(100)
+        NaturalNumberParse(100),
+        NaturalNumberParse(10)
       )
     ))
   }

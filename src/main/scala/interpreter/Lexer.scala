@@ -10,13 +10,7 @@ object Lexer extends RegexParsers {
   case class Enc(symbol: EnclosureSymbol, isOpen: Boolean) extends Token
   case class Identifier(id: String) extends Token
   case class Number(i: Long) extends Token
-  case class Comma() extends Token
-  case class Colon() extends Token
-  case class Equals() extends Token
-  case class Tilda() extends Token
-  case class Arrow() extends Token
-  case class Period() extends Token
-  case class TikMark() extends Token
+  case class Symbol(s: String) extends Token
   case class DQuote(s: String) extends Token
   case class Comment(s: String) extends Token
 
@@ -31,36 +25,12 @@ object Lexer extends RegexParsers {
     "0|([1-9][0-9]*)".r ^^ { str => Number(str.toLong) }
   }
 
-  def comma: Parser[Comma] = {
-    "," ^^ { str => Comma() }
-  }
-
-  def colon: Parser[Colon] = {
-    ":" ^^ { str => Colon() }
-  }
-
-  def tik: Parser[TikMark] = {
-    "`" ^^ { str => TikMark() }
+  def symbol: Parser[Symbol] = {
+    "[\\.,:`=~><][\\.,:`=~><]*".r ^^ { str => Symbol(str)}
   }
 
   def dquote: Parser[DQuote] = {
     "\"([^\"]*)\"".r ^^ { str => DQuote(str) }
-  }
-
-  def equals: Parser[Equals] = {
-    "=" ^^ { str => Equals() }
-  }
-
-  def tilda: Parser[Tilda] = {
-    "~" ^^ { str => Tilda() }
-  }
-
-  def arrow: Parser[Arrow] = {
-    "=>" ^^ { str => Arrow() }
-  }
-
-  def period: Parser[Period] = {
-    "." ^^ { str => Period() }
   }
 
   def comment: Parser[Comment] = {
@@ -81,7 +51,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | comma | colon | tik | dquote | arrow | equals | tilda | period | enclosure | comment )) ^^ { rawTokens =>
+    phrase(rep1(identifier | number | symbol | dquote | enclosure | comment )) ^^ { rawTokens =>
       rawTokens
     }
   }
