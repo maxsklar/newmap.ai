@@ -68,23 +68,6 @@ object Evaluator {
     }
   }
 
-  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
-
-  def lookupVersionedObject(
-    id: String,
-    env: Environment
-  ): Outcome[VersionedObjectLink, String] = {
-    for {
-      versionedObject <- Outcome(env.lookup(id), s"Identifier $id not found!")
-
-      versionedO <- versionedObject match {
-        case EnvironmentBinding(vo@VersionedObjectLink(_)) => Success(vo)
-        case EnvironmentBinding(nObject) => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
-        case EnvironmentParameter(_) => Failure(s"Identifier $id is a parameter, should be an object")
-      }
-    } yield versionedO
-  }
-
   def latestVersion(uuid: UUID, env: Environment): Outcome[Long, String] = {
     env.latestVersionNumber.get(uuid) match {
       case Some(v) => Success(v)

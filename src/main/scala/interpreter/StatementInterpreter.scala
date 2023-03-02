@@ -112,7 +112,7 @@ object StatementInterpreter {
             case None => {
               // IT's an object, not a channel
               for {
-                vDestination <- Evaluator.lookupVersionedObject(destination.s, env)
+                vDestination <- env.lookupVersionedObject(destination.s)
               } yield {
                 IterateIntoCommand(iterableObject, destination.s)
               }
@@ -122,13 +122,13 @@ object StatementInterpreter {
       }
       case ForkedVersionedStatementParse(id, forkId) => {
         for {
-          vObject <- Evaluator.lookupVersionedObject(forkId.s, env)
+          vObject <- env.lookupVersionedObject(forkId.s)
         } yield {
           ForkEnvironmentCommand(id.s, vObject)
         }
       }
       case ApplyCommandStatementParse(id, command) => {
-        Evaluator.lookupVersionedObject(id.s, env) match {
+        env.lookupVersionedObject(id.s) match {
           case Success(versionedObjectLink) => {
             // Now we also need to look this up in the type system!!!
             val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
@@ -188,7 +188,7 @@ object StatementInterpreter {
       }
       case ConnectChannelParse(channelId, obj) => {
         val channel = UIdentifier(channelId.s)
-        Evaluator.lookupVersionedObject(obj.s, env) match {
+        env.lookupVersionedObject(obj.s) match {
           case Success(versionedObjectLink) => {
             val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
 
@@ -217,7 +217,7 @@ object StatementInterpreter {
       }
       case DisconnectChannelParse(channelId, obj) => {
         val channel = UIdentifier(channelId.s)
-        Evaluator.lookupVersionedObject(obj.s, env) match {
+        env.lookupVersionedObject(obj.s) match {
           case Success(versionedObjectLink) => {
             // No need for type checking when we are disconnecting
             Success(DisconnectChannel(channel, obj.s))

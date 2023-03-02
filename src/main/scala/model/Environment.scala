@@ -6,145 +6,6 @@ import ai.newmap.interpreter._
 import ai.newmap.util.{Outcome, Success, Failure}
 import java.util.UUID
 
-sealed abstract class EnvironmentCommand {
-  def displayString(env: Environment): String
-  override def toString(): String = displayString(Environment.Base)
-}
-
-case class FullEnvironmentCommand(
-  id: String,
-  nObject: NewMapObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"val $id = ${nObject.displayString(env)}"
-  }
-}
-
-case class NewVersionedStatementCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"ver $id = new ${PrintNewMapObject.newMapType(nType, env.typeSystem)}"
-  }
-}
-
-case class NewTypeCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"data $id = ${PrintNewMapObject.newMapType(nType, env.typeSystem)}"
-  }
-}
-
-case class NewParamTypeCommand(
-  id: String,
-  paramList: Vector[(String, NewMapType)],
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"data $id ${paramList}"
-  }
-}
-
-case class NewTypeClassCommand(
-  id: String,
-  typeTransform: Vector[(UntaggedObject, UntaggedObject)]
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"typeclass $id ${typeTransform}"
-  }
-}
-
-case class IterateIntoCommand(
-  iterableObject: NewMapObject,
-  destinationObject: String
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"iterate ${iterableObject.displayString(env)} into ${destinationObject}"
-  }
-}
-
-case class ApplyIndividualCommand(
-  id: String,
-  nObject: UntaggedObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    "" //s"update $id $nObject"
-  }
-}
-
-case class ForkEnvironmentCommand(
-  id: String,
-  vObject: VersionedObjectLink
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"ver $id = fork ${vObject}"
-  }
-}
-
-case class ParameterEnvironmentCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"parameter $id: ${nType}"
-  }
-}
-
-case class ExpOnlyEnvironmentCommand(
-  nObject: NewMapObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = nObject.displayString(env)
-}
-
-case class AddChannel(
-  channel: UntaggedObject,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = s"addChannel $channel ${nType.displayString(env)}"
-}
-
-case class ConnectChannel(
-  channel: UntaggedObject,
-  versionedObject: String
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = s"connectChannel $channel $versionedObject}"
-}
-
-case class DisconnectChannel(
-  channel: UntaggedObject,
-  versionedObject: String
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = s"disconnectChannel $channel $versionedObject}"
-}
-
-// These are "side effects"
-// In some environments, these sides effect are "piped" to other objects
-case class OutputToChannel(
-  nObject: UntaggedObject,
-  channel: UntaggedObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = ""
-}
-
-// This should be generalized as "output to a file handle" but for now, just stdout
-// We will not call this directly, only from the stdout channel
-case class OutputToStdout(
-  nObject: UntaggedObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = ""
-}
-
-
-case class IterateIntoChannel(
-  nObject: UntaggedObject,
-  channel: UntaggedObject
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = ""
-}
-
 sealed abstract class EnvironmentValue
 
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
@@ -153,20 +14,23 @@ case class EnvironmentParameter(nType: NewMapType) extends EnvironmentValue
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
+  // A History of the commands given to this environment
   commands: Vector[EnvironmentCommand] = Vector.empty,
+
+  // A Map of all the variable bindings
   idToObject: ListMap[String, EnvironmentValue] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
-  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem, // Also a stored versioned type, but a special one!
+
+  // Also a stored versioned type, but a special one!
+  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem,
   channelIdToType: Map[String, NewMapType] = Environment.initialChannelToType,
-  channelIdToObjectCommands: Map[String, Set[String]] = Map.empty, // Map representing a list of objects to send commands to from a channelId
+
+  // Map representing a list of objects to send commands to from a channelId
+  channelIdToObjectCommands: Map[String, Set[String]] = Map.empty,
   printStdout: Boolean = true
 ) {
-  def lookup(identifier: String): Option[EnvironmentValue] = {
-    idToObject.get(identifier)
-  }
-
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
     for ((id, envValue) <- idToObject) {
@@ -177,6 +41,24 @@ case class Environment(
       builder.append(s"${command.toString}\n")
     }
     builder.toString
+  }
+
+  def lookup(identifier: String): Option[EnvironmentValue] = {
+    idToObject.get(identifier)
+  }
+
+  def lookupVersionedObject(
+    id: String
+  ): Outcome[VersionedObjectLink, String] = {
+    for {
+      versionedObject <- Outcome(lookup(id), s"Identifier $id not found!")
+
+      versionedO <- versionedObject match {
+        case EnvironmentBinding(vo@VersionedObjectLink(_)) => Success(vo)
+        case EnvironmentBinding(nObject) => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
+        case EnvironmentParameter(_) => Failure(s"Identifier $id is a parameter, should be an object")
+      }
+    } yield versionedO
   }
 
   def printTypes: String = {
@@ -320,7 +202,7 @@ case class Environment(
               command <- commandList
             } {
               val convertedCommandO = for {
-                versionedObjectLink <- Evaluator.lookupVersionedObject(destinationObject, this)
+                versionedObjectLink <- lookupVersionedObject(destinationObject)
                 nType = RetrieveType.fromNewMapObject(versionedObjectLink, this)
 
                 itemType <- IterationUtils.iterationItemType(nType, this)
@@ -353,7 +235,7 @@ case class Environment(
 
         // Maybe s is also a stdout (as in println)
 
-        val retVal = Evaluator.lookupVersionedObject(s, this) match {
+        val retVal = lookupVersionedObject(s) match {
           case Success(versionLink) => {
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
