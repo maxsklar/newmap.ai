@@ -713,6 +713,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
+      CodeExpectation("val length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
+      CodeExpectation("def length: ReqMaq(ListOfCounts, Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
       CodeExpectation("def length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", GeneralSuccessCheck),
       CodeExpectation("length Empty", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(0, CountT)))),
       CodeExpectation("length (Node|(6, Node|(2, Empty)))", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, CountT)))),
