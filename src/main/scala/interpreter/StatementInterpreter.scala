@@ -22,15 +22,13 @@ object StatementInterpreter {
 
 
           // If prefix is DefStatement then make sure nType is a potentially recursive function!
+          // Also update the environment with the name because it's potentially recursive
           // TODO - shouldn't this check happen in the type checker?
-          _ <- nType match {
-            case _ if (prefix != DefStatement) => Success()
-            case MapT(_, MapConfig(_, featureSet, _, _, _)) if (featureSet.getLevel >= WellFoundedFunction.getLevel) => Success()
+          newEnv <- nType match {
+            case _ if (prefix != DefStatement) => Success(env)
+            case MapT(_, MapConfig(_, featureSet, _, _, _)) if (featureSet.getLevel >= WellFoundedFunction.getLevel) => Success(env.newParam(id.s, nType))
             case _ => Failure("A def statment should define a function that is Full or Well Founded. For other values or functions, use a val or ver statement instead")
           }
-
-          // And also put that in the env
-          newEnv = if (prefix == DefStatement) env.newParam(id.s, nType) else env
 
           tc <- TypeChecker.typeCheck(objExpression, nType, newEnv, FullFunction)
           evaluatedObject <- Evaluator(tc.nExpression, newEnv)
