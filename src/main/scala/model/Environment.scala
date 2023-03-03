@@ -101,7 +101,36 @@ case class Environment(
     val newCommands = commands :+ command
 
     command match {
-      case FullEnvironmentCommand(s, nObject) => {
+      case FullEnvironmentCommand(s, nObjectFunc, true) => nObjectFunc match {
+        case TaggedObject(uObject, nType) => {
+          val updatedEnv = this.newCommand(
+            ApplyIndividualCommand(
+              "__FunctionSystem",
+              UMap(
+                Vector(UIndex(0) -> UIdentifier(s), UIndex(1) -> UCase(typeSystem.typeToUntaggedObject(nType), uObject))
+              )
+            )
+          )
+
+          val fSystemId = updatedEnv.lookup("__FunctionSystem") match {
+            case Some(EnvironmentBinding(VersionedObjectLink(VersionedObjectKey(_, uuid)))) => uuid
+            case f => {
+              throw new Exception(s"Can't handle Function System $f")
+            }
+          }
+
+          val fLink = UFunctionLink(UIdentifier(s), fSystemId)
+
+          updatedEnv.copy(
+            commands = newCommands,
+            idToObject = idToObject + (s -> EnvironmentBinding(TaggedObject(fLink, nType)))
+          )
+        }
+        case _ => {
+          throw new Exception(s"Can't handle this yet: ${nObjectFunc.displayString(this)}")
+        }
+      }
+      case FullEnvironmentCommand(s, nObject, false) => {
         this.copy(
           commands = newCommands,
           idToObject = idToObject + (s -> EnvironmentBinding(nObject))
@@ -291,7 +320,7 @@ case class Environment(
 
         retVal match {
           case Success(s) => s
-          case Failure(f) => throw new Exception(s"type checker failed on command $command: $f")
+          case Failure(f) => throw new Exception(s"type checker failed on command $command: $f \n -- $retVal")
         }
       }
       case ForkEnvironmentCommand(s, vObject) => {
@@ -632,6 +661,7 @@ object Environment {
         SimpleFunction
       )
     ),
-    NewTypeCommand("Object", NewMapO.taggedObjectT)
+    NewTypeCommand("Object", NewMapO.taggedObjectT),
+    NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty))
   ))
 }

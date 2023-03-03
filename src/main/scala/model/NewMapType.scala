@@ -182,6 +182,16 @@ case class SubtypeT(
   featureSet: MapFeatureSet = BasicMap
 ) extends NewMapType
 
+/** 
+ * This represents a "system" of functions that are potentially mutually recursive on one another.
+ * The keys (the way we name these functions) are assumed to identifier, so no need to give it one.
+ * The values are MapT type signatures
+ */
+case class FunctionalSystemT(
+  // Contains the type of each function
+  functionTypes: Vector[(UntaggedObject, UntaggedObject)]
+) extends NewMapType
+
 case class CustomT(
   name: String,
   params: UntaggedObject

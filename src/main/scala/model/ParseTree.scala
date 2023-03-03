@@ -134,6 +134,7 @@ case class IterateIntoStatementParse(
 
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
+case object DefStatement extends StatementPrefix
 
 sealed abstract class BinaryOpParse
 

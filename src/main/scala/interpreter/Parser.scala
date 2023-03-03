@@ -245,6 +245,14 @@ object NewMapParser extends Parsers {
     }
   }
 
+  private def defineFunction: Parser[FullStatementParse] = {
+    Lexer.Identifier("def") ~ identifier ~ Lexer.Symbol(":") ~ expressionListWithOperations ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
+      case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
+        FullStatementParse(DefStatement, id, typeExp, exp)
+      }
+    }
+  }
+
   private def newVersionedStatement: Parser[NewVersionedStatementParse] = {
     Lexer.Identifier("ver") ~ identifier ~ Lexer.Symbol("=") ~ Lexer.Identifier("new") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ _ ~ exp => {
@@ -407,7 +415,7 @@ object NewMapParser extends Parsers {
       ai.newmap.util.Success(ExpressionOnlyStatementParse(EmptyParse()))
     } else {
       val reader = new TokenReader(tokensWithoutComments)
-      val program = phrase(fullStatement | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
+      val program = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
 
       program(reader) match {
         case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)

@@ -68,6 +68,9 @@ object CommandMaps {
       case StructT(params, _, _, _) if (params.length == 0) => {
         Success(defaultUMap)
       }
+      case FunctionalSystemT(functionTypes) if functionTypes.length == 0 => {
+        Success(defaultUMap)
+      }
       /*case TypeClassT(typeTransform, implementation) if (implementation.isEmpty) => {
         Success(defaultUMap)
       }*/
@@ -362,6 +365,15 @@ object CommandMaps {
           }
         }
       }
+      case FunctionalSystemT(functionTypes) => {
+        Success(StructT(
+          Vector(
+            UIndex(0) -> env.typeSystem.typeToUntaggedObject(IdentifierT),
+            UIndex(1) -> env.typeSystem.typeToUntaggedObject(NewMapO.taggedObjectT)
+          ),
+          IndexTN(2)
+        ))
+      }
       case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         // We may have the option to wanting to expand this struct!
         // TODO: This is one of the cases where the type CHANGES when you update the object
@@ -380,7 +392,7 @@ object CommandMaps {
           ),
           IndexTN(2)
         ))
-    }
+      }
       case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
@@ -576,6 +588,78 @@ object CommandMaps {
           }
         }
       }
+      case FunctionalSystemT(functionTypes) => {
+        for {
+          untaggedCurrent <- Evaluator.removeTypeTag(current)
+          currentMapping <- untaggedCurrent match {
+            case UMap(m) => Success(m)
+            case _ => Failure(s"Function not a mapping: $untaggedCurrent")
+          }
+
+          newFunctionNameObj <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+
+          currentFunctionType <- Evaluator.applyFunctionAttempt(UMap(functionTypes), newFunctionNameObj, env)
+          currentFunctionT <- env.typeSystem.convertToNewMapType(currentFunctionType)
+
+          currentFunctionTPair <- componentsOfMapType(currentFunctionT, env)
+          currentFunctionTypeTransform = currentFunctionTPair._1
+          currentFunctionMapConfig = currentFunctionTPair._2
+
+          newFunctionObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+
+          newFunctionObjectComponents <- newFunctionObject match {
+            case UCase(t, UMap(pairs)) => Success(t -> pairs)
+            case _ => Failure(s"Recieved Unexpected Object: $newFunctionObject") 
+          }
+
+          uNewFunctionType = newFunctionObjectComponents._1
+          newFunctionT <- env.typeSystem.convertToNewMapType(uNewFunctionType)
+
+          newFunctionTPair <- componentsOfMapType(newFunctionT, env)
+          newFunctionTypeTransform = newFunctionTPair._1
+          newFunctionMapConfig = newFunctionTPair._2
+
+          uNewFunctionMapping = newFunctionObjectComponents._2
+
+          composedCompleteness <- if (currentFunctionMapConfig.completeness == newFunctionMapConfig.completeness) {
+            Success(currentFunctionMapConfig.completeness)
+          } else {
+            Failure(s"Completeness doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
+          }
+
+          composedChannelParentType <- if (currentFunctionMapConfig.channelParentType == newFunctionMapConfig.channelParentType) {
+            Success(currentFunctionMapConfig.channelParentType)
+          } else {
+            Failure(s"channelParentType doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
+          }
+        } yield {
+          val composedTypeTransForm = newFunctionTypeTransform ++ currentFunctionTypeTransform
+
+          val composedFeatureSet = if (currentFunctionMapConfig.featureSet.getLevel > newFunctionMapConfig.featureSet.getLevel) {
+            currentFunctionMapConfig.featureSet
+          } else {
+            newFunctionMapConfig.featureSet
+          }
+
+          val composedMapConfig = MapConfig(
+            composedCompleteness,
+            composedFeatureSet,
+            currentFunctionMapConfig.preservationRules ++ newFunctionMapConfig.preservationRules,
+            newFunctionMapConfig.channels ++ currentFunctionMapConfig.channels,
+            composedChannelParentType
+          )
+
+          // Object to upgrade the functionalSystemT
+          val composedTypeObject = env.typeSystem.typeToUntaggedObject(MapT(UMap(composedTypeTransForm), composedMapConfig))
+
+          // Also upgrade the function itself
+          // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
+          TaggedObject(
+            UMap((newFunctionNameObj -> UMap(uNewFunctionMapping)) +: currentMapping),
+            FunctionalSystemT((newFunctionNameObj -> composedTypeObject) +: functionTypes)
+          )
+        }
+      }
       case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         for {
           mapValues <- current match {
@@ -679,6 +763,18 @@ object CommandMaps {
         Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")
       }
     }
+  }
+
+  def componentsOfMapType(
+    nType: NewMapType,
+    env: Environment
+  ): Outcome[(Vector[(UntaggedObject, UntaggedObject)], MapConfig), String] = nType match {
+    case MapT(UMap(typeTransform), config) => Success(typeTransform -> config)
+    case UndefinedT => Success(
+      Vector.empty,
+      MapConfig(RequireCompleteness, BasicMap)
+    )
+    case _ => Failure(s"Unexpected function type: ${nType.displayString(env)}")
   }
 
   def getDefaultValueFromStructParams(

@@ -100,6 +100,7 @@ case class NewMapTypeSystem(
       typeToUntaggedObject(parentType),
       UIdentifier(featureSet.getName)
     )))
+    case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
     case CustomT(name, params) => UCase(UIdentifier(name), params)
     case WithStateT(uuid, nType) => {
       UCase(
@@ -494,7 +495,6 @@ object NewMapTypeSystem {
         "Boolean" -> java.util.UUID.randomUUID,
         "Byte" -> java.util.UUID.randomUUID,
         "Character" -> java.util.UUID.randomUUID,
-        //"String" -> java.util.UUID.randomUUID,
         "Long" -> java.util.UUID.randomUUID,
         "Double" -> java.util.UUID.randomUUID,
         "Uuit" -> java.util.UUID.randomUUID,

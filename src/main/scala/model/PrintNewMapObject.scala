@@ -130,6 +130,7 @@ object PrintNewMapObject {
       //TODO(2022): we might not want to print out the full parent here, because it could be large
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
       case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+      case FunctionalSystemT(functionTypes) => s"FunctionalSystem(${untagged(UMap(functionTypes))})"
       case WithStateT(uuid, nType) => {
         newMapType(nType, typeSystem, Some(uuid))
         /*if (typeSystem.currentState == uuid) {
@@ -191,7 +192,7 @@ object PrintNewMapObject {
       if (isEmptyMap(value)) {
         untagged(constructor)
       } else {
-        untagged(constructor) + "." + untagged(value)
+        untagged(constructor) + "|" + untagged(value)
       }
     }
     case UIndex(i) => i.toString
@@ -207,6 +208,9 @@ object PrintNewMapObject {
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
     case Uuuid(value) => s"$value"
+    case UFunctionLink(functionName, functionalSystem) => {
+      s"${untagged(functionName)}~$functionalSystem}"
+    }
     case UWildcardPattern(name) => "W~" + name
     case ParamId(name) => s"$name~pi"
     case ApplyFunction(func, input, matchingRules) => {

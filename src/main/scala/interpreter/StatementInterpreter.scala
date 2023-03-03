@@ -14,17 +14,23 @@ object StatementInterpreter {
     env: Environment
   ): Outcome[EnvironmentCommand, String] = {
     sParse match {
-      case FullStatementParse(_, id, typeExpression, objExpression) => {
+      case FullStatementParse(prefix, id, typeExpression, objExpression) => {
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
-          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction)
-          evaluatedObject <- Evaluator(tc.nExpression, env)
-          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
+
+          // TODO: If prefix is DefStatement then make sure nType is a function!
+          
+          // And also put that in the env
+          newEnv = if (prefix == DefStatement) env.newParam(id.s, nType) else env
+
+          tc <- TypeChecker.typeCheck(objExpression, nType, newEnv, FullFunction)
+          evaluatedObject <- Evaluator(tc.nExpression, newEnv)
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, newEnv)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, newEnv)
         } yield {
-          FullEnvironmentCommand(id.s, nObject)
+          FullEnvironmentCommand(id.s, nObject, prefix == DefStatement)
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
@@ -243,7 +249,7 @@ object StatementInterpreter {
           evaluatedObject <- Evaluator(tc.nExpression, env)
           nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc.refinedTypeClass, env)
         } yield {
-          FullEnvironmentCommand(id.s, nObject)
+          FullEnvironmentCommand(id.s, nObject, false)
         }
       }
       case ExpressionOnlyStatementParse(exp) => {

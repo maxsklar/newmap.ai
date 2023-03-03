@@ -34,6 +34,12 @@ case class ULet(commands: Vector[EnvironmentCommand], output: UntaggedObject) ex
 case object UInit extends UntaggedObject
 case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
+// This is the name of a function, which is going to be calling other functions in the context of the function system given.
+case class UFunctionLink(
+  functionName: UntaggedObject,
+  functionalSystem: UUID
+) extends UntaggedObject
+
 // To be moved into user-defined types soon
 case class UByte(value: Byte) extends UntaggedObject
 case class UCharacter(value: Char) extends UntaggedObject

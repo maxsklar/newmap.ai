@@ -178,8 +178,20 @@ object Evaluator {
 
         Success(if (isCommand) UIndex(1) else UInit)
       }
+      case UFunctionLink(name, uuid) => {
+        for {
+          // TODO - don't ignore the uuid if we're using an old functional system
+          fSystemV <- env.lookupVersionedObject("__FunctionSystem")
+          fSystem = stripVersioning(fSystemV, env)
+          uFSystem <- removeTypeTag(fSystem)
+
+          uFunction <- applyFunctionAttempt(uFSystem, name, env)
+          result <- applyFunctionAttempt(uFunction, input, env)
+        } yield {
+          result
+        }
+      }
       case _ => {
-        //throw new Exception(s"Not implemented: apply function\nFunction: $func\nInput: $input")
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
       }
     }
