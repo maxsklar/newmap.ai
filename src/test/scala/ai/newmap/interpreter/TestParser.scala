@@ -69,7 +69,7 @@ class TestParser extends FlatSpec {
       Symbol("="), 
       Number(5)
     )
-    assert(NewMapParser.statementParse(tokens) == 
+    assert(NewMapParser.statementParse(tokens) ==
       Success(
         FullStatementParse(ValStatement,
           IdentifierParse("a", false),
@@ -126,7 +126,7 @@ class TestParser extends FlatSpec {
       Number(67), 
       Enc(Paren,false)
     )
-    assert(NewMapParser.statementParse(tokens) == 
+    assert(NewMapParser.statementParse(tokens) ==
       Success(
         FullStatementParse(ValStatement,
           IdentifierParse("a",false),
