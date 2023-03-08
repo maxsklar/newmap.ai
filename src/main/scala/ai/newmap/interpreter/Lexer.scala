@@ -2,7 +2,7 @@ package ai.newmap.interpreter
 
 import ai.newmap.model._
 import scala.util.parsing.combinator.RegexParsers
-import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.util.Outcome
 
 object Lexer extends RegexParsers {
   sealed trait Token

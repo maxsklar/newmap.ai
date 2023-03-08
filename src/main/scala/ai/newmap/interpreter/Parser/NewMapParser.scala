@@ -1,16 +1,14 @@
-package ai.newmap.interpreter
+package ai.newmap.interpreter.Parser
 
+import ai.newmap.interpreter.Lexer
 import ai.newmap.model.{EnvStatementParse, ParseTree}
 import ai.newmap.util.{Failure, Outcome, Success}
 
 object NewMapParser {
-  def apply(
-             tokens: Seq[Lexer.Token]
-           ): Outcome[ParseTree, String] = {
+  def apply(tokens: Seq[Lexer.Token]): Outcome[ParseTree, String] = {
+    val parseTree = NewMapStateMachineParser(tokens)
 
-    val result = NewMapStateMachineParser(tokens)
-
-    result match {
+    parseTree match {
 
       case Failure(v) =>
         if(v.equals("Unimplemented")) NewMapCombinatorParser(tokens)
@@ -19,9 +17,7 @@ object NewMapParser {
     }
   }
 
-  def statementParse(
-                      tokens: Seq[Lexer.Token]
-                    ): Outcome[EnvStatementParse, String] = {
+  def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
     val statementParse = NewMapStateMachineParser.statementParse(tokens)
 
     statementParse match {

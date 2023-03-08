@@ -1,19 +1,14 @@
-package ai.newmap.interpreter
+package ai.newmap.interpreter.Parser
 
+import ai.newmap.interpreter.Lexer
+import ai.newmap.interpreter.Parser.TokenUtils.TokenStream
 import ai.newmap.model._
-import scala.util.parsing.combinator.Parsers
-import scala.util.parsing.input.{Reader, Position, NoPosition}
 import ai.newmap.util.Outcome
+
+import scala.util.parsing.combinator.Parsers
 
 object NewMapCombinatorParser extends Parsers {
   override type Elem = Lexer.Token
-
-  class TokenReader(tokens: Seq[Lexer.Token]) extends Reader[Lexer.Token] {
-    override def first: Lexer.Token = tokens.head
-    override def atEnd: Boolean = tokens.isEmpty
-    override def pos: Position = NoPosition
-    override def rest: Reader[Lexer.Token] = new TokenReader(tokens.tail)
-  }
 
   private def naturalNumber: Parser[NaturalNumberParse] = {
     accept("number", { case Lexer.Number(i) =>
@@ -116,9 +111,9 @@ object NewMapCombinatorParser extends Parsers {
     pattern ^^ {
       case startingExp ~ otherExps =>
 
-        val o0: Vector[(BinaryOpParse, ParseTree)] = otherExps.map(_ match {
-          case (symbol ~ exp) => (symbol, exp)
-        }).toVector
+        val o0: Vector[(BinaryOpParse, ParseTree)] = otherExps.map {
+          case symbol ~ exp => (symbol, exp)
+        }.toVector
 
         // Precedence of operations is, highest to lowest: Period, Colon, Comma, Arrow
         // Arrow associates to the right, while the others associate to the left
@@ -126,11 +121,11 @@ object NewMapCombinatorParser extends Parsers {
         // TODO - this binding code is confusing. It's just order of operations, should be
         //  possible to rewrite
 
-        val (s2, o2) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, first) => {
+        val (s2, o2) = bindBinaryOpParse(startingExp, o0, ColonBinaryOpParse(), (a, b, _) => {
           KeyValueBinding(a, b)
         })
 
-        val (s3, o3) = bindBinaryOpParse(s2, o2, CommaBinaryOpParse(), (a, b, first) => {
+        val (s3, o3) = bindBinaryOpParse(s2, o2, CommaBinaryOpParse(), (a, b, _) => {
           // LiteralListParse(Vector(a, b), _)
           // This part of the parser has been such an annoyance!!
           // Assumed to be a map and not an array without brackets
@@ -142,7 +137,7 @@ object NewMapCombinatorParser extends Parsers {
 
         def bindArrow(in: ParseTree, out: ParseTree, first: Boolean): ParseTree = {
           in match {
-            case LambdaParse(inIn, inOut) if (!first) => LambdaParse(inIn, bindArrow(inOut, out, first = false))
+            case LambdaParse(inIn, inOut) if !first => LambdaParse(inIn, bindArrow(inOut, out, first = false))
             case _ => LambdaParse(in, out)
           }
         }
@@ -159,7 +154,7 @@ object NewMapCombinatorParser extends Parsers {
     }
   }
 
-  def bindBinaryOpParse(
+  private def bindBinaryOpParse(
     startingExp: ParseTree,
     otherExpressions: Vector[(BinaryOpParse, ParseTree)],
     binaryOpToBind: BinaryOpParse,
@@ -214,9 +209,9 @@ object NewMapCombinatorParser extends Parsers {
     val pattern = rep(baseExpression ~ Lexer.Symbol("|")) ~ baseExpression
     pattern ^^ {
       case startingExps ~ lastExp =>
-        val start: Vector[ParseTree] = startingExps.map(_ match {
-          case (exp ~ _) => exp
-        }).toVector
+        val start: Vector[ParseTree] = startingExps.map {
+          case exp ~ _ => exp
+        }.toVector
 
         val fullExps = start :+ lastExp
         fullExps reduceLeft ConstructCaseParse
@@ -224,9 +219,7 @@ object NewMapCombinatorParser extends Parsers {
   }
 
   private def expressionList: Parser[ParseTree] = {
-    rep1(baseExpressionWithFieldAccess) ^^ {
-      case exps => exps reduceLeft ApplyParse
-    }
+    rep1(baseExpressionWithFieldAccess) ^^ (exps => exps reduceLeft ApplyParse)
   }
 
   private def fullStatement: Parser[FullStatementParse] = {
@@ -308,7 +301,7 @@ object NewMapCombinatorParser extends Parsers {
     }
   }
 
-  private def addChannel: Parser[AddChannelParse] = {
+  private def addChannel(): Parser[AddChannelParse] = {
     Lexer.Identifier("addChannel") ~ identifier ~ expressionListWithOperations ^^ {
       case _ ~ id ~ obj =>
         AddChannelParse(id, obj)
@@ -343,15 +336,13 @@ object NewMapCombinatorParser extends Parsers {
     }
   }
 
-  private def expOnlyStatmentParse: Parser[ExpressionOnlyStatementParse] = {
-    expressionListWithOperations ^^ {
-      case exp =>
-        ExpressionOnlyStatementParse(exp)
-    }
+  private def expOnlyStatementParse: Parser[ExpressionOnlyStatementParse] = {
+    expressionListWithOperations ^^ (exp =>
+      ExpressionOnlyStatementParse(exp))
   }
 
-  // New Statment for defining a function
-  /*private def defFunctionStatment: Parser[DefineFunctionStatment] = {
+  // New Statement for defining a function
+  /*private def defFunctionStatement: Parser[DefineFunctionStatement] = {
     Lexer.Identifier("def") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
       case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
         FullStatementParse(ValStatement, id, typeExp, exp)
@@ -359,44 +350,27 @@ object NewMapCombinatorParser extends Parsers {
     }
   }*/
 
-  def apply(
-    tokens: Seq[Lexer.Token]
-  ): Outcome[ParseTree, String] = {
-    val tokensWithoutComments = tokens.filter(!isComment(_))
-
-    if (tokensWithoutComments.isEmpty) {
-      ai.newmap.util.Success(EmptyParse())
+  private def parse(tokens: Seq[Lexer.Token], emptyResult: Any, phrase: Parser[Any]): Outcome[Any, String] ={
+    val tokenStream = new TokenStream(tokens, removeTokens = true)
+    if (tokenStream.isEmpty) {
+      ai.newmap.util.Success(emptyResult)
     } else {
-      val reader = new TokenReader(tokensWithoutComments)
-      val program = phrase(expressionListWithOperations)
-
-      program(reader) match {
-        case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
-        case Success(result, next) => ai.newmap.util.Success(result)
+      val program = phrase
+      program(tokenStream.getReader) match {
+        case NoSuccess(msg, _) => ai.newmap.util.Failure(msg)
+        case Success(result, _) => ai.newmap.util.Success(result)
       }
     }
   }
 
-  def isComment(token: Lexer.Token): Boolean = token match {
-    case Lexer.Comment(_) => true
-    case _ => false
+  def apply(tokens: Seq[Lexer.Token]): Outcome[ParseTree, String] = {
+    val result = parse(tokens, EmptyParse(), phrase(expressionListWithOperations))
+    result.asInstanceOf[Outcome[ParseTree, String]]
   }
 
-  def statementParse(
-    tokens: Seq[Lexer.Token]
-  ): Outcome[EnvStatementParse, String] = {
-    val tokensWithoutComments = tokens.filter(!isComment(_))
-
-    if (tokensWithoutComments.isEmpty) {
-      ai.newmap.util.Success(ExpressionOnlyStatementParse(EmptyParse()))
-    } else {
-      val reader = new TokenReader(tokensWithoutComments)
-      val program = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatmentParse)
-
-      program(reader) match {
-        case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
-        case Success(result, next) => ai.newmap.util.Success(result)
-      }
-    }
+  def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
+    val parsePhrase = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatementParse)
+    val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse()), parsePhrase)
+    result.asInstanceOf[Outcome[EnvStatementParse, String]]
   }
 }

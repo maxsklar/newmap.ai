@@ -1,9 +1,8 @@
 package ai.newmap.interpreter
 
 import ai.newmap.model._
-import ai.newmap.util.{Outcome, Success, Failure}
 
-// Subsitute the given parameters for their given values in the expression
+// Substitute the given parameters for their given values in the expression
 object MakeSubstitution {
   def apply(
     expression: UntaggedObject,
