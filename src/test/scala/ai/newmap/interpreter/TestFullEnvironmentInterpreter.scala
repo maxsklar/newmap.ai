@@ -1,9 +1,6 @@
 package ai.newmap.interpreter
 
 import org.scalatest._
-import ai.newmap.interpreter._
-import ai.newmap.interpreter.Lexer._
-import ai.newmap.interpreter.NewMapParser._
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success}
 
@@ -45,19 +42,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * on each line, you can check that it succeeds, fails, or 
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
-    val interp = new EnvironmentInterpreter(
+    val interpreter = new EnvironmentInterpreter(
       useInitialCommands = true,
       printInitCommandErrors = false,
       suppressStdout = true
     )
 
     expectations.foreach(expectation => {
-      val interpretation = interp(expectation.line)
+      val interpretation = interpreter(expectation.line)
       expectation.resultExpectation match {
         case FailureCheck => assert(interpretation.isFailure)
         case GeneralSuccessCheck => {
           interpretation match {
-            case Success(msg) => ()
+            case Success(_) => ()
             case Failure(msg) => fail(msg)
           }
         }

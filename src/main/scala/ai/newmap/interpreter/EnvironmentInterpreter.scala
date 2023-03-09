@@ -1,8 +1,9 @@
 package ai.newmap.interpreter
 
+import ai.newmap.interpreter.Parser.NewMapParser
 import ai.newmap.model._
-import ai.newmap.interpreter.TypeChecker._
 import ai.newmap.util.{Outcome, Success, Failure}
+
 import java.io.File
 import scala.io.Source
 

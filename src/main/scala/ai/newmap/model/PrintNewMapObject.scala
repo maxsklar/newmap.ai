@@ -1,12 +1,10 @@
 package ai.newmap.model
 
-import scala.collection.mutable.StringBuilder
-import ai.newmap.model._
-import java.util.UUID
-import ai.newmap.util.{Outcome, Success, Failure}
-
 // CAREFUL! This should not be imported here, need to move some things around
 import ai.newmap.interpreter.Evaluator
+
+import java.util.UUID
+import ai.newmap.util.{Outcome, Success, Failure}
 
 object PrintNewMapObject {
   def apply(obj: NewMapObject, env: Environment): String = obj match {

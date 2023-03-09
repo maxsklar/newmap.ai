@@ -1,8 +1,7 @@
 package ai.newmap.interpreter
 
+import ai.newmap.interpreter.Lexer.{Enc, Identifier, Number, Symbol}
 import org.scalatest._
-import ai.newmap.interpreter._
-import ai.newmap.interpreter.Lexer._
 import ai.newmap.model.Paren
 import ai.newmap.util.Success
 
@@ -44,7 +43,7 @@ class TestLexer extends FlatSpec {
 
   "A constructed value " should " be lexed correctly" in {
     assert(Lexer("a|b") == Success(List(
-      Identifier("a"), 
+      Identifier("a"),
       Symbol("|"), 
       Identifier("b")
     )))
