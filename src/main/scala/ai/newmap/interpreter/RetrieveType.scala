@@ -14,15 +14,14 @@ object RetrieveType {
 
   def isTermPatternFree(untaggedObject: UntaggedObject): Boolean = untaggedObject match {
     case UWildcardPattern(_) => false
-    case UCase(_, input) => isTermPatternFree(input)
+    case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
     case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
     case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))
     case _ => true
   }
 
   // Ensures that there are no free variables in this term
-  // TODO: Return a NewMapObject if this is the case?
-  // TODO: This can be handled by a specialized type-checker on UntaggedObject (ripe for removing this code)
+  // TODO: See if this can be handled by a specialized type-checker on UntaggedObject (ripe for removing this code)
   // - But it's not that simple yet
   def isTermClosedLiteral(
     nExpression: UntaggedObject,

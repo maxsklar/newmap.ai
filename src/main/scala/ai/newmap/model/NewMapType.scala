@@ -131,6 +131,7 @@ object FullFunction extends MapFeatureSet {
   variance: Option[TypeParameterVariance] = None, // If none - then variance is inferred
 )
 
+//  How does this framework make sense in a Type Transformer world?
 case class TypeParameterVariance(
   isCovariant: Boolean,
   isContravariant: Boolean
@@ -143,7 +144,6 @@ case class TypeParameterVariance(
 // TODO: What about simpler product types (no identifiers) based on MapT(TypeT, Count, CommandOutput, BasicMap)
 
 // Params is a map from the fields of the struct to the Types (all the same level)
-// TODO: We also need a feature set!
 case class StructT(
   params: Vector[(UntaggedObject, UntaggedObject)],
   fieldParentType: NewMapType,

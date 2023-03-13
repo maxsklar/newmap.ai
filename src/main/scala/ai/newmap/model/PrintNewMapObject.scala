@@ -81,7 +81,7 @@ object PrintNewMapObject {
           referencedId <- typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)
         } yield {
           val legacyIndicator = if (currentId == referencedId) "" else s"[OLD:$referencedId]"
-          val includedParams = if (isEmptyMap(params)) "" else s".${untagged(params)}"
+          val includedParams = if (isEmptyMap(params)) "" else s"|${untagged(params)}"
 
           s"${legacyIndicator}${name}$includedParams"
         }

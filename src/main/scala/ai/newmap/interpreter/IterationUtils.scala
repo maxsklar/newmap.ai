@@ -15,14 +15,56 @@ object IterationUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      /*case CaseT(values, parentType, BasicMap) => {
-        ???
-      }*/
+      case Success(CaseT(cases, CustomT("String", UStruct(v)), BasicMap)) if (v.isEmpty) => {
+        for {
+          paramList <- StatementInterpreter.convertMapValuesToParamList(cases, env)
+          result <- enumerateCaseValues(paramList, env)
+        } yield result
+      }
       case Success(IndexT(UIndex(i))) => {
         Success((0 until i.toInt).map(j => UIndex(j.toLong)).toVector)
       }
       case Success(BooleanT) => {
         Success(Vector(UIndex(0), UIndex(1)))
+      }
+      case Success(StructT(params, parentFieldType, RequireCompleteness, BasicMap)) => {
+        // This is dangerous because the multiplications can cause a large blowout of allowed types
+        
+        params match {
+          case (name, firstParamType) +: otherParams => {
+            for {
+              firstParamT <- env.typeSystem.convertToNewMapType(firstParamType)
+              firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
+              otherParamValues <- enumerateAllValuesIfPossible(StructT(otherParams, parentFieldType, RequireCompleteness, BasicMap), env)
+            } yield {
+              val valueList = for {
+                firstParam <- firstParamValues
+                otherParam <- otherParamValues
+
+                otherParamValues <- otherParam match {
+                  case UStruct(values) => Some(values)
+                  case _ => None
+                }
+              } yield {
+                firstParam +: otherParamValues
+              }
+
+              valueList.map(v => UStruct(v))
+            }
+          }
+          case _ => {
+            Success(Vector(UStruct(Vector.empty)))
+          }
+        }
+        /*
+          case class StructT(
+            params: Vector[(UntaggedObject, UntaggedObject)],
+            fieldParentType: NewMapType,
+            completeness: MapCompleteness = RequireCompleteness,
+            featureSet: MapFeatureSet = BasicMap
+          ) extends NewMapType
+
+        */
       }
       case Success(undertype) => {
         //throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
@@ -44,6 +86,24 @@ object IterationUtils {
         }
       }
       case _ => Success(Vector.empty) 
+    }
+  }
+
+  def enumerateCaseValues(
+    cases: Vector[(String, NewMapType)],
+    env: Environment
+  ): Outcome[Vector[UntaggedObject], String] = {
+    cases match {
+      case firstCase +: otherCases => {
+        for {
+          firstCaseValues <- enumerateAllValuesIfPossible(firstCase._2, env)
+          otherCaseValues <- enumerateCaseValues(otherCases, env)
+        } yield {
+          val taggedFirstCaseVals = firstCaseValues.map(v => UCase(UIdentifier(firstCase._1), v))
+          taggedFirstCaseVals ++ otherCaseValues
+        }
+      }
+      case _ => Success(Vector.empty)
     }
   }
 
@@ -101,6 +161,12 @@ object IterationUtils {
         for {
           retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
           result <- iterateObject(retaggedCurrent, env, Some(typeSystemId))
+        } yield result
+      }
+      case TaggedObject(untaggedCurrent, TypeT) => {
+        for {
+          nType <- env.typeSystem.convertToNewMapType(untaggedCurrent)
+          result <- enumerateAllValuesIfPossible(nType, env)
         } yield result
       }
       case TaggedObject(untaggedCurrent, nType) => {
