@@ -1019,9 +1019,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
       CodeExpectation("val t: Type = 10", GeneralSuccessCheck),
-      // TODO: replace with this when the parser is better
-      //CodeExpectation("iterate 10 into appendedArray", GeneralSuccessCheck),
       CodeExpectation("iterate t into appendedArray", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(10), CountT)))),
+    ))
+  }
+
+  ignore should " be usable on types with a literal" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
+      CodeExpectation("val t: Type = 10", GeneralSuccessCheck),
+      CodeExpectation("iterate 10 into appendedArray", GeneralSuccessCheck),
       CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
       CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(10), CountT)))),
     ))
