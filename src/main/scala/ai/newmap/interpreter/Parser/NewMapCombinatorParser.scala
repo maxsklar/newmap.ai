@@ -315,12 +315,12 @@ object NewMapCombinatorParser extends Parsers {
     }
   }
 
-  private def disconnectChannel: Parser[DisconnectChannelParse] = {
-    Lexer.Identifier("disconnectChannel") ~ identifier ~ identifier ^^ {
-      case _ ~ id ~ obj =>
-        DisconnectChannelParse(id, obj)
-    }
-  }
+//  private def disconnectChannel: Parser[DisconnectChannelParse] = {
+//    Lexer.Identifier("disconnectChannel") ~ identifier ~ identifier ^^ {
+//      case _ ~ id ~ obj =>
+//        DisconnectChannelParse(id, obj)
+//    }
+//  }
 
   private def writeToChannel: Parser[WriteToChannelParse] = {
     Lexer.Identifier("write") ~ identifier ~ expressionListWithOperations ^^ {
@@ -369,7 +369,7 @@ object NewMapCombinatorParser extends Parsers {
   }
 
   def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
-    val parsePhrase = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatementParse)
+    val parsePhrase = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatementParse)
     val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse()), parsePhrase)
     result.asInstanceOf[Outcome[EnvStatementParse, String]]
   }
