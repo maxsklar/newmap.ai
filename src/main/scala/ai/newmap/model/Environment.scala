@@ -1,9 +1,11 @@
 package ai.newmap.model
 
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, SubtypeUtils}
+
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
-import ai.newmap.interpreter._
-import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.util.{Failure, Outcome, Success}
+
 import java.util.UUID
 
 sealed abstract class EnvironmentValue

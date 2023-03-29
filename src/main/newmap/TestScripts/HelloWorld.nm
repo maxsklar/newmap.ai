@@ -1,4 +1,2 @@
-// HelloWorld.nm
-
 val myString = "hello world !!\n"
 write stdout myString

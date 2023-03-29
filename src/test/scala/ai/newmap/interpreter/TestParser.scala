@@ -1,9 +1,8 @@
 package ai.newmap.interpreter
 
+import ai.newmap.interpreter.Lexer.{Enc, Identifier, Number, Symbol}
+import ai.newmap.interpreter.Parser.NewMapParser
 import org.scalatest._
-import ai.newmap.interpreter._
-import ai.newmap.interpreter.Lexer._
-import ai.newmap.interpreter.NewMapParser._
 import ai.newmap.model._
 import ai.newmap.util.Success
 
@@ -69,7 +68,7 @@ class TestParser extends FlatSpec {
       Symbol("="), 
       Number(5)
     )
-    assert(NewMapParser.statementParse(tokens) == 
+    assert(NewMapParser.statementParse(tokens) ==
       Success(
         FullStatementParse(ValStatement,
           IdentifierParse("a", false),
@@ -126,7 +125,7 @@ class TestParser extends FlatSpec {
       Number(67), 
       Enc(Paren,false)
     )
-    assert(NewMapParser.statementParse(tokens) == 
+    assert(NewMapParser.statementParse(tokens) ==
       Success(
         FullStatementParse(ValStatement,
           IdentifierParse("a",false),

@@ -102,6 +102,9 @@ object SubtypeUtils {
     params: Vector[(UntaggedObject, UntaggedObject)],
     env: Environment
   ): Outcome[Boolean, String] = {
+    // TODO: There is surely a better, more comprehensive algorithm for this, but
+    //  we'll have something here for now to attempt to solve this.
+
     // TODO: Implement
     Success(false)
   }

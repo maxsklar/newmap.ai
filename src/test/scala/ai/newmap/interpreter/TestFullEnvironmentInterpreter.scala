@@ -1,9 +1,6 @@
 package ai.newmap.interpreter
 
 import org.scalatest._
-import ai.newmap.interpreter._
-import ai.newmap.interpreter.Lexer._
-import ai.newmap.interpreter.NewMapParser._
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success}
 
@@ -45,19 +42,19 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * on each line, you can check that it succeeds, fails, or 
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
-    val interp = new EnvironmentInterpreter(
+    val interpreter = new EnvironmentInterpreter(
       useInitialCommands = true,
       printInitCommandErrors = false,
       suppressStdout = true
     )
 
     expectations.foreach(expectation => {
-      val interpretation = interp(expectation.line)
+      val interpretation = interpreter(expectation.line)
       expectation.resultExpectation match {
         case FailureCheck => assert(interpretation.isFailure)
         case GeneralSuccessCheck => {
           interpretation match {
-            case Success(msg) => ()
+            case Success(_) => ()
             case Failure(msg) => fail(msg)
           }
         }
@@ -273,6 +270,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver x = new ()", GeneralSuccessCheck),
       CodeExpectation("val o: Object = Count|3", GeneralSuccessCheck),
       CodeExpectation("update x (myField, o)", GeneralSuccessCheck),
+    ))
+  }
+
+  it should " be recognized as complete when in a pattern " in {
+    testCodeScript(Vector(
+      CodeExpectation("val myStructSimple: Type = (first: 1, second: 1)", GeneralSuccessCheck),
+      CodeExpectation("val myMap: ReqMap(myStructSimple, Identifier) = ((0, 0): x)", GeneralSuccessCheck),
+      // Figure out why this direct approach doesn't work.
+      //CodeExpectation("val myMap: ReqMap((first: 1, second: 1), Identifier) = ((0, 0): x)", GeneralSuccessCheck),
+      CodeExpectation("val myStruct: Type = (first: 2, second: 3)", GeneralSuccessCheck),
+      CodeExpectation("val myMap: ReqMap(myStruct, Identifier) = ((0, 0): a, (0, 1): b, (0, 2): c, (1, 0): d, (1, 1): e, (1, 2): f)", GeneralSuccessCheck),
+      CodeExpectation("val myMap: ReqMap(myStruct, Identifier) = ((0, 0): a, (0, 1): b, (1, 0): d, (1, 1): e, (1, 2): f)", FailureCheck),
     ))
   }
 
@@ -1003,6 +1012,26 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("iterate myArray2 into appendedArray", GeneralSuccessCheck),
       CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
       CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(5), CountT)))),
+    ))
+  }
+
+  it should " be usable on types" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
+      CodeExpectation("val t: Type = 10", GeneralSuccessCheck),
+      CodeExpectation("iterate t into appendedArray", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(10), CountT)))),
+    ))
+  }
+
+  ignore should " be usable on types with a literal" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
+      CodeExpectation("val t: Type = 10", GeneralSuccessCheck),
+      CodeExpectation("iterate 10 into appendedArray", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(10), CountT)))),
     ))
   }
 
