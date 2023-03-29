@@ -6,7 +6,6 @@ import ai.newmap.model._
 import ai.newmap.util.{Failure, Success}
 import scala.io.Source
 
-
 class TestNewmapFiles extends FlatSpec{
 
   "An identifier " should " be lexed correctly" in {
@@ -55,6 +54,21 @@ class TestNewmapFiles extends FlatSpec{
       Number(0),
       Number(67),
       Identifier("world")
+    )))
+  }
+
+  "A struct field call " should " be lexed correctly" in {
+    val filename = "src/main/newmap/TestScripts/TokenizeStructField.nm"
+    val lines = Source.fromFile(filename).getLines.toList
+    assert(Lexer(lines.apply(0)) == Success(List(
+      Identifier("val"),
+      Identifier("a"),
+      Symbol(":"),
+      Number(12),
+      Symbol("="),
+      Identifier("date"),
+      Symbol("."),
+      Identifier("getMonth")
     )))
   }
 
