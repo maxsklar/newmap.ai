@@ -5,7 +5,7 @@ import scala.util.parsing.combinator.RegexParsers
 import ai.newmap.util.Outcome
 
 object Lexer extends RegexParsers {
-  sealed trait Token
+  sealed trait Token extends ParseElement
   
   case class Enc(symbol: EnclosureSymbol, isOpen: Boolean) extends Token
   case class Identifier(id: String) extends Token

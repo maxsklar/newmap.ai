@@ -2,7 +2,8 @@ package ai.newmap.model
 
 sealed abstract class StatementOrExpressionParse
 
-sealed abstract class ParseTree
+class ParseElement
+sealed abstract class ParseTree extends ParseElement
 
 case class NaturalNumberParse(i: Long) extends ParseTree
 
