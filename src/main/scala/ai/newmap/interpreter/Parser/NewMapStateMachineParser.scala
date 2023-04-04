@@ -1,6 +1,7 @@
 package ai.newmap.interpreter.Parser
 
 import ai.newmap.interpreter.Lexer
+import ai.newmap.interpreter.Parser.StateMachineConfig.StateMachineRunner
 import ai.newmap.interpreter.Parser.TokenUtils.TokenStream
 import ai.newmap.model.{EmptyParse, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree}
 import ai.newmap.util.Outcome
@@ -11,6 +12,7 @@ object NewMapStateMachineParser {
   //TODO:Add a parser function parameter to the parse function to call the respective state machines
   private def parse(tokens: Seq[Lexer.Token], emptyResult: Any): Outcome[Any, String] = {
     val tokenStream = new TokenStream(tokens, removeTokens = true)
+    StateMachineRunner.run(tokens)
     if (tokenStream.isEmpty) {
       ai.newmap.util.Success(emptyResult)
     } else {
