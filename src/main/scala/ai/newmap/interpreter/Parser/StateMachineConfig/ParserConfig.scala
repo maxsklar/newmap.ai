@@ -3,11 +3,13 @@ package ai.newmap.interpreter.Parser.StateMachineConfig
 import ai.newmap.StateMachine.State
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Parser.StateMachineConfig.DisconnectChannelPath.disconnectChannelInitTransition
+import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTransition
 
 class ParserConfig {
 
   val initState = new State(name = "INIT")
   initState.addAcceptedTransition(disconnectChannelInitTransition)
+  initState.addAcceptedTransition(iterateInitTransition)
 
 }
 
