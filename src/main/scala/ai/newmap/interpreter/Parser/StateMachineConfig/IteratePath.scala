@@ -12,16 +12,19 @@ object IteratePath {
   private val initState = new State(name = "iterate")
   private val iterateIdentifier = new State(isEndState = false, name = "iterateIdentifier")
   private val iterateIdentifierIdentifier = new State(isEndState = false, name = "iterateIdentifierIdentifier")
+  private val iterateIdentifierIdentifierIdentifier = new State(isEndState = false, name = "iterateIdentifierIdentifierIdentifier")
   private val iterateEndState = new IterateEndState(name = "iterateEndState")
 
   val iterateInitTransition = new Transition(Identifier("iterate"), initState)
   private val iterateId1Transition = new Transition(Identifier("a"), iterateIdentifier)
-  private val iterateId2Transition = new Transition(Identifier("a"), iterateIdentifierIdentifier)
+  private val iterateId2Transition = new Transition(Identifier("into"), iterateIdentifierIdentifier)
+  private val iterateId3Transition = new Transition(Identifier("a"), iterateIdentifierIdentifierIdentifier)
   private val iterateEndTransition = new IterateEndStateTransition(iterateEndState)
 
   initState.addAcceptedTransition(iterateId1Transition)
   iterateIdentifier.addAcceptedTransition(iterateId2Transition)
-  iterateIdentifierIdentifier.addAcceptedTransition(iterateEndTransition)
+  iterateIdentifierIdentifier.addAcceptedTransition(iterateId3Transition)
+  iterateIdentifierIdentifierIdentifier.addAcceptedTransition(iterateEndTransition)
 
 }
 
