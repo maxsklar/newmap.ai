@@ -13,7 +13,7 @@ class State (isEndState: Boolean = false, name:String){
   }
 
   def reach(p: ListBuffer[ParseElement]): Unit = {
-    println("Reached" + name)
+    println("Reached " + name)
     parseElementList = p
   }
 
