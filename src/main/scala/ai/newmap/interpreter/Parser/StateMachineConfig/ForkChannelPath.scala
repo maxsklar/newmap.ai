@@ -25,19 +25,20 @@ object ForkChannelPath {
   forkedVersionedStmtIdentifierIdentifier.addAcceptedTransition(forkedVersionedStmtId3Transition)
   forkedVersionedStmtIdentifierIdentifierIdentifier.addAcceptedTransition(forkedVersionedStmtEndTransition)
 
-  class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, name){
+}
 
-    override def reach(p: ListBuffer[ParseElement]): Unit = {
-      val tokens = p.toList
-      print(ForkedVersionedStatementParse(
-        IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
-        IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
-      ))
-    }
+class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, name){
 
+  override def reach(p: ListBuffer[ParseElement]): Unit = {
+    val tokens = p.toList
+    print(ForkedVersionedStatementParse(
+      IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
+      IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
+    ))
   }
 
-  class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(token = null, nextState){
-    override def validateToken(t: Lexer.Token): Boolean = true
-  }
+}
+
+class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(token = null, nextState){
+  override def validateToken(t: Lexer.Token): Boolean = true
 }

@@ -38,7 +38,6 @@ class DisconnectChannelEndState(name:String) extends State(isEndState = true, na
       IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
     ))
   }
-
 }
 
 class DisconnectChannelEndStateTransition(nextState:State) extends Transition(token = null, nextState){
