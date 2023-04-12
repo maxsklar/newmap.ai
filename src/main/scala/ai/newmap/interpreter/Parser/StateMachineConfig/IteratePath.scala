@@ -3,7 +3,7 @@ package ai.newmap.interpreter.Parser.StateMachineConfig
 import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{IterateIntoStatementParse, IdentifierParse, ParseElement}
+import ai.newmap.model.{EnvStatementParse, IdentifierParse, IterateIntoStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
@@ -30,13 +30,19 @@ object IteratePath {
 
 class IterateEndState(name:String) extends State(isEndState = true, name){
 
+  var tokenOptions: Option[List[ParseElement]] = None
   override def reach(p: ListBuffer[ParseElement]): Unit = {
-    val tokens = p.toList
-    print(IterateIntoStatementParse(
+    tokenOptions = Option(p.toList)
+  }
+
+  override def generateParseTree: EnvStatementParse = {
+    val tokens = tokenOptions.get
+    IterateIntoStatementParse(
       IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
       IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
-    ))
+    )
   }
+
 
 }
 
