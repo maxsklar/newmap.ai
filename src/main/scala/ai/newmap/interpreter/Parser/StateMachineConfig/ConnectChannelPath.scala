@@ -3,7 +3,7 @@ package ai.newmap.interpreter.Parser.StateMachineConfig
 import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{ConnectChannelParse, IdentifierParse, ParseElement}
+import ai.newmap.model.{ConnectChannelParse, EnvStatementParse, IdentifierParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
@@ -27,12 +27,17 @@ object ConnectChannelPath {
 
 class ConnectChannelEndState(name:String) extends State(isEndState = true, name){
 
+  var tokenOptions: Option[List[ParseElement]] = None
   override def reach(p: ListBuffer[ParseElement]): Unit = {
-    val tokens = p.toList
-    print(ConnectChannelParse(
+    tokenOptions = Option(p.toList)
+  }
+
+  override def generateParseTree: EnvStatementParse = {
+    val tokens = tokenOptions.get
+    ConnectChannelParse(
       IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
       IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
-    ))
+    )
   }
 
 }
@@ -40,7 +45,3 @@ class ConnectChannelEndState(name:String) extends State(isEndState = true, name)
 class ConnectChannelEndStateTransition(nextState:State) extends Transition(token = null, nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }
-
-
-
-
