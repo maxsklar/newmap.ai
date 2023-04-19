@@ -8,7 +8,7 @@ object Lexer extends RegexParsers {
   sealed trait Token extends ParseElement
   
   case class Enc(symbol: EnclosureSymbol, isOpen: Boolean) extends Token
-  case class Identifier(id: String = null) extends Token
+  case class Identifier(s: String = null) extends Token
   case class Number(i: Long = 0) extends Token
   case class Symbol(s: String = null) extends Token
   case class DQuote(s: String = null) extends Token

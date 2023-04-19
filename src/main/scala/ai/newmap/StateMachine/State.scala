@@ -1,7 +1,7 @@
 package ai.newmap.StateMachine
 
 import ai.newmap.interpreter.Lexer.Token
-import ai.newmap.model.ParseElement
+import ai.newmap.model.{EnvStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,7 +13,6 @@ class State (isEndState: Boolean = false, name:String){
   }
 
   def reach(p: ListBuffer[ParseElement]): Unit = {
-    println("Reached " + name)
     parseElementList = p
   }
 
@@ -25,6 +24,10 @@ class State (isEndState: Boolean = false, name:String){
     }
     new DeadState()
   }
+
+  def getName: String = name
+  def endState: Boolean = isEndState
+  def generateParseTree: EnvStatementParse = null
 }
 
 class DeadState(name:String = "deadState") extends State(name = name)
