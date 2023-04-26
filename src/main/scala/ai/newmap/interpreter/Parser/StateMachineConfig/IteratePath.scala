@@ -3,7 +3,7 @@ package ai.newmap.interpreter.Parser.StateMachineConfig
 import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{EnvStatementParse, IdentifierParse, IterateIntoStatementParse, ParseElement}
+import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
@@ -16,9 +16,9 @@ object IteratePath {
   private val iterateEndState = new IterateEndState(name = "iterateEndState")
 
   val iterateInitTransition = new Transition(expectedToken = Identifier("iterate"), nextState = initState)
-  private val iterateId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = iterateIdentifier)
+  private val iterateId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = iterateIdentifier)
   private val iterateId2Transition = new Transition(expectedToken = Identifier("into"), nextState = iterateIdentifierIdentifier)
-  private val iterateId3Transition = new Transition(expectedClass = classOf[Identifier], nextState = iterateIdentifierIdentifierIdentifier)
+  private val iterateId3Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = iterateIdentifierIdentifierIdentifier)
   private val iterateEndTransition = new IterateEndStateTransition(nextState = iterateEndState)
 
   initState.addAcceptedTransition(iterateId1Transition)
@@ -31,7 +31,7 @@ object IteratePath {
 class IterateEndState(name:String) extends State(isEndState = true, name){
 
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement]): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
     tokenOptions = Option(p.toList)
   }
 

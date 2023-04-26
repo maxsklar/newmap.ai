@@ -15,10 +15,10 @@ object ForkChannelPath {
   private val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState(name = "forkedVersionedStmtEndState")
 
 
-  val forkedVersionedStmtInitTransition = new Transition(expectedToken = Identifier("fork"), nextState = initState)
-  private val forkedVersionedStmtId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifier)
+  val forkedVersionedStmtInitTransition = new Transition(expectedToken = Identifier("fork"), nextState = null)
+  private val forkedVersionedStmtId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifier)
   private val forkedVersionedStmtId2Transition = new Transition(expectedToken = Identifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier)
-  private val forkedVersionedStmtId3Transition = new Transition(expectedClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifierIdentifierIdentifier)
+  private val forkedVersionedStmtId3Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifierIdentifierIdentifier)
   private val forkedVersionedStmtEndTransition = new ForkedVersionedStmtEndStateTransition(nextState = forkedVersionedStmtEndState)
 
   initState.addAcceptedTransition(forkedVersionedStmtId1Transition)
@@ -31,7 +31,7 @@ object ForkChannelPath {
 class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, name){
 
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement]): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
     tokenOptions = Option(p.toList)
   }
 

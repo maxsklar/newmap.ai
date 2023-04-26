@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
-import ai.newmap.StateMachine.State
+import ai.newmap.StateMachine.{State, StateMachine}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Parser.StateMachineConfig.DisconnectChannelPath.disconnectChannelInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTransition
@@ -16,20 +16,12 @@ class ParserConfig() {
   initState.addAcceptedTransition(iterateInitTransition)
   initState.addAcceptedTransition(connectChannelInitTransition)
   initState.addAcceptedTransition(forkedVersionedStmtInitTransition)
-  initState.addAcceptedTransition(applyCommandStmtInitTransition)
+//  initState.addAcceptedTransition(applyCommandStmtInitTransition)
 }
 
 object StateMachineRunner{
-  def run(tokens: Seq[Lexer.Token]) : Outcome[Any, String] = {
-    val parserConfig = new ParserConfig()
-    var curState = parserConfig.initState
-    tokens.foreach(token => {
-      curState = curState.changeState(token)
-    })
-    curState = curState.changeState(null)
-    if(curState.endState){
-      ai.newmap.util.Success(curState.generateParseTree)
-    }
-    ai.newmap.util.Failure("Unimplemented")
+  def run(tokens: Seq[Lexer.Token]): Outcome[Any, String] = {
+    val sm = new StateMachine()
+    sm.run(tokens)
   }
 }

@@ -4,7 +4,7 @@ import ai.newmap.interpreter.Lexer.Identifier
 
 sealed abstract class StatementOrExpressionParse
 
-case class ParseElement()
+class ParseElement()
 sealed abstract class ParseTree extends ParseElement
 
 case class NaturalNumberParse(i: Long) extends ParseTree

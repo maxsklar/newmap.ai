@@ -15,8 +15,8 @@ object ConnectChannelPath {
   private val connectChannelEndState = new ConnectChannelEndState(name = "connectChannelEndState")
 
   val connectChannelInitTransition = new Transition(expectedToken = Identifier("connectChannel"), nextState = initState)
-  private val connectChannelId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = connectChannelIdentifier)
-  private val connectChannelId2Transition = new Transition(expectedClass = classOf[Identifier], nextState = connectChannelIdentifierIdentifier)
+  private val connectChannelId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = connectChannelIdentifier)
+  private val connectChannelId2Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = connectChannelIdentifierIdentifier)
   private val connectChannelEndTransition = new ConnectChannelEndStateTransition(nextState = connectChannelEndState)
 
   initState.addAcceptedTransition(connectChannelId1Transition)
@@ -28,7 +28,7 @@ object ConnectChannelPath {
 class ConnectChannelEndState(name:String) extends State(isEndState = true, name){
 
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement]): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
     tokenOptions = Option(p.toList)
   }
 
@@ -45,7 +45,3 @@ class ConnectChannelEndState(name:String) extends State(isEndState = true, name)
 class ConnectChannelEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }
-
-
-
-

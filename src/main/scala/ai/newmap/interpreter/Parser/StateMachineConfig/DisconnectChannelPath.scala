@@ -15,8 +15,8 @@ object DisconnectChannelPath {
   private val disconnectChannelEndState = new DisconnectChannelEndState(name = "disconnectChannelEndState")
 
   val disconnectChannelInitTransition = new Transition(expectedToken = Identifier("disconnectChannel"), nextState = initState)
-  private val disconnectChannelId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = disconnectChannelIdentifier)
-  private val disconnectChannelId2Transition = new Transition(expectedClass = classOf[Identifier], nextState = disconnectChannelIdentifierIdentifier)
+  private val disconnectChannelId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = disconnectChannelIdentifier)
+  private val disconnectChannelId2Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = disconnectChannelIdentifierIdentifier)
   private val disconnectChannelEndTransition = new DisconnectChannelEndStateTransition(nextState = disconnectChannelEndState)
 
   initState.addAcceptedTransition(disconnectChannelId1Transition)
@@ -27,7 +27,7 @@ object DisconnectChannelPath {
 
 class DisconnectChannelEndState(name:String) extends State(isEndState = true, name){
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement]): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
     tokenOptions = Option(p.toList)
   }
 
