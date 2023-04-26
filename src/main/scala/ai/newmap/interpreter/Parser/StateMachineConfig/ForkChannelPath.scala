@@ -14,6 +14,7 @@ object ForkChannelPath {
   private val forkedVersionedStmtIdentifierIdentifierIdentifier = new State(isEndState = false, name = "forkedVersionedStmtIdentifierIdentifierIdentifier")
   private val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState(name = "forkedVersionedStmtEndState")
 
+
   val forkedVersionedStmtInitTransition = new Transition(expectedToken = Identifier("fork"), nextState = initState)
   private val forkedVersionedStmtId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifier)
   private val forkedVersionedStmtId2Transition = new Transition(expectedToken = Identifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier)
@@ -37,6 +38,7 @@ class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, 
   override def generateParseTree: EnvStatementParse = {
     val tokens = tokenOptions.get
     ForkedVersionedStatementParse(
+
       tokens(1).asInstanceOf[Identifier],
       tokens(2).asInstanceOf[Identifier]
     )
