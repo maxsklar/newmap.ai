@@ -2,6 +2,7 @@ package ai.newmap.StateMachine
 
 import ai.newmap.interpreter.Lexer
 import ai.newmap.model.ParseElement
+import ai.newmap.util.{Success,Failure}
 
 import scala.collection.mutable.ListBuffer
 

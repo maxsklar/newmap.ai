@@ -6,12 +6,12 @@ import ai.newmap.interpreter.Parser.StateMachineConfig.DisconnectChannelPath.dis
 import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.ConnectChannelPath.connectChannelInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.ForkChannelPath.forkedVersionedStmtInitTransition
-
+//import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandPath.applyCommandStmtInitTransition
 import ai.newmap.util.Outcome
 
 class ParserConfig() {
 
-  val initState = new State(name = "INIT")
+  val initState = new State(name = "INIT" )
   initState.addAcceptedTransition(disconnectChannelInitTransition)
   initState.addAcceptedTransition(iterateInitTransition)
   initState.addAcceptedTransition(connectChannelInitTransition)

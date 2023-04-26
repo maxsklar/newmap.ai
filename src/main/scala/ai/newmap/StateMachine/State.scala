@@ -1,6 +1,6 @@
 package ai.newmap.StateMachine
 
-import ai.newmap.interpreter.Lexer.Token
+import ai.newmap.interpreter._
 import ai.newmap.model.{EnvStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
