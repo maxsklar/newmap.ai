@@ -3,7 +3,7 @@ package ai.newmap.interpreter.Parser.StateMachineConfig
 import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{IterateIntoStatementParse, IdentifierParse, ParseElement}
+import ai.newmap.model.{EnvStatementParse, IdentifierParse, IterateIntoStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
@@ -15,11 +15,11 @@ object IteratePath {
   private val iterateIdentifierIdentifierIdentifier = new State(isEndState = false, name = "iterateIdentifierIdentifierIdentifier")
   private val iterateEndState = new IterateEndState(name = "iterateEndState")
 
-  val iterateInitTransition = new Transition(Identifier("iterate"), initState)
-  private val iterateId1Transition = new Transition(Identifier("a"), iterateIdentifier)
-  private val iterateId2Transition = new Transition(Identifier("into"), iterateIdentifierIdentifier)
-  private val iterateId3Transition = new Transition(Identifier("a"), iterateIdentifierIdentifierIdentifier)
-  private val iterateEndTransition = new IterateEndStateTransition(iterateEndState)
+  val iterateInitTransition = new Transition(expectedToken = Identifier("iterate"), nextState = initState)
+  private val iterateId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = iterateIdentifier)
+  private val iterateId2Transition = new Transition(expectedToken = Identifier("into"), nextState = iterateIdentifierIdentifier)
+  private val iterateId3Transition = new Transition(expectedClass = classOf[Identifier], nextState = iterateIdentifierIdentifierIdentifier)
+  private val iterateEndTransition = new IterateEndStateTransition(nextState = iterateEndState)
 
   initState.addAcceptedTransition(iterateId1Transition)
   iterateIdentifier.addAcceptedTransition(iterateId2Transition)
@@ -30,16 +30,22 @@ object IteratePath {
 
 class IterateEndState(name:String) extends State(isEndState = true, name){
 
+  var tokenOptions: Option[List[ParseElement]] = None
   override def reach(p: ListBuffer[ParseElement]): Unit = {
-    val tokens = p.toList
-    print(IterateIntoStatementParse(
-      IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
-      IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
-    ))
+    tokenOptions = Option(p.toList)
   }
+
+  override def generateParseTree: EnvStatementParse = {
+    val tokens = tokenOptions.get
+    IterateIntoStatementParse(
+      tokens(1).asInstanceOf[Identifier],
+      tokens(2).asInstanceOf[Identifier]
+    )
+  }
+
 
 }
 
-class IterateEndStateTransition(nextState:State) extends Transition(token = null, nextState){
+class IterateEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }

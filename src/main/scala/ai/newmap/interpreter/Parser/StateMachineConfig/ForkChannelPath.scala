@@ -14,11 +14,12 @@ object ForkChannelPath {
   private val forkedVersionedStmtIdentifierIdentifierIdentifier = new State(isEndState = false, name = "forkedVersionedStmtIdentifierIdentifierIdentifier")
   private val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState(name = "forkedVersionedStmtEndState")
 
-  val forkedVersionedStmtInitTransition = new Transition(Identifier("fork"), initState)
-  private val forkedVersionedStmtId1Transition = new Transition(Identifier("c"), forkedVersionedStmtIdentifier)
-  private val forkedVersionedStmtId2Transition = new Transition(Identifier("as"), forkedVersionedStmtIdentifierIdentifier)
-  private val forkedVersionedStmtId3Transition = new Transition(Identifier("c"), forkedVersionedStmtIdentifierIdentifierIdentifier)
-  private val forkedVersionedStmtEndTransition = new ForkedVersionedStmtEndStateTransition(forkedVersionedStmtEndState)
+
+  val forkedVersionedStmtInitTransition = new Transition(expectedToken = Identifier("fork"), nextState = initState)
+  private val forkedVersionedStmtId1Transition = new Transition(expectedClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifier)
+  private val forkedVersionedStmtId2Transition = new Transition(expectedToken = Identifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier)
+  private val forkedVersionedStmtId3Transition = new Transition(expectedClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifierIdentifierIdentifier)
+  private val forkedVersionedStmtEndTransition = new ForkedVersionedStmtEndStateTransition(nextState = forkedVersionedStmtEndState)
 
   initState.addAcceptedTransition(forkedVersionedStmtId1Transition)
   forkedVersionedStmtIdentifier.addAcceptedTransition(forkedVersionedStmtId2Transition)
@@ -37,13 +38,14 @@ class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, 
   override def generateParseTree: EnvStatementParse = {
     val tokens = tokenOptions.get
     ForkedVersionedStatementParse(
-      IdentifierParse(tokens(1).asInstanceOf[Identifier].id),
-      IdentifierParse(tokens(2).asInstanceOf[Identifier].id)
+
+      tokens(1).asInstanceOf[Identifier],
+      tokens(2).asInstanceOf[Identifier]
     )
   }
 
 }
 
-class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(token = null, nextState){
+class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }

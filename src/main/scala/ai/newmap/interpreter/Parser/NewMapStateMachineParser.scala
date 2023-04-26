@@ -12,11 +12,11 @@ object NewMapStateMachineParser {
   //TODO:Add a parser function parameter to the parse function to call the respective state machines
   private def parse(tokens: Seq[Lexer.Token], emptyResult: Any): Outcome[Any, String] = {
     val tokenStream = new TokenStream(tokens, removeTokens = true)
-    StateMachineRunner.run(tokens)
+
     if (tokenStream.isEmpty) {
       ai.newmap.util.Success(emptyResult)
     } else {
-      ai.newmap.util.Failure("Unimplemented")
+      StateMachineRunner.run(tokens)
     }
   }
 
