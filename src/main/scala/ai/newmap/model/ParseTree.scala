@@ -1,8 +1,11 @@
 package ai.newmap.model
 
+import ai.newmap.interpreter.Lexer.Identifier
+
 sealed abstract class StatementOrExpressionParse
 
-sealed abstract class ParseTree
+class ParseElement()
+sealed abstract class ParseTree extends ParseElement
 
 case class NaturalNumberParse(i: Long) extends ParseTree
 
@@ -78,8 +81,8 @@ case class NewVersionedStatementParse(
 ) extends EnvStatementParse
 
 case class ForkedVersionedStatementParse(
-  identifier: IdentifierParse,
-  expression: IdentifierParse // Must represent a versioned object
+  identifier: Identifier,
+  expression: Identifier // Must represent a versioned object
 ) extends EnvStatementParse
 
 case class ApplyCommandStatementParse(
@@ -98,13 +101,13 @@ case class AddChannelParse(
 ) extends EnvStatementParse
 
 case class ConnectChannelParse(
-  identifier: IdentifierParse,
-  obj: IdentifierParse
+  identifier: Identifier,
+  obj: Identifier
 ) extends EnvStatementParse
 
 case class DisconnectChannelParse(
-  identifier: IdentifierParse,
-  obj: IdentifierParse
+  identifier: Identifier,
+  obj: Identifier
 ) extends EnvStatementParse
 
 case class WriteToChannelParse(
@@ -128,8 +131,8 @@ case class NewTypeClassStatementParse(
 ) extends EnvStatementParse
 
 case class IterateIntoStatementParse(
-  iterableObject: IdentifierParse, // This should be a parseTree - but our parser doesn't allow this yet!
-  destinationObject: IdentifierParse
+  iterableObject: Identifier, // This should be a parseTree - but our parser doesn't allow this yet!
+  destinationObject: Identifier
 ) extends EnvStatementParse
 
 sealed abstract class StatementPrefix

@@ -255,7 +255,7 @@ object NewMapCombinatorParser extends Parsers {
   private def forkedVersionedStatement: Parser[ForkedVersionedStatementParse] = {
     Lexer.Identifier("fork") ~ identifier ~ Lexer.Identifier("as") ~ identifier ^^ {
       case _ ~ existingId ~ _ ~ id =>
-        ForkedVersionedStatementParse(id, existingId)
+        ForkedVersionedStatementParse(Lexer.Identifier(id.s), Lexer.Identifier(existingId.s))
     }
   }
 
@@ -297,7 +297,7 @@ object NewMapCombinatorParser extends Parsers {
   private def iterateIntoCommand: Parser[IterateIntoStatementParse] = {
     Lexer.Identifier("iterate") ~ identifier ~ Lexer.Identifier("into") ~ identifier ^^ {
       case _ ~ obj ~ _ ~ dest =>
-        IterateIntoStatementParse(obj, dest)
+        IterateIntoStatementParse(Lexer.Identifier(obj.s), Lexer.Identifier(dest.s))
     }
   }
 
@@ -311,14 +311,14 @@ object NewMapCombinatorParser extends Parsers {
   private def connectChannel: Parser[ConnectChannelParse] = {
     Lexer.Identifier("connectChannel") ~ identifier ~ identifier ^^ {
       case _ ~ id ~ obj =>
-        ConnectChannelParse(id, obj)
+        ConnectChannelParse(Lexer.Identifier(id.s), Lexer.Identifier(obj.s))
     }
   }
 
   private def disconnectChannel: Parser[DisconnectChannelParse] = {
     Lexer.Identifier("disconnectChannel") ~ identifier ~ identifier ^^ {
       case _ ~ id ~ obj =>
-        DisconnectChannelParse(id, obj)
+        DisconnectChannelParse(Lexer.Identifier(id.s), Lexer.Identifier(obj.s))
     }
   }
 
