@@ -3,6 +3,7 @@ package ai.newmap.StateMachine
 import ai.newmap.interpreter.Lexer
 import ai.newmap.model.ParseElement
 import ai.newmap.util.{Success,Failure}
+import ai.newmap.model.ParseTree
 
 import scala.collection.mutable.ListBuffer
 
@@ -20,7 +21,7 @@ class Transition (expectedToken: Lexer.Token = null,
       execStateTransition(t, partialParseElementList, ts)
     }
     else if(nextExpectedParseTree != null && nextState != null){
-      val sm = new StateMachine(0, nextExpectedParseTree)
+      val sm = new StateMachine(1, nextExpectedParseTree)
       val outcome= sm.run(tokenStream)
       outcome match {
         case Success(v) =>
