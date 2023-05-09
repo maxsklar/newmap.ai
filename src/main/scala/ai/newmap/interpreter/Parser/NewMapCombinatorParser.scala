@@ -4,7 +4,7 @@ import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Parser.TokenUtils.TokenStream
 import ai.newmap.model._
 import ai.newmap.util.Outcome
-
+import ai.newmap.model.ParseTree
 import scala.util.parsing.combinator.Parsers
 
 object NewMapCombinatorParser extends Parsers {
