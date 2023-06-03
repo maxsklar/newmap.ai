@@ -7,7 +7,10 @@ import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTr
 import ai.newmap.interpreter.Parser.StateMachineConfig.ConnectChannelPath.connectChannelInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.DataPath.dataInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.ForkChannelPath.forkedVersionedStmtInitTransition
-//import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandPath.applyCommandStmtInitTransition
+import ai.newmap.interpreter.Parser.StateMachineConfig.WritePath.writeInitTransition
+import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandPath.applyCommandStmtInitTransition
+import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandsPath.applyCommandsStmtInitTransition
+
 import ai.newmap.util.Outcome
 
 class ParserConfig() {
@@ -17,10 +20,10 @@ class ParserConfig() {
   initState.addAcceptedTransition(iterateInitTransition)
   initState.addAcceptedTransition(connectChannelInitTransition)
   initState.addAcceptedTransition(forkedVersionedStmtInitTransition)
-//  initState.addAcceptedTransition(applyCommandStmtInitTransition)
   initState.addAcceptedTransition(dataInitTransition)
-
-
+  initState.addAcceptedTransition(writeInitTransition)
+  initState.addAcceptedTransition(applyCommandStmtInitTransition)
+  initState.addAcceptedTransition(applyCommandsStmtInitTransition)
 }
 
 object StateMachineRunner{
