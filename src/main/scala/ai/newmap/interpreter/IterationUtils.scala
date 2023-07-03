@@ -169,6 +169,17 @@ object IterationUtils {
           result <- enumerateAllValuesIfPossible(nType, env)
         } yield result
       }
+      case TaggedObject(uType, HistoricalTypeT(typeSystemId)) => {
+        val newUType = UCase(
+          UIdentifier("WithState"),
+          UCase(
+            Uuuid(typeSystemId),
+            uType
+          )
+        )
+
+        iterateObject(TaggedObject(newUType, TypeT), env)
+      }
       case TaggedObject(untaggedCurrent, nType) => {
         Failure(s"Unable to iterate over object: $untaggedCurrent of type ${nType.displayString(env)}")
       }

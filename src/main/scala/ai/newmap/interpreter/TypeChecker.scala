@@ -30,17 +30,15 @@ object TypeChecker {
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!
     expression match {
-      case EmptyParse() => {
-        expectedTypeOutcome match {
-          case Success(WildcardPatternT(_)) => {
-            Success(TypeCheckResponse(UStruct(Vector.empty), NewMapO.emptyStruct))
-          }
-          case _ => {
-            for {
-              result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
-            } yield {
-              TypeCheckResponse(result, expectedType)
-            }
+      case EmptyParse() => expectedTypeOutcome match {
+        case Success(WildcardPatternT(_)) => {
+          Success(TypeCheckResponse(UStruct(Vector.empty), NewMapO.emptyStruct))
+        }
+        case _ => {
+          for {
+            result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
+          } yield {
+            TypeCheckResponse(result, expectedType)
           }
         }
       }
@@ -175,7 +173,6 @@ object TypeChecker {
                   env,
                   featureSet
                 )
-                  
               } yield {
                 expectedTypeOutcome match {
                   case Success(HistoricalTypeT(uuid)) => {
@@ -961,9 +958,7 @@ object TypeChecker {
     uObject match {
       case UInit => Success(0)
       case UCase(UIdentifier("Inc"), internal) => {
-        for {
-          i <- normalizeCount(internal)
-        } yield i + 1
+        normalizeCount(internal).map(i => i + 1)
       }
       case UIndex(i) => Success(i)
       case _ => Failure(s"Couldn't normalize count: $uObject")

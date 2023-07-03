@@ -31,7 +31,7 @@ case class ParamIdT(s: String) extends NewMapType
 // Type of types that exist in the given state
 case class HistoricalTypeT(uuid: UUID) extends NewMapType
 
-// Tytpe of all types that have ever existed!!
+// Type of all types
 case object TypeT extends NewMapType
 
 // This is the "bottom" type

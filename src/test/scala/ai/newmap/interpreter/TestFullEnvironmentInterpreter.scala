@@ -1035,6 +1035,20 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " work on subtypes " in {
+    testCodeScript(Vector(
+      CodeExpectation("data x = Subtype(Count)", GeneralSuccessCheck),
+      CodeExpectation("update x 10", GeneralSuccessCheck),
+      CodeExpectation("update x 3", GeneralSuccessCheck),
+      CodeExpectation("update x 10", GeneralSuccessCheck),
+      CodeExpectation("update x 2", GeneralSuccessCheck),
+      CodeExpectation("ver a = new Array|Count", GeneralSuccessCheck),
+      CodeExpectation("iterate x into a", GeneralSuccessCheck),
+      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("len a", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(3), CountT)))),
+    ))
+  }
+
   "Strings " should " be creatable and updatable" in {
     testCodeScript(Vector(
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),

@@ -103,7 +103,16 @@ object StatementInterpreter {
         for {
           iterableObject <- env.lookup(id.s) match {
             case Some(EnvironmentBinding(nObject)) => Success(nObject)
-            case _ => Failure(s"Could not lookup $id in environment")
+            case _ => {
+              env.typeSystem.currentMapping.get(id.s) match {
+                case Some(nTypeId) => {
+                  val uType = env.typeSystem.typeToUntaggedObject(CustomT(id.s, UStruct(Vector.empty)))
+                  val nObject = TaggedObject(uType, HistoricalTypeT(env.typeSystem.currentState))
+                  Success(nObject)
+                }
+                case None => Failure(s"Could not lookup $id in environment -- ${env.lookupVersionedObject(id.s)}")
+              }
+            }
           }
 
           // destination can either be a CHANNEL or it can be a VERSIONED OBJECT
