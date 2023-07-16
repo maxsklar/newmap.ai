@@ -4,90 +4,9 @@ import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveTy
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
-import ai.newmap.interpreter._
-import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.util.{Failure, Outcome, Success}
+
 import java.util.UUID
-
-sealed abstract class EnvironmentCommand
-
-case class FullEnvironmentCommand(
-  id: String,
-  nObject: NewMapObject
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"val $id = ${nObject}"
-  }
-}
-
-case class NewVersionedStatementCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"ver $id = new ${nType}"
-  }
-}
-
-case class NewTypeCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"data $id = ${nType}"
-  }
-}
-
-case class NewParamTypeCommand(
-  id: String,
-  paramList: Vector[(String, NewMapType)],
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"data $id ${paramList}"
-  }
-}
-
-case class ApplyIndividualCommand(
-  id: String,
-  nObject: UntaggedObject
-) extends EnvironmentCommand {
-  override def toString: String = {
-    "" //s"update $id $nObject"
-  }
-}
-
-case class ForkEnvironmentCommand(
-  id: String,
-  vObject: VersionedObjectLink
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"ver $id = fork ${vObject}"
-  }
-}
-
-case class ParameterEnvironmentCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def toString: String = {
-    s"parameter $id: ${nType}"
-  }
-}
-
-case class ExpOnlyEnvironmentCommand(
-  nObject: NewMapObject
-) extends EnvironmentCommand {
-  override def toString: String = nObject.toString
-}
-
-
-// These are "side effects"
-// Channels must be created!
-case class OutputToChannel(
-  nObject: UntaggedObject,
-  channel: UntaggedObject
-)
->>>>>>> Stashed changes:src/main/scala/model/Environment.scala
 
 sealed abstract class EnvironmentValue
 
@@ -105,7 +24,6 @@ case class Environment(
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
-<<<<<<< Updated upstream:src/main/scala/ai/newmap/model/Environment.scala
 
   // Also a stored versioned type, but a special one!
   typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem,
@@ -114,9 +32,6 @@ case class Environment(
   // Map representing a list of objects to send commands to from a channelId
   channelIdToObjectCommands: Map[String, Set[String]] = Map.empty,
   printStdout: Boolean = true
-=======
-  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem // Also a stored versioned type, but a special one!
->>>>>>> Stashed changes:src/main/scala/model/Environment.scala
 ) {
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
@@ -162,6 +77,20 @@ case class Environment(
       parameterTypeString = parameterTypeOpt.map(x => "\t" + x.toString).getOrElse("")
     } {
       builder.append(s"${typeMap._1}${parameterTypeString}\n")
+    }
+    builder.toString
+  }
+
+  def printChannels: String = {
+    val builder: StringBuilder = new StringBuilder()
+    builder.append(s"Current Channels\n")
+
+    for {
+      channels <- channelIdToType
+      channelName = channels._1
+      channelType = channels._2
+    } {
+      builder.append(s"${channelName}\t${channelType.displayString(this)}\n")
     }
     builder.toString
   }
@@ -235,16 +164,7 @@ case class Environment(
         )
       }
       case NewTypeCommand(s, nType) => {
-        //val uuid = java.util.UUID.randomUUID
-        //val key = VersionedObjectKey(0L, uuid)
-        //val versionedObject = VersionedObjectLink(key)
-        //val envValue = EnvironmentBinding(versionedObject)
-
         val uType = typeSystem.typeToUntaggedObject(nType)
-
-        //val typeAsObject = TaggedObject(uType, HistoricalTypeT(typeSystem.currentState))
-
-        //val envValue = EnvironmentBinding(typeAsObject)
 
         val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
         val parameterPattern = UStruct(Vector.empty)
@@ -253,22 +173,27 @@ case class Environment(
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
-        
 
         this.copy(
           commands = newCommands,
-          //idToObject = idToObject + (s -> envValue),
-          //latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          //storedVersionedTypes = storedVersionedTypes + (key -> TaggedObject(typeSystem.typeToUntaggedObject(CustomT(uuid, nType)), TypeT))
           typeSystem = newTypeSystem
         )
       }
       case NewParamTypeCommand(s, paramList, nType) => {
-        val parameterPattern = UStruct(paramList.map(param => UWildcardPattern(param._1)))
-        val paramT = StructT(
-          paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
-          IndexT(UIndex(paramList.length))
-        )
+        val parameterPattern = if (paramList.length == 1) {
+          UWildcardPattern(paramList.head._1)
+        } else {
+          UStruct(paramList.map(param => UWildcardPattern(param._1)))
+        }
+
+        val paramT = if (paramList.length == 1) {
+          paramList.head._2
+        } else {
+          StructT(
+            paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
+            IndexT(UIndex(paramList.length))
+          )
+        }
 
         val uType = typeSystem.typeToUntaggedObject(nType)
 
@@ -283,7 +208,6 @@ case class Environment(
           typeSystem = newTypeSystem
         )
       }
-<<<<<<< Updated upstream:src/main/scala/ai/newmap/model/Environment.scala
       case NewTypeClassCommand(s, typeTransform) => {
         val nType = TypeClassT(typeTransform, Vector.empty)
         val uType = typeSystem.typeToUntaggedObject(nType)
@@ -336,24 +260,18 @@ case class Environment(
           }
         }
       }
-=======
->>>>>>> Stashed changes:src/main/scala/model/Environment.scala
       case ApplyIndividualCommand(s, command) => {
         // This split on lookupVersionedObject suggests that we may want to refactor
         // Code is repeated!!
 
-<<<<<<< Updated upstream:src/main/scala/ai/newmap/model/Environment.scala
         // Maybe s is also a stdout (as in println)
 
         val retVal = lookupVersionedObject(s) match {
-=======
-        val retVal = Evaluator.lookupVersionedObject(s, this) match {
->>>>>>> Stashed changes:src/main/scala/model/Environment.scala
           case Success(versionLink) => {
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
-              nType = RetrieveType.fromNewMapObject(currentState, this)
+
               newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid
@@ -441,6 +359,118 @@ case class Environment(
           }
         }
       }
+      case AddChannel(channel, nType) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        println(s"Add channel $channelName -- ${nType.displayString(this)}")
+
+        // TODO: Check that the channel doesn't already exist!
+        // (and if it does - remove it?)
+
+        this.copy(
+          channelIdToType = this.channelIdToType + (channelName -> nType)
+        )
+      }
+      case ConnectChannel(channel, versionedObject) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+
+        println(s"Connecting channel $channelName -- $versionedObject")
+
+        this.copy(
+          channelIdToObjectCommands = this.channelIdToObjectCommands + (channelName -> (currentConnections + versionedObject))
+        )
+      }
+      case DisconnectChannel(channel, versionedObject) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+        
+        println(s"Disconnecting channel $channelName -- $versionedObject")
+        this.copy(
+          channelIdToObjectCommands = this.channelIdToObjectCommands + (channelName -> (currentConnections - versionedObject))
+        )
+      }
+      case OutputToChannel(nObject, channel) => {
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val channelType: NewMapType = channelIdToType.get(channelName).getOrElse(UndefinedT)
+
+        var returnedEnv = this
+        val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
+
+        val taggedObject = TaggedObject(nObject, channelType)
+
+        if (channelName == "stdout" && printStdout) {
+          returnedEnv = returnedEnv.newCommand(OutputToStdout(nObject))
+        }
+
+        for {
+          connection <- currentConnections
+        } {
+          returnedEnv = returnedEnv.newCommand(IterateIntoCommand(taggedObject, connection))
+        }
+
+        returnedEnv
+      }
+      case OutputToStdout(nObject) => {
+        val taggedObject = TaggedObject(nObject, CustomT("String", UStruct(Vector.empty)))
+
+        // TODO: obviously this can be way more efficient!
+        for {
+          chars <- IterationUtils.iterateObject(taggedObject, this)
+        } yield {
+          val listOfChars = chars.flatMap(_ match {
+            case UCharacter(c) => Some(c)
+            case _ => None
+          })
+
+          System.out.print(listOfChars.mkString(""))
+        }
+
+        this
+      }
+      case IterateIntoChannel(nObject, channel) => {
+        // TODO - this is repeated code!
+        // Combine channels and objects, and this will be unified
+        val channelName = channel match {
+          case UIdentifier(s) => s
+          case _ => throw new Exception(s"illegal channel: $channel")
+        }
+
+        val channelType: NewMapType = channelIdToType.get(channelName).getOrElse(UndefinedT)
+
+        val taggedObject = TaggedObject(nObject, channelType)
+
+        IterationUtils.iterateObject(taggedObject, this) match {
+          case Success(commandList) => {
+            var returnedEnv = this
+            for {
+              command <- commandList
+            } {
+              returnedEnv = returnedEnv.newCommand(OutputToChannel(command, channel))
+            }
+
+            returnedEnv
+          }
+          case Failure(reason) => {
+            throw new Exception(s"Iterate into command failed: $reason")
+          }
+        }
+      }
     }
   }
 
@@ -477,8 +507,6 @@ object Environment {
   def eCommand(id: String, nObject: NewMapObject): EnvironmentCommand = {
     FullEnvironmentCommand(id, nObject)
   }
-
-
 
   def fullFuncT(typeTransform: UntaggedObject): NewMapType = {
     MapT(typeTransform, MapConfig(RequireCompleteness, FullFunction))
@@ -542,6 +570,11 @@ object Environment {
     Environment().typeSystem.typeToUntaggedObject(nType)
   }
 
+  // TODO - eventually make this empty and add it elsewhere!!
+  val initialChannelToType = Map(
+    "stdout" -> CustomT("String", UStruct(Vector.empty))
+  )
+
   var Base: Environment = Environment()
 
   def buildTableT(keyType: UntaggedObject, valueType: UntaggedObject, env: Environment): UntaggedObject = {
@@ -570,6 +603,7 @@ object Environment {
     //eCommand("Any", typeAsObject(AnyT)),
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
+    eCommand("Char", typeAsObject(CharacterT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", TaggedObject(
       UMap(Vector(UWildcardPattern("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),
@@ -615,12 +649,9 @@ object Environment {
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewVersionedStatementCommand("_default", TypeClassT(Vector(UWildcardPattern("t") -> ParamId("t")), Vector.empty)),
-    NewVersionedStatementCommand("_typeOf", 
-      TypeClassT(
-        Vector(UWildcardPattern("t") -> buildSimpleMapT(ParamId("t"), typeAsUntaggedObject(TypeT), MapConfig(RequireCompleteness, SimpleFunction), Base)),
-        Vector.empty
-      )
+    NewTypeClassCommand("_default", Vector(UWildcardPattern("t") -> ParamId("t"))),
+    NewTypeClassCommand("_typeOf", 
+      Vector(UWildcardPattern("t") -> buildSimpleMapT(ParamId("t"), typeAsUntaggedObject(TypeT), MapConfig(RequireCompleteness, SimpleFunction), Base))
     ),
     ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t"))))),
     NewParamTypeCommand(
@@ -631,12 +662,8 @@ object Environment {
         CountT,
         SimpleFunction
       )
-<<<<<<< Updated upstream:src/main/scala/ai/newmap/model/Environment.scala
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
     NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty))
-=======
-    )
->>>>>>> Stashed changes:src/main/scala/model/Environment.scala
   ))
 }
