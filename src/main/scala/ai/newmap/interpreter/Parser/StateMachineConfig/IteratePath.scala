@@ -4,7 +4,7 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Number}
 import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement, ParseTree, IdentifierParse, NaturalNumberParse}
-
+import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object IteratePath {
@@ -17,12 +17,12 @@ object IteratePath {
   val iterateIdentifierIdentifierIdentifier = new State(isEndState = false, name = "iterateIdentifierIdentifierIdentifier")
   val iterateEndState = new IterateEndState(name = "iterateEndState")
 
-  val iterateInitTransition = new Transition(expectedToken = Identifier("iterate"), nextState = initState)
-  val iterateId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = iterateIdentifier)
-  val iterateId1TransitionNumber = new Transition(expectedTokenClass = classOf[Number], nextState = iterateIndexSize)
+  val iterateInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("iterate"), nextState = initState)
+  val iterateId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = iterateIdentifier)
+  val iterateId1TransitionNumber = new Transition(tokenValidator = TokenValidators.number, nextState = iterateIndexSize)
 
-  val iterateId2Transition = new Transition(expectedToken = Identifier("into"), nextState = iterateIdentifierIdentifier)
-  val iterateId3Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = iterateIdentifierIdentifierIdentifier)
+  val iterateId2Transition = new Transition(tokenValidator = TokenValidators.specificIdentifier("into"), nextState = iterateIdentifierIdentifier)
+  val iterateId3Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = iterateIdentifierIdentifierIdentifier)
   val iterateEndTransition = new IterateEndStateTransition(nextState = iterateEndState)
 
   initState.addAcceptedTransition(iterateId1Transition)
@@ -57,6 +57,6 @@ class IterateEndState(name:String) extends State(isEndState = true, name){
   }
 }
 
-class IterateEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
+class IterateEndStateTransition(nextState:State) extends Transition(nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }

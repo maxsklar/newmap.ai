@@ -1,7 +1,8 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
 import ai.newmap.StateMachine.{State, StateMachine}
-import ai.newmap.interpreter.Lexer
+import ai.newmap.interpreter.Lexer.Token
+import ai.newmap.model.EnvStatementParse
 import ai.newmap.interpreter.Parser.StateMachineConfig.DisconnectChannelPath.disconnectChannelInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTransition
 import ai.newmap.interpreter.Parser.StateMachineConfig.ConnectChannelPath.connectChannelInitTransition
@@ -26,7 +27,7 @@ class ParserConfig() {
 }
 
 object StateMachineRunner{
-  def run(tokens: Seq[Lexer.Token]): Outcome[Any, String] = {
+  def run(tokens: Seq[Token]): Outcome[EnvStatementParse, String] = {
     val sm = new StateMachine()
     sm.run(tokens)
   }

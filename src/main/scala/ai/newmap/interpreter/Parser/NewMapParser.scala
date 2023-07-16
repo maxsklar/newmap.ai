@@ -9,7 +9,6 @@ object NewMapParser {
     val parseTree = NewMapStateMachineParser(tokens)
 
     parseTree match {
-
       case Failure(v) =>
         if(v.equals("Unimplemented")) NewMapCombinatorParser(tokens)
         else ai.newmap.util.Failure(v)

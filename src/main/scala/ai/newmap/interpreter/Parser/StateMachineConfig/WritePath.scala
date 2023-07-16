@@ -4,7 +4,7 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{EnvStatementParse, IdentifierParse, ParseElement, ParseTree, WriteToChannelParse}
-
+import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object WritePath {
@@ -14,19 +14,17 @@ object WritePath {
   private val writeIdentifierIdentifier = new State(isEndState = false, name = "writeIdentifierIdentifier")
   private val writeEndState = new WritePathEndState(name = "writeEndState")
 
-  val writeInitTransition = new Transition(expectedToken = Identifier("write"), nextState = initState)
-  private val writeId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = writeIdentifier)
+  val writeInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("write"), nextState = initState)
+  private val writeId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = writeIdentifier)
   private val writeId2Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = writeIdentifierIdentifier)
   private val writeEndTransition = new WritePathEndStateTransition(nextState = writeEndState)
 
   initState.addAcceptedTransition(writeId1Transition)
   writeIdentifier.addAcceptedTransition(writeId2Transition)
   writeIdentifierIdentifier.addAcceptedTransition(writeEndTransition)
-
 }
 
 class WritePathEndState(name: String) extends State(isEndState = true, name) {
-
   var tokenOptions: Option[List[ParseElement]] = None
 
   override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
@@ -40,9 +38,8 @@ class WritePathEndState(name: String) extends State(isEndState = true, name) {
       tokens(2).asInstanceOf[ParseTree]
     )
   }
-
 }
 
-class WritePathEndStateTransition(nextState: State) extends Transition(expectedToken = null, nextState = nextState) {
+class WritePathEndStateTransition(nextState: State) extends Transition(nextState = nextState) {
   override def validateToken(t: Lexer.Token): Boolean = true
 }

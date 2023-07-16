@@ -4,19 +4,18 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{ConnectChannelParse, EnvStatementParse, ParseElement}
-
+import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object ConnectChannelPath {
-
   private val initState = new State(name = "connectChannel")
   private val connectChannelIdentifier = new State(isEndState = false, name = "connectChannelIdentifier")
   private val connectChannelIdentifierIdentifier = new State(isEndState = false, name = "connectChannelIdentifierIdentifier")
   private val connectChannelEndState = new ConnectChannelEndState(name = "connectChannelEndState")
 
-  val connectChannelInitTransition = new Transition(expectedToken = Identifier("connectChannel"), nextState = initState)
-  private val connectChannelId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = connectChannelIdentifier)
-  private val connectChannelId2Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = connectChannelIdentifierIdentifier)
+  val connectChannelInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("connectChannel"), nextState = initState)
+  private val connectChannelId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifier)
+  private val connectChannelId2Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifierIdentifier)
   private val connectChannelEndTransition = new ConnectChannelEndStateTransition(nextState = connectChannelEndState)
 
   initState.addAcceptedTransition(connectChannelId1Transition)
@@ -42,6 +41,6 @@ class ConnectChannelEndState(name:String) extends State(isEndState = true, name)
 
 }
 
-class ConnectChannelEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
+class ConnectChannelEndStateTransition(nextState:State) extends Transition(nextState = nextState) {
   override def validateToken(t: Lexer.Token): Boolean = true
 }

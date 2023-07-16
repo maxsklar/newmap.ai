@@ -4,6 +4,7 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{ApplyCommandStatementParse, EnvStatementParse, IdentifierParse, ParseElement, ParseTree}
+import ai.newmap.StateMachine.TokenValidators
 
 import scala.collection.mutable.ListBuffer
 object applyCommandPath {
@@ -12,8 +13,8 @@ object applyCommandPath {
   private val applyCommandStmtIdentifierIdentifier = new State(isEndState = false, name = "applyCommandStmtIdentifierIdentifier")
   private val applyCommandStmtEndState = new ApplyCommandStmtEndState(name = "applyCommandStmtEndState")
 
-  val applyCommandStmtInitTransition = new Transition(expectedToken = Identifier("update"), nextState = initState)
-  private val applyCommandStmtId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = applyCommandStmtIdentifier)
+  val applyCommandStmtInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("update"), nextState = initState)
+  private val applyCommandStmtId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = applyCommandStmtIdentifier)
   private val applyCommandStmtId2Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = applyCommandStmtIdentifierIdentifier)
   private val applyCommandStmtEndTransition = new ApplyCommandStmtEndStateTransition(nextState = applyCommandStmtEndState)
 
@@ -40,6 +41,6 @@ class ApplyCommandStmtEndState(name:String) extends State(isEndState = true, nam
 
 }
 
-class ApplyCommandStmtEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
+class ApplyCommandStmtEndStateTransition(nextState:State) extends Transition(nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }

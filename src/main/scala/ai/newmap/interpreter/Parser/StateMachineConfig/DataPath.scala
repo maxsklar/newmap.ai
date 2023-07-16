@@ -4,7 +4,7 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model._
-
+import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object DataPath {
@@ -15,9 +15,9 @@ object DataPath {
   private val dataIdentifierIdentifierIdentifier = new State(isEndState = false, name = "dataIdentifierIdentifierIdentifier")
   private val dataEndState = new DataEndState(name = "dataEndState")
 
-  val dataInitTransition = new Transition(expectedToken = Identifier("data"), nextState = initState)
-  private val dataId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = dataIdentifier)
-  private val dataId2Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = dataIdentifierIdentifier)
+  val dataInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("data"), nextState = initState)
+  private val dataId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifier)
+  private val dataId2Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifierIdentifier)
   private val dataId3Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = dataIdentifierIdentifierIdentifier)
   private val dataEndTransition = new DataEndStateTransition(nextState = dataEndState)
 
@@ -47,6 +47,6 @@ class DataEndState(name: String) extends State(isEndState = true, name) {
 
 }
 
-class DataEndStateTransition(nextState: State) extends Transition(expectedToken = null, nextState = nextState) {
+class DataEndStateTransition(nextState: State) extends Transition(nextState = nextState) {
   override def validateToken(t: Lexer.Token): Boolean = true
 }

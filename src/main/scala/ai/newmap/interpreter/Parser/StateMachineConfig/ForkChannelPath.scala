@@ -4,7 +4,7 @@ import ai.newmap.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{EnvStatementParse, ForkedVersionedStatementParse, IdentifierParse, ParseElement}
-
+import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object ForkChannelPath {
@@ -15,10 +15,10 @@ object ForkChannelPath {
   private val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState(name = "forkedVersionedStmtEndState")
 
 
-  val forkedVersionedStmtInitTransition = new Transition(expectedToken = Identifier("fork"), nextState = null)
-  private val forkedVersionedStmtId1Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifier)
-  private val forkedVersionedStmtId2Transition = new Transition(expectedToken = Identifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier)
-  private val forkedVersionedStmtId3Transition = new Transition(expectedTokenClass = classOf[Identifier], nextState = forkedVersionedStmtIdentifierIdentifierIdentifier)
+  val forkedVersionedStmtInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("fork"), nextState = null)
+  private val forkedVersionedStmtId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = forkedVersionedStmtIdentifier)
+  private val forkedVersionedStmtId2Transition = new Transition(tokenValidator = TokenValidators.specificIdentifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier)
+  private val forkedVersionedStmtId3Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = forkedVersionedStmtIdentifierIdentifierIdentifier)
   private val forkedVersionedStmtEndTransition = new ForkedVersionedStmtEndStateTransition(nextState = forkedVersionedStmtEndState)
 
   initState.addAcceptedTransition(forkedVersionedStmtId1Transition)
@@ -46,6 +46,6 @@ class ForkedVersionedStmtEndState(name:String) extends State(isEndState = true, 
 
 }
 
-class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(expectedToken = null, nextState = nextState){
+class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(nextState = nextState){
   override def validateToken(t: Lexer.Token): Boolean = true
 }

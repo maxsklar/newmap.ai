@@ -18,8 +18,9 @@ class State(val isEndState: Boolean = false, val name: String, var tokenStream: 
   }
 
   def changeState(token: Lexer.Token, tokens: Seq[Lexer.Token]): State = {
-    for(transition <- acceptedTransitions){
-      if (transition.validateToken(token)){
+
+    for(transition <- acceptedTransitions) {
+      if (transition.validateToken(token)) {
         return transition.exec(token, parseElementList, tokens)
       }
     }
