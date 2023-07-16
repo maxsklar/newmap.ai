@@ -21,7 +21,6 @@ object NewMapParser {
     val statementParse = NewMapStateMachineParser.statementParse(tokens)
 
     statementParse match {
-
       case Failure(v) =>
         if (v.equals("Unimplemented")) NewMapCombinatorParser.statementParse(tokens)
         else ai.newmap.util.Failure(v)

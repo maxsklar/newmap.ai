@@ -2,25 +2,30 @@ package ai.newmap.StateMachine
 
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Parser.StateMachineConfig.ParserConfig
-import ai.newmap.util.Outcome;
+import ai.newmap.util.{Failure, Success, Outcome};
 
 class StateMachine (val depth: Integer = 0, val expectation: Class[_] = null){
   private val MAX_DEPTH = 5
 
   def run(tokens: Seq[Lexer.Token]): Outcome[Any, String] = {
     if(depth > MAX_DEPTH){
-      ai.newmap.util.Failure("Max Depth Reached")
+      Failure("Max Depth Reached")
     }
+    
     val parserConfig = new ParserConfig()
     var curState = parserConfig.initState
+    //println("Current State: " + curState.name)
     tokens.foreach(token => {
       curState = curState.changeState(token, tokens)
+      //println("Current State: " + curState.name)
     })
-    curState = curState.changeState(null, tokens)
-    if (curState.endState) {
-      ai.newmap.util.Success(curState.generateParseTree)
-    }
-    ai.newmap.util.Failure("Unimplemented")
-  }
 
+    curState = curState.changeState(null, tokens)
+
+    for {
+      _ <- Outcome.failWhen(!curState.isEndState, "Unimplemented")
+    } yield {
+      curState.generateParseTree
+    }
+  }
 }

@@ -99,19 +99,26 @@ object StatementInterpreter {
           NewTypeClassCommand(id.s, typeTransform)
         }
       }
-      case IterateIntoStatementParse(id, destination) => {
+      case IterateIntoStatementParse(iterableExp, destination) => {
         for {
-          iterableObject <- env.lookup(id.s) match {
-            case Some(EnvironmentBinding(nObject)) => Success(nObject)
+          // TODO - we need a type inference here!!
+          tc <- TypeChecker.typeCheckUnknownType(iterableExp, env)
+          evaluatedObject <- Evaluator(tc.nExpression, env)
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
+          iterableObjectCandidate <- TypeChecker.tagAndNormalizeObject(constantObject, tc.refinedTypeClass, env)
+
+          // NOTE: This is a very inefficient way (we are calling the whole function to see if we can call the function)
+          // - In the future, this should be taken into account by the type checker
+          // - the type checker, instead of using unknown type, will get a hint that this is an iterable object, and
+          //   will use that hint to build it!
+          iterableObject <- IterationUtils.iterateObject(iterableObjectCandidate, env) match {
+            case Success(_) => Success(iterableObjectCandidate)
             case _ => {
-              env.typeSystem.currentMapping.get(id.s) match {
-                case Some(nTypeId) => {
-                  val uType = env.typeSystem.typeToUntaggedObject(CustomT(id.s, UStruct(Vector.empty)))
-                  val nObject = TaggedObject(uType, HistoricalTypeT(env.typeSystem.currentState))
-                  Success(nObject)
-                }
-                case None => Failure(s"Could not lookup $id in environment -- ${env.lookupVersionedObject(id.s)}")
-              }
+              for {
+                tcType <- TypeChecker.typeCheck(iterableExp, TypeT, env, FullFunction)
+                uType <- Evaluator(tcType.nExpression, env)
+                iterableTypeCandidate = TaggedObject(uType, HistoricalTypeT(env.typeSystem.currentState))
+              } yield iterableTypeCandidate
             }
           }
 

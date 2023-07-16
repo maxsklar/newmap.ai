@@ -5,7 +5,7 @@ import ai.newmap.model.{EnvStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
-class State (isEndState: Boolean = false, name:String, var tokenStream: Seq[Lexer.Token] = null){
+class State(val isEndState: Boolean = false, val name: String, var tokenStream: Seq[Lexer.Token] = null) {
   private var parseElementList: ListBuffer[ParseElement] = ListBuffer()
   private var acceptedTransitions: Seq[Transition] = Seq[Transition]()
   def addAcceptedTransition(transition: Transition): Unit = {
@@ -26,9 +26,7 @@ class State (isEndState: Boolean = false, name:String, var tokenStream: Seq[Lexe
     new DeadState()
   }
 
-  def getName: String = name
-  def endState: Boolean = isEndState
   def generateParseTree: EnvStatementParse = null
 }
 
-class DeadState(name:String = "deadState") extends State(name = name)
+class DeadState(name: String = "deadState") extends State(name = name)

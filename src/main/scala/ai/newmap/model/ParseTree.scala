@@ -131,7 +131,7 @@ case class NewTypeClassStatementParse(
 ) extends EnvStatementParse
 
 case class IterateIntoStatementParse(
-  iterableObject: Identifier, // This should be a parseTree - but our parser doesn't allow this yet!
+  iterableObject: ParseTree,
   destinationObject: Identifier
 ) extends EnvStatementParse
 

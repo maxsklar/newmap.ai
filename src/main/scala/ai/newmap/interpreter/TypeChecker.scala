@@ -139,7 +139,7 @@ object TypeChecker {
           // - we are looking for types that ONLY include identifiers.
           _ <- underlyingExpectedT match {
             case WildcardPatternT(_) => None
-            case _ => Some()
+            case _ => Some(())
           }
 
           // Herin Lies the problem!!!

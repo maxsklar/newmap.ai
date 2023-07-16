@@ -29,5 +29,4 @@ object NewMapStateMachineParser {
     val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse()))
     result.asInstanceOf[Outcome[EnvStatementParse, String]]
   }
-
 }

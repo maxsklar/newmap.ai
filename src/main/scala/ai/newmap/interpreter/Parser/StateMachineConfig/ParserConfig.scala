@@ -14,8 +14,7 @@ import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandsPath.applyCo
 import ai.newmap.util.Outcome
 
 class ParserConfig() {
-
-  val initState = new State(name = "INIT" )
+  val initState = new State(name = "INIT")
   initState.addAcceptedTransition(disconnectChannelInitTransition)
   initState.addAcceptedTransition(iterateInitTransition)
   initState.addAcceptedTransition(connectChannelInitTransition)

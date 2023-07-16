@@ -7,11 +7,13 @@ import ai.newmap.model.ParseTree
 
 import scala.collection.mutable.ListBuffer
 
-class Transition (expectedToken: Lexer.Token = null,
-                  expectedTokenClass:Class[_] = null,
-                  nextState: State,
-                  nextExpectedParseTree: Class[_] = null,
-                  var tokenStream: Seq[Lexer.Token] = null){
+class Transition(
+  expectedToken: Lexer.Token = null,
+  expectedTokenClass: Class[_] = null,
+  nextState: State,
+  nextExpectedParseTree: Class[_] = null,
+  var tokenStream: Seq[Lexer.Token] = null
+) {
   def validateToken(t: Lexer.Token): Boolean = {
     t == expectedToken || expectedTokenClass == t.getClass
   }
@@ -22,7 +24,7 @@ class Transition (expectedToken: Lexer.Token = null,
     }
     else if(nextExpectedParseTree != null && nextState != null){
       val sm = new StateMachine(1, nextExpectedParseTree)
-      val outcome= sm.run(tokenStream)
+      val outcome = sm.run(tokenStream)
       outcome match {
         case Success(v) =>
           partialParseElementList += v.asInstanceOf[ParseElement]

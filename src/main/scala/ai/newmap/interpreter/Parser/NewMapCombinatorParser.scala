@@ -297,7 +297,7 @@ object NewMapCombinatorParser extends Parsers {
   private def iterateIntoCommand: Parser[IterateIntoStatementParse] = {
     Lexer.Identifier("iterate") ~ identifier ~ Lexer.Identifier("into") ~ identifier ^^ {
       case _ ~ obj ~ _ ~ dest =>
-        IterateIntoStatementParse(Lexer.Identifier(obj.s), Lexer.Identifier(dest.s))
+        IterateIntoStatementParse(IdentifierParse(obj.s), Lexer.Identifier(dest.s))
     }
   }
 
