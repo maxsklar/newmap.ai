@@ -335,7 +335,7 @@ case class NewMapTypeSystem(
             WithStateT(uuid, resultT)
           }
         }
-        case _ => Failure(s"Couldn't convert WithState tp NewMapType with params: $params")
+        case _ => Failure(s"Couldn't convert WithState to NewMapType with params: $params")
       }
       case custom => Success(CustomT(custom, params))
     }

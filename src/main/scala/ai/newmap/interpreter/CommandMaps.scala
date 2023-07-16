@@ -74,7 +74,7 @@ object CommandMaps {
       /*case TypeClassT(typeTransform, implementation) if (implementation.isEmpty) => {
         Success(defaultUMap)
       }*/
-      case CharacterT => Success(UCharacter('\0'))
+      case CharacterT => Success(UCharacter('\u0000'))
       case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       case CustomT("String", _) => Success(UCase(UIndex(0), UStruct(Vector.empty))) // Replace this line with a conversion!
       case WithStateT(uuid, underlying) => {

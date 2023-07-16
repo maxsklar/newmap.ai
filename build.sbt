@@ -50,9 +50,12 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
 
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.5"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
-resolvers += "Artima Maven Repository" at "http://repo.artima.com/releases"
+resolvers += "Artima Maven Repository" at "https://repo.artima.com/releases"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"
+
+scalacOptions ++= Seq("-unchecked", "-deprecation")
+
 // ============================================================================
 
 // Most moderately interesting Scala projects don't make use of the very simple

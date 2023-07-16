@@ -119,7 +119,7 @@ object StatementInterpreter {
           // which is it?
           // TODO - eventually merge the 2 concepts!
 
-          val channelTypeOpt = env.channelIdToType.get(destination.s)
+          channelTypeOpt = env.channelIdToType.get(destination.s)
 
           command <- channelTypeOpt match {
             case Some(channelType) => {
