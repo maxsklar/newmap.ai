@@ -1,29 +1,22 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
-import ai.newmap.StateMachine.{State, StateMachine}
+import ai.newmap.StateMachine.{State, StateMachine, Transition}
 import ai.newmap.interpreter.Lexer.Token
 import ai.newmap.model.EnvStatementParse
-import ai.newmap.interpreter.Parser.StateMachineConfig.DisconnectChannelPath.disconnectChannelInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.IteratePath.iterateInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.ConnectChannelPath.connectChannelInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.DataPath.dataInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.ForkChannelPath.forkedVersionedStmtInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.WritePath.writeInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandPath.applyCommandStmtInitTransition
-import ai.newmap.interpreter.Parser.StateMachineConfig.applyCommandsPath.applyCommandsStmtInitTransition
-
+import ai.newmap.StateMachine.TokenValidators
 import ai.newmap.util.Outcome
 
 class ParserConfig() {
-  val initState = new State(name = "INIT")
-  initState.addAcceptedTransition(disconnectChannelInitTransition)
-  initState.addAcceptedTransition(iterateInitTransition)
-  initState.addAcceptedTransition(connectChannelInitTransition)
-  initState.addAcceptedTransition(forkedVersionedStmtInitTransition)
-  initState.addAcceptedTransition(dataInitTransition)
-  initState.addAcceptedTransition(writeInitTransition)
-  initState.addAcceptedTransition(applyCommandStmtInitTransition)
-  initState.addAcceptedTransition(applyCommandsStmtInitTransition)
+  val initState = State("INIT", Vector(
+    Transition(TokenValidators.specificIdentifier("disconnectChannel"), DisconnectChannelPath.initState),
+    Transition(TokenValidators.specificIdentifier("iterate"), IteratePath.initState),
+    Transition(TokenValidators.specificIdentifier("connectChannel"), ConnectChannelPath.initState) ,
+    Transition(TokenValidators.specificIdentifier("fork"), ForkChannelPath.initState),
+    Transition(TokenValidators.specificIdentifier("data"), DataPath.initState),
+    Transition(TokenValidators.specificIdentifier("write"), WritePath.initState),
+    Transition(TokenValidators.specificIdentifier("update"), ApplyCommandPath.initState),
+    Transition(TokenValidators.specificIdentifier("updates"), ApplyCommandsPath.initState)
+  ))
 }
 
 object StateMachineRunner{

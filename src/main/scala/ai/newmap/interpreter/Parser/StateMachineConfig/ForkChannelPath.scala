@@ -8,18 +8,23 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object ForkChannelPath {
-  private val initState = State("fork")
-  private val forkedVersionedStmtIdentifier = State("forkedVersionedStmtIdentifier")
-  private val forkedVersionedStmtIdentifierIdentifier = State("forkedVersionedStmtIdentifierIdentifier")
-  private val forkedVersionedStmtIdentifierIdentifierIdentifier = State("forkedVersionedStmtIdentifierIdentifierIdentifier")
-  private val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState("forkedVersionedStmtEndState")
+  val forkedVersionedStmtEndState = new ForkedVersionedStmtEndState("forkedVersionedStmtEndState")
 
-  val forkedVersionedStmtInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("fork"), nextState = initState)
+  val forkedVersionedStmtIdentifierIdentifierIdentifier = State("forkedVersionedStmtIdentifierIdentifierIdentifier", Vector(
+    new ForkedVersionedStmtEndStateTransition(nextState = forkedVersionedStmtEndState)
+  ))
 
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = forkedVersionedStmtIdentifier))
-  forkedVersionedStmtIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.specificIdentifier("as"), nextState = forkedVersionedStmtIdentifierIdentifier))
-  forkedVersionedStmtIdentifierIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = forkedVersionedStmtIdentifierIdentifierIdentifier))
-  forkedVersionedStmtIdentifierIdentifierIdentifier.addAcceptedTransition(new ForkedVersionedStmtEndStateTransition(nextState = forkedVersionedStmtEndState))
+  val forkedVersionedStmtIdentifierIdentifier = State("forkedVersionedStmtIdentifierIdentifier", Vector(
+    Transition(TokenValidators.identifier, forkedVersionedStmtIdentifierIdentifierIdentifier)
+  ))
+
+  val forkedVersionedStmtIdentifier = State("forkedVersionedStmtIdentifier", Vector(
+    Transition(TokenValidators.specificIdentifier("as"), forkedVersionedStmtIdentifierIdentifier)
+  ))
+
+  val initState = State("fork", Vector(
+    Transition(TokenValidators.identifier, forkedVersionedStmtIdentifier)
+  ))
 }
 
 class ForkedVersionedStmtEndState(name: String) extends State(name, isEndState = true){

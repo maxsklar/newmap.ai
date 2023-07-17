@@ -8,17 +8,16 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object WritePath {
+  val writeEndState = new WritePathEndState("writeEndState")
+  val writeIdentifierIdentifier = State("writeIdentifierIdentifier", Vector(
+    new WritePathEndStateTransition(nextState = writeEndState)
+  ))
 
-  private val initState = State("write")
-  private val writeIdentifier = State("writeIdentifier")
-  private val writeIdentifierIdentifier = State("writeIdentifierIdentifier")
-  private val writeEndState = new WritePathEndState("writeEndState")
+  val writeIdentifier = State("writeIdentifier", Vector(
+    Transition(expectingParseTree = true, nextState = writeIdentifierIdentifier)
+  ))
 
-  val writeInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("write"), nextState = initState)
-
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = writeIdentifier))
-  writeIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = writeIdentifierIdentifier))
-  writeIdentifierIdentifier.addAcceptedTransition(new WritePathEndStateTransition(nextState = writeEndState))
+  val initState = State("write", Vector(Transition(TokenValidators.identifier, writeIdentifier)))
 }
 
 class WritePathEndState(name: String) extends State(name, isEndState = true) {

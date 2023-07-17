@@ -8,16 +8,19 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object DisconnectChannelPath {
-  private val initState = State("disconnectChannel")
-  private val disconnectChannelIdentifier = State("disconnectChannelIdentifier")
-  private val disconnectChannelIdentifierIdentifier = State("disconnectChannelIdentifierIdentifier")
-  private val disconnectChannelEndState = new DisconnectChannelEndState("disconnectChannelEndState")
+  val disconnectChannelEndState = new DisconnectChannelEndState("disconnectChannelEndState")
 
-  val disconnectChannelInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("disconnectChannel"), nextState = initState)
+  val disconnectChannelIdentifierIdentifier = State("disconnectChannelIdentifierIdentifier", Vector(
+    new DisconnectChannelEndStateTransition(nextState = disconnectChannelEndState)
+  ))
 
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifier))
-  disconnectChannelIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifierIdentifier))
-  disconnectChannelIdentifierIdentifier.addAcceptedTransition(new DisconnectChannelEndStateTransition(nextState = disconnectChannelEndState))
+  val disconnectChannelIdentifier = State("disconnectChannelIdentifier", Vector(
+    Transition(TokenValidators.identifier, disconnectChannelIdentifierIdentifier)
+  ))
+
+  val initState = State("disconnectChannel", Vector(
+    Transition(TokenValidators.identifier, disconnectChannelIdentifier)
+  ))
 }
 
 class DisconnectChannelEndState(name:String) extends State(name, isEndState = true) {

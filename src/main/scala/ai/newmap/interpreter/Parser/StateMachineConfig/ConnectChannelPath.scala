@@ -8,16 +8,19 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object ConnectChannelPath {
-  private val initState = State("connectChannel")
-  private val connectChannelIdentifier = State("connectChannelIdentifier")
-  private val connectChannelIdentifierIdentifier = State("connectChannelIdentifierIdentifier")
-  private val connectChannelEndState = new ConnectChannelEndState("connectChannelEndState")
+  val connectChannelEndState = new ConnectChannelEndState("connectChannelEndState")
 
-  val connectChannelInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("connectChannel"), nextState = initState) 
+  val connectChannelIdentifierIdentifier = State("connectChannelIdentifierIdentifier", Vector(
+    new ConnectChannelEndStateTransition(nextState = connectChannelEndState)
+  ))
 
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifier))
-  connectChannelIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifierIdentifier))
-  connectChannelIdentifierIdentifier.addAcceptedTransition(new ConnectChannelEndStateTransition(nextState = connectChannelEndState))
+  val connectChannelIdentifier = State("connectChannelIdentifier", Vector(
+    Transition(TokenValidators.identifier, connectChannelIdentifierIdentifier)
+  ))
+
+  val initState = State("connectChannel", Vector(
+    Transition(TokenValidators.identifier, connectChannelIdentifier)
+  ))
 }
 
 class ConnectChannelEndState(name:String) extends State(name, isEndState = true){

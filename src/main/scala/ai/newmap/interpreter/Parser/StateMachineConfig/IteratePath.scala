@@ -9,23 +9,28 @@ import scala.collection.mutable.ListBuffer
 
 object IteratePath {
 
-  val initState = State("iterate")
-  val iterateIdentifier = State("iterateIdentifier")
-  val iterateIndexSize = State("iterateIndexSize")
-
-  val iterateIdentifierIdentifier = State("iterateIdentifierIdentifier")
-  val iterateIdentifierIdentifierIdentifier = State("iterateIdentifierIdentifierIdentifier")
   val iterateEndState = new IterateEndState("iterateEndState")
 
-  val iterateInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("iterate"), nextState = initState)
+  val iterateIdentifierIdentifierIdentifier = State("iterateIdentifierIdentifierIdentifier", Vector(
+    new IterateEndStateTransition(nextState = iterateEndState)
+  ))
 
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = iterateIdentifier))
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.number, nextState = iterateIndexSize))
+  val iterateIdentifierIdentifier = State("iterateIdentifierIdentifier", Vector(
+    Transition(TokenValidators.identifier, iterateIdentifierIdentifierIdentifier)
+  ))
 
-  iterateIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.specificIdentifier("into"), nextState = iterateIdentifierIdentifier))
-  iterateIndexSize.addAcceptedTransition(Transition(tokenValidator = TokenValidators.specificIdentifier("into"), nextState = iterateIdentifierIdentifier))
-  iterateIdentifierIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = iterateIdentifierIdentifierIdentifier))
-  iterateIdentifierIdentifierIdentifier.addAcceptedTransition(new IterateEndStateTransition(nextState = iterateEndState))
+  val iterateIndexSize = State("iterateIndexSize", Vector(
+    Transition(TokenValidators.specificIdentifier("into"), iterateIdentifierIdentifier)
+  ))
+
+  val iterateIdentifier = State("iterateIdentifier", Vector(
+    Transition(TokenValidators.specificIdentifier("into"), iterateIdentifierIdentifier)
+  ))
+
+  val initState = State("iterate", Vector(
+    Transition(TokenValidators.identifier, iterateIdentifier),
+    Transition(TokenValidators.number, iterateIndexSize)
+  ))
 }
 
 class IterateEndState(name: String) extends State(name, isEndState = true){

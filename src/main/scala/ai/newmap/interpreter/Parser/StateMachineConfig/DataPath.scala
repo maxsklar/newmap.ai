@@ -8,19 +8,23 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object DataPath {
+  val dataEndState = new DataEndState("dataEndState")
 
-  private val initState = State("data")
-  private val dataIdentifier = State("dataIdentifier")
-  private val dataIdentifierIdentifier = State("dataIdentifierIdentifier")
-  private val dataIdentifierIdentifierIdentifier = State("dataIdentifierIdentifierIdentifier")
-  private val dataEndState = new DataEndState("dataEndState")
+  val dataIdentifierIdentifierIdentifier = State("dataIdentifierIdentifierIdentifier", Vector(
+    new DataEndStateTransition(nextState = dataEndState)
+  ))
 
-  val dataInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("data"), nextState = initState)
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifier))
-  dataIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifierIdentifier))
-  dataIdentifierIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = dataIdentifierIdentifierIdentifier))
-  dataIdentifierIdentifierIdentifier.addAcceptedTransition(new DataEndStateTransition(nextState = dataEndState))
+  val dataIdentifierIdentifier = State("dataIdentifierIdentifier", Vector(
+    Transition(expectingParseTree = true, nextState = dataIdentifierIdentifierIdentifier)
+  ))
 
+  val dataIdentifier = State("dataIdentifier", Vector(
+    Transition(TokenValidators.identifier, dataIdentifierIdentifier)
+  ))
+
+  val initState = State("data", Vector(
+    Transition(TokenValidators.identifier, dataIdentifier)
+  ))
 }
 
 class DataEndState(name: String) extends State(name,isEndState = true) {

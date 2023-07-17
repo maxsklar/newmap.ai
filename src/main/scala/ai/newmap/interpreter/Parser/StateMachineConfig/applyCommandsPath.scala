@@ -7,17 +7,20 @@ import ai.newmap.model.{ApplyCommandsStatementParse, EnvStatementParse, Identifi
 import ai.newmap.StateMachine.TokenValidators
 
 import scala.collection.mutable.ListBuffer
-object applyCommandsPath {
-  private val initState = State("updates")
-  private val applyCommandsStmtIdentifier = State("applyCommandsStmtIdentifier")
-  private val applyCommandsStmtIdentifierIdentifier = State("applyCommandsStmtIdentifierIdentifier")
-  private val applyCommandsStmtEndState = new ApplyCommandsStmtEndState("applyCommandsStmtEndState")
+object ApplyCommandsPath {
+  val applyCommandsStmtEndState = new ApplyCommandsStmtEndState("applyCommandsStmtEndState")
 
-  val applyCommandsStmtInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("updates"), nextState = initState)
+  val applyCommandsStmtIdentifierIdentifier = State("applyCommandsStmtIdentifierIdentifier", Vector(
+    new ApplyCommandsStmtEndStateTransition(nextState = applyCommandsStmtEndState)
+  ))
+  
+  val applyCommandsStmtIdentifier = State("applyCommandsStmtIdentifier", Vector(
+    Transition(expectingParseTree = true, nextState = applyCommandsStmtIdentifierIdentifier)
+  ))
 
-  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = applyCommandsStmtIdentifier))
-  applyCommandsStmtIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = applyCommandsStmtIdentifierIdentifier))
-  applyCommandsStmtIdentifierIdentifier.addAcceptedTransition(new ApplyCommandsStmtEndStateTransition(nextState = applyCommandsStmtEndState))
+  val initState = State("updates", Vector(
+    Transition(TokenValidators.identifier, applyCommandsStmtIdentifier)
+  ))
 }
 
 class ApplyCommandsStmtEndState(name:String) extends State(name, isEndState = true){
