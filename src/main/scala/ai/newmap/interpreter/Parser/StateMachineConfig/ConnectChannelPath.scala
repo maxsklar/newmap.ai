@@ -8,23 +8,20 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object ConnectChannelPath {
-  private val initState = new State(name = "connectChannel")
-  private val connectChannelIdentifier = new State(isEndState = false, name = "connectChannelIdentifier")
-  private val connectChannelIdentifierIdentifier = new State(isEndState = false, name = "connectChannelIdentifierIdentifier")
-  private val connectChannelEndState = new ConnectChannelEndState(name = "connectChannelEndState")
+  private val initState = State("connectChannel")
+  private val connectChannelIdentifier = State("connectChannelIdentifier")
+  private val connectChannelIdentifierIdentifier = State("connectChannelIdentifierIdentifier")
+  private val connectChannelEndState = new ConnectChannelEndState("connectChannelEndState")
 
-  val connectChannelInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("connectChannel"), nextState = initState)
-  private val connectChannelId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifier)
-  private val connectChannelId2Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifierIdentifier)
-  private val connectChannelEndTransition = new ConnectChannelEndStateTransition(nextState = connectChannelEndState)
+  val connectChannelInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("connectChannel"), nextState = initState) 
 
-  initState.addAcceptedTransition(connectChannelId1Transition)
-  connectChannelIdentifier.addAcceptedTransition(connectChannelId2Transition)
-  connectChannelIdentifierIdentifier.addAcceptedTransition(connectChannelEndTransition)
+  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifier))
+  connectChannelIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = connectChannelIdentifierIdentifier))
+  connectChannelIdentifierIdentifier.addAcceptedTransition(new ConnectChannelEndStateTransition(nextState = connectChannelEndState))
 
 }
 
-class ConnectChannelEndState(name:String) extends State(isEndState = true, name){
+class ConnectChannelEndState(name:String) extends State(name, isEndState = true){
 
   var tokenOptions: Option[List[ParseElement]] = None
   override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
@@ -41,6 +38,4 @@ class ConnectChannelEndState(name:String) extends State(isEndState = true, name)
 
 }
 
-class ConnectChannelEndStateTransition(nextState:State) extends Transition(nextState = nextState) {
-  override def validateToken(t: Lexer.Token): Boolean = true
-}
+class ConnectChannelEndStateTransition(nextState: State) extends Transition(nextState = nextState)

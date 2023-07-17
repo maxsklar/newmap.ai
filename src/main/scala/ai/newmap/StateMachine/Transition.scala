@@ -7,39 +7,36 @@ import ai.newmap.model.ParseTree
 
 import scala.collection.mutable.ListBuffer
 
-class Transition(
-  tokenValidator: Lexer.Token => Boolean = TokenValidators.none,
-  nextState: State,
-  nextExpectedParseTree: Class[_] = null,
-  var tokenStream: Seq[Lexer.Token] = Seq.empty
+case class Transition(
+  val tokenValidator: Lexer.Token => Boolean = TokenValidators.none,
+  val nextState: State,
+  val expectingParseTree: Boolean = false
 ) {
-  def validateToken(t: Lexer.Token): Boolean = tokenValidator(t)
-
   def exec(t: Lexer.Token, partialParseElementList: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): State = {
-    if (nextExpectedParseTree == null && nextState != null) {
+    if (!expectingParseTree) {
       execStateTransition(t, partialParseElementList, ts)
     }
-    else if (nextExpectedParseTree != null && nextState != null){
-      val sm = new StateMachine(1, nextExpectedParseTree)
-      val outcome = sm.run(tokenStream)
+    else {
+      // TODO - work this part out
+      // NOTE(max): it appears to have to do with looking for a sub-expression within a parse.
+      val sm = new StateMachine(1)
+      val outcome = sm.run(Seq.empty)
       outcome match {
         case Success(v) => {
           partialParseElementList += v.asInstanceOf[ParseElement]
           execStateTransition(null, partialParseElementList, ts)
         }
-        case Failure(_) => new DeadState()
+        case Failure(_) => State.Dead
       }
     }
-    else new DeadState()
   }
 
   private def execStateTransition(t: Lexer.Token, partialParseElementList: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): State = {
     if (tokenValidator(t)) {
       partialParseElementList += t
-      tokenStream = ts
-      nextState.reach(partialParseElementList, tokenStream)
+      nextState.reach(partialParseElementList, ts)
       nextState
     }
-    else new DeadState()
+    else State.Dead
   }
 }

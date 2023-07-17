@@ -8,22 +8,19 @@ import ai.newmap.StateMachine.TokenValidators
 
 import scala.collection.mutable.ListBuffer
 object applyCommandPath {
-  private val initState = new State(isEndState = false, name = "update")
-  private val applyCommandStmtIdentifier = new State(isEndState = false, name = "applyCommandStmtIdentifier")
-  private val applyCommandStmtIdentifierIdentifier = new State(isEndState = false, name = "applyCommandStmtIdentifierIdentifier")
-  private val applyCommandStmtEndState = new ApplyCommandStmtEndState(name = "applyCommandStmtEndState")
+  private val initState = State("update")
+  private val applyCommandStmtIdentifier = State("applyCommandStmtIdentifier")
+  private val applyCommandStmtIdentifierIdentifier = State("applyCommandStmtIdentifierIdentifier")
+  private val applyCommandStmtEndState = new ApplyCommandStmtEndState("applyCommandStmtEndState")
 
-  val applyCommandStmtInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("update"), nextState = initState)
-  private val applyCommandStmtId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = applyCommandStmtIdentifier)
-  private val applyCommandStmtId2Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = applyCommandStmtIdentifierIdentifier)
-  private val applyCommandStmtEndTransition = new ApplyCommandStmtEndStateTransition(nextState = applyCommandStmtEndState)
+  val applyCommandStmtInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("update"), nextState = initState)
 
-  initState.addAcceptedTransition(applyCommandStmtId1Transition)
-  applyCommandStmtIdentifier.addAcceptedTransition(applyCommandStmtId2Transition)
-  applyCommandStmtIdentifierIdentifier.addAcceptedTransition(applyCommandStmtEndTransition)
+  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = applyCommandStmtIdentifier))
+  applyCommandStmtIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = applyCommandStmtIdentifierIdentifier))
+  applyCommandStmtIdentifierIdentifier.addAcceptedTransition(new ApplyCommandStmtEndStateTransition(nextState = applyCommandStmtEndState))
 }
 
-class ApplyCommandStmtEndState(name:String) extends State(isEndState = true, name){
+class ApplyCommandStmtEndState(name:String) extends State(name, isEndState = true){
   var tokenOptions: Option[List[ParseElement]] = None
 
   override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
@@ -41,6 +38,4 @@ class ApplyCommandStmtEndState(name:String) extends State(isEndState = true, nam
 
 }
 
-class ApplyCommandStmtEndStateTransition(nextState:State) extends Transition(nextState = nextState){
-  override def validateToken(t: Lexer.Token): Boolean = true
-}
+class ApplyCommandStmtEndStateTransition(nextState: State) extends Transition(nextState = nextState)

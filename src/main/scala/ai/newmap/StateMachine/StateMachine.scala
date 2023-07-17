@@ -5,7 +5,7 @@ import ai.newmap.interpreter.Parser.StateMachineConfig.ParserConfig
 import ai.newmap.model.EnvStatementParse
 import ai.newmap.util.{Failure, Success, Outcome};
 
-class StateMachine (val depth: Integer = 0, val expectation: Class[_] = null){
+class StateMachine (val depth: Integer = 0){
   private val MAX_DEPTH = 5
 
   def run(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {

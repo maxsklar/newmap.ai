@@ -9,26 +9,21 @@ import scala.collection.mutable.ListBuffer
 
 object DataPath {
 
-  private val initState = new State(name = "data")
-  private val dataIdentifier = new State(isEndState = false, name = "dataIdentifier")
-  private val dataIdentifierIdentifier = new State(isEndState = false, name = "dataIdentifierIdentifier")
-  private val dataIdentifierIdentifierIdentifier = new State(isEndState = false, name = "dataIdentifierIdentifierIdentifier")
-  private val dataEndState = new DataEndState(name = "dataEndState")
+  private val initState = State("data")
+  private val dataIdentifier = State("dataIdentifier")
+  private val dataIdentifierIdentifier = State("dataIdentifierIdentifier")
+  private val dataIdentifierIdentifierIdentifier = State("dataIdentifierIdentifierIdentifier")
+  private val dataEndState = new DataEndState("dataEndState")
 
-  val dataInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("data"), nextState = initState)
-  private val dataId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifier)
-  private val dataId2Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifierIdentifier)
-  private val dataId3Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = dataIdentifierIdentifierIdentifier)
-  private val dataEndTransition = new DataEndStateTransition(nextState = dataEndState)
-
-  initState.addAcceptedTransition(dataId1Transition)
-  dataIdentifier.addAcceptedTransition(dataId2Transition)
-  dataIdentifierIdentifier.addAcceptedTransition(dataId3Transition)
-  dataIdentifierIdentifierIdentifier.addAcceptedTransition(dataEndTransition)
+  val dataInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("data"), nextState = initState)
+  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifier))
+  dataIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = dataIdentifierIdentifier))
+  dataIdentifierIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = dataIdentifierIdentifierIdentifier))
+  dataIdentifierIdentifierIdentifier.addAcceptedTransition(new DataEndStateTransition(nextState = dataEndState))
 
 }
 
-class DataEndState(name: String) extends State(isEndState = true, name) {
+class DataEndState(name: String) extends State(name,isEndState = true) {
 
   var tokenOptions: Option[List[ParseElement]] = None
 
@@ -47,6 +42,4 @@ class DataEndState(name: String) extends State(isEndState = true, name) {
 
 }
 
-class DataEndStateTransition(nextState: State) extends Transition(nextState = nextState) {
-  override def validateToken(t: Lexer.Token): Boolean = true
-}
+class DataEndStateTransition(nextState: State) extends Transition(nextState = nextState)

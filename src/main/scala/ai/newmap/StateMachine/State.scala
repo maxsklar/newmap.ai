@@ -5,29 +5,34 @@ import ai.newmap.model.{EnvStatementParse, ParseElement}
 
 import scala.collection.mutable.ListBuffer
 
-class State(val isEndState: Boolean = false, val name: String, var tokenStream: Seq[Lexer.Token] = null) {
+case class State(
+  val name: String,
+  val isEndState: Boolean = false
+) {
   private var parseElementList: ListBuffer[ParseElement] = ListBuffer()
   private var acceptedTransitions: Seq[Transition] = Seq[Transition]()
+  
   def addAcceptedTransition(transition: Transition): Unit = {
     acceptedTransitions = acceptedTransitions :+ transition
   }
 
-  def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token]): Unit = {
-    tokenStream = ts
+  def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
     parseElementList = p
   }
 
   def changeState(token: Lexer.Token, tokens: Seq[Lexer.Token]): State = {
-
     for(transition <- acceptedTransitions) {
-      if (transition.validateToken(token)) {
+      if (transition.tokenValidator(token)) {
         return transition.exec(token, parseElementList, tokens)
       }
     }
-    new DeadState()
+
+    State.Dead
   }
 
   def generateParseTree: EnvStatementParse = null
 }
 
-class DeadState(name: String = "deadState") extends State(name = name)
+object State {
+  val Dead = State("deadState")
+}

@@ -9,22 +9,19 @@ import scala.collection.mutable.ListBuffer
 
 object WritePath {
 
-  private val initState = new State(name = "write")
-  private val writeIdentifier = new State(isEndState = false, name = "writeIdentifier")
-  private val writeIdentifierIdentifier = new State(isEndState = false, name = "writeIdentifierIdentifier")
-  private val writeEndState = new WritePathEndState(name = "writeEndState")
+  private val initState = State("write")
+  private val writeIdentifier = State("writeIdentifier")
+  private val writeIdentifierIdentifier = State("writeIdentifierIdentifier")
+  private val writeEndState = new WritePathEndState("writeEndState")
 
-  val writeInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("write"), nextState = initState)
-  private val writeId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = writeIdentifier)
-  private val writeId2Transition = new Transition(nextExpectedParseTree = classOf[ParseTree], nextState = writeIdentifierIdentifier)
-  private val writeEndTransition = new WritePathEndStateTransition(nextState = writeEndState)
+  val writeInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("write"), nextState = initState)
 
-  initState.addAcceptedTransition(writeId1Transition)
-  writeIdentifier.addAcceptedTransition(writeId2Transition)
-  writeIdentifierIdentifier.addAcceptedTransition(writeEndTransition)
+  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = writeIdentifier))
+  writeIdentifier.addAcceptedTransition(Transition(expectingParseTree = true, nextState = writeIdentifierIdentifier))
+  writeIdentifierIdentifier.addAcceptedTransition(new WritePathEndStateTransition(nextState = writeEndState))
 }
 
-class WritePathEndState(name: String) extends State(isEndState = true, name) {
+class WritePathEndState(name: String) extends State(name, isEndState = true) {
   var tokenOptions: Option[List[ParseElement]] = None
 
   override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
@@ -40,6 +37,4 @@ class WritePathEndState(name: String) extends State(isEndState = true, name) {
   }
 }
 
-class WritePathEndStateTransition(nextState: State) extends Transition(nextState = nextState) {
-  override def validateToken(t: Lexer.Token): Boolean = true
-}
+class WritePathEndStateTransition(nextState: State) extends Transition(nextState = nextState)

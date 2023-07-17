@@ -8,22 +8,19 @@ import ai.newmap.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object DisconnectChannelPath {
-  private val initState = new State(isEndState = false, name = "disconnectChannel")
-  private val disconnectChannelIdentifier = new State(isEndState = false, name = "disconnectChannelIdentifier")
-  private val disconnectChannelIdentifierIdentifier = new State(isEndState = false, name = "disconnectChannelIdentifierIdentifier")
-  private val disconnectChannelEndState = new DisconnectChannelEndState(name = "disconnectChannelEndState")
+  private val initState = State("disconnectChannel")
+  private val disconnectChannelIdentifier = State("disconnectChannelIdentifier")
+  private val disconnectChannelIdentifierIdentifier = State("disconnectChannelIdentifierIdentifier")
+  private val disconnectChannelEndState = new DisconnectChannelEndState("disconnectChannelEndState")
 
-  val disconnectChannelInitTransition = new Transition(tokenValidator = TokenValidators.specificIdentifier("disconnectChannel"), nextState = initState)
-  private val disconnectChannelId1Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifier)
-  private val disconnectChannelId2Transition = new Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifierIdentifier)
-  private val disconnectChannelEndTransition = new DisconnectChannelEndStateTransition(nextState = disconnectChannelEndState)
+  val disconnectChannelInitTransition = Transition(tokenValidator = TokenValidators.specificIdentifier("disconnectChannel"), nextState = initState)
 
-  initState.addAcceptedTransition(disconnectChannelId1Transition)
-  disconnectChannelIdentifier.addAcceptedTransition(disconnectChannelId2Transition)
-  disconnectChannelIdentifierIdentifier.addAcceptedTransition(disconnectChannelEndTransition)
+  initState.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifier))
+  disconnectChannelIdentifier.addAcceptedTransition(Transition(tokenValidator = TokenValidators.identifier, nextState = disconnectChannelIdentifierIdentifier))
+  disconnectChannelIdentifierIdentifier.addAcceptedTransition(new DisconnectChannelEndStateTransition(nextState = disconnectChannelEndState))
 }
 
-class DisconnectChannelEndState(name:String) extends State(isEndState = true, name){
+class DisconnectChannelEndState(name:String) extends State(name, isEndState = true) {
   var tokenOptions: Option[List[ParseElement]] = None
   override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
     tokenOptions = Option(p.toList)
@@ -39,6 +36,4 @@ class DisconnectChannelEndState(name:String) extends State(isEndState = true, na
   }
 }
 
-class DisconnectChannelEndStateTransition(nextState:State) extends Transition(nextState = nextState){
-  override def validateToken(t: Lexer.Token): Boolean = true
-}
+class DisconnectChannelEndStateTransition(nextState: State) extends Transition(nextState = nextState)
