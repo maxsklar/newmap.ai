@@ -1,10 +1,10 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
-import ai.newmap.StateMachine.{State, Transition}
+import ai.newmap.interpreter.Parser.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model._
-import ai.newmap.StateMachine.TokenValidators
+import ai.newmap.interpreter.Parser.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object DataPath {
@@ -42,8 +42,6 @@ class DataEndState(name: String) extends State(name,isEndState = true) {
       tokens(2).asInstanceOf[ParseTree]
     ))
   }
-
-
 }
 
 class DataEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

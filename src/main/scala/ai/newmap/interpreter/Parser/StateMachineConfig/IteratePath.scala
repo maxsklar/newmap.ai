@@ -1,10 +1,10 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
-import ai.newmap.StateMachine.{State, Transition}
+import ai.newmap.interpreter.Parser.StateMachine.{State, Transition}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Number}
 import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement, ParseTree, IdentifierParse, NaturalNumberParse}
-import ai.newmap.StateMachine.TokenValidators
+import ai.newmap.interpreter.Parser.StateMachine.TokenValidators
 import scala.collection.mutable.ListBuffer
 
 object IteratePath {

@@ -1,4 +1,4 @@
-package ai.newmap.StateMachine
+package ai.newmap.interpreter.Parser.StateMachine
 
 import ai.newmap.interpreter._
 import ai.newmap.model.{EnvStatementParse, ParseElement}

@@ -1,10 +1,7 @@
 package ai.newmap.interpreter.Parser.StateMachineConfig
 
-import ai.newmap.StateMachine.{State, StateMachine, Transition}
-import ai.newmap.interpreter.Lexer.Token
-import ai.newmap.model.EnvStatementParse
-import ai.newmap.StateMachine.TokenValidators
-import ai.newmap.util.Outcome
+import ai.newmap.interpreter.Parser.StateMachine.{State, Transition}
+import ai.newmap.interpreter.Parser.StateMachine.TokenValidators
 
 class ParserConfig() {
   val initState = State("INIT", Vector(
@@ -17,11 +14,4 @@ class ParserConfig() {
     Transition(TokenValidators.specificIdentifier("update"), ApplyCommandPath.initState),
     Transition(TokenValidators.specificIdentifier("updates"), ApplyCommandsPath.initState)
   ))
-}
-
-object StateMachineRunner{
-  def run(tokens: Seq[Token]): Outcome[EnvStatementParse, String] = {
-    val sm = new StateMachine()
-    sm.run(tokens)
-  }
 }
