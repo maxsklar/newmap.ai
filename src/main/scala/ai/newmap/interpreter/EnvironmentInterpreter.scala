@@ -1,6 +1,6 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.Parser.NewMapParser
+import ai.newmap.interpreter.parser.NewMapParser
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 

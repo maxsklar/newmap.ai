@@ -1,7 +1,7 @@
-package ai.newmap.interpreter.Parser
+package ai.newmap.interpreter.parser
 
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Parser.TokenUtils.TokenStream
+import ai.newmap.interpreter.parser.tokenUtils.TokenStream
 import ai.newmap.model._
 import ai.newmap.util.Outcome
 import ai.newmap.model.ParseTree

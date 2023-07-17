@@ -1,4 +1,4 @@
-package ai.newmap.interpreter.Parser.TokenUtils
+package ai.newmap.interpreter.parser.tokenUtils
 
 import ai.newmap.interpreter.Lexer
 

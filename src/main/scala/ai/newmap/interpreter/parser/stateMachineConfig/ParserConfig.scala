@@ -1,7 +1,6 @@
-package ai.newmap.interpreter.Parser.StateMachineConfig
+package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.Parser.StateMachine.{State, Transition}
-import ai.newmap.interpreter.Parser.StateMachine.TokenValidators
+import ai.newmap.interpreter.parser.stateMachine.{State, Transition, TokenValidators}
 
 class ParserConfig() {
   val initState = State("INIT", Vector(

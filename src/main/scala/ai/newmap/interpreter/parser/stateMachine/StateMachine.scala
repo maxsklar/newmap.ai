@@ -1,7 +1,7 @@
-package ai.newmap.interpreter.Parser.StateMachine
+package ai.newmap.interpreter.parser.stateMachine
 
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Parser.StateMachineConfig.ParserConfig
+import ai.newmap.interpreter.parser.stateMachineConfig.ParserConfig
 import ai.newmap.model.EnvStatementParse
 import ai.newmap.util.{Failure, Success, Outcome};
 

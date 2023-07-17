@@ -1,4 +1,4 @@
-package ai.newmap.interpreter.Parser
+package ai.newmap.interpreter.parser
 
 import ai.newmap.interpreter.Lexer
 import ai.newmap.model.{EnvStatementParse, ParseTree}

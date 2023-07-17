@@ -1,7 +1,7 @@
 package ai.newmap.interpreter
 
 import ai.newmap.interpreter.Lexer.{Identifier, Number, Symbol}
-import ai.newmap.interpreter.Parser.NewMapParser
+import ai.newmap.interpreter.parser.NewMapParser
 import org.scalatest._
 import ai.newmap.model._
 import ai.newmap.util.Success

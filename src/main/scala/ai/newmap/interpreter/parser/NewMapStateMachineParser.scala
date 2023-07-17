@@ -1,9 +1,9 @@
-package ai.newmap.interpreter.Parser
+package ai.newmap.interpreter.parser
 
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Parser.TokenUtils.TokenStream
+import ai.newmap.interpreter.parser.tokenUtils.TokenStream
 import ai.newmap.model.{EmptyParse, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree}
-import ai.newmap.interpreter.Parser.StateMachine.StateMachine
+import ai.newmap.interpreter.parser.stateMachine.StateMachine
 import ai.newmap.util.Outcome
 
 object NewMapStateMachineParser {
