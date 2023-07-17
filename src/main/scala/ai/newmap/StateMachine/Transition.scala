@@ -24,7 +24,7 @@ case class Transition(
       outcome match {
         case Success(v) => {
           partialParseElementList += v.asInstanceOf[ParseElement]
-          execStateTransition(null, partialParseElementList, ts)
+          execStateTransition(Lexer.EndToken, partialParseElementList, ts)
         }
         case Failure(_) => State.Dead
       }

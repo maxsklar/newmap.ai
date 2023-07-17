@@ -31,11 +31,11 @@ object IteratePath {
 class IterateEndState(name: String) extends State(name, isEndState = true){
 
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     val tokens = tokenOptions.get
 
     val iterableObject = tokens(1) match {
@@ -44,11 +44,11 @@ class IterateEndState(name: String) extends State(name, isEndState = true){
       case x => throw new Exception(s"Unexpected token for iterate parse token: $x")
     }
 
-    IterateIntoStatementParse(
+    Some(IterateIntoStatementParse(
       iterableObject,
       tokens(3).asInstanceOf[Identifier]
-    )
+    ))
   }
 }
 
-class IterateEndStateTransition(nextState: State) extends Transition(nextState = nextState)
+class IterateEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

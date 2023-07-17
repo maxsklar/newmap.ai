@@ -24,18 +24,18 @@ object ForkChannelPath {
 
 class ForkedVersionedStmtEndState(name: String) extends State(name, isEndState = true){
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     val tokens = tokenOptions.get
-    ForkedVersionedStatementParse(
+    Some(ForkedVersionedStatementParse(
       tokens(3).asInstanceOf[Identifier],
       tokens(1).asInstanceOf[Identifier]
-    )
+    ))
   }
 
 }
 
-class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(nextState = nextState)
+class ForkedVersionedStmtEndStateTransition(nextState:State) extends Transition(TokenValidators.endOfInput, nextState)

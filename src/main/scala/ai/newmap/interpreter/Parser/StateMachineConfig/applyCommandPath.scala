@@ -20,22 +20,22 @@ object applyCommandPath {
   applyCommandStmtIdentifierIdentifier.addAcceptedTransition(new ApplyCommandStmtEndStateTransition(nextState = applyCommandStmtEndState))
 }
 
-class ApplyCommandStmtEndState(name:String) extends State(name, isEndState = true){
+class ApplyCommandStmtEndState(name:String) extends State(name){
   var tokenOptions: Option[List[ParseElement]] = None
 
-  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     println("Reached ApplyCommand Generate Parse Tree")
     val tokens = tokenOptions.get
-    ApplyCommandStatementParse(
+    Some(ApplyCommandStatementParse(
       tokens(1).asInstanceOf[IdentifierParse],
       tokens(2).asInstanceOf[ParseTree]
-    )
+    ))
   }
 
 }
 
-class ApplyCommandStmtEndStateTransition(nextState: State) extends Transition(nextState = nextState)
+class ApplyCommandStmtEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

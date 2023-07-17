@@ -19,5 +19,7 @@ object TokenValidators {
     case _ => false
   }
 
+  val endOfInput: Token => Boolean = t => t == EndToken
+
   val none: Token => Boolean = t => true
 }

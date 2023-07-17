@@ -24,17 +24,17 @@ object WritePath {
 class WritePathEndState(name: String) extends State(name, isEndState = true) {
   var tokenOptions: Option[List[ParseElement]] = None
 
-  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     val tokens = tokenOptions.get
-    WriteToChannelParse(
+    Some(WriteToChannelParse(
       tokens(1).asInstanceOf[IdentifierParse],
       tokens(2).asInstanceOf[ParseTree]
-    )
+    ))
   }
 }
 
-class WritePathEndStateTransition(nextState: State) extends Transition(nextState = nextState)
+class WritePathEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

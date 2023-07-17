@@ -15,19 +15,19 @@ class StateMachine (val depth: Integer = 0){
     
     val parserConfig = new ParserConfig()
     var curState = parserConfig.initState
+
     //println("Current State: " + curState.name)
     tokens.foreach(token => {
       //println("Found Token: " + token)
-      curState = curState.changeState(token, tokens)
+      curState = curState.nextState(token, tokens)
       //println("Current State: " + curState.name)
     })
 
-    curState = curState.changeState(null, tokens)
+    curState = curState.nextState(Lexer.EndToken, tokens)
 
     for {
       _ <- Outcome.failWhen(!curState.isEndState, "Unimplemented")
-    } yield {
-      curState.generateParseTree
-    }
+      parseTree <- Outcome(curState.generateParseTree, "No parse tree available")
+    } yield parseTree
   }
 }

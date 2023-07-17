@@ -23,19 +23,19 @@ object applyCommandsPath {
 class ApplyCommandsStmtEndState(name:String) extends State(name, isEndState = true){
   var tokenOptions: Option[List[ParseElement]] = None
 
-  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     println("Reached ApplyCommand Generate Parse Tree")
     val tokens = tokenOptions.get
-    ApplyCommandsStatementParse(
+    Some(ApplyCommandsStatementParse(
       tokens(1).asInstanceOf[IdentifierParse],
       tokens(2).asInstanceOf[ParseTree]
-    )
+    ))
   }
 
 }
 
-class ApplyCommandsStmtEndStateTransition(nextState: State) extends Transition(nextState = nextState)
+class ApplyCommandsStmtEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

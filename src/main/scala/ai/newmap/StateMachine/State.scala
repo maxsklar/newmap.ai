@@ -20,17 +20,11 @@ case class State(
     parseElementList = p
   }
 
-  def changeState(token: Lexer.Token, tokens: Seq[Lexer.Token]): State = {
-    for(transition <- acceptedTransitions) {
-      if (transition.tokenValidator(token)) {
-        return transition.exec(token, parseElementList, tokens)
-      }
-    }
-
-    State.Dead
+  def nextState(token: Lexer.Token, tokens: Seq[Lexer.Token]): State = {
+    acceptedTransitions.find(_.tokenValidator(token)).map(_.exec(token, parseElementList, tokens)).getOrElse(State.Dead)
   }
 
-  def generateParseTree: EnvStatementParse = null
+  def generateParseTree: Option[EnvStatementParse] = None
 }
 
 object State {

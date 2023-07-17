@@ -22,18 +22,18 @@ object DisconnectChannelPath {
 
 class DisconnectChannelEndState(name:String) extends State(name, isEndState = true) {
   var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token] = null): Unit = {
+  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
     tokenOptions = Option(p.toList)
   }
 
-  override def generateParseTree: EnvStatementParse = {
+  override def generateParseTree: Option[EnvStatementParse] = {
     println("Reached DisconnectChannel Generate Parse Tree")
     val tokens = tokenOptions.get
-    DisconnectChannelParse(
+    Some(DisconnectChannelParse(
       tokens(1).asInstanceOf[Identifier],
       tokens(2).asInstanceOf[Identifier]
-    )
+    ))
   }
 }
 
-class DisconnectChannelEndStateTransition(nextState: State) extends Transition(nextState = nextState)
+class DisconnectChannelEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)
