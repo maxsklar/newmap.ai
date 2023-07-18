@@ -8,7 +8,6 @@ import java.io.File
 import scala.io.Source
 
 class EnvironmentInterpreter(
-  useInitialCommands: Boolean = true,
   printInitCommandErrors: Boolean = true,
   suppressStdout: Boolean = false,
 ) {
@@ -16,13 +15,9 @@ class EnvironmentInterpreter(
 
   if (suppressStdout) env = env.copy(printStdout = false)
 
-  for (code <- EnvironmentInterpreter.initialCommands) {
-    if (useInitialCommands) {
-      apply(code) match {
-        case Failure(f) => if (printInitCommandErrors) println(s"Error: $f\n => $code")
-        case Success(_) => ()
-      }
-    }
+  val loadFileErrors = loadFile("system/init.nm")
+  if (printInitCommandErrors) {
+    println(loadFileErrors)
   }
 
   /*
@@ -150,13 +145,17 @@ class EnvironmentInterpreter(
     }
   }
 
-  private def loadFileFromIterator(linesIt: Iterator[String], originalEnv: Environment): Outcome[Unit, String] = {
+  private def loadFileFromIterator(
+    linesIt: Iterator[String],
+    originalEnv: Environment
+  ): Outcome[Unit, String] = {
     if (linesIt.hasNext) {
-      applyEnvCommand(linesIt.next()) match {
+      val nextLine = linesIt.next()
+      applyEnvCommand(nextLine) match {
         case Success(result) => loadFileFromIterator(linesIt, originalEnv)
         case Failure(reason) => {
           env = originalEnv
-          Failure(reason)
+          Failure(s"Error found\nLine: $nextLine\nReason: $reason")
         }
       }
     } else {
@@ -188,7 +187,6 @@ class EnvironmentInterpreter(
 
       // TODO: This statement parse can now be "waiting" for the next line.. keep that in mind
       statementParse <- NewMapParser.statementParse(tokens)
-      
 
       command <- StatementInterpreter(statementParse, env)
     } yield {
@@ -201,28 +199,4 @@ class EnvironmentInterpreter(
     env = env.newCommand(command)
     command.displayString(env)
   }
-}
-
-object EnvironmentInterpreter {
-  // TODO: Turn this into a file to be read!
-  val initialCommands: Vector[String] = Vector(
-    "ver res = new ReqMap(0, Object)",
-    "update _default Count|0",
-    "update _default Boolean|0",
-    "update _default Type|UndefinedType",
-    "data String = Array|Char",
-    "typeclass _display (t: (t => String))",
-    "update _display String|(s: s)"
-    
-    //"update _default (Array.T).(0.())", // TODO - this can't work yet because it has a pattern!
-    //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
-      
-    // todo - _typeOf should be creatable all in one swoop, and as a generic
-    //"update _typeOf Count|(_: Count)",
-    //"update _typeOf Identifier|(_: Identifier)",
-
-    //"data Option (T: Type)",
-    //"update Option (None, ())",
-    //"update Option (Some, T)"
-  )
 }

@@ -43,7 +43,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    */
   def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
     val interpreter = new EnvironmentInterpreter(
-      useInitialCommands = true,
       printInitCommandErrors = false,
       suppressStdout = true
     )

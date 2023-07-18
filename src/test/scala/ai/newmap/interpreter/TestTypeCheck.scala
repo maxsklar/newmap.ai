@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestTypeCheck extends FlatSpec {
   def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
-  val env = (new EnvironmentInterpreter(true, false)).env
+  val env = (new EnvironmentInterpreter(false)).env
   
   "A number" should " be interpreted correctly" in {
   	TypeChecker(NaturalNumberParse(4)) match {

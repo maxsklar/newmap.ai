@@ -21,9 +21,11 @@ object NewMapParser {
 
     statementParse match {
       case Failure(v) =>
-        if (v.equals("Unimplemented")) NewMapCombinatorParser.statementParse(tokens)
-        else ai.newmap.util.Failure(v)
-      case Success(envStatementParse: EnvStatementParse) => ai.newmap.util.Success(envStatementParse)
+        if (v.equals("Unimplemented")) {
+          NewMapCombinatorParser.statementParse(tokens)
+        }
+        else Failure(v)
+      case Success(envStatementParse: EnvStatementParse) => Success(envStatementParse)
     }
   }
 }
