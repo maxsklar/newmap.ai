@@ -9,9 +9,11 @@ class TokenStream(var tokens: Seq[Lexer.Token], removeTokens: Boolean) {
   def isEmpty: Boolean ={
     tokens.isEmpty
   }
+  
   def getReader: TokenReader = {
     new TokenReader(tokens)
   }
+
   private def isComment(token: Lexer.Token): Boolean = token match {
     case Lexer.Comment(_) => true
     case _ => false

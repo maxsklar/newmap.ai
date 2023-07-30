@@ -382,8 +382,6 @@ case class Environment(
 
         val currentConnections = this.channelIdToObjectCommands.get(channelName).getOrElse(Set.empty)
 
-        println(s"Connecting channel $channelName -- $versionedObject")
-
         this.copy(
           channelIdToObjectCommands = this.channelIdToObjectCommands + (channelName -> (currentConnections + versionedObject))
         )

@@ -3,12 +3,14 @@ update _default Count|0
 update _default Boolean|0
 update _default Type|UndefinedType
 
+// TODO - include this!
+//update _default (Array|T)|(0|())
+
 // Do this
 data String = Array|Char
 typeclass _display (t: (t => String))
 update _display String|(s: s)
 
-//update _default (Array.T).(0.()) // TODO - this can't work yet because it has a pattern!
 
 //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
 

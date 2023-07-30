@@ -29,7 +29,7 @@ case class LiteralListParse(
 ) extends ParseTree
 
 // TODO - this will be a list of commands enclosed by '{'
-//case class LiteralCode()
+case class LiteralCode()
 
 case class ApplyParse(
   function: ParseTree,
@@ -54,7 +54,7 @@ case class StringParse(
   s: String
 ) extends ParseTree
 
-case class EmptyParse() extends ParseTree
+case object EmptyParse extends ParseTree
 
 abstract class EnvStatementParse
 

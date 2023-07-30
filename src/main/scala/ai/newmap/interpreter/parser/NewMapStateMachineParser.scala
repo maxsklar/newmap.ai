@@ -4,29 +4,17 @@ import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.parser.tokenUtils.TokenStream
 import ai.newmap.model.{EmptyParse, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree}
 import ai.newmap.interpreter.parser.stateMachine.StateMachine
+import ai.newmap.interpreter.parser.stateMachineConfig.{ExpressionPath, InitStatementState}
 import ai.newmap.util.Outcome
 
 object NewMapStateMachineParser {
-
-  //TODO:Add a parser function parameter to the parse function to call the respective state machines
-  private def parse(tokens: Seq[Lexer.Token], emptyResult: Any): Outcome[Any, String] = {
-    val tokenStream = new TokenStream(tokens, removeTokens = true)
-
-    if (tokenStream.isEmpty) {
-      ai.newmap.util.Success(emptyResult)
-    } else {
-      val sm = new StateMachine()
-      sm.run(tokens)
-    }
-  }
-
   def apply(tokens: Seq[Lexer.Token]): Outcome[ParseTree, String] = {
-    val result = parse(tokens, EmptyParse)
+    val result = (new StateMachine(ExpressionPath.InitState())).run(tokens)
     result.asInstanceOf[Outcome[ParseTree, String]]
   }
 
   def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
-    val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse()))
+    val result = (new StateMachine(InitStatementState())).run(tokens)
     result.asInstanceOf[Outcome[EnvStatementParse, String]]
   }
 }

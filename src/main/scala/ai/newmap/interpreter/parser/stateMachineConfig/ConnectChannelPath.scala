@@ -1,42 +1,30 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{State, Transition, TokenValidators}
+import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{ConnectChannelParse, EnvStatementParse, ParseElement}
+import ai.newmap.util.{Failure, Success, Outcome}
 import scala.collection.mutable.ListBuffer
 
 object ConnectChannelPath {
-  val connectChannelEndState = new ConnectChannelEndState("connectChannelEndState")
+  case class ConnectChannelIdentifierIdentifier(firstId: String, secondId: String) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = Failure("Connect Channel only inputs 2 identifiers")
 
-  val connectChannelIdentifierIdentifier = State("connectChannelIdentifierIdentifier", Vector(
-    new ConnectChannelEndStateTransition(nextState = connectChannelEndState)
-  ))
-
-  val connectChannelIdentifier = State("connectChannelIdentifier", Vector(
-    Transition(TokenValidators.identifier, connectChannelIdentifierIdentifier)
-  ))
-
-  val initState = State("connectChannel", Vector(
-    Transition(TokenValidators.identifier, connectChannelIdentifier)
-  ))
-}
-
-class ConnectChannelEndState(name:String) extends State(name, isEndState = true){
-
-  var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
-    tokenOptions = Option(p.toList)
+    override def generateOutput: Option[EnvStatementParse] = {
+      Some(ConnectChannelParse(Identifier(firstId), Identifier(secondId)))
+    }
   }
 
-  override def generateParseTree: Option[EnvStatementParse] = {
-    val tokens = tokenOptions.get
-    Some(ConnectChannelParse(
-      tokens(1).asInstanceOf[Identifier],
-      tokens(2).asInstanceOf[Identifier]
-    ))
+  case class ConnectChannelIdentifier(firstId: String) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
+      ParseStateUtils.expectingIdentifier(token, id => ConnectChannelIdentifierIdentifier(firstId, id))
+    }
   }
 
+  case class InitState() extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
+      ParseStateUtils.expectingIdentifier(token, id => ConnectChannelIdentifier(id))
+    }
+  }
 }
-
-class ConnectChannelEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

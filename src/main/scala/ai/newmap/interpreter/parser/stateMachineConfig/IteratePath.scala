@@ -1,58 +1,42 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{State, Transition, TokenValidators}
+import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Number}
 import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement, ParseTree, IdentifierParse, NaturalNumberParse}
+import ai.newmap.util.{Failure, Success, Outcome}
 import scala.collection.mutable.ListBuffer
 
 object IteratePath {
+  case class IterateIntoIdentifier(expression: ParseTree, id: String) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = Failure("Iterate statement is finished")
 
-  val iterateEndState = new IterateEndState("iterateEndState")
-
-  val iterateIdentifierIdentifierIdentifier = State("iterateIdentifierIdentifierIdentifier", Vector(
-    new IterateEndStateTransition(nextState = iterateEndState)
-  ))
-
-  val iterateIdentifierIdentifier = State("iterateIdentifierIdentifier", Vector(
-    Transition(TokenValidators.identifier, iterateIdentifierIdentifierIdentifier)
-  ))
-
-  val iterateIndexSize = State("iterateIndexSize", Vector(
-    Transition(TokenValidators.specificIdentifier("into"), iterateIdentifierIdentifier)
-  ))
-
-  val iterateIdentifier = State("iterateIdentifier", Vector(
-    Transition(TokenValidators.specificIdentifier("into"), iterateIdentifierIdentifier)
-  ))
-
-  val initState = State("iterate", Vector(
-    Transition(TokenValidators.identifier, iterateIdentifier),
-    Transition(TokenValidators.number, iterateIndexSize)
-  ))
-}
-
-class IterateEndState(name: String) extends State(name, isEndState = true){
-
-  var tokenOptions: Option[List[ParseElement]] = None
-  override def reach(p: ListBuffer[ParseElement], ts:Seq[Lexer.Token]): Unit = {
-    tokenOptions = Option(p.toList)
-  }
-
-  override def generateParseTree: Option[EnvStatementParse] = {
-    val tokens = tokenOptions.get
-
-    val iterableObject = tokens(1) match {
-      case (a: Identifier) => IdentifierParse(a.s)
-      case (a: Number) => NaturalNumberParse(a.i)
-      case x => throw new Exception(s"Unexpected token for iterate parse token: $x")
+    override def generateOutput: Option[EnvStatementParse] = {
+      Some(IterateIntoStatementParse(expression, Identifier(id)))
     }
+  }
 
-    Some(IterateIntoStatementParse(
-      iterableObject,
-      tokens(3).asInstanceOf[Identifier]
-    ))
+  case class IterateInto(expression: ParseTree) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
+      ParseStateUtils.expectingIdentifier(token, id => IterateIntoIdentifier(expression, id))
+    }
+  }
+
+  case class InitState(val expressionState: ParseState[ParseTree] = ExpressionPath.InitState()) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
+      case Identifier("into") => {
+        Outcome(
+          expressionState.generateOutput.map(exp => IterateInto(exp)),
+          "Got into keyboard before expression is finished"
+        )
+      }
+      case _ => {
+        for {
+          newExpressionState <- expressionState.update(token)
+        } yield {
+          this.copy(expressionState = newExpressionState)
+        }
+      }
+    }
   }
 }
-
-class IterateEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)

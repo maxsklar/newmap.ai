@@ -30,7 +30,7 @@ object TypeChecker {
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!
     expression match {
-      case EmptyParse() => expectedTypeOutcome match {
+      case EmptyParse => expectedTypeOutcome match {
         case Success(WildcardPatternT(_)) => {
           Success(TypeCheckResponse(UStruct(Vector.empty), NewMapO.emptyStruct))
         }

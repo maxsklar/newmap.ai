@@ -13,7 +13,6 @@ object Lexer extends RegexParsers {
   case class Symbol(s: String) extends Token
   case class DQuote(s: String) extends Token
   case class Comment(s: String) extends Token
-  case object EndToken extends Token
 
   override def skipWhitespace = true
   override val whiteSpace = "[ \t\r\f]+".r
@@ -49,6 +48,18 @@ object Lexer extends RegexParsers {
         case "}" => Enc(CurlyBrace, isOpen = false)
       }
     }}
+  }
+
+  def closedFormOfEnclosure(s: EnclosureSymbol): String = s match {
+    case Paren => ")"
+    case SquareBracket => "]"
+    case CurlyBrace => "}"
+  }
+
+  def openFormOfEnclosure(s: EnclosureSymbol): String = s match {
+    case Paren => "("
+    case SquareBracket => "["
+    case CurlyBrace => "{"
   }
 
   def tokens: Parser[List[Token]] = {

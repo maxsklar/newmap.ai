@@ -341,15 +341,6 @@ object NewMapCombinatorParser extends Parsers {
       ExpressionOnlyStatementParse(exp))
   }
 
-  // New Statement for defining a function
-  /*private def defFunctionStatement: Parser[DefineFunctionStatement] = {
-    Lexer.Identifier("def") ~ identifier ~ Lexer.Colon() ~ expressionListWithOperations ~ Lexer.Symbol("=") ~ expressionListWithOperations ^^ {
-      case _ ~ id ~ _ ~ typeExp ~ _ ~ exp => {
-        FullStatementParse(ValStatement, id, typeExp, exp)
-      }
-    }
-  }*/
-
   private def parse(tokens: Seq[Lexer.Token], emptyResult: Any, phrase: Parser[Any]): Outcome[Any, String] ={
     val tokenStream = new TokenStream(tokens, removeTokens = true)
     if (tokenStream.isEmpty) {
@@ -364,13 +355,13 @@ object NewMapCombinatorParser extends Parsers {
   }
 
   def apply(tokens: Seq[Lexer.Token]): Outcome[ParseTree, String] = {
-    val result = parse(tokens, EmptyParse(), phrase(expressionListWithOperations))
+    val result = parse(tokens, EmptyParse, phrase(expressionListWithOperations))
     result.asInstanceOf[Outcome[ParseTree, String]]
   }
 
   def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
     val parsePhrase = phrase(fullStatement | defineFunction | newVersionedStatement | newParamTypeCommand | newTypeClassCommand | iterateIntoCommand | addChannel | connectChannel | disconnectChannel | writeToChannel | newTypeCommand | forkedVersionedStatement | applyCommand | applyCommands | inferredTypeStatement | expOnlyStatementParse)
-    val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse()), parsePhrase)
+    val result = parse(tokens, ExpressionOnlyStatementParse(EmptyParse), parsePhrase)
     result.asInstanceOf[Outcome[EnvStatementParse, String]]
   }
 }

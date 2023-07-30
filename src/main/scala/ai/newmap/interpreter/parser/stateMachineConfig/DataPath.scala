@@ -1,46 +1,71 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{State, Transition, TokenValidators}
+import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.Identifier
+import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model._
+import ai.newmap.util.{Failure, Success, Outcome}
 import scala.collection.mutable.ListBuffer
 
 object DataPath {
-  val dataEndState = new DataEndState("dataEndState")
+  case class DataIdentifierParams(
+    val id: String,
+    val expressionState: ParseState[ParseTree]
+  ) extends ParseState[EnvStatementParse] {
 
-  val dataIdentifierIdentifierIdentifier = State("dataIdentifierIdentifierIdentifier", Vector(
-    new DataEndStateTransition(nextState = dataEndState)
-  ))
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = for {
+      newExpressionState <- expressionState.update(token)
+    } yield {
+      this.copy(expressionState = newExpressionState)
+    }
 
-  val dataIdentifierIdentifier = State("dataIdentifierIdentifier", Vector(
-    Transition(expectingParseTree = true, nextState = dataIdentifierIdentifierIdentifier)
-  ))
-
-  val dataIdentifier = State("dataIdentifier", Vector(
-    Transition(TokenValidators.identifier, dataIdentifierIdentifier)
-  ))
-
-  val initState = State("data", Vector(
-    Transition(TokenValidators.identifier, dataIdentifier)
-  ))
-}
-
-class DataEndState(name: String) extends State(name,isEndState = true) {
-
-  var tokenOptions: Option[List[ParseElement]] = None
-
-  override def reach(p: ListBuffer[ParseElement], ts: Seq[Lexer.Token]): Unit = {
-    tokenOptions = Option(p.toList)
+    override def generateOutput: Option[EnvStatementParse] = {
+      for {
+        parseTree <- expressionState.generateOutput
+      } yield {
+        NewParamTypeStatementParse(IdentifierParse(id), parseTree)
+      }
+    }
   }
 
-  override def generateParseTree: Option[EnvStatementParse] = {
-    val tokens = tokenOptions.get
-    Some(NewTypeStatementParse(
-      tokens(1).asInstanceOf[IdentifierParse],
-      tokens(2).asInstanceOf[ParseTree]
-    ))
+  case class DataIdentifierEquals(
+    val id: String,
+    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState()
+  ) extends ParseState[EnvStatementParse] {
+
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = for {
+      newExpressionState <- expressionState.update(token)
+    } yield {
+      this.copy(expressionState = newExpressionState)
+    }
+
+    override def generateOutput: Option[EnvStatementParse] = {
+      for {
+        parseTree <- expressionState.generateOutput
+      } yield {
+        NewTypeStatementParse(IdentifierParse(id), parseTree)
+      }
+    }
+  }
+
+  case class DataIdentifier(id: String) extends ParseState[EnvStatementParse] {
+
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
+      case Symbol("=") => Success(DataIdentifierEquals(id))
+      case _ => {
+        for {
+          params <- ExpressionPath.InitState().update(token)
+        } yield {
+          DataIdentifierParams(id, params)
+        }
+      }
+    }
+  }
+
+  case class InitState() extends ParseState[EnvStatementParse] {
+
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
+      ParseStateUtils.expectingIdentifier(token, id => DataIdentifier(id))
+    }
   }
 }
-
-class DataEndStateTransition(nextState: State) extends Transition(TokenValidators.endOfInput, nextState)
