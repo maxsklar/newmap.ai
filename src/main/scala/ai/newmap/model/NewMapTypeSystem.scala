@@ -157,6 +157,7 @@ case class NewMapTypeSystem(
     case custom => {
       for {
         identifierToIdMapping <- Outcome(historicalMapping.get(typeSystemId), s"Couldn't get historical type mapping for $typeSystemId")
+
         typeId <- Outcome(identifierToIdMapping.get(identifier), s"Couldn't get typeId for identifier $identifier")
         parameterType <- Outcome(typeToParameterType.get(typeId), s"Couldn't get parameterType for identifier $identifier")
         parameterT <- convertToNewMapType(parameterType)

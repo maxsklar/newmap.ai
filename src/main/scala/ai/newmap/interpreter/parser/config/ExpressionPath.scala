@@ -52,10 +52,6 @@ object ExpressionPath {
           (connectiveSymbol == symbol) && (thisSymbolAssociation == Right)
         )
 
-        //println(s"connectiveSymbol: $connectiveSymbol -- thisPrecedence: $thisPrecedence")
-        //println(s"symbol: $symbol -- currPrecedence: $currPrecedence -- thisSymbolAssociation: $thisSymbolAssociation")
-        //println(s"applyToSecondParam: $applyToSecondParam")
-
         if (applyToSecondParam) {
           for {
             newSecondParameter <- secondParameter.update(token)
@@ -104,6 +100,7 @@ object ExpressionPath {
         val thisPredecence = symbolPrecedence(s)
         Success(ExpressionInBinaryOpNoRight(s, this))
       }
+      case NewLine => Success(this)
       case _ => ExpressionInBinaryOpNoRight("", this).update(token)
     }
 
@@ -154,6 +151,86 @@ object ExpressionPath {
     }
   }
 
+  case class MultilineMidStatement(
+    statementState: ParseState[EnvStatementParse],
+    existingStatements: Seq[EnvStatementParse] = Vector.empty
+  ) extends ParseState[ParseTree] {
+    override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
+      (statementState.generateOutput, token) match {
+        case (Some(statement), Identifier(id)) => {
+          val newStatementList = existingStatements :+ statement
+          InitStatementState.statementKeywordToState.get(id) match {
+            case Some(state) => Success(MultilineMidStatement(state, newStatementList))
+            case None => {
+              for {
+                newStatementState <- statementState.update(token)
+              } yield this.copy(statementState = newStatementState)
+            }
+          }
+        }
+        case (Some(statement), NewLine) => {
+          val newStatementList = existingStatements :+ statement
+          Success(MultilineExpression(newStatementList))
+        }
+        case (Some(statement), Enc(CurlyBrace, false)) => {
+          val newStatementList = existingStatements :+ statement
+          Success(ExpressionStart(LiteralCode(newStatementList.toVector, EmptyParse)))
+        }
+        case _ => {
+          for {
+            newStatementState <- statementState.update(token)
+          } yield this.copy(statementState = newStatementState)
+        }
+      }
+    }
+  }
+
+  case class MultilineMidExpression(
+    currentExpression: ParseState[ParseTree],
+    existingStatements: Seq[EnvStatementParse] = Vector.empty
+  ) extends ParseState[ParseTree] {
+    override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
+      (currentExpression.generateOutput, token) match {
+        case (Some(expression), Enc(CurlyBrace, false)) => {
+          Success(ExpressionStart(LiteralCode(existingStatements.toVector, expression)))
+        }
+        case _ => {
+          // Then we continue building ths current expression
+          for {
+            newExpressionState <- currentExpression.update(token)
+          } yield {
+            this.copy(currentExpression = newExpressionState)
+          }
+        }
+      }
+    }
+  }
+
+  case class MultilineExpression(
+    existingStatements: Seq[EnvStatementParse] = Vector.empty
+  ) extends ParseState[ParseTree] {
+    override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
+      token match {
+        case Identifier(id) => InitStatementState.statementKeywordToState.get(id) match {
+          case Some(state) => Success(MultilineMidStatement(state, existingStatements))
+          case None => {
+            InitState.update(token).map(expressionState => {
+              MultilineMidExpression(expressionState, existingStatements)
+            })
+          }
+        }
+        case Enc(CurlyBrace, false) => {
+          // You've closed the block without having any expression
+          Success(ExpressionStart(EmptyParse))
+        }
+        case NewLine => Success(this)
+        case _ => InitState.update(token).map(expressionState => {
+          MultilineMidExpression(expressionState, existingStatements)
+        })
+      }
+    }
+  }
+
   case class UnaryExpression(s: String, internalExpression: ParseState[ParseTree]) extends ParseState[ParseTree] {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
       internalExpression.update(token) match {
@@ -195,7 +272,7 @@ object ExpressionPath {
       case Enc(enc, true) => enc match {
         case Paren => Success(ExpressionInEnc(Paren))
         case SquareBracket => Success(ExpressionInEnc(SquareBracket))
-        case CurlyBrace => Failure("We do not currently support the curly brace")
+        case CurlyBrace => Success(MultilineExpression())
       }
       case Enc(symbol, false) => {
         Failure("Unmatched enclosure symbol: " + Lexer.closedFormOfEnclosure(symbol))
@@ -206,7 +283,7 @@ object ExpressionPath {
       case Symbol("`") => Success(ExpressionTickMark())
       case Symbol(s) => Success(UnaryExpression(s, InitState))
       case DQuote(s) => Success(ExpressionStart(StringParse(s)))
-      case Comment(_) => Success(this) 
+      case Comment(_) | NewLine => Success(this)
     }
 
     override def generateOutput: Option[ParseTree] = Some(EmptyParse)

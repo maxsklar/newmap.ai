@@ -5,7 +5,9 @@ import scala.util.parsing.combinator.RegexParsers
 import ai.newmap.util.Outcome
 
 object Lexer extends RegexParsers {
-  sealed trait Token extends ParseElement
+  sealed trait Token extends ParseElement {
+    val locationInfo: Option[TokenLocationInformation] = None
+  }
   
   case class Enc(symbol: EnclosureSymbol, isOpen: Boolean) extends Token
   case class Identifier(s: String) extends Token
@@ -13,6 +15,14 @@ object Lexer extends RegexParsers {
   case class Symbol(s: String) extends Token
   case class DQuote(s: String) extends Token
   case class Comment(s: String) extends Token
+  case object NewLine extends Token
+
+  case class TokenLocationInformation(
+    file: String,
+    line: Int,
+    character: Int,
+    length: Int
+  )
 
   override def skipWhitespace = true
   override val whiteSpace = "[ \t\r\f]+".r

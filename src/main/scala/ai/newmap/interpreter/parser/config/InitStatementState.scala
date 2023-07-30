@@ -8,28 +8,29 @@ import ai.newmap.util.{Failure, Success, Outcome}
 
 case object InitStatementState extends ParseState[EnvStatementParse] {
   override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
-    case Identifier(id) => id match {
-      case "disconnectChannel" => Success(DisconnectChannelPath.InitState())
-      case "iterate" => Success(IteratePath.InitState())
-      case "connectChannel" => Success(ConnectChannelPath.InitState())
-      case "fork" => Success(ForkPath.InitState())
-      case "data" => Success(DataPath.InitState())
-      case "write" => Success(WritePath.InitState())
-      case "update" => Success(ApplyCommandPath.InitState())
-      case "updates" => Success(ApplyCommandsPath.InitState())
-      case "typeclass" => Success(TypeClassPath.InitState())
-      case "ver" => Success(VersionedPath.InitState())
-      case "new" => Success(VersionedPath.InitStateNew())
-      case "val" => Success(ValPath.InitState(ValStatement))
-      case "def" => Success(ValPath.InitState(DefStatement))
-      case _ => ExpressionOnlyPath().update(token)
+    case Identifier(id) => statementKeywordToState.get(id) match {
+      case Some(state) => Success(state)
+      case None => ExpressionOnlyPath().update(token)
     }
     case Comment(_) => Success(this)
-    case _ => {
-      val state = ExpressionOnlyPath()
-      state.update(token)
-    }
+    case _ => ExpressionOnlyPath().update(token)
   }
+
+  val statementKeywordToState: Map[String, ParseState[EnvStatementParse]] = Map(
+    "disconnectChannel" -> DisconnectChannelPath.InitState(),
+    "iterate" -> IteratePath.InitState(),
+    "connectChannel" -> ConnectChannelPath.InitState(),
+    "fork" -> ForkPath.InitState(),
+    "data" -> DataPath.InitState(),
+    "write" -> WritePath.InitState(),
+    "update" -> ApplyCommandPath.InitState(),
+    "updates" -> ApplyCommandsPath.InitState(),
+    "typeclass" -> TypeClassPath.InitState(),
+    "ver" -> VersionedPath.InitState(),
+    "new" -> VersionedPath.InitStateNew(),
+    "val" -> ValPath.InitState(ValStatement),
+    "def" -> ValPath.InitState(DefStatement),
+  )
 
   override def generateOutput: Option[EnvStatementParse] = Some(EmptyStatement)
 }

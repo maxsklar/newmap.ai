@@ -431,6 +431,9 @@ object TypeChecker {
           }
         }
       }
+      case LiteralCode(statements, expression) => {
+        CodeBlockTypeChecker(statements, expression, expectedType, env, featureSet)
+      }
     }
   }
 

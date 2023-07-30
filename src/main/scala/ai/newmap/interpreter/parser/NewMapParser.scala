@@ -33,6 +33,24 @@ object NewMapParser {
   }
 }
 
+case class NewMapCodeParserResponse(
+  newParser: NewMapCodeParser,
+  statementOutput: Option[EnvStatementParse] = None
+)
+
+case class NewMapCodeParser(curState: ParseState[EnvStatementParse] = InitStatementState) {
+  def update(token: Lexer.Token): Outcome[NewMapCodeParserResponse, String] = {
+    (token, curState.generateOutput) match {
+      case (Lexer.NewLine | Lexer.Symbol(";"), Some(statement)) => {
+        Success(
+          NewMapCodeParserResponse(NewMapCodeParser(), Some(statement))
+        )
+      }
+      case _ => curState.update(token).map(newState => NewMapCodeParserResponse(NewMapCodeParser(newState)))
+    }
+  }
+}
+
 trait ParseState[OutT] {
   // Update tot he next state given the token
   def update(token: Lexer.Token): Outcome[ParseState[OutT], String]

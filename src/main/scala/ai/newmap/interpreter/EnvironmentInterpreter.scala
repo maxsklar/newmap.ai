@@ -1,6 +1,6 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.parser.NewMapParser
+import ai.newmap.interpreter.parser.{NewMapCodeParser, NewMapParser}
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
@@ -84,6 +84,10 @@ class EnvironmentInterpreter(
     else Lexer(code)
   }
 
+  private def getTokensWithNewline(code: String): Outcome[List[Lexer.Token], String] = {
+    getTokens(code).map(tokens => tokens :+ Lexer.NewLine)
+  }
+
   private def getTypeOf(code: String): String = {
     val result = for {
       tokens <- getTokens(code)
@@ -140,37 +144,57 @@ class EnvironmentInterpreter(
     val linesIt = Source.fromFile(fileName).getLines
 
     loadFileFromIterator(linesIt, env) match {
-      case Success(_) => ""
+      case Success(newEnv) => {
+        env = newEnv
+        ""
+      }
       case Failure(reason) => s"Failure: $reason"
     }
   }
 
   private def loadFileFromIterator(
     linesIt: Iterator[String],
-    originalEnv: Environment
-  ): Outcome[Unit, String] = {
-    if (linesIt.hasNext) {
-      val nextLine = linesIt.next()
-      applyEnvCommand(nextLine) match {
-        case Success(result) => loadFileFromIterator(linesIt, originalEnv)
-        case Failure(reason) => {
-          env = originalEnv
-          Failure(s"Error found\nLine: $nextLine\nReason: $reason")
+    env: Environment,
+    tokens: Seq[Lexer.Token] = Seq.empty,
+    parser: NewMapCodeParser = NewMapCodeParser()
+  ): Outcome[Environment, String] = {
+    tokens match {
+      case firstToken +: otherTokens => {
+        for {
+          response <- parser.update(firstToken)
+
+          newEnv <- response.statementOutput match {
+            case None => Success(env)
+            case Some(statement) => {
+              for {
+                command <- StatementInterpreter(statement, env)
+              } yield env.newCommand(command)
+            }
+          }
+
+          result <- loadFileFromIterator(linesIt, newEnv, otherTokens, response.newParser)
+        } yield result
+      }
+      case Nil => {
+        if (linesIt.hasNext) {
+          val code = linesIt.next()
+          for {
+            tokens <- getTokensWithNewline(code)
+            result <- loadFileFromIterator(linesIt, env, tokens, parser)
+          } yield result
+        } else {
+          Success(env)
         }
       }
-    } else {
-      Success(())
     }
   }
 
   private def printDirectory(dir: String): String = {
     val d = new File(dir)
     val files = if (d.exists && d.isDirectory) {
-        d.listFiles.filter(_.isFile).toList
-    } else {
-        List[File]()
-    }
-
+      d.listFiles.filter(_.isFile).toList
+    } else List[File]()
+    
     s"directory: $files"
   }
 

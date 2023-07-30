@@ -6,11 +6,9 @@ update _default Type|UndefinedType
 // TODO - include this!
 //update _default (Array|T)|(0|())
 
-// Do this
 data String = Array|Char
 typeclass _display (t: (t => String))
 update _display String|(s: s)
-
 
 //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
 

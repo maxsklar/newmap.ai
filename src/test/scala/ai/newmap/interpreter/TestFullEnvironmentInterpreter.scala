@@ -1104,6 +1104,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Multiline commands " should " work as expected" ignore {
+    testCodeScript(Vector(
+      CodeExpectation(":load TestScripts/MultilineTest.nm", GeneralSuccessCheck),
+      CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(TaggedObject(UIndex(3), CountT)))),
+    ))
+  }
+
   /*
   TODOs with the arrays:
   - startsWith function (or general regular expression?)
