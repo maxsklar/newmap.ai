@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{ConnectChannelParse, EnvStatementParse, ParseElement}
@@ -18,13 +18,13 @@ object ConnectChannelPath {
 
   case class ConnectChannelIdentifier(firstId: String) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ConnectChannelIdentifierIdentifier(firstId, id))
+      ParseState.expectingIdentifier(token, id => ConnectChannelIdentifierIdentifier(firstId, id))
     }
   }
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ConnectChannelIdentifier(id))
+      ParseState.expectingIdentifier(token, id => ConnectChannelIdentifier(id))
     }
   }
 }

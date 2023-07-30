@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Number}
 import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement, ParseTree, IdentifierParse, NaturalNumberParse}
@@ -18,11 +18,11 @@ object IteratePath {
 
   case class IterateInto(expression: ParseTree) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => IterateIntoIdentifier(expression, id))
+      ParseState.expectingIdentifier(token, id => IterateIntoIdentifier(expression, id))
     }
   }
 
-  case class InitState(val expressionState: ParseState[ParseTree] = ExpressionPath.InitState()) extends ParseState[EnvStatementParse] {
+  case class InitState(val expressionState: ParseState[ParseTree] = ExpressionPath.InitState) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
       case Identifier("into") => {
         Outcome(

@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model._
@@ -12,7 +12,7 @@ object ValPath {
     prefix: StatementPrefix,
     id: String,
     typeExp: Option[ParseTree] = None,
-    expressionState: ParseState[ParseTree] = ExpressionPath.InitState()
+    expressionState: ParseState[ParseTree] = ExpressionPath.InitState
   ) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
       for {
@@ -35,7 +35,7 @@ object ValPath {
   case class ValIdentifierColon(
     prefix: StatementPrefix,
     id: String,
-    expressionState: ParseState[ParseTree] = ExpressionPath.InitState()
+    expressionState: ParseState[ParseTree] = ExpressionPath.InitState
   ) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
       val currentTypeExpression = expressionState.generateOutput
@@ -64,7 +64,7 @@ object ValPath {
 
   case class InitState(prefix: StatementPrefix) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ValIdentifier(prefix, id))
+      ParseState.expectingIdentifier(token, id => ValIdentifier(prefix, id))
     }
   }
 }

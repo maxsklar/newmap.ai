@@ -1,12 +1,12 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.ParseState
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Comment, Identifier}
-import ai.newmap.model.{DefStatement, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree, ValStatement}
+import ai.newmap.model.{DefStatement, EmptyStatement, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree, ValStatement}
 import ai.newmap.util.{Failure, Success, Outcome}
 
-case class InitStatementState() extends ParseState[EnvStatementParse] {
+case object InitStatementState extends ParseState[EnvStatementParse] {
   override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
     case Identifier(id) => id match {
       case "disconnectChannel" => Success(DisconnectChannelPath.InitState())
@@ -19,12 +19,10 @@ case class InitStatementState() extends ParseState[EnvStatementParse] {
       case "updates" => Success(ApplyCommandsPath.InitState())
       case "typeclass" => Success(TypeClassPath.InitState())
       case "ver" => Success(VersionedPath.InitState())
+      case "new" => Success(VersionedPath.InitStateNew())
       case "val" => Success(ValPath.InitState(ValStatement))
       case "def" => Success(ValPath.InitState(DefStatement))
-      case _ => {
-        val state = ExpressionOnlyPath()
-        state.update(token)
-      }
+      case _ => ExpressionOnlyPath().update(token)
     }
     case Comment(_) => Success(this)
     case _ => {
@@ -32,9 +30,11 @@ case class InitStatementState() extends ParseState[EnvStatementParse] {
       state.update(token)
     }
   }
+
+  override def generateOutput: Option[EnvStatementParse] = Some(EmptyStatement)
 }
 
-case class ExpressionOnlyPath(exp: ParseState[ParseTree] = ExpressionPath.InitState()) extends ParseState[EnvStatementParse] {
+case class ExpressionOnlyPath(exp: ParseState[ParseTree] = ExpressionPath.InitState) extends ParseState[EnvStatementParse] {
   override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
     for {
       newExp <- exp.update(token)

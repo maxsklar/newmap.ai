@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{DisconnectChannelParse, EnvStatementParse, ParseElement}
@@ -19,13 +19,13 @@ object DisconnectChannelPath {
 
   case class DisconnectChannelIdentifier(val firstId: String) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => DisconnectChannelIdentifierIdentifier(firstId, id))
+      ParseState.expectingIdentifier(token, id => DisconnectChannelIdentifierIdentifier(firstId, id))
     }
   }
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => DisconnectChannelIdentifier(id))
+      ParseState.expectingIdentifier(token, id => DisconnectChannelIdentifier(id))
     }
   }
 }

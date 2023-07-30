@@ -122,7 +122,7 @@ case class OutputToChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
 ) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = ""
+  override def displayString(env: Environment): String = s"write $nObject to $channel"
 }
 
 // This should be generalized as "output to a file handle" but for now, just stdout
@@ -130,7 +130,7 @@ case class OutputToChannel(
 case class OutputToStdout(
   nObject: UntaggedObject
 ) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = ""
+  override def displayString(env: Environment): String = s"write $nObject"
 }
 
 
@@ -138,5 +138,9 @@ case class IterateIntoChannel(
   nObject: UntaggedObject,
   channel: UntaggedObject
 ) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = s"iterate $nObject into $channel"
+}
+
+case object EmptyEnvironmentCommand extends EnvironmentCommand {
   override def displayString(env: Environment): String = ""
 }

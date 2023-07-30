@@ -135,6 +135,8 @@ case class IterateIntoStatementParse(
   destinationObject: Identifier
 ) extends EnvStatementParse
 
+case object EmptyStatement extends EnvStatementParse
+
 sealed abstract class StatementPrefix
 case object ValStatement extends StatementPrefix
 case object DefStatement extends StatementPrefix

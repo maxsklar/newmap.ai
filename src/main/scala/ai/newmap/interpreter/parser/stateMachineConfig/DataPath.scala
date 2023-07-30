@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model._
@@ -30,7 +30,7 @@ object DataPath {
 
   case class DataIdentifierEquals(
     val id: String,
-    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState()
+    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState
   ) extends ParseState[EnvStatementParse] {
 
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = for {
@@ -54,7 +54,7 @@ object DataPath {
       case Symbol("=") => Success(DataIdentifierEquals(id))
       case _ => {
         for {
-          params <- ExpressionPath.InitState().update(token)
+          params <- ExpressionPath.InitState.update(token)
         } yield {
           DataIdentifierParams(id, params)
         }
@@ -65,7 +65,7 @@ object DataPath {
   case class InitState() extends ParseState[EnvStatementParse] {
 
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => DataIdentifier(id))
+      ParseState.expectingIdentifier(token, id => DataIdentifier(id))
     }
   }
 }

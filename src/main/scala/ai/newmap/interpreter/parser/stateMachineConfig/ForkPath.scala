@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{EnvStatementParse, ForkedVersionedStatementParse, IdentifierParse, ParseElement}
@@ -18,19 +18,19 @@ object ForkPath {
 
   case class ForkIdentifierAs(firstId: String) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ForkIdentifierAsIdentifier(firstId, id))
+      ParseState.expectingIdentifier(token, id => ForkIdentifierAsIdentifier(firstId, id))
     }
   }
 
   case class ForkIdentifier(id: String) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingSpecificIdentifier(token, "as", ForkIdentifierAs(id))
+      ParseState.expectingSpecificIdentifier(token, "as", ForkIdentifierAs(id))
     }
   }
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ForkIdentifier(id))
+      ParseState.expectingIdentifier(token, id => ForkIdentifier(id))
     }
   }
 }

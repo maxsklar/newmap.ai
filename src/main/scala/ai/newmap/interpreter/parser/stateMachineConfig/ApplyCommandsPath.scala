@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.{ParseState, ParseStateUtils}
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
 import ai.newmap.model.{ApplyCommandsStatementParse, EnvStatementParse, IdentifierParse, ParseElement, ParseTree}
@@ -10,7 +10,7 @@ import scala.collection.mutable.ListBuffer
 object ApplyCommandsPath {
   case class ApplyCommands(
     val identifier: String,
-    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState()
+    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState
   ) extends ParseState[EnvStatementParse] {
 
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
@@ -32,7 +32,7 @@ object ApplyCommandsPath {
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseStateUtils.expectingIdentifier(token, id => ApplyCommands(id))
+      ParseState.expectingIdentifier(token, id => ApplyCommands(id))
     }
   }
 }

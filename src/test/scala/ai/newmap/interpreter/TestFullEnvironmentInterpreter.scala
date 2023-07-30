@@ -614,6 +614,16 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " work with the alternative ordering and without specifying the empty command" in {
+    testCodeScript(Vector(
+      CodeExpectation("new Count as n", GeneralSuccessCheck),
+      CodeExpectation("update n", GeneralSuccessCheck),
+      CodeExpectation("update n", GeneralSuccessCheck),
+      CodeExpectation("update n", GeneralSuccessCheck),
+      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
+    ))
+  }
+
   it should " be allowed to have members" in {
     testCodeScript(Vector(
       CodeExpectation("data n = 0", GeneralSuccessCheck),

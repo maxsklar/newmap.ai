@@ -1,6 +1,6 @@
 package ai.newmap.interpreter.parser.stateMachineConfig
 
-import ai.newmap.interpreter.parser.stateMachine.ParseState
+import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer._
 import ai.newmap.model._
@@ -14,10 +14,8 @@ object ExpressionPath {
     firstParameter: ParseState[ParseTree]
   ) extends ParseState[ParseTree] {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
-      val state = InitState()
-
       for {
-        rightState <- state.update(token)
+        rightState <- InitState.update(token)
       } yield {
         ExpressionInBinaryOp(symbol, firstParameter, rightState)
       }
@@ -66,9 +64,8 @@ object ExpressionPath {
           token match {
             case Symbol(s) => Success(ExpressionInBinaryOpNoRight(connectiveSymbol, this))
             case _ => {
-              val initSecondParameter = InitState()
               for {
-                newSecondParameter <- initSecondParameter.update(token)
+                newSecondParameter <- InitState.update(token)
               } yield ExpressionInBinaryOp(connectiveSymbol, this, newSecondParameter)
             }
           }
@@ -117,7 +114,7 @@ object ExpressionPath {
 
   case class ExpressionInEnc(
     enc: EnclosureSymbol,
-    exp: ParseState[ParseTree] = InitState()
+    exp: ParseState[ParseTree] = InitState
   ) extends ParseState[ParseTree] {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
       exp.update(token) match {
@@ -193,7 +190,7 @@ object ExpressionPath {
     }
   }
 
-  case class InitState() extends ParseState[ParseTree] {
+  case object InitState extends ParseState[ParseTree] {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = token match {
       case Enc(enc, true) => enc match {
         case Paren => Success(ExpressionInEnc(Paren))
@@ -207,7 +204,7 @@ object ExpressionPath {
       case Number(i) => Success(ExpressionStart(NaturalNumberParse(i)))
       case Symbol("~") => Success(ExpressionForceId())
       case Symbol("`") => Success(ExpressionTickMark())
-      case Symbol(s) => Success(UnaryExpression(s, InitState()))
+      case Symbol(s) => Success(UnaryExpression(s, InitState))
       case DQuote(s) => Success(ExpressionStart(StringParse(s)))
       case Comment(_) => Success(this) 
     }

@@ -87,7 +87,7 @@ class EnvironmentInterpreter(
   private def getTypeOf(code: String): String = {
     val result = for {
       tokens <- getTokens(code)
-      parseTree <- NewMapParser(tokens)
+      parseTree <- NewMapParser.expressionParse(tokens)
       tc <- TypeChecker.typeCheckUnknownType(parseTree, env)
       nObject <- Evaluator(tc.nExpression, env)
     } yield {
@@ -103,7 +103,7 @@ class EnvironmentInterpreter(
   private def evaluateAndUnderlying(code: String): String = {
     val result = for {
       tokens <- getTokens(code)
-      parseTree <- NewMapParser(tokens)
+      parseTree <- NewMapParser.expressionParse(tokens)
       tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction)
       nObject <- Evaluator(tc.nExpression, env)
       nType <- env.typeSystem.convertToNewMapType(nObject)

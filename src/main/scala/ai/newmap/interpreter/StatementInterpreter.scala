@@ -286,6 +286,7 @@ object StatementInterpreter {
           ExpOnlyEnvironmentCommand(nObject)
         }
       }
+      case EmptyStatement => Success(EmptyEnvironmentCommand)
     }
   }
 

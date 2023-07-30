@@ -469,6 +469,7 @@ case class Environment(
           }
         }
       }
+      case EmptyEnvironmentCommand => this
     }
   }
 

@@ -9,49 +9,49 @@ import ai.newmap.util.Success
 class TestParser extends FlatSpec {
   "A number " should " be parsed correctly" in {
     val tokens = Vector(Number(123))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       NaturalNumberParse(123)
     ))
   }
 
   "An identifier " should " be parsed correctly" in {
     val tokens = Vector(Identifier("x"))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       IdentifierParse("x")
     ))
   }
 
   it should " work when forced with a Tilda" in {
     val tokens = Vector(Symbol("~"), Identifier("x"))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       IdentifierParse("x", force = true)
     ))
   }
 
   "Parens for grouping " should " work on a number" in {
     val tokens = Vector(Enc(Paren, true), Number(6), Enc(Paren, false))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       NaturalNumberParse(6)
     ))
   }
 
   "Apply function " should " work for f(x)" in {
     val tokens = Vector(Identifier("f"), Enc(Paren, true), Identifier("x"), Enc(Paren, false))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       ApplyParse(IdentifierParse("f"), IdentifierParse("x"))
     ))
   }
 
   it should " work for f 5" in {
     val tokens = Vector(Identifier("f"), Number(5))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       ApplyParse(IdentifierParse("f"), NaturalNumberParse(5))
     ))
   }
 
   it should " apply values from left to right" in {
     val tokens = Vector(Identifier("f"), Number(5), Number(2))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       ApplyParse(
         ApplyParse(IdentifierParse("f"), NaturalNumberParse(5)),
         NaturalNumberParse(2)
@@ -153,7 +153,7 @@ class TestParser extends FlatSpec {
       Symbol(":"),
       Number(10),
       Enc(Paren, false))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       KeyValueBinding(IdentifierParse("digit"), NaturalNumberParse(10))
     ))
   }
@@ -169,7 +169,7 @@ class TestParser extends FlatSpec {
       Symbol(":"),
       Identifier("Type"),
       Enc(Paren, false))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LiteralListParse(
         Vector(
           KeyValueBinding(IdentifierParse("digit"), NaturalNumberParse(10)),
@@ -194,7 +194,7 @@ class TestParser extends FlatSpec {
       Symbol(","),
       Number(5),
       Enc(Paren, false))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LiteralListParse(
         Vector(
           NaturalNumberParse(10), 
@@ -215,7 +215,7 @@ class TestParser extends FlatSpec {
       Symbol("=>"),
       Identifier("d")
     )
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LambdaParse(
         KeyValueBinding(IdentifierParse("d"), NaturalNumberParse(5)),
         IdentifierParse("d")
@@ -225,14 +225,14 @@ class TestParser extends FlatSpec {
 
   it should " work correctly for multiple types" in {
     val tokens = Vector(Number(1), Symbol("=>"), Number(2), Symbol("=>"), Number(3))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LambdaParse(NaturalNumberParse(1), LambdaParse(NaturalNumberParse(2), NaturalNumberParse(3)))
     ))
   }
 
   it should " work correctly when the types are grouped" in {
     val tokens = Vector(Enc(Paren, true), Number(1), Symbol("=>"), Number(2), Enc(Paren, false), Symbol("=>"), Number(3))
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LambdaParse(LambdaParse(NaturalNumberParse(1), NaturalNumberParse(2)), NaturalNumberParse(3))
     ))
   }
@@ -244,7 +244,7 @@ class TestParser extends FlatSpec {
       Symbol(":"),
       Number(5)
     )
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       KeyValueBinding(
         ApplyParse(IdentifierParse("Object"), IdentifierParse("getId")),
         NaturalNumberParse(5)
@@ -255,7 +255,7 @@ class TestParser extends FlatSpec {
   it should " have the right precedence" in {
     val tokens = Vector(Identifier("a"), Identifier("b"), Identifier("c"))
 
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       ApplyParse(
         ApplyParse(IdentifierParse("a"), IdentifierParse("b")),
         IdentifierParse("c")
@@ -266,7 +266,7 @@ class TestParser extends FlatSpec {
   it should " use parens to fix precedence" in {
     val tokens = Vector(Identifier("a"), Enc(Paren, true), Identifier("b"), Identifier("c"), Enc(Paren, false))
 
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       ApplyParse(
         IdentifierParse("a"),
         ApplyParse(IdentifierParse("b"), IdentifierParse("c")),
@@ -277,7 +277,7 @@ class TestParser extends FlatSpec {
   "Arrays " should " work in the singleton case" in {
     val tokens = Vector(Enc(SquareBracket, true), Number(10), Enc(SquareBracket, false))
 
-    assert(NewMapParser(tokens) == Success(
+    assert(NewMapParser.expressionParse(tokens) == Success(
       LiteralListParse(
         Vector(NaturalNumberParse(10)),
         ArrayType
