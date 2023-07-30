@@ -2,7 +2,7 @@ package ai.newmap.interpreter.parser
 
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Token}
-import ai.newmap.interpreter.parser.stateMachineConfig.{ExpressionPath, InitStatementState}
+import ai.newmap.interpreter.parser.config.{ExpressionPath, InitStatementState}
 import ai.newmap.model.{EnvStatementParse, ParseTree}
 import ai.newmap.util.{Failure, Outcome, Success}
 

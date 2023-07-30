@@ -1,4 +1,4 @@
-package ai.newmap.interpreter.parser.stateMachineConfig
+package ai.newmap.interpreter.parser.config
 
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
