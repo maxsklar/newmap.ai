@@ -13,8 +13,6 @@ object StatementInterpreter {
     sParse: EnvStatementParse,
     env: Environment
   ): Outcome[EnvironmentCommand, String] = {
-    println("Calling statement interpreter: " + sParse)
-
     sParse match {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
         for {
@@ -34,11 +32,8 @@ object StatementInterpreter {
 
           tc <- TypeChecker.typeCheck(objExpression, nType, newEnv, FullFunction)
 
-          _ = println("TypeChecked: " + tc)
-
           evaluatedObject <- Evaluator(tc.nExpression, newEnv)
 
-          _ = println("evaluatedObject: " + evaluatedObject)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, newEnv)
           nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, newEnv)
         } yield {
