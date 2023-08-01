@@ -134,7 +134,7 @@ object SubtypeUtils {
 
   case class IsTypeConvertibleResponse(
     convertInstructions: Vector[FunctionWithMatchingRules],
-    newParameters: Map[String, UntaggedObject]
+    newParameters: Map[String, UntaggedObject] = Map.empty
   )
 
   // Return - Instructions in the form of functions for converting from one type to another
@@ -144,7 +144,7 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[IsTypeConvertibleResponse, String] = {
     //println(s"Calling isTypeConvertible: $startingType -- $endingType")
-    val emptyResponse = IsTypeConvertibleResponse(Vector.empty, Map.empty)
+    val emptyResponse = IsTypeConvertibleResponse(Vector.empty)
 
     (startingType, endingType) match {
       case (startingType, WildcardPatternT(name)) => {
@@ -326,7 +326,7 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions, Map.empty)
+          IsTypeConvertibleResponse(convertInstructions)
         }
       }
       case (WithStateT(typeSystemId1, CustomT(name1, params1)), CustomT(name2, params2)) => {
@@ -338,7 +338,7 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions, Map.empty)
+          IsTypeConvertibleResponse(convertInstructions)
         }
       }
       case (CustomT(name1, params1), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
@@ -350,7 +350,7 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions, Map.empty)
+          IsTypeConvertibleResponse(convertInstructions)
         }
       }
       case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
@@ -384,20 +384,22 @@ object SubtypeUtils {
   // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
   // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
-  // @return if the object is convertible, return the untagged object that represents its data in the new type
+  // @return if the object is convertible, return the tagged object that represents its data in the new type
   def attemptConvertObjectToType(
     startingObject: NewMapObject,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[UntaggedObject, String] = {
+  ): Outcome[TaggedObject, String] = {
+    //println("Calling attemptConvertObjectToType: " + startingObject.displayString(env) + " -- " + endingType.displayString(env))
+
     endingType match {
       case SubtypeT(isMember, parentType, featureSet) => {
         for {
-          uObject <- attemptConvertObjectToType(startingObject, parentType, env)
-          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, uObject, env)
+          tObject <- attemptConvertObjectToType(startingObject, parentType, env)
+          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, tObject.uObject, env)
           _ <- Outcome.failWhen(membershipCheck == UInit, s"Not member of subtype: $startingObject, $endingType")
         } yield {
-          uObject
+          tObject
         }
       }
       case _ => {
@@ -409,9 +411,15 @@ object SubtypeUtils {
 
           // We're not taking into account the type!!!
           result <- Evaluator.applyListOfFunctions(uObject, response.convertInstructions, env)
-        } yield {
-          result
-        }
+
+          endingUType = env.typeSystem.typeToUntaggedObject(endingType)
+
+          // TODO - this doesn't work if endingType is a wildcard unless includeWildcards = true
+          // - Once parameters are removed from map keys, this ugly exception will disappear
+          endingUTypeSubst = MakeSubstitution(endingUType, response.newParameters, includeWildcards = true)
+
+          endingTypeSubst <- env.typeSystem.convertToNewMapType(endingUTypeSubst)
+        } yield TaggedObject(result, endingTypeSubst)
       }
     }
   }

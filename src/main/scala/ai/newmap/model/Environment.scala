@@ -242,7 +242,7 @@ case class Environment(
                 inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
                 convertedCommand <- SubtypeUtils.attemptConvertObjectToType(commandObj, inputT, this)
               } yield {
-                convertedCommand
+                convertedCommand.uObject
               }
 
               convertedCommandO match {
@@ -599,7 +599,6 @@ object Environment {
   }
 
   Base = Base.newCommands(Vector(
-    //eCommand("Any", typeAsObject(AnyT)),
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
     eCommand("Char", typeAsObject(CharacterT)),

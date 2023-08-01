@@ -6,7 +6,10 @@ import ai.newmap.model._
 object MakeSubstitution {
   def apply(
     expression: UntaggedObject,
-    parameters: Map[String, UntaggedObject]
+    parameters: Map[String, UntaggedObject],
+
+    // TODO: Once we remove wildcards and banish parameters from map keys, this can be removed
+    includeWildcards: Boolean = false
   ): UntaggedObject = {
     expression match {
       case ApplyFunction(func, input, matchingRules) => {
@@ -22,6 +25,15 @@ object MakeSubstitution {
           case None => expression
         }
       }
+      case UWildcardPattern(name) => {
+        // TODO: Once we remove wildcards and banish parameters from map keys, this can be removed
+        if (includeWildcards) {
+          parameters.get(name) match {
+            case Some(uObject) => uObject
+            case None => expression
+          }
+        } else expression
+      }
       case UCase(constructor, input) => {
         UCase(constructor, this(input, parameters))
       }
@@ -29,19 +41,22 @@ object MakeSubstitution {
         val newMapValues = for {
           (k, v) <- values
         } yield {
+          // Note that Map Keys SHOULD NOT contain parameters.
+          // Figure out why we need to do this here.
           val newKey = this(k, parameters)
 
           // I'm pretty sure that this is supposed to be "k" and not "newkey" at this point
           // - I'm having a hard time articulating why!
           val nps = Evaluator.newParametersFromPattern(k).toSet
           val newValue = this(v, parameters.filter(x => !nps.contains(x._1)))
+
           newKey -> newValue
         }
 
         UMap(newMapValues)
       }
       case UStruct(values) => UStruct(values.map(v => this(v, parameters)))
-      case constant => constant
+      case _ => expression
     }
   }
 }

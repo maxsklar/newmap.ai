@@ -31,57 +31,38 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case EmptyParse => expectedTypeOutcome match {
-        case Success(WildcardPatternT(_)) => {
-          Success(TypeCheckResponse(UStruct(Vector.empty), NewMapO.emptyStruct))
-        }
         case _ => {
           for {
-            result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
+            tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
           } yield {
-            TypeCheckResponse(result, expectedType)
+            TypeCheckResponse(tObject.uObject, tObject.nType)
           }
         }
       }
       case NaturalNumberParse(i: Long) => {
-        expectedTypeOutcome match {
-          case Success(WildcardPatternT(_)) => {
-            // BUT - the type will be abridged!!!
-            Success(TypeCheckResponse(UIndex(i), CountT))
-          }
-          case _ => {
-            for {
-              t <- expectedTypeOutcome
-              _ <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
-            } yield {
-              val expectingType = SubtypeUtils.isTypeConvertible(t, TypeT, env).isSuccess
+        for {
+          t <- expectedTypeOutcome
+          refinedType <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
+        } yield {
+          val expectingType = SubtypeUtils.isTypeConvertible(refinedType, TypeT, env).isSuccess
 
-              if (expectingType) {
-                val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(UIndex(i)))
-                TypeCheckResponse(untaggedValue, expectedType)
-              } else {
-                TypeCheckResponse(UIndex(i), expectedType)
-              }
-            }
+          if (expectingType) {
+            val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(UIndex(i)))
+            TypeCheckResponse(untaggedValue, refinedType)
+          } else {
+            TypeCheckResponse(UIndex(i), refinedType)
           }
         }
       }
       case CharacterParse(s: String) => {
         if (s.length == 1) {
-          val uObject = UCharacter(s(0))
+          val tObject = TaggedObject(UCharacter(s(0)), CharacterT)
 
-          expectedTypeOutcome match {
-            case Success(WildcardPatternT(_)) => {
-              // BUT - the type will be abridged!!!
-              Success(TypeCheckResponse(uObject, CharacterT))
-            }
-            case _ => {
-              for {
-                expectedType <- expectedTypeOutcome
-                result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, CharacterT), expectedType, env)
-              } yield {
-                TypeCheckResponse(result, expectedType)
-              }
-            }
+          for {
+            expectedType <- expectedTypeOutcome
+            tObject <- SubtypeUtils.attemptConvertObjectToType(tObject, expectedType, env)
+          } yield {
+            TypeCheckResponse(tObject.uObject, tObject.nType)
           }
         } else {
           Failure(s"Character not recognized because it has length > 1: $s")
@@ -97,37 +78,18 @@ object TypeChecker {
 
         val stringType = CustomT("String", UStruct(Vector.empty))
 
-        expectedTypeOutcome match {
-          case Success(WildcardPatternT(_)) => {
-            Success(TypeCheckResponse(uObject, stringType))
-          }
-          case _ => {
-            for {
-              underlyingExpectedT <- expectedTypeOutcome
-
-              result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, stringType), expectedType, env)
-            } yield {
-              TypeCheckResponse(result, expectedType)
-            }
-          }
+        for {
+          tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, stringType), expectedType, env)
+        } yield {
+          TypeCheckResponse(tObject.uObject, tObject.nType)
         }
       }
       case IdentifierParse(s: String, true) => {
         // We need to check that the expectedType allows an identifier!!
-        expectedTypeOutcome match {
-          case Success(WildcardPatternT(_)) => {
-            Success(TypeCheckResponse(UIdentifier(s), IdentifierT))
-          }
-          case Success(t) => {
-            for {
-              uObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), t, env)
-            } yield {
-              TypeCheckResponse(uObject, t)
-            }
-          }
-          case _ => {
-            Failure(s"Unexpected type with identifier: $expectedType")
-          }
+        for {
+          tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), expectedType, env)
+        } yield {
+          TypeCheckResponse(tObject.uObject, tObject.nType)
         }
 
       }
@@ -160,9 +122,10 @@ object TypeChecker {
             case Some(EnvironmentBinding(nObject)) => {
               val nType = RetrieveType.fromNewMapObject(nObject, env)
               for { 
-                uObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
+                tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
               } yield {
-                TypeCheckResponse(uObject, nType)
+                // TODO: why can't we have tObject.ntype?
+                TypeCheckResponse(tObject.uObject, nType)
               }
             }
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
@@ -241,9 +204,9 @@ object TypeChecker {
                 case Success(nType) => {
                   val trialObject = TaggedObject(UIdentifier(s), IdentifierT)
                   for {
-                    result <- SubtypeUtils.attemptConvertObjectToType(trialObject, nType, env)
+                    tObject <- SubtypeUtils.attemptConvertObjectToType(trialObject, nType, env)
                   } yield {
-                    TypeCheckResponse(result, expectedType)
+                    TypeCheckResponse(tObject.uObject, tObject.nType)
                   }
                 }
                 case _ => {
