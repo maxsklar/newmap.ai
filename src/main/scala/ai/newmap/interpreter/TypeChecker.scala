@@ -225,10 +225,18 @@ object TypeChecker {
           // Is member of Subtype check here?
           functionFeatureSet <- retrieveFeatureSetFromFunctionTypePattern(result.typeOfFunction, env)
 
+          // If the function is a simplemap, and if it has no internal parameters, it can be executed now, and considered a basic
+          functionFeatureSetFixed = if (functionFeatureSet.getLevel <= SimpleFunction.getLevel) {
+            Evaluator.applyFunctionAttempt(result.functionExpression, result.inputExpression, env) match {
+              case Success(result) => BasicMap // TODO - save the actual result we got!
+              case Failure(_) => functionFeatureSet
+            }
+          } else functionFeatureSet
+
           // Validate that this is allowed from the feature set
           _ <- Outcome.failWhen(
-            !SubtypeUtils.isFeatureSetConvertible(functionFeatureSet, featureSet),
-            s"Cannot allow function with feature set $functionFeatureSet in expression that should be featureSet $featureSet"
+            !SubtypeUtils.isFeatureSetConvertible(functionFeatureSetFixed, featureSet),
+            s"Cannot allow function with feature set $functionFeatureSetFixed in expression that should be featureSet $featureSet"
           )
 
           // If the function is a parameter, then there's no guarantee that it's not self-referential
@@ -241,7 +249,8 @@ object TypeChecker {
           response <- SubtypeUtils.isTypeConvertible(result.resultingType, expectedType, env)
           // TODO - execute response.convertInstructions
         } yield {
-          TypeCheckResponse(ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher), result.resultingType)
+          val applyParseResult = ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher)
+          TypeCheckResponse(applyParseResult, result.resultingType)
         }
       }
       case LiteralListParse(values: Vector[ParseTree], llType: LiteralListType) => {
@@ -440,7 +449,8 @@ object TypeChecker {
           inputTypeClassT <- env.typeSystem.convertToNewMapType(inputTypeClass)
           resultKey <- typeCheckWithPatternMatching(k, inputTypeClassT, env, externalFeatureSet, internalFeatureSet)
 
-          foundKeyPattern = resultKey.typeCheckResult
+          // Keys must be evaluated on the spot
+          foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
 
           valueTypePatternUntagged <- Evaluator.applyFunctionAttempt(
             UMap(typeTransform),
@@ -462,7 +472,7 @@ object TypeChecker {
 
           restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, internalFeatureSet, env, externalFeatureSet)
         } yield {
-          (resultKey.typeCheckResult -> objectFoundValue.nExpression) +: restOfMap
+          (foundKeyPattern -> objectFoundValue.nExpression) +: restOfMap
         }
       }
       case s +: _ => {
@@ -549,6 +559,8 @@ object TypeChecker {
     expression: ParseTree,
     expectedType: NewMapType,
     env: Environment,
+
+    // TODO - I want to get rid of this!
     externalFeatureSet: MapFeatureSet, // Am I inside a map with restricted features already?
     internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
@@ -670,7 +682,6 @@ object TypeChecker {
     env: Environment,
     featureSet: MapFeatureSet
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
-
     (parameterList, valueList) match {
       case (((paramId, typeOfIdentifier) +: restOfParamList), (KeyValueBinding(valueIdentifier, valueObject) +: restOfValueList)) => {
         for {

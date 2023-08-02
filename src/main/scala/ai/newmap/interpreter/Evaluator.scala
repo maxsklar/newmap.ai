@@ -16,15 +16,13 @@ object Evaluator {
           evalFunc <- this(func, env)
           evalInput <- this(input, env)
           result <- applyFunctionAttempt(evalFunc, evalInput, env, matchingRules)
-        } yield {
-          result
-        }
+        } yield result
       }
       case ParamId(s) => {
         env.lookup(s) match {
           case None => {
-            throw new Exception(s"Unbound identifier: $s")
-            //Failure(s"Unbound identifier: $s")
+            //throw new Exception(s"Unbound identifier: $s")
+            Failure(s"Unbound identifier: $s")
           }
           case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
           case Some(EnvironmentParameter(nObject)) => {
@@ -101,12 +99,11 @@ object Evaluator {
           evalRest <- evalMapInstanceVals(restOfValues, env)
         } yield {
           // TODO - rethink about "when to evaluate" what's inside a map
-          // - We probably should not evaluate if it's not a simple function
-          /*val newV = Evaluator(v, env) match {
+          val newV = Evaluator(v, env) match {
             case Success(vObj) => vObj
             case _ => v
-          }*/
-          val newV = v
+          }
+          //val newV = v
 
           (k -> newV) +: evalRest
         }

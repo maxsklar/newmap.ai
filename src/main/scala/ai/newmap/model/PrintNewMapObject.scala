@@ -150,8 +150,8 @@ object PrintNewMapObject {
     config: MapConfig
   ): String = {
     (config.completeness, config.featureSet) match {
-      case (CommandOutput, BasicMap) => "Map(" + key + ", " + value + ")"
-      case (RequireCompleteness, SimpleFunction) => "ReqMap(" + key + ", " + value + ")"
+      case (CommandOutput, BasicMap) => "Map(" + key + ": " + value + ")"
+      case (RequireCompleteness, SimpleFunction) => "ReqMap(" + key + ": " + value + ")"
       case (RequireCompleteness, FullFunction) => {
         // TODO(2022): Change the way lambda input works so that it's more like Map
         "\\(" + key + ": " + value + ")"
@@ -171,7 +171,7 @@ object PrintNewMapObject {
         }
 
         // TODO(2022): Improve Notation so that we don't need this!
-        s"Map($key, $value, $completenessStr, $featureSetStr)"
+        s"Map($key: $value, $completenessStr, $featureSetStr)"
       }  
     }
   }

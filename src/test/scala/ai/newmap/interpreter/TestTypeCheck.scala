@@ -136,7 +136,7 @@ class TestTypeCheck extends FlatSpec {
   "A boolean map " should " be interpreted correctly" in {
   	val booleanMap = ApplyParse(
       IdentifierParse("Map"),
-      LiteralListParse(Vector(NaturalNumberParse(2), NaturalNumberParse(2)), MapType)
+      LiteralListParse(Vector(KeyValueBinding(NaturalNumberParse(2), NaturalNumberParse(2))), MapType)
     )
 
     TypeChecker(booleanMap) match {
