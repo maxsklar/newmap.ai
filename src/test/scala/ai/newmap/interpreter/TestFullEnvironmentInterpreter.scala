@@ -1116,7 +1116,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   - startsWith function (or general regular expression?)
   - Commands (replace sequence)
   - append arrays
-  - Strings as arrays
   - mapValue function (could this be done with maps too?)
   - Convert to LinkedList?
 

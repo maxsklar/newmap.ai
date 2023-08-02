@@ -30,14 +30,8 @@ object TypeChecker {
     // OR if expectedType is a Subset, it's a member of the superset and also matches the subset condition
     // TODO - write a bunch of tests for that!
     expression match {
-      case EmptyParse => expectedTypeOutcome match {
-        case _ => {
-          for {
-            tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
-          } yield {
-            TypeCheckResponse(tObject.uObject, tObject.nType)
-          }
-        }
+      case EmptyParse => {
+        responseFromConversion(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
       }
       case NaturalNumberParse(i: Long) => {
         for {
@@ -57,13 +51,7 @@ object TypeChecker {
       case CharacterParse(s: String) => {
         if (s.length == 1) {
           val tObject = TaggedObject(UCharacter(s(0)), CharacterT)
-
-          for {
-            expectedType <- expectedTypeOutcome
-            tObject <- SubtypeUtils.attemptConvertObjectToType(tObject, expectedType, env)
-          } yield {
-            TypeCheckResponse(tObject.uObject, tObject.nType)
-          }
+          responseFromConversion(tObject, expectedType, env)
         } else {
           Failure(s"Character not recognized because it has length > 1: $s")
         }
@@ -78,20 +66,11 @@ object TypeChecker {
 
         val stringType = CustomT("String", UStruct(Vector.empty))
 
-        for {
-          tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(uObject, stringType), expectedType, env)
-        } yield {
-          TypeCheckResponse(tObject.uObject, tObject.nType)
-        }
+        responseFromConversion(TaggedObject(uObject, stringType), expectedType, env)
       }
       case IdentifierParse(s: String, true) => {
         // We need to check that the expectedType allows an identifier!!
-        for {
-          tObject <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), expectedType, env)
-        } yield {
-          TypeCheckResponse(tObject.uObject, tObject.nType)
-        }
-
+        responseFromConversion(TaggedObject(UIdentifier(s), IdentifierT), expectedType, env)
       }
       case IdentifierParse(s: String, false) => {
         val useLiteralIdentifier = for {
@@ -120,11 +99,12 @@ object TypeChecker {
               } yield TypeCheckResponse(ParamId(s), nType)
             }
             case Some(EnvironmentBinding(nObject)) => {
-              val nType = RetrieveType.fromNewMapObject(nObject, env)
               for { 
                 tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
               } yield {
-                // TODO: why can't we have tObject.ntype?
+                // TODO: why can't we use tObject.nType?
+                // We can once we solve the parameter-in-key problem (probably with a singleton map)
+                val nType = RetrieveType.fromNewMapObject(nObject, env)
                 TypeCheckResponse(tObject.uObject, nType)
               }
             }
@@ -203,11 +183,7 @@ object TypeChecker {
                 }
                 case Success(nType) => {
                   val trialObject = TaggedObject(UIdentifier(s), IdentifierT)
-                  for {
-                    tObject <- SubtypeUtils.attemptConvertObjectToType(trialObject, nType, env)
-                  } yield {
-                    TypeCheckResponse(tObject.uObject, tObject.nType)
-                  }
+                  responseFromConversion(trialObject, nType, env)
                 }
                 case _ => {
                   Failure(s"Identifier $s is unknown, expecting type class $expectedType")
@@ -380,8 +356,8 @@ object TypeChecker {
               // must be a "simple map" type situation
               // can this be built into the evaluator?
               firstObj <- Evaluator(firstExp.nExpression, env)
-
               secondType <- Evaluator.applyFunctionAttempt(UMap(simpleMap), firstObj, env)
+
               secondT <- Evaluator.asType(secondType, env)
               secondExp <- typeCheck(second, secondT, env, featureSet)
             } yield {
@@ -407,6 +383,16 @@ object TypeChecker {
         CodeBlockTypeChecker(statements, expression, expectedType, env, featureSet)
       }
     }
+  }
+
+  def responseFromConversion(
+    nObject: NewMapObject,
+    expectedType: NewMapType,
+    env: Environment
+  ): Outcome[TypeCheckResponse, String] = {
+    SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env).map(tObject => {
+      TypeCheckResponse(tObject.uObject, tObject.nType)
+    })
   }
 
   def typeCheckSequence(

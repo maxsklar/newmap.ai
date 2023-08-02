@@ -649,8 +649,16 @@ object Environment {
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),
+      // TODO - how do I avoid the key as a parameter here?
+      // ANSWER: probably needs some kind of "singleton map" where the key is allowed to be a param
+      // -- also maybe avoid arrays?
       CaseT(
-        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(MapT(Base.toTypeTransform(IndexT(ParamId("i")), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction)))),
+        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(
+          MapT(
+            Base.toTypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
+            MapConfig(RequireCompleteness, SimpleFunction)
+          )
+        )),
         CountT,
         SimpleFunction
       )

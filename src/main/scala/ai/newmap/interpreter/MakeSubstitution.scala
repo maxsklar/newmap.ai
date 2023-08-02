@@ -19,19 +19,11 @@ object MakeSubstitution {
           matchingRules
         )
       }
-      case ParamId(name) => {
-        parameters.get(name) match {
-          case Some(uObject) => uObject
-          case None => expression
-        }
-      }
+      case ParamId(name) => parameters.get(name).getOrElse(expression)
       case UWildcardPattern(name) => {
-        // TODO: Once we remove wildcards and banish parameters from map keys, this can be removed
+        // TODO: Once we banish parameters from map keys, this can be removed
         if (includeWildcards) {
-          parameters.get(name) match {
-            case Some(uObject) => uObject
-            case None => expression
-          }
+          parameters.get(name).getOrElse(expression)
         } else expression
       }
       case UCase(constructor, input) => {
@@ -51,6 +43,8 @@ object MakeSubstitution {
           val newValue = this(v, parameters.filter(x => !nps.contains(x._1)))
 
           newKey -> newValue
+          // Eventually, we should have this unless it's a singleton map
+          //k -> newValue
         }
 
         UMap(newMapValues)
