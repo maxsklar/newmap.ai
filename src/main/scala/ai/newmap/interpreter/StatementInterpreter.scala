@@ -116,7 +116,7 @@ object StatementInterpreter {
               for {
                 tcType <- TypeChecker.typeCheck(iterableExp, TypeT, env, FullFunction)
                 uType <- Evaluator(tcType.nExpression, env)
-                iterableTypeCandidate = TaggedObject(uType, HistoricalTypeT(env.typeSystem.currentState))
+                iterableTypeCandidate = NewMapObject(uType, HistoricalTypeT(env.typeSystem.currentState))
               } yield iterableTypeCandidate
             }
           }
@@ -150,17 +150,14 @@ object StatementInterpreter {
         for {
           vObject <- env.lookupVersionedObject(forkId.s)
         } yield {
-          ForkEnvironmentCommand(id.s, vObject)
+          ForkEnvironmentCommand(id.s, vObject.key)
         }
       }
       case ApplyCommandStatementParse(id, command) => {
         env.lookupVersionedObject(id.s) match {
           case Success(versionedObjectLink) => {
-            // Now we also need to look this up in the type system!!!
-            val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
-
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
+              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
 
               commandExp <- typeCheck(command, inputT, env, FullFunction)
 
@@ -216,10 +213,8 @@ object StatementInterpreter {
         val channel = UIdentifier(channelId.s)
         env.lookupVersionedObject(obj.s) match {
           case Success(versionedObjectLink) => {
-            val nType = RetrieveType.fromNewMapObject(versionedObjectLink, env)
-
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
+              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
 
               channelType = env.channelIdToType.get(channelId.s).getOrElse(UndefinedT)
 

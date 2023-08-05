@@ -188,18 +188,17 @@ object CommandMaps {
         val constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
         val mapConfig = MapConfig(RequireCompleteness, BasicMap)
 
-        val caseMap = TaggedObject(UMap(cases), MapT(
+        val caseMap = NewMapObject(UMap(cases), MapT(
           env.toTypeTransform(constructorsSubtype, TypeT), 
           mapConfig
         ))
 
         for {
           newCaseMap <- updateVersionedObject(caseMap, command, env)
-          untaggedNewCaseMap <- Evaluator.removeTypeTag(newCaseMap)
 
           newCaseName <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
         } yield {
-          untaggedNewCaseMap match {
+          newCaseMap.uObject match {
             case UMap(newCases) => {
               ExpandKeyResponse(
                 CaseT(newCases, parentType, featureSet),
@@ -214,7 +213,7 @@ object CommandMaps {
         }
       }
       case SubtypeT(isMember, parentType, featureSet) => {
-        val isMemberMap = TaggedObject(isMember, MapT(
+        val isMemberMap = NewMapObject(isMember, MapT(
           env.toTypeTransform(parentType, BooleanT),
           MapConfig(CommandOutput, BasicMap)
         ))
@@ -226,10 +225,9 @@ object CommandMaps {
 
         for {
           newMembersMap <- updateVersionedObject(isMemberMap, adjustedCommand, env)
-          untaggedNewMembersMap <- Evaluator.removeTypeTag(newMembersMap)
         } yield {
           ExpandKeyResponse(
-            SubtypeT(untaggedNewMembersMap, parentType, featureSet),
+            SubtypeT(newMembersMap.uObject, parentType, featureSet),
             Vector(command),
             untaggedIdentity
           )
@@ -456,15 +454,13 @@ object CommandMaps {
     env: Environment,
     typeSystemIdOpt: Option[UUID] = None
   ): Outcome[NewMapObject, String] = {
-    RetrieveType.fromNewMapObject(current, env) match {
+    current.nType match {
       case nType@CountT => {
         for {
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-
-          c <- untaggedCurrent match {
+          c <- current.uObject match {
             case UIndex(i) => Success(i)
             case UInit => Success(0L)
-            case _ => Failure(s"Couldn't interpret count value: $untaggedCurrent")
+            case _ => Failure(s"Couldn't interpret count value: ${current.uObject}")
           }
 
           newState = UCase(UIdentifier("Inc"), UIndex(c))
@@ -473,9 +469,9 @@ object CommandMaps {
       }
       case BooleanT => {
         for {
-          currentValue <- current match {
-            case TaggedObject(UIndex(i), _) => Success(i)
-            case TaggedObject(UInit, _) => Success(0)
+          currentValue <- current.uObject match {
+            case UIndex(i) => Success(i)
+            case UInit => Success(0)
             case _ => Failure(s"Couldn't interpret current value: $current")
           }
 
@@ -486,7 +482,7 @@ object CommandMaps {
           }
         } yield {
           val result = if (currentValue == 1 || j == 1) 1 else 0
-          TaggedObject(UIndex(result), BooleanT)
+          NewMapObject(UIndex(result), BooleanT)
         }
       }
       case mapT@MapT(UMap(typeTransform), MapConfig(CommandOutput, featureSet, _, _, _)) => {
@@ -509,26 +505,22 @@ object CommandMaps {
           input <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
           commandForInput <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
 
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-
-          currentResultForInput <- Evaluator.applyFunctionAttempt(untaggedCurrent, input, env)
+          currentResultForInput <- Evaluator.applyFunctionAttempt(current.uObject, input, env)
 
           newResultForInput <- updateVersionedObject(
-            TaggedObject(currentResultForInput, outputType),
+            NewMapObject(currentResultForInput, outputType),
             commandForInput,
             env
           )
 
-          mapValues <- untaggedCurrent match {
+          mapValues <- current.uObject match {
             case UMap(values) => Success(values)
-            case _ => Failure(s"Couldn't get map values from $current")
+            case _ => Failure(s"Couldn't get map values from ${current.uObject}")
           }
 
-          untaggedNewState <- Evaluator.removeTypeTag(newResultForInput)
-
-          newMapValues = (input -> untaggedNewState) +: mapValues.filter(x => x._1 != input)
+          newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
         } yield {
-          TaggedObject(UMap(newMapValues), mapT)
+          NewMapObject(UMap(newMapValues), mapT)
         }
       }
       case MapT(UMap(typeTransform), MapConfig(style, features, _, _, _)) => {
@@ -548,7 +540,7 @@ object CommandMaps {
                 case StructT(items, _, _, _) if (items.length == 0) => {
                   // TODO - this is an ugle exception.. we need a better way to add fields to a struct
                   // (particularly an empty struct like in this case)
-                  Success((TaggedObject(UMap(Vector.empty), keyExpansionCommandT), command))
+                  Success((NewMapObject(UMap(Vector.empty), keyExpansionCommandT), command))
                 }
                 case _ => {
 
@@ -562,17 +554,15 @@ object CommandMaps {
 
                     valueExpression <- Evaluator.attemptPatternMatchInOrder(commandPatterns, UIndex(1), env)
                   } yield {
-                    (TaggedObject(keyField, keyT), valueExpression)
+                    (NewMapObject(keyField, keyT), valueExpression)
                   }
                 }
               }
 
               (keyExpansionCommand, valueExpansionExpression) = result
-
-              updateKeyUntagged <- Evaluator.removeTypeTag(keyExpansionCommand)
               
               // Really we're updating the key??
-              updateKeyTypeResponse <- expandType(keyT, updateKeyUntagged, env)
+              updateKeyTypeResponse <- expandType(keyT, keyExpansionCommand.uObject, env)
               // TODO- we need to do something with updateKeyTypeResponse.converter
 
 
@@ -581,8 +571,8 @@ object CommandMaps {
                 MapConfig(style, features)
               )
                       
-              mapValues <- current match {
-                case TaggedObject(UMap(values), _) => Success(values)
+              mapValues <- current.uObject match {
+                case UMap(values) => Success(values)
                 case _ => Failure(s"Couldn't get map values from $current")
               }
 
@@ -594,12 +584,12 @@ object CommandMaps {
                 value <- mapValues
 
                 // Remove old value
-                if (value._1 != updateKeyUntagged)
+                if (value._1 != keyExpansionCommand.uObject)
               } yield (value._1 -> value._2)
 
               newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
             } yield {
-              TaggedObject(UMap(newMapValues), newTableType)
+              NewMapObject(UMap(newMapValues), newTableType)
             }
           }
           case _ => {
@@ -609,10 +599,9 @@ object CommandMaps {
       }
       case FunctionalSystemT(functionTypes) => {
         for {
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-          currentMapping <- untaggedCurrent match {
+          currentMapping <- current.uObject match {
             case UMap(m) => Success(m)
-            case _ => Failure(s"Function not a mapping: $untaggedCurrent")
+            case _ => Failure(s"Function not a mapping: ${current.uObject}")
           }
 
           newFunctionNameObj <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
@@ -673,7 +662,7 @@ object CommandMaps {
 
           // Also upgrade the function itself
           // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
-          TaggedObject(
+          NewMapObject(
             UMap((newFunctionNameObj -> UMap(uNewFunctionMapping)) +: currentMapping),
             FunctionalSystemT((newFunctionNameObj -> composedTypeObject) +: functionTypes)
           )
@@ -681,17 +670,17 @@ object CommandMaps {
       }
       case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         for {
-          mapValues <- current match {
-            case TaggedObject(UMap(values), _) => Success(values)
+          mapValues <- current.uObject match {
+            case UMap(values) => Success(values)
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
           nameOfField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-          newValueAsTaggedObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+          newValueAsNewMapObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
 
-          uCaseValue <- newValueAsTaggedObject match {
+          uCaseValue <- newValueAsNewMapObject match {
             case u@UCase(_, _) => Success(u)
-            case _ => Failure(s"Wrong update for complete struct: $newValueAsTaggedObject")
+            case _ => Failure(s"Wrong update for complete struct: $newValueAsNewMapObject")
           }
         } yield {
           val typeOfField = uCaseValue.constructor
@@ -701,15 +690,15 @@ object CommandMaps {
 
           val newParams = (nameOfField -> typeOfField) +: parameterList.filter(x => x._1 != nameOfField)
 
-          TaggedObject(UMap(newMapValues), StructT(newParams, parentFieldType, RequireCompleteness, featureSet))
+          NewMapObject(UMap(newMapValues), StructT(newParams, parentFieldType, RequireCompleteness, featureSet))
         }
       }
       case StructT(params, parentFieldType, CommandOutput, _) => {
         command match {
           case UCase(constructor, input) => {
             for {
-              mapValues <- current match {
-                case TaggedObject(UMap(values), _) => Success(values)
+              mapValues <- current.uObject match {
+                case UMap(values) => Success(values)
                 case _ => Failure(s"Couldn't get map values from $current")
               }
 
@@ -718,7 +707,7 @@ object CommandMaps {
               newParams = params
             } yield {
               val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
-              TaggedObject(UMap(newMapValues), StructT(newParams, parentFieldType))
+              NewMapObject(UMap(newMapValues), StructT(newParams, parentFieldType))
             }
           }
           case _ => {
@@ -729,9 +718,7 @@ object CommandMaps {
       case nType@CustomT("Array", uType) => {
 
         for {
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-
-          untaggedResult <- untaggedCurrent match {
+          untaggedResult <- current.uObject match {
             case UCase(UIndex(length), UStruct(values)) => {
               Success(UCase(UIndex(length + 1), UStruct(values :+ command)))
             }
@@ -759,18 +746,15 @@ object CommandMaps {
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
           underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-          currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
+          currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
 
           result <- updateVersionedObject(currentResolved, command, env)
-          untaggedResult <- Evaluator.removeTypeTag(result)
-          resultResolved <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
+          resultResolved <- TypeChecker.tagAndNormalizeObject(result.uObject, nType, env)
         } yield resultResolved
       }
       case WithStateT(typeSystemId, nType) => {
         for {
-          untaggedCurrent <- Evaluator.removeTypeTag(current)
-          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
+          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(current.uObject, nType, env)
 
           result <- updateVersionedObject(retaggedCurrent, command, env, Some(typeSystemId))
         } yield result

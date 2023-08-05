@@ -62,7 +62,6 @@ case class NewMapTypeSystem(
     case BooleanT => UCase(UIdentifier("Boolean"), UStruct(Vector.empty))
     case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
     case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
-    //case StringT => UCase(UIdentifier("String"), UStruct(Vector.empty))
     case LongT => UCase(UIdentifier("Long"), UStruct(Vector.empty))
     case DoubleT => UCase(UIdentifier("Double"), UStruct(Vector.empty))
     case UuidT => UCase(UIdentifier("Uuid"), UStruct(Vector.empty))

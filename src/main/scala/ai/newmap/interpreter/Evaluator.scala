@@ -24,7 +24,7 @@ object Evaluator {
             //throw new Exception(s"Unbound identifier: $s")
             Failure(s"Unbound identifier: $s")
           }
-          case Some(EnvironmentBinding(nObject)) => removeTypeTag(nObject)
+          case Some(EnvironmentBinding(nObject)) => Success(nObject.uObject)
           case Some(EnvironmentParameter(nObject)) => {
             Success(ParamId(s))
             //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
@@ -50,19 +50,6 @@ object Evaluator {
         } yield UStruct(evalValues)
       }
       case constant => Success(constant)
-    }
-  }
-
-  // TODO - try to remove the usage of this as much as possible
-  // (In other words, look for ways to rely on the type less)
-  def removeTypeTag(nObject: NewMapObject): Outcome[UntaggedObject, String] = {
-    nObject match {
-      case TaggedObject(uObject, _) => Success(uObject)
-      case VersionedObjectLink(key) => Success(ULink(key))
-      case _ => {
-        //throw new Exception(nObject.toString)
-        Failure(s"Can't yet remove type tag from typed object $nObject (once types are redefined as a case it'll be possible)")
-      }
     }
   }
 
@@ -179,10 +166,7 @@ object Evaluator {
         for {
           // TODO - don't ignore the uuid if we're using an old functional system
           fSystemV <- env.lookupVersionedObject("__FunctionSystem")
-          fSystem = stripVersioning(fSystemV, env)
-          uFSystem <- removeTypeTag(fSystem)
-
-          uFunction <- applyFunctionAttempt(uFSystem, name, env)
+          uFunction <- applyFunctionAttempt(ULink(fSystemV.key), name, env)
           result <- applyFunctionAttempt(uFunction, input, env)
         } yield {
           result
@@ -352,19 +336,9 @@ object Evaluator {
     }
   }
 
-  def stripVersioning(nObject: NewMapObject, env: Environment): NewMapObject = {
-    nObject match {
-      case VersionedObjectLink(key) => {
-        // TODO - make this function an outcome
-        currentState(key.uuid, env).toOption.get
-      }
-      case _ => nObject
-    }
-  }
-
   def stripVersioningU(uObject: UntaggedObject, env: Environment): UntaggedObject = {
     uObject match {
-      case ULink(key) => removeTypeTag(currentState(key.uuid, env).toOption.get).toOption.get
+      case ULink(key) => currentState(key.uuid, env).toOption.get.uObject
       case _ => uObject
     }
   }

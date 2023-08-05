@@ -112,30 +112,30 @@ object IterationUtils {
     env: Environment,
     typeSystemIdOpt: Option[UUID] = None
   ): Outcome[Vector[UntaggedObject], String] = {
-    Evaluator.stripVersioning(nObject, env) match {
-      case TaggedObject(UMap(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
+    nObject match {
+      case NewMapObject(UMap(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
         Success(values.map(_._1))
       }
-      case TaggedObject(UMap(values), MapT(_, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
+      case NewMapObject(UMap(values), MapT(_, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         Success(values.map(_._2))
       }
-      case TaggedObject(UStruct(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
+      case NewMapObject(UStruct(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
         Success(values)
       }
-      case TaggedObject(UStruct(values), MapT(UMap(typeTransform), MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
+      case NewMapObject(UStruct(values), MapT(UMap(typeTransform), MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         for {
           ttv <- typeTransformValues(typeTransform, env.typeSystem)
           enumeration <- enumerateAllValuesIfPossible(ttv.keyType, env)
         } yield enumeration
       }
-      case TaggedObject(UCase(UIndex(i), UStruct(values)), CustomT("Array", itemType)) => {
+      case NewMapObject(UCase(UIndex(i), UStruct(values)), CustomT("Array", itemType)) => {
         Success(values)
       }
-      case TaggedObject(UCase(UIndex(i), UMap(values)), CustomT("Array", itemType)) => {
+      case NewMapObject(UCase(UIndex(i), UMap(values)), CustomT("Array", itemType)) => {
         // We should be more careful about the ordering here!!
         Success(values.map(_._2))
       }
-      case TaggedObject(untaggedCurrent, CustomT(typeName, params)) => {
+      case NewMapObject(untaggedCurrent, CustomT(typeName, params)) => {
         val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
         val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
 
@@ -157,19 +157,19 @@ object IterationUtils {
           result <- iterateObject(currentResolved, env, typeSystemIdOpt)
         } yield result
       }
-      case TaggedObject(untaggedCurrent, WithStateT(typeSystemId, nType)) => {
+      case NewMapObject(untaggedCurrent, WithStateT(typeSystemId, nType)) => {
         for {
           retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
           result <- iterateObject(retaggedCurrent, env, Some(typeSystemId))
         } yield result
       }
-      case TaggedObject(untaggedCurrent, TypeT) => {
+      case NewMapObject(untaggedCurrent, TypeT) => {
         for {
           nType <- env.typeSystem.convertToNewMapType(untaggedCurrent)
           result <- enumerateAllValuesIfPossible(nType, env)
         } yield result
       }
-      case TaggedObject(uType, HistoricalTypeT(typeSystemId)) => {
+      case NewMapObject(uType, HistoricalTypeT(typeSystemId)) => {
         val newUType = UCase(
           UIdentifier("WithState"),
           UCase(
@@ -178,9 +178,9 @@ object IterationUtils {
           )
         )
 
-        iterateObject(TaggedObject(newUType, TypeT), env)
+        iterateObject(NewMapObject(newUType, TypeT), env)
       }
-      case TaggedObject(untaggedCurrent, nType) => {
+      case NewMapObject(untaggedCurrent, nType) => {
         Failure(s"Unable to iterate over object: $untaggedCurrent of type ${nType.displayString(env)}")
       }
       case _ => Failure(s"Unable to iterate over object: ${nObject.displayString(env)}")

@@ -3,16 +3,13 @@ package ai.newmap.interpreter
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
+/*
+ * This object is now misnamed, since more stuff was added to it and its original type-retrieving capabilities have
+ * become unneccesary
+ * TODO: Either move these methods to different places, or rename this as a util object.
+ */
 object RetrieveType {
-  def fromNewMapObject(nObject: NewMapObject, env: Environment): NewMapType = nObject match {
-    case TaggedObject(_, nType) => nType
-    case VersionedObjectLink(key) => {
-      val currentState = Evaluator.currentState(key.uuid, env).toOption.get
-      fromNewMapObject(currentState, env)
-    }
-  }
-
-  def isTermPatternFree(untaggedObject: UntaggedObject): Boolean = untaggedObject match {
+  def isTermPatternFree(UntaggedObject: UntaggedObject): Boolean = UntaggedObject match {
     case UWildcardPattern(_) => false
     case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
     case UStruct(patterns) => patterns.forall(isTermPatternFree(_))

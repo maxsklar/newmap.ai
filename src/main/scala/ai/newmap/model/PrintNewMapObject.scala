@@ -7,22 +7,14 @@ import java.util.UUID
 import ai.newmap.util.{Outcome, Success, Failure}
 
 object PrintNewMapObject {
-  def apply(obj: NewMapObject, env: Environment): String = obj match {
-    case TaggedObject(uObject, nType) => {
-      val defaultString = untagged(uObject)
+  def apply(nObject: NewMapObject, env: Environment): String = {
+    val defaultString = untagged(nObject.uObject)
 
-      printObjectFromEnv(uObject, env.typeSystem.typeToUntaggedObject(nType), env) match {
-        case Success(s) => s
-        case _ => defaultString
-      }
-    }
-    case VersionedObjectLink(key) => {
-      // latestVersion(uuid: UUID, env: Environment): Outcome[Long, String]
-      // currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String]
-      s"VER[${key.toString}]"
-
-      //this(currentState) + s"v$v"
-    }
+    printObjectFromEnv(
+      nObject.uObject,
+      env.typeSystem.typeToUntaggedObject(nObject.nType),
+      env
+    ).toOption.getOrElse(defaultString)
   }
 
   /*

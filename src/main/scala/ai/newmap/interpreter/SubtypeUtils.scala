@@ -385,7 +385,7 @@ object SubtypeUtils {
     startingObject: NewMapObject,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[TaggedObject, String] = {
+  ): Outcome[NewMapObject, String] = {
     //println("Calling attemptConvertObjectToType: " + startingObject.displayString(env) + " -- " + endingType.displayString(env))
 
     endingType match {
@@ -399,14 +399,11 @@ object SubtypeUtils {
         }
       }
       case _ => {
-        val nType = RetrieveType.fromNewMapObject(startingObject, env)
-
         for {
-          response <- isTypeConvertible(nType, endingType, env)
-          uObject <- Evaluator.removeTypeTag(startingObject)
+          response <- isTypeConvertible(startingObject.nType, endingType, env)
 
           // We're not taking into account the type!!!
-          result <- Evaluator.applyListOfFunctions(uObject, response.convertInstructions, env)
+          result <- Evaluator.applyListOfFunctions(startingObject.uObject, response.convertInstructions, env)
 
           endingUType = env.typeSystem.typeToUntaggedObject(endingType)
 
@@ -415,7 +412,7 @@ object SubtypeUtils {
           endingUTypeSubst = MakeSubstitution(endingUType, response.newParameters, includeWildcards = true)
 
           endingTypeSubst <- env.typeSystem.convertToNewMapType(endingUTypeSubst)
-        } yield TaggedObject(result, endingTypeSubst)
+        } yield NewMapObject(result, endingTypeSubst)
       }
     }
   }

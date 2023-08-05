@@ -36,6 +36,14 @@ case class ULet(commands: Vector[EnvironmentCommand], output: UntaggedObject) ex
 
 // Set to the initial value of a command type
 case object UInit extends UntaggedObject
+
+// The versionNumber and uuid uniquely define this versioned object within any environment
+// (of course different environments might have updated the object differently)
+case class VersionedObjectKey(
+  versionNumber: Long,
+  uuid: UUID
+)
+
 case class ULink(key: VersionedObjectKey) extends UntaggedObject
 
 // This is the name of a function, which is going to be calling other functions in the context of the function system given.

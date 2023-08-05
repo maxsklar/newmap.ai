@@ -31,7 +31,7 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case EmptyParse => {
-        responseFromConversion(TaggedObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
+        responseFromConversion(NewMapObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
       }
       case NaturalNumberParse(i: Long) => {
         for {
@@ -50,7 +50,7 @@ object TypeChecker {
       }
       case CharacterParse(s: String) => {
         if (s.length == 1) {
-          val tObject = TaggedObject(UCharacter(s(0)), CharacterT)
+          val tObject = NewMapObject(UCharacter(s(0)), CharacterT)
           responseFromConversion(tObject, expectedType, env)
         } else {
           Failure(s"Character not recognized because it has length > 1: $s")
@@ -66,11 +66,11 @@ object TypeChecker {
 
         val stringType = CustomT("String", UStruct(Vector.empty))
 
-        responseFromConversion(TaggedObject(uObject, stringType), expectedType, env)
+        responseFromConversion(NewMapObject(uObject, stringType), expectedType, env)
       }
       case IdentifierParse(s: String, true) => {
         // We need to check that the expectedType allows an identifier!!
-        responseFromConversion(TaggedObject(UIdentifier(s), IdentifierT), expectedType, env)
+        responseFromConversion(NewMapObject(UIdentifier(s), IdentifierT), expectedType, env)
       }
       case IdentifierParse(s: String, false) => {
         val useLiteralIdentifier = for {
@@ -84,7 +84,7 @@ object TypeChecker {
           }
 
           // Herin Lies the problem!!!
-          result <- SubtypeUtils.attemptConvertObjectToType(TaggedObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
+          result <- SubtypeUtils.attemptConvertObjectToType(NewMapObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
         } yield ()
 
         if (useLiteralIdentifier.nonEmpty) {
@@ -103,8 +103,8 @@ object TypeChecker {
                 tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
               } yield {
                 // TODO: why can't we use tObject.nType?
-                // We can once we solve the parameter-in-key problem (probably with a singleton map)
-                val nType = RetrieveType.fromNewMapObject(nObject, env)
+                // We can once we solve the parameter-in-key problem (they need to be abolished except in singleton maps)
+                val nType = nObject.nType
                 TypeCheckResponse(tObject.uObject, nType)
               }
             }
@@ -182,7 +182,7 @@ object TypeChecker {
                   Failure(s"Identifier $s is unknown")
                 }
                 case Success(nType) => {
-                  val trialObject = TaggedObject(UIdentifier(s), IdentifierT)
+                  val trialObject = NewMapObject(UIdentifier(s), IdentifierT)
                   responseFromConversion(trialObject, nType, env)
                 }
                 case _ => {
@@ -978,15 +978,15 @@ object TypeChecker {
       case UInit => {
         for {
           initValue <- CommandMaps.getDefaultValueOfCommandType(nTypeClass, env)
-        } yield TaggedObject(initValue, nTypeClass)
+        } yield NewMapObject(initValue, nTypeClass)
       }
       case _ => {
         if (nTypeClass == CountT) {
           for {
             i <- normalizeCount(uObject)
-          } yield TaggedObject(UIndex(i), nTypeClass)
+          } yield NewMapObject(UIndex(i), nTypeClass)
         } else {
-          Success(TaggedObject(uObject, nTypeClass))
+          Success(NewMapObject(uObject, nTypeClass))
         }
       }
     }

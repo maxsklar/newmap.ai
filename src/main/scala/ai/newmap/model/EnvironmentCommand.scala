@@ -12,12 +12,7 @@ case class FullEnvironmentCommand(
   functionalSystem: Boolean = false // If true, this is a function that we want to add to the functional system
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    nObject match {
-      case TaggedObject(uObject, nType) => {
-        s"val $id: ${nType.displayString(env)} = ${PrintNewMapObject.untagged(uObject)}"
-      }
-      case _ => s"val $id = ${nObject.displayString(env)}"
-    }
+    s"val $id: ${nObject.nType.displayString(env)} = ${PrintNewMapObject.untagged(nObject.uObject)}"
   }
 }
 
@@ -78,7 +73,7 @@ case class ApplyIndividualCommand(
 
 case class ForkEnvironmentCommand(
   id: String,
-  vObject: VersionedObjectLink
+  vObject: VersionedObjectKey
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
     s"ver $id = fork ${vObject}"

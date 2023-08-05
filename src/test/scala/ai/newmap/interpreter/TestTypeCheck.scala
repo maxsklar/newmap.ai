@@ -5,7 +5,7 @@ import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestTypeCheck extends FlatSpec {
-  def Index(i: Long): NewMapObject = TaggedObject(UIndex(i), CountT)
+  def Index(i: Long): NewMapObject = NewMapObject(UIndex(i), CountT)
   val env = (new EnvironmentInterpreter(false)).env
   
   "A number" should " be interpreted correctly" in {
@@ -153,7 +153,7 @@ class TestTypeCheck extends FlatSpec {
     val statement = FullStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
     StatementInterpreter(statement, env) match {
       case Success(command) => {
-        assert(command == Environment.eCommand("x",TaggedObject(UIndex(0), IndexT(UIndex(1)))))
+        assert(command == Environment.eCommand("x",NewMapObject(UIndex(0), IndexT(UIndex(1)))))
       }
       case Failure(reason) => fail(reason)
     }
