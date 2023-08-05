@@ -9,7 +9,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 object PrintNewMapObject {
   def apply(obj: NewMapObject, env: Environment): String = obj match {
     case TaggedObject(uObject, nType) => {
-      val defaultString = untagged(uObject) + "\\" + newMapType(nType, env.typeSystem)
+      val defaultString = untagged(uObject)
 
       printObjectFromEnv(uObject, env.typeSystem.typeToUntaggedObject(nType), env) match {
         case Success(s) => s
@@ -154,7 +154,7 @@ object PrintNewMapObject {
       case (RequireCompleteness, SimpleFunction) => "ReqMap(" + key + ": " + value + ")"
       case (RequireCompleteness, FullFunction) => {
         // TODO(2022): Change the way lambda input works so that it's more like Map
-        "\\(" + key + ": " + value + ")"
+        "(" + key + " => " + value + ")"
       }
       case _ => {
         val completenessStr = config.completeness match {

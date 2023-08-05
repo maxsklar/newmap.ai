@@ -168,7 +168,9 @@ class EnvironmentInterpreter(
             case Some(statement) => {
               for {
                 command <- StatementInterpreter(statement, env)
-              } yield env.newCommand(command)
+              } yield {
+                env.newCommand(command)
+              }
             }
           }
 

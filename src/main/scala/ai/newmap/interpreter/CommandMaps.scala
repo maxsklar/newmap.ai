@@ -132,7 +132,18 @@ object CommandMaps {
         ))
       }
       case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
-      case TypeClassT(typeTransform, implementation) => Success(CaseT(typeTransform, TypeT, SimpleFunction))
+        
+
+      case TypeClassT(typeTransform, implementation) => Success(
+        CaseT(typeTransform, TypeT, SimpleFunction)
+        
+        // Its not requireCompleteness because we're not giving the full map here.
+        // - This is inelegant, because it shouldn't be CommandOutput either.
+        // - TODO: somehow indicate when we don't want to check for completeness
+        // -- Or maybe our typetransform should indicate a subset??
+        //MapT(UMap(typeTransform), MapConfig(RequireCompleteness, SimpleFunction))
+        //StructT(typeTransform,  TypeT, CommandOutput, SimpleFunction)
+      )
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
       case CustomT(name, UStruct(params)) => {
         val currentState = typeSystem.currentState
@@ -158,7 +169,7 @@ object CommandMaps {
 
   case class ExpandKeyResponse(
     newType: NewMapType,
-    newValueOpt: Option[UntaggedObject],
+    newValues: Seq[UntaggedObject],
     converter: UntaggedObject // This is a function that can convert from the old type to the new type
   )
 
@@ -170,7 +181,7 @@ object CommandMaps {
     nType match {
       case IndexT(UIndex(i)) => {
         val newType = IndexTN(i + 1)
-        Success(ExpandKeyResponse(newType, Some(UIndex(i)), untaggedIdentity))
+        Success(ExpandKeyResponse(newType, Vector(UIndex(i)), untaggedIdentity))
       }
       case CaseT(cases, parentType, featureSet) => {
         val uConstructors = cases.map(x => x._1 -> UIndex(1))
@@ -192,7 +203,7 @@ object CommandMaps {
             case UMap(newCases) => {
               ExpandKeyResponse(
                 CaseT(newCases, parentType, featureSet),
-                Some(UCase(newCaseName, UWildcardPattern("_"))),
+                Vector(UCase(newCaseName, UWildcardPattern("_"))),
                 untaggedIdentity
               )
             }
@@ -219,7 +230,7 @@ object CommandMaps {
         } yield {
           ExpandKeyResponse(
             SubtypeT(untaggedNewMembersMap, parentType, featureSet),
-            Some(command),
+            Vector(command),
             untaggedIdentity
           )
         }
@@ -242,7 +253,7 @@ object CommandMaps {
               // - Sort of an implementation of mapValues
               //expandedValeInfo.converter
               
-              ExpandKeyResponse(nType, None, untaggedIdentity)
+              ExpandKeyResponse(nType, Nil, untaggedIdentity)
             }
           }
         }
@@ -251,9 +262,15 @@ object CommandMaps {
         command match {
           case UCase(constructor, input) => {
             val newImplementation = (constructor -> input) +: implementation.filter(x => x._1 != constructor)
+            val keys = Vector(constructor)
+          /*}
+          case UMap(mappings) => {
+            val keys = mappings.map(_._1)
+            val newImplementation = mappings ++ implementation.filter(x => !keys.contains(x._1))*/
+
             Success(ExpandKeyResponse(
               TypeClassT(typeTransform, newImplementation),
-              Some(constructor),
+              keys,
               untaggedIdentity
             ))
           }
@@ -569,7 +586,9 @@ object CommandMaps {
                 case _ => Failure(s"Couldn't get map values from $current")
               }
 
-              newPattern <- Outcome(updateKeyTypeResponse.newValueOpt, "Cannot expand type: $keyT and get a new pattern to match")
+              _ <- Outcome.failWhen(updateKeyTypeResponse.newValues.length > 1, "A Unimplemented")
+
+              newPattern <- Outcome(updateKeyTypeResponse.newValues.headOption, s"Cannot expand type: $keyT and get a new pattern to match")
 
               prepNewValues = for {
                 value <- mapValues

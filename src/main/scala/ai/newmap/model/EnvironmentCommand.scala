@@ -12,7 +12,12 @@ case class FullEnvironmentCommand(
   functionalSystem: Boolean = false // If true, this is a function that we want to add to the functional system
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    s"val $id = ${nObject.displayString(env)}"
+    nObject match {
+      case TaggedObject(uObject, nType) => {
+        s"val $id: ${nType.displayString(env)} = ${PrintNewMapObject.untagged(uObject)}"
+      }
+      case _ => s"val $id = ${nObject.displayString(env)}"
+    }
   }
 }
 
@@ -67,7 +72,7 @@ case class ApplyIndividualCommand(
   nObject: UntaggedObject
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    "" //s"update $id $nObject"
+    s"update $id $nObject"
   }
 }
 

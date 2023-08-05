@@ -65,8 +65,6 @@ case class Environment(
 
   def printTypes: String = {
     val builder: StringBuilder = new StringBuilder()
-    builder.append(s"Current State: ${typeSystem.currentState}\n")
-
     for {
       typeMap <- typeSystem.currentMapping.toVector
       typeName = typeMap._1
@@ -322,7 +320,7 @@ case class Environment(
 
         retVal match {
           case Success(s) => s
-          case Failure(f) => throw new Exception(s"type checker failed on command $command: $f \n -- $retVal")
+          case Failure(f) => throw new Exception(s"type checker failed on command $command\n$f")
         }
       }
       case ForkEnvironmentCommand(s, vObject) => {
