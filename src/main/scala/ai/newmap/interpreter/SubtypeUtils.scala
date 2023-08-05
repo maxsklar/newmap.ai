@@ -372,10 +372,6 @@ object SubtypeUtils {
         }
       }
       case _ => {
-        if (endingType == UndefinedT) {
-          throw new Exception(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
-        }
-
         Failure(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
       }
     }

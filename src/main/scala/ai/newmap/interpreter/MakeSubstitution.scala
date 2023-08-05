@@ -49,6 +49,12 @@ object MakeSubstitution {
 
         UMap(newMapValues)
       }
+      case UMapPattern(k, v) => {
+        val newKey = this(k, parameters)
+        val nps = Evaluator.newParametersFromPattern(k).toSet
+        val newValue = this(v, parameters.filter(x => !nps.contains(x._1)))
+        UMapPattern(newKey, newValue)
+      }
       case UStruct(values) => UStruct(values.map(v => this(v, parameters)))
       case _ => expression
     }

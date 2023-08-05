@@ -357,6 +357,7 @@ object TypeChecker {
         expectedTypeOutcome match {
           case Success(CaseT(simpleMap, parentFieldType, _)) => {
             for {
+              //firstExp <- typeCheck(first, parentFieldType, env, featureSet)
               firstExp <- typeCheck(first, parentFieldType, env, featureSet)
 
               // TODO - we must ensure that the evaluator is not evaluating anything too complex here
@@ -423,6 +424,14 @@ object TypeChecker {
     }
   }
 
+  def typeTransformInputTypes(
+    typeTransform: UntaggedObject
+  ): Outcome[Vector[UntaggedObject], String] = typeTransform match {
+    case UMap(values) => Success(values.map(_._1))
+    case UMapPattern(k, v) => Success(Vector(k))
+    case _ => Failure(s"Unrecognized type transform: $typeTransform")
+  }
+
   def typeCheckGenericMap(
     values: Vector[ParseTree],
     typeTransform: Vector[(UntaggedObject, UntaggedObject)],
@@ -430,17 +439,11 @@ object TypeChecker {
     env: Environment,
     externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
-    val inputTypeClass = if (typeTransform.length == 1) {
-      typeTransform.head._1
-    } else {
-      throw new Exception(s"Can't work with type transform if it doesn't have exactly 1 pattern (because it's unimplemented): $typeTransform")
-    }
-    
     values match {
       case KeyValueBinding(k, v) +: restOfValues => {
         for {
-          inputTypeClassT <- env.typeSystem.convertToNewMapType(inputTypeClass)
-          resultKey <- typeCheckWithPatternMatching(k, inputTypeClassT, env, externalFeatureSet, internalFeatureSet)
+          expectedTypeInputs <- typeTransformInputTypes(UMap(typeTransform))
+          resultKey <- typeCheckWithPatternMatchingMultipleExpectedTypes(k, expectedTypeInputs, env, externalFeatureSet, internalFeatureSet)
 
           // Keys must be evaluated on the spot
           foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
@@ -482,18 +485,13 @@ object TypeChecker {
     env: Environment,
     externalFeatureSet: MapFeatureSet // This is the external feature set, the map feature set can be found in mapT
   ): Outcome[UntaggedObject, String] = {
-    val inputTypeClass = if (typeTransform.length == 1) {
-      typeTransform.head._1
-    } else {
-      throw new Exception(s"Can't work with type transform if it doesn't have exactly 1 pattern (because it's unimplemented): $typeTransform")
-    }
-
     value match {
       case KeyValueBinding(k, v) => {
-        // TODO - this is a copy of type check generic map for now
+        // TODO - this is mostly a copy of type check generic map for now
+        // - definitely opportunities to combine
         for {
-          inputTypeClassT <- env.typeSystem.convertToNewMapType(inputTypeClass)
-          resultKey <- typeCheckWithPatternMatching(k, inputTypeClassT, env, externalFeatureSet, internalFeatureSet)
+          expectedTypeInputs <- typeTransformInputTypes(UMap(typeTransform))
+          resultKey <- typeCheckWithPatternMatchingMultipleExpectedTypes(k, expectedTypeInputs, env, externalFeatureSet, internalFeatureSet)
 
           // Keys must be evaluated on the spot
           foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
@@ -686,6 +684,26 @@ object TypeChecker {
         }
       }
     }
+  }
+
+  def typeCheckWithPatternMatchingMultipleExpectedTypes(
+    expression: ParseTree,
+    expectedTypes: Vector[UntaggedObject],
+    env: Environment,
+
+    // TODO - I want to get rid of this!
+    externalFeatureSet: MapFeatureSet, // Am I inside a map with restricted features already?
+    internalFeatureSet: MapFeatureSet // Which feature set is this map allowed to use
+  ): Outcome[TypeCheckWithPatternMatchingResult, String] = expectedTypes match {
+    case expectedType +: others => {
+      for {
+        expectedT <- env.typeSystem.convertToNewMapType(expectedType)
+        result <- typeCheckWithPatternMatching(expression, expectedT, env, externalFeatureSet, internalFeatureSet).rescue(f => {
+          typeCheckWithPatternMatchingMultipleExpectedTypes(expression, others, env, externalFeatureSet, internalFeatureSet)
+        })    
+      } yield result
+    }
+    case _ => Failure(s"No more expected types to check with expression: $expression")
   }
 
   case class TypeCheckWithMultiplePatternMatchingResult(
