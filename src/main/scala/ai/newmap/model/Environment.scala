@@ -637,11 +637,14 @@ object Environment {
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewTypeClassCommand("_default", Vector(UWildcardPattern("t") -> ParamId("t"))),
+    NewTypeClassCommand("_default", UMapPattern(UWildcardPattern("t"), ParamId("t"))),
     NewTypeClassCommand("_typeOf", 
-      Vector(UWildcardPattern("t") -> buildSimpleMapT(
-        UMap(Vector(UWildcardPattern("_") -> typeAsUntaggedObject(TypeT))),
-      ))
+      UMapPattern(
+        UWildcardPattern("t"),
+        buildSimpleMapT(
+          UMap(Vector(UWildcardPattern("_") -> typeAsUntaggedObject(TypeT))),
+        )
+      )
     ),
     ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t"))))),
     NewParamTypeCommand(

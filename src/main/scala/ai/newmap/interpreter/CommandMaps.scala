@@ -135,7 +135,7 @@ object CommandMaps {
         
 
       case TypeClassT(typeTransform, implementation) => Success(
-        CaseT(typeTransform, TypeT, SimpleFunction)
+        CaseT(Vector(typeTransform.key -> typeTransform.value), TypeT, SimpleFunction)
         
         // Its not requireCompleteness because we're not giving the full map here.
         // - This is inelegant, because it shouldn't be CommandOutput either.

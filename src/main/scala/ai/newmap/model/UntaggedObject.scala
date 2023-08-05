@@ -20,6 +20,10 @@ case class UStruct(values: Vector[UntaggedObject]) extends UntaggedObject
 // Represents any object (of a given type)
 case class UWildcardPattern(s: String) extends UntaggedObject
 
+// This is a pattern that matches a map.
+// It first looks to see if the keyPattern is represented in the map, and if it is, does it match the value pattern
+case class UMapPattern(key: UntaggedObject, value: UntaggedObject) extends UntaggedObject
+
 // Represents a parametrized object (this can only exist in environments with parameters)
 case class ParamId(s: String) extends UntaggedObject
 

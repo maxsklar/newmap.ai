@@ -225,6 +225,12 @@ object Evaluator {
     pattern match {
       // Always look for wildcard first, no matter what the matching rules are!
       case UWildcardPattern(name) => Success(Map(name -> input))
+      case UMapPattern(key, value) => {
+        for {
+          valueForKey <- applyFunctionAttempt(input, key, env, matchingRules)
+          result <-  attemptPatternMatch(value, valueForKey, matchingRules, env)
+        } yield result
+      }
       case _ => matchingRules match {
         case StandardMatcher => attemptStandardPatternMatch(pattern, input, env)
         case TypeMatcher => {

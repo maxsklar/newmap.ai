@@ -91,6 +91,12 @@ object CommandOutput extends MapCompleteness {
   override def getName: String = "CommandOutput"
 }
 
+// This is actually not a full map, but a pattern that may match a map
+// The untagged object of this is going to be UMapPattern
+object MapPattern extends MapCompleteness {
+  override def getName: String = "MapPattern"
+}
+
 sealed abstract class MapFeatureSet {
   def getName: String
   def getLevel: Int
@@ -156,7 +162,7 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransform: Vector[(UntaggedObject, UntaggedObject)],
+  typeTransformPatter: UMapPattern,
 
   // List of the actual types in the class
   // Along with their implementation

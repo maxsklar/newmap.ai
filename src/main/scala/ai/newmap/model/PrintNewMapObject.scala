@@ -120,7 +120,7 @@ object PrintNewMapObject {
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
       case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
       case TypeClassT(typeTransform, implementation) => {
-        s"TypeClassT(${mapToString(typeTransform)}, ${mapToString(implementation)})"
+        s"TypeClassT(${untagged(typeTransform)}, ${mapToString(implementation)})"
       }
       case CaseT(cases, _, _) => {
         s"Case${mapToString(cases)}"
@@ -160,6 +160,7 @@ object PrintNewMapObject {
         val completenessStr = config.completeness match {
           case RequireCompleteness => "Required"
           case CommandOutput => "Command"
+          case MapPattern => "Pattern"
         }
 
         val featureSetStr = config.featureSet match {
@@ -185,6 +186,7 @@ object PrintNewMapObject {
   def untagged(uObject: UntaggedObject): String = uObject match {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
+    case UMapPattern(key, value) => mapToString(Vector(key -> value))
     case UStruct(values) => sequenceToString(values)
     case UCase(constructor, value) => {
       if (isEmptyMap(value)) {

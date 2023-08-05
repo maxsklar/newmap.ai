@@ -87,7 +87,7 @@ case class NewMapTypeSystem(
       UIdentifier(featureSet.getName)
     )))
     case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UStruct(Vector(
-      UMap(typeTransform),
+      typeTransform,
       UMap(typesInTypeClass)
     )))
     case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UStruct(Vector(
@@ -284,7 +284,11 @@ case class NewMapTypeSystem(
         case UStruct(items) if (items.length == 2) => {
           for {
             typeTransform <- items(0) match {
-              case UMap(uMap) => Success(uMap)
+              case ump@UMapPattern(key, value) => Success(ump)
+              case UMap(uMap) if (uMap.length <= 1) => uMap.headOption match {
+                case Some(singleton) => Success(UMapPattern(singleton._1, singleton._2))
+                case None => Failure("Empty Type Class Pattern")
+              }
               case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
             }
 
@@ -293,6 +297,7 @@ case class NewMapTypeSystem(
               case _ => Failure(s"Invalid implementation map in TypeClass: ${items(0)}")
             }
           } yield {
+
             TypeClassT(typeTransform, implementation)
           }
         }

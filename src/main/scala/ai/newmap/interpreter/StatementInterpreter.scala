@@ -84,18 +84,15 @@ object StatementInterpreter {
       case NewTypeClassStatementParse(id, typeTransformParse) => {
         val typeOfTypeTransform = MapT(
           UMap(Vector(env.typeSystem.typeToUntaggedObject(TypeT) -> env.typeSystem.typeToUntaggedObject(TypeT))),
-          MapConfig(
-            CommandOutput,
-            SimpleFunction
-          )
+          MapConfig(MapPattern, PatternMap)
         )
 
         for {
           typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, FullFunction)
 
           typeTransform <- typeTransformResult.nExpression match {
-            case UMap(values) => Success(values)
-            case _ => Failure("Invalue type transform: ${typeTransformResult.nExpression}")
+            case result@UMapPattern(_, _) => Success(result)
+            case _ => Failure(s"Invalid type transform: ${typeTransformResult.nExpression}")
           }
         } yield {
           NewTypeClassCommand(id.s, typeTransform)

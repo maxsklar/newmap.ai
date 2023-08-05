@@ -51,7 +51,7 @@ case class NewParamTypeCommand(
 
 case class NewTypeClassCommand(
   id: String,
-  typeTransform: Vector[(UntaggedObject, UntaggedObject)]
+  typeTransform: UMapPattern
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
     s"typeclass $id ${typeTransform}"
