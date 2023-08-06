@@ -206,7 +206,6 @@ case class Environment(
 
         this.copy(
           commands = newCommands,
-          //idToObject = idToObject + (id -> envValue),
           typeSystem = newTypeSystem
         )
       }
@@ -311,13 +310,9 @@ case class Environment(
               newUnderlyingType = typeSystem.typeToUntaggedObject(response.newType)
 
               newTypeSystem <- typeSystem.upgradeCustomType(s, newUnderlyingType, response.converter)
-
-              //typeAsObject = NewMapObject(newUnderlyingType, HistoricalTypeT(newTypeSystem.currentState))
-              //envValue = EnvironmentBinding(typeAsObject)
             } yield {
               this.copy(
                 commands = newCommands,
-                //idToObject = idToObject + (s -> envValue),
                 typeSystem = newTypeSystem
               )
             }

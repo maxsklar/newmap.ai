@@ -9,7 +9,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
  * TODO: Either move these methods to different places, or rename this as a util object.
  */
 object RetrieveType {
-  def isTermPatternFree(UntaggedObject: UntaggedObject): Boolean = UntaggedObject match {
+  def isTermPatternFree(uObject: UntaggedObject): Boolean = uObject match {
     case UWildcardPattern(_) => false
     case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
     case UStruct(patterns) => patterns.forall(isTermPatternFree(_))

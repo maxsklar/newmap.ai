@@ -158,37 +158,45 @@ class EnvironmentInterpreter(
     tokens: Seq[Lexer.Token] = Seq.empty,
     parser: NewMapCodeParser = NewMapCodeParser()
   ): Outcome[Environment, String] = {
-    tokens match {
+    var tokens: Seq[Lexer.Token] = Vector.empty
+    var parser: NewMapCodeParser = NewMapCodeParser()
+    var mutableEnv = env
+
+    def hasMoreTokens: Boolean = {
+      tokens.length > 0 || linesIt.hasNext
+    }
+
+    def getNextToken: Lexer.Token = tokens match {
       case firstToken +: otherTokens => {
-        for {
-          response <- parser.update(firstToken)
-
-          newEnv <- response.statementOutput match {
-            case None => Success(env)
-            case Some(statement) => {
-              for {
-                command <- StatementInterpreter(statement, env)
-              } yield {
-                env.newCommand(command)
-              }
-            }
-          }
-
-          result <- loadFileFromIterator(linesIt, newEnv, otherTokens, response.newParser)
-        } yield result
+        tokens = otherTokens
+        firstToken
       }
-      case Nil => {
-        if (linesIt.hasNext) {
-          val code = linesIt.next()
-          for {
-            tokens <- getTokensWithNewline(code)
-            result <- loadFileFromIterator(linesIt, env, tokens, parser)
-          } yield result
-        } else {
-          Success(env)
+      case _ if (linesIt.hasNext) => {
+        val code = linesIt.next()
+        getTokensWithNewline(code).map(ts => {
+          tokens = ts
+        })
+        getNextToken        
+      }
+      case _ => throw new Exception("Error: loadFileFromIterator failed")
+    }
+
+    while(hasMoreTokens) {
+      parser.update(getNextToken) match {
+        case Success(response) => {
+          parser = response.newParser
+
+          response.statementOutput.map(statement => {
+            StatementInterpreter(statement, mutableEnv).map(command => {
+              mutableEnv = mutableEnv.newCommand(command)
+            })
+          })
         }
+        case Failure(f) => return Failure(f)
       }
     }
+
+    Success(mutableEnv)
   }
 
   private def printDirectory(dir: String): String = {
