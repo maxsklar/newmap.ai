@@ -90,15 +90,16 @@ object TypeChecker {
         if (useLiteralIdentifier.nonEmpty) {
           Success(TypeCheckResponse(UIdentifier(s), expectedType))
         } else {
-          env.lookup(s) match {
-            case Some(EnvironmentParameter(nType)) => {
+          env.lookupValue(s) match {
+            case Some(NewMapObject(ParamId(_), nType)) => {
+              // TODO - can we make this case the same as the one below it?
               for {
                 response <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
                 // TODO - execute convert instructions?
                 // response.convertInstructions
               } yield TypeCheckResponse(ParamId(s), nType)
             }
-            case Some(EnvironmentBinding(nObject)) => {
+            case Some(nObject) => {
               for { 
                 tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
               } yield {

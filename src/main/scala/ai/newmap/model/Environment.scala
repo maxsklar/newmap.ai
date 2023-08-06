@@ -5,13 +5,7 @@ import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveTy
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
 import ai.newmap.util.{Failure, Outcome, Success}
-
 import java.util.UUID
-
-sealed abstract class EnvironmentValue
-
-case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
-case class EnvironmentParameter(nType: NewMapType) extends EnvironmentValue
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
@@ -19,7 +13,11 @@ case class Environment(
   commands: Vector[EnvironmentCommand] = Vector.empty,
 
   // A Map of all the variable bindings
-  idToObject: ListMap[String, EnvironmentValue] = ListMap.empty,
+  idToObject: ListMap[String, NewMapObject] = ListMap.empty,
+
+  // These are parameters where we know their type, but we don't know their object value yet.
+  // The "type" is ahead of the "object" in this respect
+  idExtraParameters: ListMap[String, NewMapType] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
@@ -34,18 +32,32 @@ case class Environment(
 ) {
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
-    for ((id, envValue) <- idToObject) {
-      val command = envValue match {
-        case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
-        case EnvironmentParameter(nTypeClass) => ParameterEnvironmentCommand(id, nTypeClass)
-      }
+
+    for ((id, nType) <- idExtraParameters) {
+      val command = ParameterEnvironmentCommand(id, nType)
       builder.append(s"${command.toString}\n")
     }
+
+    for ((id, nObject) <- idToObject) {
+      val command = FullEnvironmentCommand(id, nObject)
+      builder.append(s"${command.toString}\n")
+    }
+
     builder.toString
   }
 
-  def lookup(identifier: String): Option[EnvironmentValue] = {
-    idToObject.get(identifier)
+  def lookupType(identifier: String): Option[NewMapType] = {
+    idExtraParameters.get(identifier) match {
+      case Some(nType) => Some(nType)
+      case None => idToObject.get(identifier).map(_.nType)
+    }
+  }
+
+  def lookupValue(identifier: String): Option[NewMapObject] = {
+    idExtraParameters.get(identifier) match {
+      case Some(nType) => Some(NewMapObject(ParamId(identifier), nType))
+      case None => idToObject.get(identifier)
+    }
   }
 
   case class LookupVersionedObjectReturnValue(
@@ -57,13 +69,12 @@ case class Environment(
     id: String
   ): Outcome[LookupVersionedObjectReturnValue, String] = {
     for {
-      versionedObject <- Outcome(lookup(id), s"Identifier $id not found!")
+      versionedObject <- Outcome(lookupValue(id), s"Identifier $id not found!")
 
       versionedO <- versionedObject match {
-        //case EnvironmentBinding(vo@VersionedObjectLink(_)) => Success(vo)
-        case EnvironmentBinding(NewMapObject(ULink(key), nType)) => Success(LookupVersionedObjectReturnValue(key, nType))
-        case EnvironmentBinding(nObject) => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
-        case EnvironmentParameter(_) => Failure(s"Identifier $id is a parameter, should be an object")
+        case NewMapObject(ULink(key), nType) => Success(LookupVersionedObjectReturnValue(key, nType))
+        case NewMapObject(ParamId(_), _) => Failure(s"Identifier $id is a parameter, should be an object")
+        case nObject => Failure(s"Identifier $id does not point to a versioned object. It is actually ${nObject}.")
       }
     } yield versionedO
   }
@@ -119,24 +130,22 @@ case class Environment(
           )
         )
 
-        val fSystemId = updatedEnv.lookup("__FunctionSystem") match {
-          case Some(EnvironmentBinding(NewMapObject(ULink(VersionedObjectKey(_, uuid)), _))) => uuid
-          case f => {
-            throw new Exception(s"Can't handle Function System $f")
-          }
+        val fSystemId = updatedEnv.lookupValue("__FunctionSystem") match {
+          case Some(NewMapObject(ULink(VersionedObjectKey(_, uuid)), _)) => uuid
+          case f => throw new Exception(s"Can't handle Function System $f")
         }
 
         val fLink = UFunctionLink(UIdentifier(s), fSystemId)
 
         updatedEnv.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentBinding(NewMapObject(fLink, nType)))
+          idToObject = idToObject + (s -> NewMapObject(fLink, nType))
         )
       }
       case FullEnvironmentCommand(s, nObject, false) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentBinding(nObject))
+          idToObject = idToObject + (s -> nObject)
         )
       }
       case NewVersionedStatementCommand(s, nType) => {
@@ -155,11 +164,10 @@ case class Environment(
         val initValue = defaultOutcome.toOption.get
         val key = VersionedObjectKey(0L, uuid)
         val versionedObject = NewMapObject(ULink(key), nType)
-        val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> envValue),
+          idToObject = idToObject + (s -> versionedObject),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
           storedVersionedTypes = storedVersionedTypes + (key -> NewMapObject(initValue, nType))
         )
@@ -285,7 +293,7 @@ case class Environment(
 
               this.copy(
                 commands = newCommands,
-                idToObject = idToObject + (s -> EnvironmentBinding(newObject)),
+                idToObject = idToObject + (s -> newObject),
                 latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
                 storedVersionedTypes = newStoredVTypes
               )
@@ -330,19 +338,18 @@ case class Environment(
 
         val newKey = VersionedObjectKey(version, uuid)
         val versionedObject = NewMapObject(ULink(newKey), current.nType)
-        val envValue = EnvironmentBinding(versionedObject)
 
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> envValue),
+          idToObject = idToObject + (s -> versionedObject),
           latestVersionNumber = latestVersionNumber + (uuid -> version),
           storedVersionedTypes = storedVersionedTypes + (newKey -> current)
         )
       }
-      case ParameterEnvironmentCommand(s, nTypeClass) => {
+      case ParameterEnvironmentCommand(s, nType) => {
         this.copy(
           commands = newCommands,
-          idToObject = idToObject + (s -> EnvironmentParameter(nTypeClass))
+          idExtraParameters = idExtraParameters + (s -> nType)
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
@@ -480,7 +487,7 @@ case class Environment(
   }
 
   def typeAsObject(nType: NewMapType): NewMapObject = {
-    val uType = typeSystem.typeToUntaggedObject(nType) 
+    val uType = typeSystem.typeToUntaggedObject(nType)
     NewMapObject(uType, TypeT)
   }
 
@@ -519,12 +526,9 @@ object Environment {
 
   // For Debugging
   def printEnvWithoutBase(env: Environment): Unit = {
-    for ((id, envValue) <- env.idToObject) {
+    for ((id, nObject) <- env.idToObject) {
       if (!Base.idToObject.contains(id)) {
-        val command = envValue match {
-          case EnvironmentBinding(nObject) => FullEnvironmentCommand(id, nObject)
-          case EnvironmentParameter(nType) => ParameterEnvironmentCommand(id, nType)
-        }
+        val command = FullEnvironmentCommand(id, nObject)
         println(command.toString)
       }
     }

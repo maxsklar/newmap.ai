@@ -19,18 +19,9 @@ object Evaluator {
         } yield result
       }
       case ParamId(s) => {
-        env.lookup(s) match {
-          case None => {
-            //throw new Exception(s"Unbound identifier: $s")
-            Failure(s"Unbound identifier: $s")
-          }
-          case Some(EnvironmentBinding(nObject)) => Success(nObject.uObject)
-          case Some(EnvironmentParameter(nObject)) => {
-            Success(ParamId(s))
-            //throw new Exception(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
-            //Failure(s"Cannot evaluate identifier $s, since it is an unbound parameter of type $nObject")
-          }
-        }
+        for {
+          nObject <- Outcome(env.lookupValue(s), s"Unbound identifier: $s")
+        } yield nObject.uObject
       }
       case UCase(constructor, input) => {
         for {

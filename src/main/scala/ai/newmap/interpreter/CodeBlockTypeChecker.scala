@@ -33,6 +33,7 @@ object CodeBlockTypeChecker {
       for {
         tcResult <- TypeChecker.typeCheck(expression, expectedType, newEnv, featureSet)
       } yield {
+        // TODO - there's a bug here where the expression is a ULink that points to an object in the newEnv that doesn't exist in env.
         val resultingExpression = ULet(envCommands.toVector, tcResult.nExpression)
         TypeChecker.TypeCheckResponse(resultingExpression, tcResult.refinedTypeClass)
       }
