@@ -13,7 +13,6 @@ sealed abstract class EnvironmentValue
 case class EnvironmentBinding(nObject: NewMapObject) extends EnvironmentValue
 case class EnvironmentParameter(nType: NewMapType) extends EnvironmentValue
 
-
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
   // A History of the commands given to this environment

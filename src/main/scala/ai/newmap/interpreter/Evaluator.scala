@@ -49,6 +49,9 @@ object Evaluator {
           evalValues <- evalStructVals(values, env)
         } yield UStruct(evalValues)
       }
+      case ULet(statements, expression) => {
+        evalLet(statements, expression, env)
+      }
       case constant => Success(constant)
     }
   }
@@ -113,6 +116,25 @@ object Evaluator {
         }
       }
       case _ => Success(Vector.empty)
+    }
+  }
+
+  def evalLet(
+    commands: Vector[EnvironmentCommand],
+    expression: UntaggedObject,
+    env: Environment
+  ): Outcome[UntaggedObject, String] = commands match {
+    case command +: otherCommands => {
+      // If there are still parameters in the command, it cannot be evaluated
+      val newEnv = env.newCommand(command)
+      evalLet(otherCommands, expression, newEnv)
+    }
+    case _ => {
+      for {
+        result <- this(expression, env)
+      } yield {
+        stripVersioningU(result, env)
+      }
     }
   }
 

@@ -982,9 +982,10 @@ object TypeChecker {
       }
       case _ => {
         if (nTypeClass == CountT) {
-          for {
-            i <- normalizeCount(uObject)
-          } yield NewMapObject(UIndex(i), nTypeClass)
+          normalizeCount(uObject) match {
+            case Success(i) => Success(NewMapObject(UIndex(i), nTypeClass))
+            case _ => Success(NewMapObject(uObject, nTypeClass))
+          }
         } else {
           Success(NewMapObject(uObject, nTypeClass))
         }

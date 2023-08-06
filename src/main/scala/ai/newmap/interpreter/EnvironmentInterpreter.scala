@@ -187,7 +187,9 @@ class EnvironmentInterpreter(
           parser = response.newParser
 
           response.statementOutput.map(statement => {
-            StatementInterpreter(statement, mutableEnv).map(command => {
+            val interpreted = StatementInterpreter(statement, mutableEnv)
+
+            interpreted.map(command => {
               mutableEnv = mutableEnv.newCommand(command)
             })
           })

@@ -284,4 +284,29 @@ class TestParser extends FlatSpec {
       )
     ))
   }
+
+  "Multiline parse " should "work" ignore {
+    val multilineCode = """{
+      new Count as y
+      update y
+      update y
+      y
+    }"""
+
+    val parseAttempt = for {
+      tokens <- Lexer(multilineCode)
+      result <- NewMapParser.statementParse(tokens)
+    } yield result
+
+    val correctAnswer = LiteralCode(
+      Vector(
+        NewVersionedStatementParse(IdentifierParse("y"),IdentifierParse("Count")),
+        ApplyCommandStatementParse(IdentifierParse("y"),EmptyParse),
+        ApplyCommandStatementParse(IdentifierParse("y"),EmptyParse)
+      ),
+      IdentifierParse("y")
+    )
+
+    assert(parseAttempt == Success(correctAnswer))
+  } 
 }
