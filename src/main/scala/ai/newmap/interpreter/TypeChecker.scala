@@ -354,7 +354,7 @@ object TypeChecker {
         } yield {
           val typeTransform = UMapPattern(evalInputType, outputType.nExpression)
 
-          // TODO - how do we indicate completeness and featureSet in the LambdaParse Symbol?
+          // TODO - how do we make the mapConfig customizable in the LambdaParse Symbol?
           val mapConfig = MapConfig(RequireCompleteness, FullFunction)
 
           TypeCheckResponse(
