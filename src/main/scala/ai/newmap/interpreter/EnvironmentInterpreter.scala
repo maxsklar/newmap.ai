@@ -187,7 +187,7 @@ class EnvironmentInterpreter(
           parser = response.newParser
 
           response.statementOutput.map(statement => {
-            val interpreted = StatementInterpreter(statement, mutableEnv)
+            val interpreted = StatementInterpreter(statement, mutableEnv, Map.empty)
 
             interpreted.map(command => {
               mutableEnv = mutableEnv.newCommand(command)
@@ -224,7 +224,7 @@ class EnvironmentInterpreter(
       // TODO: This statement parse can now be "waiting" for the next line.. keep that in mind
       statementParse <- NewMapParser.statementParse(tokens)
 
-      command <- StatementInterpreter(statementParse, env)
+      command <- StatementInterpreter(statementParse, env, Map.empty)
     } yield {
       applyEnvCommand(command)
     }

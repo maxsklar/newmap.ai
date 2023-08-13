@@ -134,6 +134,7 @@ object SubtypeUtils {
 
   case class IsTypeConvertibleResponse(
     convertInstructions: Vector[FunctionWithMatchingRules],
+    refinedEndingType: NewMapType,
     newParameters: Map[String, UntaggedObject] = Map.empty
   )
 
@@ -144,12 +145,13 @@ object SubtypeUtils {
     env: Environment
   ): Outcome[IsTypeConvertibleResponse, String] = {
     //println(s"Calling isTypeConvertible: $startingType -- $endingType")
-    val emptyResponse = IsTypeConvertibleResponse(Vector.empty)
+    val emptyResponse = IsTypeConvertibleResponse(Vector.empty, endingType)
 
     (startingType, endingType) match {
       case (startingType, WildcardPatternT(name)) => {
         Success(IsTypeConvertibleResponse(
           Vector.empty,
+          startingType,
           Map(name -> env.typeSystem.typeToUntaggedObject(startingType))
         ))
       }
@@ -163,8 +165,9 @@ object SubtypeUtils {
 
           newParameters <- Evaluator.attemptPatternMatch(param2, param1, matcher, env)
         } yield {
-          //println(s"newParameters: $newParameters")
-          IsTypeConvertibleResponse(Vector.empty, newParameters)
+          val refinedEndingType = endingType // TODO - recheck this!
+
+          IsTypeConvertibleResponse(Vector.empty, refinedEndingType, newParameters)
         }
       }
       case _ if (startingType == endingType) => Success(emptyResponse)
@@ -335,7 +338,9 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions)
+          val refinedEndingType = endingType // TODO - recheck this!
+
+          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
         }
       }
       case (WithStateT(typeSystemId1, CustomT(name1, params1)), CustomT(name2, params2)) => {
@@ -347,7 +352,9 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions)
+          val refinedEndingType = endingType // TODO - recheck this!
+
+          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
         }
       }
       case (CustomT(name1, params1), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
@@ -359,7 +366,9 @@ object SubtypeUtils {
 
           convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions)
+          val refinedEndingType = endingType // TODO - recheck this!
+
+          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
         }
       }
       case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
@@ -386,8 +395,7 @@ object SubtypeUtils {
     }
   }
 
-  // TODO: ultimately, more potential conversions will be added to the environment, making this function more interesting
-  // ALSO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
+  // TODO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic
   //  - To be used in cases where you want the programmer to specifically ask for a conversion!
   // @return if the object is convertible, return the tagged object that represents its data in the new type
   def attemptConvertObjectToType(
@@ -409,17 +417,12 @@ object SubtypeUtils {
         for {
           response <- isTypeConvertible(startingObject.nType, endingType, env)
 
-          // We're not taking into account the type!!!
-          result <- Evaluator.applyListOfFunctions(startingObject.uObject, response.convertInstructions, env)
-
-          endingUType = env.typeSystem.typeToUntaggedObject(endingType)
-
-          // TODO - this doesn't work if endingType is a wildcard unless includeWildcards = true
-          // - Once parameters are removed from map keys, this ugly exception will disappear
-          endingUTypeSubst = MakeSubstitution(endingUType, response.newParameters, includeWildcards = true)
-
-          endingTypeSubst <- env.typeSystem.convertToNewMapType(endingUTypeSubst)
-        } yield NewMapObject(result, endingTypeSubst)
+          convertedStartingObject <- Evaluator.applyListOfFunctions(
+            startingObject.uObject,
+            response.convertInstructions,
+            env
+          )
+        } yield NewMapObject(convertedStartingObject, response.refinedEndingType)
       }
     }
   }

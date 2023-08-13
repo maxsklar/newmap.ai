@@ -6,10 +6,7 @@ import ai.newmap.model._
 object MakeSubstitution {
   def apply(
     expression: UntaggedObject,
-    parameters: Map[String, UntaggedObject],
-
-    // TODO: Once we remove wildcards and banish parameters from map keys, this can be removed
-    includeWildcards: Boolean = false
+    parameters: Map[String, UntaggedObject]
   ): UntaggedObject = {
     expression match {
       case ApplyFunction(func, input, matchingRules) => {
@@ -20,12 +17,6 @@ object MakeSubstitution {
         )
       }
       case ParamId(name) => parameters.get(name).getOrElse(expression)
-      case UWildcardPattern(name) => {
-        // TODO: Once we banish parameters from map keys, this can be removed
-        if (includeWildcards) {
-          parameters.get(name).getOrElse(expression)
-        } else expression
-      }
       case UCase(constructor, input) => {
         UCase(constructor, this(input, parameters))
       }
@@ -33,18 +24,13 @@ object MakeSubstitution {
         val newMapValues = for {
           (k, v) <- values
         } yield {
-          // Note that Map Keys SHOULD NOT contain parameters.
-          // Figure out why we need to do this here.
-          val newKey = this(k, parameters)
-
-          // I'm pretty sure that this is supposed to be "k" and not "newkey" at this point
-          // - I'm having a hard time articulating why!
           val nps = Evaluator.newParametersFromPattern(k).toSet
           val newValue = this(v, parameters.filter(x => !nps.contains(x._1)))
 
-          newKey -> newValue
-          // Eventually, we should have this unless it's a singleton map
-          //k -> newValue
+          // Note that UMap keys should NOT contain parameters.
+          // - This is because a map cannot be organized into a data structure if the keys are unknown
+          // - If there needs to be a parameters in the key, use the single-pair version of UMap, which is UMapPattern
+          k -> newValue
         }
 
         UMap(newMapValues)

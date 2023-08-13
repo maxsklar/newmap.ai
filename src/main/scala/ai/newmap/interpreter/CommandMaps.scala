@@ -54,7 +54,7 @@ object CommandMaps {
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
       //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(_, MapConfig(CommandOutput, _, _, _, _)) => Success(defaultUMap)
-      case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, _, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
           Success(defaultUMap)
         } else {
@@ -85,24 +85,27 @@ object CommandMaps {
   }
 
   def typeTransformHasEmptyKey(
-    typeTransform: Vector[(UntaggedObject, UntaggedObject)],
+    typeTransform: UntaggedObject,
     env: Environment
   ): Boolean = {
-    val patterns = typeTransform.map(_._1)
-
-    if (patterns.length == 0) {
-      true
-    } else if (patterns.length == 1) {
-      env.typeSystem.convertToNewMapType(patterns.head) match {
-        case Failure(_) => false
-        case Success(nType) => nType match {
-          case IndexT(UIndex(0)) | IndexT(UInit) => true
-          case SubtypeT(UMap(m), _, _) => m.isEmpty
-          case _ => false // TODO - unimplemented
+    TypeChecker.typeTransformInputTypes(typeTransform) match {
+      case Success(patterns) => {
+        if (patterns.length == 0) {
+          true
+        } else if (patterns.length == 1) {
+          env.typeSystem.convertToNewMapType(patterns.head) match {
+            case Failure(_) => false
+            case Success(nType) => nType match {
+              case IndexT(UIndex(0)) | IndexT(UInit) => true
+              case SubtypeT(UMap(m), _, _) => m.isEmpty
+              case _ => false // TODO - unimplemented
+            }
+          }
+        } else {
+          false
         }
       }
-    } else {
-      false
+      case Failure(_) => false
     }
   }
 
@@ -233,27 +236,24 @@ object CommandMaps {
           )
         }
       }
-      case MapT(UMap(typeTransform), config) => {
-        if (typeTransform.length != 1) {
-          throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
-        }
+      case MapT(typeTransform, config) => {
+        for {
+          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
 
-        typeTransform.head match {
-          case (keyType, valueType) => {
-            for {
-              keyT <- env.typeSystem.convertToNewMapType(keyType)
-              valueT <- env.typeSystem.convertToNewMapType(valueType)
-              expandedValueInfo <- expandType(valueT, command, env)
-            } yield {
-              val newType = MapT(env.toTypeTransform(keyT, expandedValueInfo.newType), config)
+          keyType = typeTransformKeyValue._1
+          valueType = typeTransformKeyValue._2
 
-              // TODO - the valueTypes need to be converted - figure out a way to do this!!
-              // - Sort of an implementation of mapValues
-              //expandedValeInfo.converter
-              
-              ExpandKeyResponse(nType, Nil, untaggedIdentity)
-            }
-          }
+          keyT <- env.typeSystem.convertToNewMapType(keyType)
+          valueT <- env.typeSystem.convertToNewMapType(valueType)
+          expandedValueInfo <- expandType(valueT, command, env)
+        } yield {
+          val newType = MapT(env.toTypeTransform(keyT, expandedValueInfo.newType), config)
+
+          // TODO - the valueTypes need to be converted - figure out a way to do this!!
+          // - Sort of an implementation of mapValues
+          //expandedValeInfo.converter
+          
+          ExpandKeyResponse(nType, Nil, untaggedIdentity)
         }
       }
       case TypeClassT(typeTransform, implementation) => {
@@ -307,7 +307,7 @@ object CommandMaps {
         NewMapO.emptyStruct
       )
       case BooleanT => Success(IndexTN(2))
-      case MapT(UMap(typeTransform), MapConfig(CommandOutput, _, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
         // we have typeTransform
         // we need a pair (a, b) that satisfies the type transform
@@ -316,67 +316,54 @@ object CommandMaps {
         // -- therefore, this is a binding!
         // -- should we make a binding a first class object, and should typeTransform just be a binding?
         
-        if (typeTransform.length != 1) {
-          throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
-        }
+        for {
+          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
+          keyType = typeTransformKeyValue._1
+          valuesType = typeTransformKeyValue._2
 
-        typeTransform.head match {
-          case (keyType, valuesType) => {
-            for {
-              valuesT <- Evaluator.asType(valuesType, env)
-              outputCommandT <- getCommandInputOfCommandType(valuesT, env)
-            } yield {
+          valuesT <- Evaluator.asType(valuesType, env)
+          outputCommandT <- getCommandInputOfCommandType(valuesT, env)
+        } yield {
+          StructT(
+            Vector(
+              UIndex(0) -> keyType,
+              UIndex(1) -> env.typeSystem.typeToUntaggedObject(outputCommandT)
+            ),
+            IndexTN(2)
+          )
+        }
+      }
+      case MapT(typeTransform, _) => {
+        // In this case, there must be a key expansion type
+        // TODO: enforce this?
+
+        // Key Expansion + requiredValue expansion
+        // What if Key expansion is a case? (for now we don't allow this, only basic map)
+
+        for {
+          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
+          keyType = typeTransformKeyValue._1
+          requiredValuesType = typeTransformKeyValue._2
+
+          keyT <- env.typeSystem.convertToNewMapType(keyType)
+          requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
+          keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
+        } yield {
+          keyExpansionCommandT match {
+            case StructT(items, _, _, _) if (items.length == 0) => {
+              // TODO - this is an ugly exception.. we need a better way to add fields to a struct
+              // (particularly an empty struct like in this case)
+              requiredValuesT
+            }
+            case _ => {
               StructT(
                 Vector(
-                  UIndex(0) -> keyType,
-                  UIndex(1) -> env.typeSystem.typeToUntaggedObject(outputCommandT)
+                  UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
+                  UIndex(1) -> requiredValuesType
                 ),
                 IndexTN(2)
               )
             }
-          }
-          case _ => {
-            Failure(s"Cannot yet handle commands for generic map $typeTransform")
-          }
-        }
-      }
-      case MapT(UMap(typeTransform), _) => {
-        if (typeTransform.length != 1) {
-          throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
-        }
-
-        typeTransform.head match {
-          case (keyType, requiredValuesType) => {
-            // In this case, there must be a key expansion type
-            // TODO: enforce this?
-
-            // Key Expansion + requiredValue expansion
-            // What if Key expansion is a case? (for now we don't allow this, only basic map)
-            for {
-              keyT <- env.typeSystem.convertToNewMapType(keyType)
-              requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
-              keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
-            } yield {
-              keyExpansionCommandT match {
-                case StructT(items, _, _, _) if (items.length == 0) => {
-                  // TODO - this is an ugly exception.. we need a better way to add fields to a struct
-                  // (particularly an empty struct like in this case)
-                  requiredValuesT
-                }
-                case _ => {
-                  StructT(
-                    Vector(
-                      UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
-                      UIndex(1) -> requiredValuesType
-                    ),
-                    IndexTN(2)
-                  )
-                }
-              }
-            }
-          }
-          case _ => {
-            Failure(s"Cannot yet handle commands for generic map $typeTransform")
           }
         }
       }
@@ -485,22 +472,14 @@ object CommandMaps {
           NewMapObject(UIndex(result), BooleanT)
         }
       }
-      case mapT@MapT(UMap(typeTransform), MapConfig(CommandOutput, featureSet, _, _, _)) => {
-        if (typeTransform.length != 1) {
-          throw new Exception(s"Not implemented: type transform must have exactly 1 mapping: $typeTransform")
-        }
-
+      case mapT@MapT(typeTransform, MapConfig(CommandOutput, featureSet, _, _, _)) => {
         for {
-          outputType <- typeTransform.head match {
-            case (inputPattern, outputT) => {
-              for {
-                ouT <- Evaluator.asType(outputT, env)
-              } yield ouT
-            }
-            case _ => {
-              Failure(s"Not implement for generic type transform: $typeTransform")
-            }
-          }
+          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
+
+          inputPattern = typeTransformKeyValue._1
+          outputT = typeTransformKeyValue._2
+
+          outputType <- Evaluator.asType(outputT, env)
 
           input <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
           commandForInput <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
@@ -523,78 +502,71 @@ object CommandMaps {
           NewMapObject(UMap(newMapValues), mapT)
         }
       }
-      case MapT(UMap(typeTransform), MapConfig(style, features, _, _, _)) => {
-        if (typeTransform.length != 1) {
-          throw new Exception(s"Can't yet handle typeTransforms without a single binding: $typeTransform")
-        }
+      case MapT(typeTransform, MapConfig(style, features, _, _, _)) => {
+        for {
+          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
+          keyType = typeTransformKeyValue._1
+          requiredValuesType = typeTransformKeyValue._2
 
-        typeTransform.head match {
-          case (keyType, requiredValuesType) => {
-            for {
-              keyT <- env.typeSystem.convertToNewMapType(keyType)
-              requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
+          keyT <- env.typeSystem.convertToNewMapType(keyType)
+          requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
 
-              keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
+          keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
 
-              result <- keyExpansionCommandT match {
-                case StructT(items, _, _, _) if (items.length == 0) => {
-                  // TODO - this is an ugle exception.. we need a better way to add fields to a struct
-                  // (particularly an empty struct like in this case)
-                  Success((NewMapObject(UMap(Vector.empty), keyExpansionCommandT), command))
+          result <- keyExpansionCommandT match {
+            case StructT(items, _, _, _) if (items.length == 0) => {
+              // TODO - this is an ugle exception.. we need a better way to add fields to a struct
+              // (particularly an empty struct like in this case)
+              Success((NewMapObject(UMap(Vector.empty), keyExpansionCommandT), command))
+            }
+            case _ => {
+
+              for {
+                commandPatterns <- command match {
+                  case UMap(patterns) => Success(patterns)
+                  case _ => Failure(s"Unexpected command shape $command")
                 }
-                case _ => {
 
-                  for {
-                    commandPatterns <- command match {
-                      case UMap(patterns) => Success(patterns)
-                      case _ => Failure(s"Unexpected command shape $command")
-                    }
+                keyField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
 
-                    keyField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-
-                    valueExpression <- Evaluator.attemptPatternMatchInOrder(commandPatterns, UIndex(1), env)
-                  } yield {
-                    (NewMapObject(keyField, keyT), valueExpression)
-                  }
-                }
+                valueExpression <- Evaluator.attemptPatternMatchInOrder(commandPatterns, UIndex(1), env)
+              } yield {
+                (NewMapObject(keyField, keyT), valueExpression)
               }
-
-              (keyExpansionCommand, valueExpansionExpression) = result
-              
-              // Really we're updating the key??
-              updateKeyTypeResponse <- expandType(keyT, keyExpansionCommand.uObject, env)
-              // TODO- we need to do something with updateKeyTypeResponse.converter
-
-
-              newTableType = MapT(
-                env.toTypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
-                MapConfig(style, features)
-              )
-                      
-              mapValues <- current.uObject match {
-                case UMap(values) => Success(values)
-                case _ => Failure(s"Couldn't get map values from $current")
-              }
-
-              _ <- Outcome.failWhen(updateKeyTypeResponse.newValues.length > 1, "A Unimplemented")
-
-              newPattern <- Outcome(updateKeyTypeResponse.newValues.headOption, s"Cannot expand type: $keyT and get a new pattern to match")
-
-              prepNewValues = for {
-                value <- mapValues
-
-                // Remove old value
-                if (value._1 != keyExpansionCommand.uObject)
-              } yield (value._1 -> value._2)
-
-              newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
-            } yield {
-              NewMapObject(UMap(newMapValues), newTableType)
             }
           }
-          case _ => {
-            Failure(s"Cannot yet handle commands for generic map $typeTransform")
+
+          (keyExpansionCommand, valueExpansionExpression) = result
+          
+          // Really we're updating the key??
+          updateKeyTypeResponse <- expandType(keyT, keyExpansionCommand.uObject, env)
+          // TODO- we need to do something with updateKeyTypeResponse.converter
+
+
+          newTableType = MapT(
+            env.toTypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
+            MapConfig(style, features)
+          )
+                  
+          mapValues <- current.uObject match {
+            case UMap(values) => Success(values)
+            case _ => Failure(s"Couldn't get map values from $current")
           }
+
+          _ <- Outcome.failWhen(updateKeyTypeResponse.newValues.length > 1, "A Unimplemented")
+
+          newPattern <- Outcome(updateKeyTypeResponse.newValues.headOption, s"Cannot expand type: $keyT and get a new pattern to match")
+
+          prepNewValues = for {
+            value <- mapValues
+
+            // Remove old value
+            if (value._1 != keyExpansionCommand.uObject)
+          } yield (value._1 -> value._2)
+
+          newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
+        } yield {
+          NewMapObject(UMap(newMapValues), newTableType)
         }
       }
       case FunctionalSystemT(functionTypes) => {
@@ -760,9 +732,6 @@ object CommandMaps {
         } yield result
       }
       case _ => {
-        if (s"${current.displayString(env)}" == "0\\Character") {
-          throw new Exception(s"C) ${current.displayString(env)} is not a command type, error in type checker")
-        }
         Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")
       }
     }
@@ -779,6 +748,17 @@ object CommandMaps {
       MapConfig(RequireCompleteness, BasicMap)
     )
     case _ => Failure(s"Unexpected function type: ${nType.displayString(env)}")
+  }
+
+  def checkTypeTransformForSingleBinding(
+    typeTransform: UntaggedObject
+  ): Outcome[(UntaggedObject, UntaggedObject), String] = typeTransform match {
+    case UMap(Vector((key, value))) => Success(key -> value)
+    case UMapPattern(key, value) => Success(key -> value)
+    case UMap(_) => {
+      Failure("Type transform  must have a single binding. Instead it was: " + typeTransform)
+    }
+    case _ => Failure("Could not handle type transform: " + typeTransform)
   }
 
   def getDefaultValueFromStructParams(

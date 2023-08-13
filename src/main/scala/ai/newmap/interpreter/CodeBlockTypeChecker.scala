@@ -19,21 +19,31 @@ object CodeBlockTypeChecker {
       var envCommands: Seq[EnvironmentCommand] = Vector.empty
 
       // TODO - what if the command is not executable yet due to unset variables, but we still know what the types are going to be?
-      var newEnv: Environment = env
+      //var newEnv: Environment = env
+      var newParams: Map[String, NewMapType] = tcParameters
 
       statements.foreach(statement => {
-        StatementInterpreter(statement, newEnv) match {
+        println("Processing Statement: " + statement)
+
+        StatementInterpreter(statement, env, newParams) match {
           case Success(envCommand) => {
+            println("got env command: " + envCommand)
+
             // TODO - are we getting new parameters here too?
             envCommands = envCommands :+ envCommand
-            newEnv = newEnv.newCommand(envCommand)
+
+            // TODO
+            newParams = newParams
           }
-          case Failure(f) => return Failure(f)
+          case Failure(f) => {
+            println("Failed: " + f)
+            return Failure(f)
+          }
         }
       })
 
       for {
-        tcResult <- TypeChecker.typeCheck(expression, expectedType, newEnv, featureSet, tcParameters)
+        tcResult <- TypeChecker.typeCheck(expression, expectedType, env, featureSet, tcParameters)
       } yield {
         // TODO - there's a bug here where the expression is a ULink that points to an object in the newEnv that doesn't exist in env.
         val resultingExpression = ULet(envCommands.toVector, tcResult.nExpression)

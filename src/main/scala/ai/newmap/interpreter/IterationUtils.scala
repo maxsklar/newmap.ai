@@ -122,7 +122,7 @@ object IterationUtils {
       case NewMapObject(UStruct(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
         Success(values)
       }
-      case NewMapObject(UStruct(values), MapT(UMap(typeTransform), MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
+      case NewMapObject(UStruct(values), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         for {
           ttv <- typeTransformValues(typeTransform, env.typeSystem)
           enumeration <- enumerateAllValuesIfPossible(ttv.keyType, env)
@@ -193,12 +193,11 @@ object IterationUtils {
   )
 
   def typeTransformValues(
-    values: Vector[(UntaggedObject, UntaggedObject)],
+    values: UntaggedObject,
     typeSystem: NewMapTypeSystem
   ): Outcome[TypeTransformValuesResponse, String] = {
     for {
-      ttItem <- Outcome(values.headOption, "type transform has no values")
-      _ <- Outcome.failWhen(values.length != 1, s"Can't yet handle typeTransforms without a single binding: $values")
+      ttItem <- CommandMaps.checkTypeTransformForSingleBinding(values)
       (keyType, valueType) = ttItem
       keyT <- typeSystem.convertToNewMapType(keyType)
       valueT <- typeSystem.convertToNewMapType(valueType)
@@ -210,14 +209,14 @@ object IterationUtils {
   // Give a type, what's going to come out of the iteration?
   def iterationItemType(nType: NewMapType, env: Environment, typeSystemIdOpt: Option[UUID] = None): Outcome[NewMapType, String] = {
     nType match {
-      case MapT(UMap(typeTransform), MapConfig(CommandOutput, BasicMap, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(CommandOutput, BasicMap, _, _, _)) => {
         for {
           ttv <- typeTransformValues(typeTransform, env.typeSystem)
         } yield {
           ttv.keyType
         }
       }
-      case MapT(UMap(typeTransform), MapConfig(RequireCompleteness, BasicMap, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _)) => {
         for {
           ttv <- typeTransformValues(typeTransform, env.typeSystem)
         } yield {

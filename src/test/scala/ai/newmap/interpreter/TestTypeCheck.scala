@@ -151,7 +151,7 @@ class TestTypeCheck extends FlatSpec {
   // TODO - should be in a separate file
   "A statement " should " be readable" in {
     val statement = FullStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(1), NaturalNumberParse(0))
-    StatementInterpreter(statement, env) match {
+    StatementInterpreter(statement, env, Map.empty) match {
       case Success(command) => {
         assert(command == Environment.eCommand("x",NewMapObject(UIndex(0), IndexT(UIndex(1)))))
       }
@@ -161,7 +161,7 @@ class TestTypeCheck extends FlatSpec {
 
   it should " be readable if there's an inferred type" in {
     val statement = InferredTypeStatementParse(ValStatement, IdentifierParse("x"), NaturalNumberParse(10))
-    StatementInterpreter(statement, env) match {
+    StatementInterpreter(statement, env, Map.empty) match {
       case Success(command) => {
         assert(command == FullEnvironmentCommand("x", Index(10)))
       }
