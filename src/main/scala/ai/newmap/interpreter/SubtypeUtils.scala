@@ -386,8 +386,6 @@ object SubtypeUtils {
     endingType: NewMapType,
     env: Environment
   ): Outcome[NewMapObject, String] = {
-    //println("Calling attemptConvertObjectToType: " + startingObject.displayString(env) + " -- " + endingType.displayString(env))
-
     endingType match {
       case SubtypeT(isMember, parentType, featureSet) => {
         for {

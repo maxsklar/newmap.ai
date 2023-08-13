@@ -101,14 +101,6 @@ object TypeChecker {
           } yield TypeCheckResponse(ParamId(s), nType)
         } else {
           env.lookupValue(s) match {
-            case Some(NewMapObject(ParamId(_), nType)) => {
-              // TODO - can we make this case the same as the one below it?
-              for {
-                response <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
-                // TODO - execute convert instructions?
-                // response.convertInstructions
-              } yield TypeCheckResponse(ParamId(s), nType)
-            }
             case Some(nObject) => {
               for { 
                 tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
