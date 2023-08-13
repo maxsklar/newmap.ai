@@ -31,10 +31,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   def toTypeTransform(
     inputT: NewMapType,
-    outputT: NewMapType
+    outputT: NewMapType,
+    useMapPattern: Boolean = false
   ): UntaggedObject = {
     val typeSystem = Environment.Base.typeSystem
-    UMap(Vector(typeSystem.typeToUntaggedObject(inputT) -> typeSystem.typeToUntaggedObject(outputT)))
+    val inputType = typeSystem.typeToUntaggedObject(inputT)
+    val outputType = typeSystem.typeToUntaggedObject(outputT)
+    
+    if (useMapPattern) UMapPattern(inputType, outputType)
+    else UMap(Vector(inputType -> outputType))
   }
 
   /**
@@ -323,7 +328,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
             StandardMatcher
           )
         )),
-        MapT(toTypeTransform(IndexTN(3), IndexTN(4)), MapConfig(RequireCompleteness, FullFunction))
+        MapT(toTypeTransform(IndexTN(3), IndexTN(4), true), MapConfig(RequireCompleteness, FullFunction))
       )
     )
 

@@ -175,8 +175,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(UMap(startingTypeTransform), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
-        MapT(UMap(endingTypeTransform), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
+        MapT(startingTypeTransform, MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
+        MapT(endingTypeTransform, MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -184,11 +184,14 @@ object SubtypeUtils {
         val isMapCompletenessConvertible = true
 
         for {
-          _ <- Outcome.failWhen(startingTypeTransform.length != 1, s"map conversions only available for type transforms of length 1. StartingTypeTransform was $startingTypeTransform")
-          _ <- Outcome.failWhen(endingTypeTransform.length != 1, s"map conversions only available for type transforms of length 1. endingTypeTransform was $endingTypeTransform")
-
-          startingTypePair <- startingTypeTransform.head match {
-            case (inputT, outputT) => {
+          startingTypePair <- startingTypeTransform match {
+            case UMap(Vector((inputT, outputT))) => {
+              for {
+                inT <- Evaluator.asType(inputT, env)
+                ouT <- Evaluator.asType(outputT, env)
+              } yield (inT, ouT)
+            }
+            case UMapPattern(inputT, outputT) => {
               for {
                 inT <- Evaluator.asType(inputT, env)
                 ouT <- Evaluator.asType(outputT, env)
@@ -199,8 +202,14 @@ object SubtypeUtils {
             }
           }
 
-          endingTypePair <- endingTypeTransform.head match {
-            case (inputT, outputT) => {
+          endingTypePair <- endingTypeTransform match {
+            case UMap(Vector((inputT, outputT)))  => {
+              for {
+                inT <- Evaluator.asType(inputT, env)
+                ouT <- Evaluator.asType(outputT, env)
+              } yield (inT, ouT)
+            }
+            case UMapPattern(inputT, outputT) => {
               for {
                 inT <- Evaluator.asType(inputT, env)
                 ouT <- Evaluator.asType(outputT, env)

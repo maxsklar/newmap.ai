@@ -171,6 +171,10 @@ object Evaluator {
 
         this(keyMatchResult, env)
       }
+      case UMapPattern(key, value) => {
+        // Treat it like a small map
+        applyFunctionAttempt(UMap(Vector(key -> value)), input, env, matchingRules)
+      }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
           inputT <- env.typeSystem.convertToNewMapType(input)

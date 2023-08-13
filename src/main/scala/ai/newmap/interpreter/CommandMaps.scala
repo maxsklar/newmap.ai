@@ -773,6 +773,7 @@ object CommandMaps {
     env: Environment
   ): Outcome[(Vector[(UntaggedObject, UntaggedObject)], MapConfig), String] = nType match {
     case MapT(UMap(typeTransform), config) => Success(typeTransform -> config)
+    case MapT(UMapPattern(key, value), config) => Success(Vector(key -> value) -> config)
     case UndefinedT => Success(
       Vector.empty,
       MapConfig(RequireCompleteness, BasicMap)

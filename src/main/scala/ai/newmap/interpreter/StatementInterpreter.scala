@@ -30,15 +30,7 @@ object StatementInterpreter {
             case _ => Failure("A def statment should define a function that is Full or Well Founded. For other values or functions, use a val or ver statement instead")
           }
 
-          _ = if (prefix == DefStatement) {
-            println("newParams: " + newParams)
-          }
-
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction, newParams.toMap)
-
-          _ =  if (prefix == DefStatement) {
-            println("tc worked: " + tc)
-          }
 
           evaluatedObject <- Evaluator(tc.nExpression, env)
 
@@ -78,8 +70,8 @@ object StatementInterpreter {
           case _ => Vector(params) 
         }
 
-        val typeTransform = Vector(
-          env.typeSystem.typeToUntaggedObject(IdentifierT) -> patternToExpression(env.typeSystem.typeToUntaggedObject(TypeT))
+        val typeTransform = UMapPattern(
+          env.typeSystem.typeToUntaggedObject(IdentifierT), patternToExpression(env.typeSystem.typeToUntaggedObject(TypeT))
         )
 
         for {
