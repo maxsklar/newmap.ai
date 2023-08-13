@@ -80,15 +80,6 @@ case class ForkEnvironmentCommand(
   }
 }
 
-case class ParameterEnvironmentCommand(
-  id: String,
-  nType: NewMapType
-) extends EnvironmentCommand {
-  override def displayString(env: Environment): String = {
-    s"parameter $id: ${nType}"
-  }
-}
-
 case class ExpOnlyEnvironmentCommand(
   nObject: NewMapObject
 ) extends EnvironmentCommand {

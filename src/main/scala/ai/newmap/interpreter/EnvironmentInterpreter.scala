@@ -92,7 +92,7 @@ class EnvironmentInterpreter(
     val result = for {
       tokens <- getTokens(code)
       parseTree <- NewMapParser.expressionParse(tokens)
-      tc <- TypeChecker.typeCheckUnknownType(parseTree, env)
+      tc <- TypeChecker.typeCheckUnknownType(parseTree, env, Map.empty)
       nObject <- Evaluator(tc.nExpression, env)
     } yield {
       tc.refinedTypeClass
@@ -108,7 +108,7 @@ class EnvironmentInterpreter(
     val result = for {
       tokens <- getTokens(code)
       parseTree <- NewMapParser.expressionParse(tokens)
-      tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction)
+      tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction, Map.empty)
       nObject <- Evaluator(tc.nExpression, env)
       nType <- env.typeSystem.convertToNewMapType(nObject)
       underlyingType <- TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)

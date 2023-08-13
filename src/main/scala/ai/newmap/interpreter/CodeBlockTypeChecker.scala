@@ -10,10 +10,11 @@ object CodeBlockTypeChecker {
     expression: ParseTree,
     expectedType: NewMapType,
     env: Environment,
-    featureSet: MapFeatureSet
+    featureSet: MapFeatureSet,
+    tcParameters: Map[String, NewMapType]
   ): Outcome[TypeChecker.TypeCheckResponse, String] = {
     if (statements.isEmpty) {
-      TypeChecker.typeCheck(expression, expectedType, env, featureSet)
+      TypeChecker.typeCheck(expression, expectedType, env, featureSet, tcParameters)
     } else {
       var envCommands: Seq[EnvironmentCommand] = Vector.empty
 
@@ -23,6 +24,7 @@ object CodeBlockTypeChecker {
       statements.foreach(statement => {
         StatementInterpreter(statement, newEnv) match {
           case Success(envCommand) => {
+            // TODO - are we getting new parameters here too?
             envCommands = envCommands :+ envCommand
             newEnv = newEnv.newCommand(envCommand)
           }
@@ -31,7 +33,7 @@ object CodeBlockTypeChecker {
       })
 
       for {
-        tcResult <- TypeChecker.typeCheck(expression, expectedType, newEnv, featureSet)
+        tcResult <- TypeChecker.typeCheck(expression, expectedType, newEnv, featureSet, tcParameters)
       } yield {
         // TODO - there's a bug here where the expression is a ULink that points to an object in the newEnv that doesn't exist in env.
         val resultingExpression = ULet(envCommands.toVector, tcResult.nExpression)

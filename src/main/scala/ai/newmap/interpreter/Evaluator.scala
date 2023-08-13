@@ -8,7 +8,10 @@ import java.util.UUID
 object Evaluator {
   def apply(
     nExpression: UntaggedObject,
-    env: Environment
+    env: Environment,
+
+    // TODO: any way we can get rid of this?
+    paramsToAllow: Map[String, NewMapType] = Map.empty
   ): Outcome[UntaggedObject, String] = {
     nExpression match {
       case ApplyFunction(func, input, matchingRules) => {
@@ -19,9 +22,12 @@ object Evaluator {
         } yield result
       }
       case ParamId(s) => {
-        for {
-          nObject <- Outcome(env.lookupValue(s), s"Unbound identifier: $s")
-        } yield nObject.uObject
+        env.lookupValue(s) match {
+          case Some(nObject) => Success(nObject.uObject)
+          case None => if (paramsToAllow.get(s).nonEmpty) Success(ParamId(s)) else {
+            Failure(s"Unbound identifier: $s")
+          }
+        }
       }
       case UCase(constructor, input) => {
         for {

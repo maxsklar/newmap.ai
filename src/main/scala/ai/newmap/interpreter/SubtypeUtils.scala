@@ -254,9 +254,9 @@ object SubtypeUtils {
       case (StructT(values, fieldParentType, _, _), _) if (values.length == 1) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, fieldParentType, env)
-          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
-          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
-          response <- isTypeConvertible(singularObjT, endingType, singularOutput.env)
+          singularObj <- Evaluator(singularOutput, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
       case (_, StructT(values, fieldParentType, _, _)) => {
@@ -284,9 +284,9 @@ object SubtypeUtils {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, startingFieldType, env)
-          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
-          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
-          response <- isTypeConvertible(singularObjT, endingType, singularOutput.env)
+          singularObj <- Evaluator(singularOutput, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
       case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, endingFieldType, _)) if (values.length == 1) => {
@@ -303,9 +303,9 @@ object SubtypeUtils {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, endingFieldType, env)
-          singularObj <- Evaluator(singularOutput.uObject, singularOutput.env)
-          singularObjT <- Evaluator.asType(singularObj, singularOutput.env)
-          response <- isTypeConvertible(startingType, singularObjT, singularOutput.env)
+          singularObj <- Evaluator(singularOutput, env)
+          singularObjT <- Evaluator.asType(singularObj, env)
+          response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
       }
       case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
@@ -425,26 +425,20 @@ object SubtypeUtils {
     startingFeatureSet.getLevel <= endingFeatureSet.getLevel
   }
 
-  case class SingularOutpotResponse(uObject: UntaggedObject, env: Environment)
-
   // If this function only allows one input, then return the output for that input
   def outputIfFunctionHasSingularInput(
     mapValues: Vector[(UntaggedObject, UntaggedObject)],
     fieldType: NewMapType,
     env: Environment
-  ): Outcome[SingularOutpotResponse, String] = {
+  ): Outcome[UntaggedObject, String] = {
     if (mapValues.length == 1) {
       // THIS IS WHERE WE NEED TO DEAL WITH PATTERNS IN THE MAP VALUE
       val key = mapValues.head._1
 
       for {
         newParameters <- RetrieveType.fetchParamsFromPattern(fieldType, key, env)
-      } yield {
-        SingularOutpotResponse(
-          mapValues.head._2,
-          env.newParams(newParameters.toVector)
-        )
-      }
+        _ <- Outcome.failWhen(newParameters.size > 0, "Function had a pattern")
+      } yield mapValues.head._2
     } else {
       Failure("Function did not have singular input")
     }

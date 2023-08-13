@@ -16,7 +16,7 @@ object StatementInterpreter {
     sParse match {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
         for {
-          tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction)
+          tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, Map.empty)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
@@ -24,25 +24,33 @@ object StatementInterpreter {
           // If prefix is DefStatement then make sure nType is a potentially recursive function!
           // Also update the environment with the name because it's potentially recursive
           // TODO - shouldn't this check happen in the type checker?
-          newEnv <- nType match {
-            case _ if (prefix != DefStatement) => Success(env)
-            case MapT(_, MapConfig(_, featureSet, _, _, _)) if (featureSet.getLevel >= WellFoundedFunction.getLevel) => Success(env.newParam(id.s, nType))
+          newParams <- nType match {
+            case _ if (prefix != DefStatement) => Success(Vector.empty)
+            case MapT(_, MapConfig(_, featureSet, _, _, _)) if (featureSet.getLevel >= WellFoundedFunction.getLevel) => Success(Vector(id.s -> nType))
             case _ => Failure("A def statment should define a function that is Full or Well Founded. For other values or functions, use a val or ver statement instead")
           }
 
-          tc <- TypeChecker.typeCheck(objExpression, nType, newEnv, FullFunction)
+          _ = if (prefix == DefStatement) {
+            println("newParams: " + newParams)
+          }
 
-          evaluatedObject <- Evaluator(tc.nExpression, newEnv)
+          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction, newParams.toMap)
 
-          constantObject = Evaluator.stripVersioningU(evaluatedObject, newEnv)
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, newEnv)
+          _ =  if (prefix == DefStatement) {
+            println("tc worked: " + tc)
+          }
+
+          evaluatedObject <- Evaluator(tc.nExpression, env)
+
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
         } yield {
           FullEnvironmentCommand(id.s, nObject, prefix == DefStatement)
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, Map.empty)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
 
@@ -57,7 +65,7 @@ object StatementInterpreter {
       }
       case NewTypeStatementParse(id, typeExpression) => {
         for {
-          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction)
+          tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, Map.empty)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
@@ -75,7 +83,7 @@ object StatementInterpreter {
         )
 
         for {
-          mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction)
+          mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction, Map.empty)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT))
@@ -88,7 +96,7 @@ object StatementInterpreter {
         )
 
         for {
-          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, FullFunction)
+          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, FullFunction, Map.empty)
 
           typeTransform <- typeTransformResult.nExpression match {
             case result@UMapPattern(_, _) => Success(result)
@@ -101,7 +109,7 @@ object StatementInterpreter {
       case IterateIntoStatementParse(iterableExp, destination) => {
         for {
           // TODO - we need a type inference here!!
-          tc <- TypeChecker.typeCheckUnknownType(iterableExp, env)
+          tc <- TypeChecker.typeCheckUnknownType(iterableExp, env, Map.empty)
           evaluatedObject <- Evaluator(tc.nExpression, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
           iterableObjectCandidate <- TypeChecker.tagAndNormalizeObject(constantObject, tc.refinedTypeClass, env)
@@ -114,7 +122,7 @@ object StatementInterpreter {
             case Success(_) => Success(iterableObjectCandidate)
             case _ => {
               for {
-                tcType <- TypeChecker.typeCheck(iterableExp, TypeT, env, FullFunction)
+                tcType <- TypeChecker.typeCheck(iterableExp, TypeT, env, FullFunction, Map.empty)
                 uType <- Evaluator(tcType.nExpression, env)
                 iterableTypeCandidate = NewMapObject(uType, HistoricalTypeT(env.typeSystem.currentState))
               } yield iterableTypeCandidate
@@ -159,7 +167,7 @@ object StatementInterpreter {
             for {
               inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
 
-              commandExp <- typeCheck(command, inputT, env, FullFunction)
+              commandExp <- typeCheck(command, inputT, env, FullFunction, Map.empty)
 
               commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
@@ -185,11 +193,9 @@ object StatementInterpreter {
 
               newParameterMap <- RetrieveType.getParameterValues(id.s, env)
 
-              newEnv = env.newParams(newParameterMap.toVector)
+              commandExp <- typeCheck(command, inputT, env, FullFunction, newParameterMap)
 
-              commandExp <- typeCheck(command, inputT, newEnv, FullFunction)
-
-              commandObj <- Evaluator(commandExp.nExpression, newEnv)
+              commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
               ApplyIndividualCommand(id.s, commandObj)
             }
@@ -202,7 +208,7 @@ object StatementInterpreter {
       case AddChannelParse(channelId, channelTypeParse) => {
         val channel = UIdentifier(channelId.s)
         for {
-          tcType <- TypeChecker.typeCheck(channelTypeParse, TypeT, env, FullFunction)
+          tcType <- TypeChecker.typeCheck(channelTypeParse, TypeT, env, FullFunction, Map.empty)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
@@ -252,7 +258,7 @@ object StatementInterpreter {
         val channel = UIdentifier(channelId.s)
         val nType = env.channelIdToType.get(channelId.s).getOrElse(UndefinedT)
         for {
-          tc <- TypeChecker.typeCheck(command, nType, env, FullFunction)
+          tc <- TypeChecker.typeCheck(command, nType, env, FullFunction, Map.empty)
         } yield {
           OutputToChannel(tc.nExpression, channel)
         }
@@ -260,7 +266,7 @@ object StatementInterpreter {
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
           // TODO - we need a type inference here!!
-          tc <- TypeChecker.typeCheckUnknownType(objExpression, env)
+          tc <- TypeChecker.typeCheckUnknownType(objExpression, env, Map.empty)
           evaluatedObject <- Evaluator(tc.nExpression, env)
           nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc.refinedTypeClass, env)
         } yield {
@@ -270,7 +276,7 @@ object StatementInterpreter {
       case ExpressionOnlyStatementParse(exp) => {
         for {
           // TODO - we need a type inference here!!
-          tc <- TypeChecker.typeCheckUnknownType(exp, env)
+          tc <- TypeChecker.typeCheckUnknownType(exp, env, Map.empty)
           evaluatedObject <- Evaluator(tc.nExpression, env)
 
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)

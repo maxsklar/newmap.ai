@@ -12,6 +12,7 @@ sealed abstract class UntaggedObject {
 // Todo - replace with "user defined type" in prelude
 case class UIdentifier(s: String) extends UntaggedObject
 
+// TODO: change from Vector to ListMap
 case class UMap(values: Vector[(UntaggedObject, UntaggedObject)]) extends UntaggedObject
 
 // This is equivalent to UMap where the keys are indecies

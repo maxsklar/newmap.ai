@@ -15,10 +15,6 @@ case class Environment(
   // A Map of all the variable bindings
   idToObject: ListMap[String, NewMapObject] = ListMap.empty,
 
-  // These are parameters where we know their type, but we don't know their object value yet.
-  // The "type" is ahead of the "object" in this respect
-  idExtraParameters: ListMap[String, NewMapType] = ListMap.empty,
-
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
 
@@ -33,11 +29,6 @@ case class Environment(
   override def toString: String = {
     val builder: StringBuilder = new StringBuilder()
 
-    for ((id, nType) <- idExtraParameters) {
-      val command = ParameterEnvironmentCommand(id, nType)
-      builder.append(s"${command.toString}\n")
-    }
-
     for ((id, nObject) <- idToObject) {
       val command = FullEnvironmentCommand(id, nObject)
       builder.append(s"${command.toString}\n")
@@ -46,18 +37,8 @@ case class Environment(
     builder.toString
   }
 
-  def lookupType(identifier: String): Option[NewMapType] = {
-    idExtraParameters.get(identifier) match {
-      case Some(nType) => Some(nType)
-      case None => idToObject.get(identifier).map(_.nType)
-    }
-  }
-
   def lookupValue(identifier: String): Option[NewMapObject] = {
-    idExtraParameters.get(identifier) match {
-      case Some(nType) => Some(NewMapObject(ParamId(identifier), nType))
-      case None => idToObject.get(identifier)
-    }
+    idToObject.get(identifier)
   }
 
   case class LookupVersionedObjectReturnValue(
@@ -346,12 +327,6 @@ case class Environment(
           storedVersionedTypes = storedVersionedTypes + (newKey -> current)
         )
       }
-      case ParameterEnvironmentCommand(s, nType) => {
-        this.copy(
-          commands = newCommands,
-          idExtraParameters = idExtraParameters + (s -> nType)
-        )
-      }
       case ExpOnlyEnvironmentCommand(nObject) => {
         val uType = typeSystem.typeToUntaggedObject(nObject.nType)
         this.newCommand(ApplyIndividualCommand("res", UCase(uType, nObject.uObject)))
@@ -476,14 +451,6 @@ case class Environment(
       env = env.newCommand(com)
     }
     env
-  }
-
-  def newParam(id: String, nType: NewMapType): Environment = {
-    newCommand(ParameterEnvironmentCommand(id, nType))
-  }
-
-  def newParams(xs: Vector[(String, NewMapType)]) = {
-    newCommands(xs.map(x => ParameterEnvironmentCommand(x._1, x._2)))
   }
 
   def typeAsObject(nType: NewMapType): NewMapObject = {
