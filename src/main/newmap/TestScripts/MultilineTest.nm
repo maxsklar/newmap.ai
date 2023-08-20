@@ -2,5 +2,6 @@ val x: Count = {
   new Count as y
   update y
   update y
+  update y
   y
 }

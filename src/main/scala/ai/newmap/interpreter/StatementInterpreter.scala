@@ -5,15 +5,21 @@ import ai.newmap.model._
 import ai.newmap.util.{Failure, Outcome, Success}
 
 object StatementInterpreter {
+  case class ReturnValue(
+    command: EnvironmentCommand,
+    tcParameters: Map[String, NewMapType]
+  )
+
   /*
    * @param sParse The statement parses
    * @param env This is a map of identifiers which at this point are supposed to be subsituted.
+   * @return Do not execute the statement, only reason about the values that it will return to add to the parameters.
    */
   def apply(
     sParse: EnvStatementParse,
     env: Environment,
     tcParameters: Map[String, NewMapType]
-  ): Outcome[EnvironmentCommand, String] = {
+  ): Outcome[ReturnValue, String] = {
     sParse match {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
         for {
@@ -32,13 +38,13 @@ object StatementInterpreter {
           }
 
           tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction, newParams)
-
-          evaluatedObject <- Evaluator(tc.nExpression, env)
-
-          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nType, env)
+          
+          nObject = NewMapObject(tc.nExpression, nType)
         } yield {
-          FullEnvironmentCommand(id.s, nObject, prefix == DefStatement)
+          ReturnValue(
+            FullEnvironmentCommand(id.s, nObject, prefix == DefStatement),
+            newParams
+          )
         }
       }
       case NewVersionedStatementParse(id, typeExpression) => {
@@ -53,7 +59,10 @@ object StatementInterpreter {
           // - In fact, we have yet to build an actual command type checker
           initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
         } yield {
-          NewVersionedStatementCommand(id.s, nType)
+          ReturnValue(
+            NewVersionedStatementCommand(id.s, nType),
+            tcParameters + (id.s -> nType)
+          )
         }
       }
       case NewTypeStatementParse(id, typeExpression) => {
@@ -62,7 +71,10 @@ object StatementInterpreter {
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
-          NewTypeCommand(id.s, nType)
+          ReturnValue(
+            NewTypeCommand(id.s, nType),
+            tcParameters + (id.s -> TypeT)
+          )
         }
       }
       case NewParamTypeStatementParse(id, params) => {
@@ -79,7 +91,10 @@ object StatementInterpreter {
           mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction, Map.empty)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
-          NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT))
+          ReturnValue(
+            NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT)),
+            tcParameters
+          )
         }
       }
       case NewTypeClassStatementParse(id, typeTransformParse) => {
@@ -96,7 +111,10 @@ object StatementInterpreter {
             case _ => Failure(s"Invalid type transform: ${typeTransformResult.nExpression}")
           }
         } yield {
-          NewTypeClassCommand(id.s, typeTransform)
+          ReturnValue(
+            NewTypeClassCommand(id.s, typeTransform),
+            tcParameters
+          )
         }
       }
       case IterateIntoStatementParse(iterableExp, destination) => {
@@ -145,29 +163,45 @@ object StatementInterpreter {
               }
             }
           }
-        } yield command
+        } yield {
+          ReturnValue(command, tcParameters)
+        }
       }
       case ForkedVersionedStatementParse(id, forkId) => {
         for {
           vObject <- env.lookupVersionedObject(forkId.s)
         } yield {
-          ForkEnvironmentCommand(id.s, vObject.key)
+          ReturnValue(
+            ForkEnvironmentCommand(id.s, vObject.key),
+            tcParameters + (id.s -> vObject.nType)
+          )
         }
       }
       case ApplyCommandStatementParse(id, command) => {
-        env.lookupVersionedObject(id.s) match {
-          case Success(versionedObjectLink) => {
+        (env.lookupVersionedObject(id.s), tcParameters.get(id.s)) match {
+          case (_, Some(nType)) => {
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
-
+              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
               commandExp <- typeCheck(command, inputT, env, FullFunction, tcParameters)
-
-              commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
-              ApplyIndividualCommand(id.s, commandObj)
+              ReturnValue(
+                ApplyIndividualCommand(id.s, commandExp.nExpression),
+                tcParameters
+              )
             }
           }
-          case Failure(objectLookupFailureMessage) => {
+          case (Success(versionedObjectLink), _) => {
+            for {
+              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
+              commandExp <- typeCheck(command, inputT, env, FullFunction, tcParameters)
+            } yield {
+              ReturnValue(
+                ApplyIndividualCommand(id.s, commandExp.nExpression),
+                tcParameters
+              )
+            }
+          }
+          case (Failure(objectLookupFailureMessage), _) => {
             val typeSystem = env.typeSystem
             val currentState = typeSystem.currentState
 
@@ -187,10 +221,11 @@ object StatementInterpreter {
               newParameterMap <- RetrieveType.getParameterValues(id.s, env)
 
               commandExp <- typeCheck(command, inputT, env, FullFunction, newParameterMap)
-
-              commandObj <- Evaluator(commandExp.nExpression, env)
             } yield {
-              ApplyIndividualCommand(id.s, commandObj)
+              ReturnValue(
+                ApplyIndividualCommand(id.s, commandExp.nExpression),
+                tcParameters
+              )
             }
           }
         }
@@ -205,7 +240,10 @@ object StatementInterpreter {
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- Evaluator.asType(nTypeObj, env)
         } yield {
-          AddChannel(channel, nType)
+          ReturnValue(
+            AddChannel(channel, nType),
+            tcParameters
+          )
         }
       }
       case ConnectChannelParse(channelId, obj) => {
@@ -228,7 +266,12 @@ object StatementInterpreter {
 
               channelCanBeConnectedToObject <- IterationUtils.isIteratableToType(channelType, inputT, env)
               _ <- Outcome.failWhen(!channelCanBeConnectedToObject, s"can't connect channel ${channelId.s} of type ${channelType.displayString(env)} to object ${obj.s} of type ${inputT.displayString(env)}")
-            } yield ConnectChannel(channel, obj.s)
+            } yield {
+              ReturnValue(
+                ConnectChannel(channel, obj.s),
+                tcParameters
+              )
+            }
           }
           case Failure(reason) => {
             throw new Exception("Cannot yet connect channel to a type")
@@ -240,7 +283,12 @@ object StatementInterpreter {
         env.lookupVersionedObject(obj.s) match {
           case Success(versionedObjectLink) => {
             // No need for type checking when we are disconnecting
-            Success(DisconnectChannel(channel, obj.s))
+            Success(
+              ReturnValue(
+                DisconnectChannel(channel, obj.s),
+                tcParameters
+              )
+            )
           }
           case Failure(reason) => {
             throw new Exception("Cannot yet disconnect channel from a type")
@@ -253,33 +301,37 @@ object StatementInterpreter {
         for {
           tc <- TypeChecker.typeCheck(command, nType, env, FullFunction, tcParameters)
         } yield {
-          OutputToChannel(tc.nExpression, channel)
+          ReturnValue(
+            OutputToChannel(tc.nExpression, channel),
+            tcParameters
+          )
         }
       }
       case InferredTypeStatementParse(_, id, objExpression) => {
         for {
-          // TODO - we need a type inference here!!
+          // This infers the type using the output "refinedTypeClass"
           tc <- TypeChecker.typeCheckUnknownType(objExpression, env, Map.empty)
-          evaluatedObject <- Evaluator(tc.nExpression, env)
-          nObject <- TypeChecker.tagAndNormalizeObject(evaluatedObject, tc.refinedTypeClass, env)
         } yield {
-          FullEnvironmentCommand(id.s, nObject, false)
+          val nObject = NewMapObject(tc.nExpression, tc.refinedTypeClass)
+          ReturnValue(
+            FullEnvironmentCommand(id.s, nObject, false),
+            tcParameters
+          )
         }
       }
       case ExpressionOnlyStatementParse(exp) => {
         for {
-          // TODO - we need a type inference here!!
+          // This infers the type using the output "refinedTypeClass"
           tc <- TypeChecker.typeCheckUnknownType(exp, env, Map.empty)
-          evaluatedObject <- Evaluator(tc.nExpression, env)
-
-          constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
-
-          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, tc.refinedTypeClass, env)
         } yield {
-          ExpOnlyEnvironmentCommand(nObject)
+          val nObject = NewMapObject(tc.nExpression, tc.refinedTypeClass)
+          ReturnValue(
+            ExpOnlyEnvironmentCommand(nObject),
+            tcParameters
+          )
         }
       }
-      case EmptyStatement => Success(EmptyEnvironmentCommand)
+      case EmptyStatement => Success(ReturnValue(EmptyEnvironmentCommand, tcParameters))
     }
   }
 

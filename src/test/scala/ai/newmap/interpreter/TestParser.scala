@@ -285,7 +285,7 @@ class TestParser extends FlatSpec {
     ))
   }
 
-  "Multiline parse " should "work" ignore {
+  "Multiline parse " should "work" in {
     val multilineCode = """{
       new Count as y
       update y
@@ -298,14 +298,14 @@ class TestParser extends FlatSpec {
       result <- NewMapParser.statementParse(tokens)
     } yield result
 
-    val correctAnswer = LiteralCode(
+    val correctAnswer = ExpressionOnlyStatementParse(LiteralCode(
       Vector(
         NewVersionedStatementParse(IdentifierParse("y"),IdentifierParse("Count")),
         ApplyCommandStatementParse(IdentifierParse("y"),EmptyParse),
         ApplyCommandStatementParse(IdentifierParse("y"),EmptyParse)
       ),
       IdentifierParse("y")
-    )
+    ))
 
     assert(parseAttempt == Success(correctAnswer))
   } 

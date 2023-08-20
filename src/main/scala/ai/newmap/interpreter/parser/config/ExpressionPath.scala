@@ -100,7 +100,7 @@ object ExpressionPath {
         val thisPredecence = symbolPrecedence(s)
         Success(ExpressionInBinaryOpNoRight(s, this))
       }
-      case NewLine => Success(this)
+      case NewLine() => Success(this)
       case _ => ExpressionInBinaryOpNoRight("", this).update(token)
     }
 
@@ -168,7 +168,7 @@ object ExpressionPath {
             }
           }
         }
-        case (Some(statement), NewLine) => {
+        case (Some(statement), NewLine()) => {
           val newStatementList = existingStatements :+ statement
           Success(MultilineExpression(newStatementList))
         }
@@ -223,7 +223,7 @@ object ExpressionPath {
           // You've closed the block without having any expression
           Success(ExpressionStart(EmptyParse))
         }
-        case NewLine => Success(this)
+        case NewLine() => Success(this)
         case _ => InitState.update(token).map(expressionState => {
           MultilineMidExpression(expressionState, existingStatements)
         })
@@ -283,7 +283,7 @@ object ExpressionPath {
       case Symbol("`") => Success(ExpressionTickMark())
       case Symbol(s) => Success(UnaryExpression(s, InitState))
       case DQuote(s) => Success(ExpressionStart(StringParse(s)))
-      case Comment(_) | NewLine => Success(this)
+      case Comment(_) | NewLine() => Success(this)
     }
 
     override def generateOutput: Option[ParseTree] = Some(EmptyParse)

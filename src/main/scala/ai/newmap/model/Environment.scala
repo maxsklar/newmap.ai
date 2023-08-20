@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, SubtypeUtils}
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, SubtypeUtils, TypeChecker}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -124,10 +124,24 @@ case class Environment(
         )
       }
       case FullEnvironmentCommand(s, nObject, false) => {
-        this.copy(
-          commands = newCommands,
-          idToObject = idToObject + (s -> nObject)
-        )
+        val nObjectO = for {
+          evaluatedObject <- Evaluator(nObject.uObject, this)
+
+          constantObject = Evaluator.stripVersioningU(evaluatedObject, this)
+          nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nObject.nType, this)
+        } yield nObject
+
+        nObjectO match {
+          case Success(nObject) => {
+            this.copy(
+              commands = newCommands,
+              idToObject = idToObject + (s -> nObject)
+            )
+          }
+          case Failure(s) => throw new Exception("FullEnvironmentCommand: " + nObject.displayString(this))
+        }
+
+
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID

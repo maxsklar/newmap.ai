@@ -85,7 +85,7 @@ class EnvironmentInterpreter(
   }
 
   private def getTokensWithNewline(code: String): Outcome[List[Lexer.Token], String] = {
-    getTokens(code).map(tokens => tokens :+ Lexer.NewLine)
+    getTokens(code).map(tokens => tokens :+ Lexer.NewLine())
   }
 
   private def getTypeOf(code: String): String = {
@@ -187,11 +187,17 @@ class EnvironmentInterpreter(
           parser = response.newParser
 
           response.statementOutput.map(statement => {
-            val interpreted = StatementInterpreter(statement, mutableEnv, Map.empty)
-
-            interpreted.map(command => {
+            val result = for {
+              interpreted <- StatementInterpreter(statement, mutableEnv, Map.empty)
+              command <- StatementEvaluator(interpreted.command, mutableEnv)
+            } yield {
               mutableEnv = mutableEnv.newCommand(command)
-            })
+            }
+
+            result match {
+              case Failure(f) => return Failure(f)
+              case _ => ()
+            }
           })
         }
         case Failure(f) => return Failure(f)
@@ -224,7 +230,8 @@ class EnvironmentInterpreter(
       // TODO: This statement parse can now be "waiting" for the next line.. keep that in mind
       statementParse <- NewMapParser.statementParse(tokens)
 
-      command <- StatementInterpreter(statementParse, env, Map.empty)
+      interpreted <- StatementInterpreter(statementParse, env, Map.empty)
+      command <- StatementEvaluator(interpreted.command, env)
     } yield {
       applyEnvCommand(command)
     }

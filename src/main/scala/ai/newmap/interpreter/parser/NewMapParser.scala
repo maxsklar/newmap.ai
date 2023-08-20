@@ -41,7 +41,7 @@ case class NewMapCodeParserResponse(
 case class NewMapCodeParser(curState: ParseState[EnvStatementParse] = InitStatementState) {
   def update(token: Lexer.Token): Outcome[NewMapCodeParserResponse, String] = {
     (token, curState.generateOutput) match {
-      case (Lexer.NewLine | Lexer.Symbol(";"), Some(statement)) => {
+      case (Lexer.NewLine() | Lexer.Symbol(";"), Some(statement)) => {
         Success(
           NewMapCodeParserResponse(NewMapCodeParser(), Some(statement))
         )

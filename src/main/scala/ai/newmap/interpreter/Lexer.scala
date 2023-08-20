@@ -15,7 +15,7 @@ object Lexer extends RegexParsers {
   case class Symbol(s: String) extends Token
   case class DQuote(s: String) extends Token
   case class Comment(s: String) extends Token
-  case object NewLine extends Token
+  case class NewLine() extends Token
 
   case class TokenLocationInformation(
     file: String,
@@ -44,7 +44,11 @@ object Lexer extends RegexParsers {
   }
 
   def comment: Parser[Comment] = {
-    "//.*".r ^^ { str => Comment(str.drop(2)) }
+    "//[^\\n]*".r ^^ { str => Comment(str.drop(2))}
+  }
+
+  def newline: Parser[NewLine] = {
+    "\n".r ^^ { str => NewLine() }
   }
 
   def enclosure: Parser[Enc] = {
@@ -73,7 +77,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | symbol | dquote | enclosure | comment )) ^^ { rawTokens =>
+    phrase(rep1(identifier | number | symbol | dquote | enclosure | comment | newline)) ^^ { rawTokens =>
       rawTokens
     }
   }
