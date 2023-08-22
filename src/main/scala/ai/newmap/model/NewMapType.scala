@@ -162,7 +162,7 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransformPatter: UMapPattern,
+  typeTransformPattern: UMapPattern,
 
   // List of the actual types in the class
   // Along with their implementation

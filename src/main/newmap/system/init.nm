@@ -1,17 +1,17 @@
 ver res = new ReqMap(0: Object)
-update _default Count|0
-update _default Boolean|0
-update _default Type|UndefinedType
+update _default (Count:0)
+update _default (Boolean:0)
+update _default (Type: UndefinedType)
 
 // TODO - include this!
-//update _default (Array|T)|(0|())
+//update _default ((Array:T):(0|()))
 
 data String = Array|Char
 typeclass _display (t: (t => String))
-update _display String|(s: s)
+update _display (String: (s: s))
 
 //case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
 
-//"data Option (T: Type)
-//"update Option (None, ())
-//"update Option (Some, T)
+//data Option (T: Type)
+//update Option (None, ())
+//update Option (Some, T)

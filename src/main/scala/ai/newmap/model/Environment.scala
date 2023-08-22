@@ -623,7 +623,10 @@ object Environment {
         )
       )
     ),
-    ApplyIndividualCommand("_typeOf", UCase(UWildcardPattern("t"), UMap(Vector(UWildcardPattern("_") -> ParamId("t"))))),
+    ApplyIndividualCommand(
+      "_typeOf",
+      UMap(Vector(UWildcardPattern("t") -> UMap(Vector(UWildcardPattern("_") -> ParamId("t")))))
+    ),
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),

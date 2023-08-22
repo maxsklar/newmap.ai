@@ -325,6 +325,7 @@ object StatementInterpreter {
           tc <- TypeChecker.typeCheckUnknownType(exp, env, Map.empty)
         } yield {
           val nObject = NewMapObject(tc.nExpression, tc.refinedTypeClass)
+
           ReturnValue(
             ExpOnlyEnvironmentCommand(nObject),
             tcParameters

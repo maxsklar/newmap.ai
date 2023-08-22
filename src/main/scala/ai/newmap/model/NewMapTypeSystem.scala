@@ -224,7 +224,7 @@ case class NewMapTypeSystem(
       case "Long" => Success(LongT)
       case "Double" => Success(DoubleT)
       case "Uuid" => Success(UuidT)
-      case "Undefined" => Success(UndefinedT)
+      case "UndefinedType" => Success(UndefinedT)
       case "Type" => Success(TypeT)
       case "HistoricalType" => params match {
         case Uuuid(uuid) => Success(HistoricalTypeT(uuid))
@@ -506,7 +506,7 @@ object NewMapTypeSystem {
 
         "Type" -> java.util.UUID.randomUUID,
         "HistoricalType" -> java.util.UUID.randomUUID,
-        "Undefined" -> java.util.UUID.randomUUID,
+        "UndefinedType" -> java.util.UUID.randomUUID,
         "Identifier" -> java.util.UUID.randomUUID,
 
         "Map" -> java.util.UUID.randomUUID,

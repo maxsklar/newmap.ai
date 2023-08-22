@@ -137,16 +137,22 @@ object CommandMaps {
       case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
         
 
-      case TypeClassT(typeTransform, implementation) => Success(
-        CaseT(Vector(typeTransform.key -> typeTransform.value), TypeT, SimpleFunction)
-        
-        // Its not requireCompleteness because we're not giving the full map here.
-        // - This is inelegant, because it shouldn't be CommandOutput either.
-        // - TODO: somehow indicate when we don't want to check for completeness
-        // -- Or maybe our typetransform should indicate a subset??
-        //MapT(UMap(typeTransform), MapConfig(RequireCompleteness, SimpleFunction))
-        //StructT(typeTransform,  TypeT, CommandOutput, SimpleFunction)
-      )
+      case TypeClassT(typeTransform, implementation) => {
+        for {
+          bindings <- getTypeTransformBindings(typeTransform)
+        } yield {
+          //CaseT(Vector(typeTransform.key -> typeTransform.value), TypeT, SimpleFunction)
+          
+          // Its not requireCompleteness because we're not giving the full map here.
+          // - This is inelegant, because it shouldn't be CommandOutput either.
+          // - TODO: somehow indicate when we don't want to check for completeness
+          // -- Or maybe our typetransform should indicate a subset??
+          //MapT(typeTransform, MapConfig(CommandOutput, BasicMap))
+          
+          //MapT(UMap(typeTransform), MapConfig(RequireCompleteness, SimpleFunction))
+          StructT(bindings, TypeT, CommandOutput, BasicMap)
+        }
+      }
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
       case CustomT(name, UStruct(params)) => {
         val currentState = typeSystem.currentState
@@ -258,13 +264,9 @@ object CommandMaps {
       }
       case TypeClassT(typeTransform, implementation) => {
         command match {
-          case UCase(constructor, input) => {
-            val newImplementation = (constructor -> input) +: implementation.filter(x => x._1 != constructor)
-            val keys = Vector(constructor)
-          /*}
           case UMap(mappings) => {
             val keys = mappings.map(_._1)
-            val newImplementation = mappings ++ implementation.filter(x => !keys.contains(x._1))*/
+            val newImplementation = mappings ++ implementation.filter(x => !keys.contains(x._1))
 
             Success(ExpandKeyResponse(
               TypeClassT(typeTransform, newImplementation),
@@ -760,6 +762,15 @@ object CommandMaps {
     }
     case _ => Failure("Could not handle type transform: " + typeTransform)
   }
+
+  def getTypeTransformBindings(
+    typeTransform: UntaggedObject
+  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = typeTransform match {
+    case UMap(values) => Success(values)
+    case UMapPattern(key, value) => Success(Vector(key -> value))
+    case _ => Failure("Could not get bindings: " + typeTransform)
+  }
+
 
   def getDefaultValueFromStructParams(
     params: Vector[(UntaggedObject, UntaggedObject)],

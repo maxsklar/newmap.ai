@@ -779,7 +779,7 @@ object TypeChecker {
 
           result <- typeCheckStruct(restOfParamList, nTypeForStructFieldName, restOfValueList, env, featureSet, tcParameters)
         } yield {
-          (paramId, substExp) +: result
+          (valueIdObj, substExp) +: result
         }
       }
       case (((paramId, typeOfIdentifier) +: restOfParamList), (valueObject +: restOfValueList)) => {
@@ -865,7 +865,7 @@ object TypeChecker {
       resultingType <- typeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, implementation) => {
-          outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
+          outputTypeFromTypeClassParams(typeTransform, UMap(implementation), inputTC, inputType, env)
         }
         case MapT(typeTransform, config) => {
           for {
@@ -883,7 +883,7 @@ object TypeChecker {
 
             result <- underlingT match {
               case TypeClassT(typeTransform, implementation) => {
-                outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
+                outputTypeFromTypeClassParams(typeTransform, UMap(implementation), inputTC, inputType, env)
               }
               case _ => Failure(s"Cannot get resulting type from function of Type ${functionTypeChecked.nExpression} -- $function -- $input")
             }
@@ -948,36 +948,21 @@ object TypeChecker {
   }
 
   def outputTypeFromTypeClassParams(
-    params: UMapPattern,
-    implementation: Vector[(UntaggedObject, UntaggedObject)],
+    params: UntaggedObject,
+    implementation: UntaggedObject,
     input: UntaggedObject,
     inputType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
-    val uMap = UMap(implementation)
     val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
     
     for {
-      // Ensure that this type is a member of the type class
-      _ <- Evaluator.applyFunctionAttempt(uMap, untaggedInputType, env)
-
-      resultingFunctionType <- Evaluator.applyFunctionAttempt(UMap(Vector(params.key -> params.value)), untaggedInputType, env)
+      resultingFunctionType <- Evaluator.applyFunctionAttempt(params, untaggedInputType, env)
       resultingFunctionT <- env.typeSystem.convertToNewMapType(resultingFunctionType)
-
-      outputT <- resultingFunctionT match {
-        case MapT(typeTransform, config) => {
-          for {
-            typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, untaggedInputType, env, TypeMatcher)
-            nType <- Evaluator.asType(typeAsObj, env)
-            // TODO: This should be uncommented when we can build "convertible to" into the type transform
-            //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
-          } yield nType
-        }
-        case _ => {
-          throw new Exception(s"Couldn't handle function type within typeclass: $resultingFunctionType")
-        }
-      }
-    } yield outputT
+    } yield {
+      println("Returning from outputTypeFromTypeClassParams: " + resultingFunctionT)
+      resultingFunctionT
+    }
   }
 
   def outputTypeFromStructParams(
