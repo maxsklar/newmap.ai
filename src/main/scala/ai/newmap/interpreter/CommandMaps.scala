@@ -604,6 +604,9 @@ object CommandMaps {
           } else {
             Failure(s"channelParentType doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
           }
+
+          currentChannels <- RetrieveType.getMapBindings(currentFunctionMapConfig.channels)
+          newChannels <- RetrieveType.getMapBindings(newFunctionMapConfig.channels)
         } yield {
           val composedTypeTransForm = newFunctionTypeTransform ++ currentFunctionTypeTransform
 
@@ -617,7 +620,7 @@ object CommandMaps {
             composedCompleteness,
             composedFeatureSet,
             currentFunctionMapConfig.preservationRules ++ newFunctionMapConfig.preservationRules,
-            newFunctionMapConfig.channels ++ currentFunctionMapConfig.channels,
+            UMap(newChannels ++ currentChannels),
             composedChannelParentType
           )
 

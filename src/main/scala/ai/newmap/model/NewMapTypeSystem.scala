@@ -75,7 +75,7 @@ case class NewMapTypeSystem(
         UIdentifier(config.completeness.getName),
         UIdentifier(config.featureSet.getName),
         UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
-        UMap(config.channels.map(x => (x._1 -> typeToUntaggedObject(x._2)))),
+        config.channels,
         typeToUntaggedObject(config.channelParentType)
       ))
     )))
