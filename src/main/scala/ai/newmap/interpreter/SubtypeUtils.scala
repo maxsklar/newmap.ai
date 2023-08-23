@@ -25,8 +25,8 @@ object SubtypeUtils {
     }
     else {
       val piecemealCompletenessOutcome = nTypeOutcome match {
-        case Success(CaseT(cases, _, _)) => Success(checkCaseComplete(keys, cases, env))
-        case Success(StructT(params, _, _, _)) => checkStructComplete(keys, params, env)
+        case Success(CaseT(UMap(cases), _, _)) => Success(checkCaseComplete(keys, cases, env))
+        case Success(StructT(UMap(params), _, _, _)) => checkStructComplete(keys, params, env)
         case _ => Success(false)
       }
 
@@ -118,7 +118,7 @@ object SubtypeUtils {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a UntaggedObject, not just a NewMapObject
-          case StructT(params, _, _, _) if (params.length == patterns.length) => {
+          case StructT(UMap(params), _, _, _) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
                 isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
@@ -263,7 +263,7 @@ object SubtypeUtils {
         )*/
         Failure("Need to implement struct conversion")
       }
-      case (StructT(values, fieldParentType, _, _), _) if (values.length == 1) => {
+      case (StructT(values, fieldParentType, _, _), _) if (isSingularMap(values)) => {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, fieldParentType, env)
           singularObj <- Evaluator(singularOutput, env)
@@ -273,7 +273,8 @@ object SubtypeUtils {
       }
       case (_, StructT(values, fieldParentType, _, _)) => {
         for {
-          singularOutputResponse <- convertToStructWithSingleValue(values, env)
+          valueBindings <- RetrieveType.getMapBindings(values)
+          singularOutputResponse <- convertToStructWithSingleValue(valueBindings, env)
           singularObj <- Evaluator(singularOutputResponse.inputType, env)
           singularObjT <- Evaluator.asType(singularObj, env)
           response <- isTypeConvertible(startingType, singularObjT, env)
@@ -292,7 +293,7 @@ object SubtypeUtils {
         // TODO: The outputs have to agree as well
         Failure("Need to implement case conversion")
       }
-      case (CaseT(values, startingFieldType, _), _) if (values.length == 1) => {
+      case (CaseT(values, startingFieldType, _), _) if (isSingularMap(values)) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, startingFieldType, env)
@@ -301,7 +302,7 @@ object SubtypeUtils {
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
-      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, endingFieldType, _)) if (values.length == 1) => {
+      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, endingFieldType, _)) if (isSingularMap(values)) => {
         // TODO: It's confusing why we would need this, but it prevents the case directly below from firing
         // -- Eventually this whole method should be refactored.
         for {
@@ -311,7 +312,7 @@ object SubtypeUtils {
           response
         }
       }
-      case (_, CaseT(values, endingFieldType, _)) if (values.length == 1) => {
+      case (_, CaseT(values, endingFieldType, _)) if (isSingularMap(values)) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, endingFieldType, env)
@@ -435,23 +436,34 @@ object SubtypeUtils {
     startingFeatureSet.getLevel <= endingFeatureSet.getLevel
   }
 
+  def isSingularMap(uObject: UntaggedObject): Boolean = uObject match {
+    case UMap(values) if (values.length == 1) => true
+    case UMapPattern(_, _) => true
+    case _ => false
+  }
+
   // If this function only allows one input, then return the output for that input
   def outputIfFunctionHasSingularInput(
-    mapValues: Vector[(UntaggedObject, UntaggedObject)],
+    mapValues: UntaggedObject,
     fieldType: NewMapType,
     env: Environment
-  ): Outcome[UntaggedObject, String] = {
-    if (mapValues.length == 1) {
+  ): Outcome[UntaggedObject, String] = mapValues match {
+    case UMap(Vector(head)) => {
       // THIS IS WHERE WE NEED TO DEAL WITH PATTERNS IN THE MAP VALUE
-      val key = mapValues.head._1
+      val key = head._1
 
       for {
         newParameters <- RetrieveType.fetchParamsFromPattern(fieldType, key, env)
         _ <- Outcome.failWhen(newParameters.size > 0, "Function had a pattern")
-      } yield mapValues.head._2
-    } else {
-      Failure("Function did not have singular input")
+      } yield head._2
     }
+    case UMapPattern(key, value) => {
+      for {
+        newParameters <- RetrieveType.fetchParamsFromPattern(fieldType, key, env)
+        _ <- Outcome.failWhen(newParameters.size > 0, "Function had a pattern")
+      } yield value
+    }
+    case _ => Failure("Function did not have singular input")
   }
 
   case class StructWithSingleValueResponse(

@@ -15,7 +15,7 @@ object IterationUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      case Success(CaseT(cases, CustomT("String", UStruct(v)), BasicMap)) if (v.isEmpty) => {
+      case Success(CaseT(UMap(cases), CustomT("String", UStruct(v)), BasicMap)) if (v.isEmpty) => {
         for {
           paramList <- StatementInterpreter.convertMapValuesToParamList(cases, env)
           result <- enumerateCaseValues(paramList, env)
@@ -27,7 +27,7 @@ object IterationUtils {
       case Success(BooleanT) => {
         Success(Vector(UIndex(0), UIndex(1)))
       }
-      case Success(StructT(params, parentFieldType, RequireCompleteness, BasicMap)) => {
+      case Success(StructT(UMap(params), parentFieldType, RequireCompleteness, BasicMap)) => {
         // This is dangerous because the multiplications can cause a large blowout of allowed types
         
         params match {
@@ -35,7 +35,7 @@ object IterationUtils {
             for {
               firstParamT <- env.typeSystem.convertToNewMapType(firstParamType)
               firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
-              otherParamValues <- enumerateAllValuesIfPossible(StructT(otherParams, parentFieldType, RequireCompleteness, BasicMap), env)
+              otherParamValues <- enumerateAllValuesIfPossible(StructT(UMap(otherParams), parentFieldType, RequireCompleteness, BasicMap), env)
             } yield {
               val valueList = for {
                 firstParam <- firstParamValues
@@ -56,15 +56,6 @@ object IterationUtils {
             Success(Vector(UStruct(Vector.empty)))
           }
         }
-        /*
-          case class StructT(
-            params: Vector[(UntaggedObject, UntaggedObject)],
-            fieldParentType: NewMapType,
-            completeness: MapCompleteness = RequireCompleteness,
-            featureSet: MapFeatureSet = BasicMap
-          ) extends NewMapType
-
-        */
       }
       case Success(undertype) => {
         //throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")

@@ -80,13 +80,13 @@ object RetrieveType {
         case (_, UWildcardPattern(x)) => Success(Map(x -> nType))
         case (CaseT(cases, _, _), UCase(constructor, resultPattern)) => {
           for {
-            valueTypeExpression <- Evaluator.attemptPatternMatchInOrder(cases, constructor, env)
+            valueTypeExpression <- Evaluator.applyFunctionAttempt(cases, constructor, env)
             valueType <- Evaluator(valueTypeExpression, env)
             valueT <- env.typeSystem.convertToNewMapType(valueType)
             result <- fetchParamsFromPattern(valueT, resultPattern, env)
           } yield result
         }
-        case (StructT(params, _, _, BasicMap), UStruct(values)) => {
+        case (StructT(UMap(params), _, _, BasicMap), UStruct(values)) => {
           if (params.length == values.length) {
             var resultMap: Map[String, NewMapType] = Map.empty
 
@@ -120,5 +120,13 @@ object RetrieveType {
         }
       }
     } yield answer
+  }
+
+  def getMapBindings(
+    map: UntaggedObject
+  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = map match {
+    case UMap(values) => Success(values)
+    case UMapPattern(key, value) => Success(Vector(key -> value))
+    case _ => Failure("Could not get bindings: " + map)
   }
 }

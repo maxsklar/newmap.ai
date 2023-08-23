@@ -151,7 +151,7 @@ case class TypeParameterVariance(
 
 // Params is a map from the fields of the struct to the Types (all the same level)
 case class StructT(
-  params: Vector[(UntaggedObject, UntaggedObject)],
+  params: UntaggedObject,
   fieldParentType: NewMapType,
   completeness: MapCompleteness = RequireCompleteness,
   featureSet: MapFeatureSet = BasicMap
@@ -166,13 +166,13 @@ case class TypeClassT(
 
   // List of the actual types in the class
   // Along with their implementation
-  typesInTypeClass: Vector[(UntaggedObject, UntaggedObject)],
+  typesInTypeClass: UntaggedObject,
 ) extends NewMapType
 
 // cases: input type is the case constructors, output type is the field types per constructor
 // TODO - this is not really a type because of the existance of type parameters. This is more of a type constructor
 case class CaseT(
-  cases: Vector[(UntaggedObject, UntaggedObject)],
+  cases: UntaggedObject,
   fieldParentType: NewMapType,
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType

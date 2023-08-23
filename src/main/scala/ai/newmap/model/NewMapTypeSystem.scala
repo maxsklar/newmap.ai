@@ -80,17 +80,17 @@ case class NewMapTypeSystem(
       ))
     )))
     case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
-      UMap(params),
+      params,
       typeToUntaggedObject(fieldParentType),
       UIdentifier(completenesss.getName),
       UIdentifier(featureSet.getName)
     )))
     case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UStruct(Vector(
       typeTransform,
-      UMap(typesInTypeClass)
+      typesInTypeClass
     )))
     case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UStruct(Vector(
-      UMap(cases),
+      cases,
       typeToUntaggedObject(fieldParentType),
       UIdentifier(featureSet.getName)
     )))
@@ -114,7 +114,7 @@ case class NewMapTypeSystem(
     case ParamIdT(name) => ParamId(name)
   }
 
-  def emptyStructType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
   def emptyStructPattern = UStruct(Vector.empty)
 
   def getParameterType(
@@ -148,7 +148,7 @@ case class NewMapTypeSystem(
     case "Subtype" => Failure("Subtype not implemented")
     case "WithState" => Success(
       CaseT(
-        Vector(UWildcardPattern("tsid") -> UCase(UIdentifier("HistoricalType"), ParamId("tsid"))),
+        UMap(Vector(UWildcardPattern("tsid") -> UCase(UIdentifier("HistoricalType"), ParamId("tsid")))),
         UuidT,
         SimpleFunction
       )
@@ -205,7 +205,7 @@ case class NewMapTypeSystem(
 
   def buildStructTypeFromParamList(paramList: Vector[UntaggedObject]): NewMapType = {
     StructT(
-      paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1),
+      UMap(paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1)),
       IndexT(UIndex(paramList.length))
     )
   }
@@ -259,11 +259,6 @@ case class NewMapTypeSystem(
       case "Struct" => params match {
         case UStruct(items) if (items.length == 4) => {
           for {
-            structMap <- items(0) match {
-              case UMap(uMap) => Success(uMap)
-              case _ => Failure(s"Invalid struct map: ${items(0)}")
-            }
-
             parentT <- convertToNewMapType(items(1))
 
             completeness <- items(2) match {
@@ -274,7 +269,7 @@ case class NewMapTypeSystem(
 
             featureSet <- convertFeatureSet(items(3))
           } yield {
-            StructT(structMap, parentT, completeness, featureSet)
+            StructT(items(0), parentT, completeness, featureSet)
           }
         }
         case _ => Failure(s"Couldn't convert Struct to NewMapType with params: $params")
@@ -290,14 +285,8 @@ case class NewMapTypeSystem(
               }
               case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
             }
-
-            implementation <- items(1) match {
-              case UMap(uMap) => Success(uMap)
-              case _ => Failure(s"Invalid implementation map in TypeClass: ${items(0)}")
-            }
           } yield {
-
-            TypeClassT(typeTransform, implementation)
+            TypeClassT(typeTransform, items(1))
           }
         }
         case _ => Failure(s"Couldn't convert TypeClass to NewMapType with params: $params")
@@ -305,15 +294,10 @@ case class NewMapTypeSystem(
       case "Case" => params match {
         case UStruct(items) if items.length == 3 => {
           for {
-            caseMap <- items(0) match {
-              case UMap(uMap) => Success(uMap)
-              case _ => Failure(s"Invalid case map: ${items(0)}")
-            }
-
             parentT <- convertToNewMapType(items(1))
 
             featureSet <- convertFeatureSet(items(2))
-          } yield CaseT(caseMap, parentT, featureSet)
+          } yield CaseT(items(0), parentT, featureSet)
         }
         case _ => Failure(s"Couldn't convert Case to NewMapType with params: $params")
       }
@@ -517,5 +501,5 @@ object NewMapTypeSystem {
     ),
   )
 
-  val emptyStruct: NewMapType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  val emptyStruct: NewMapType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 }

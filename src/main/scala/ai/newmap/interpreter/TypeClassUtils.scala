@@ -52,7 +52,7 @@ object TypeClassUtils {
           _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $i not a member of subtype $nType")
         } yield refinedType
       }
-      case StructT(params, _, _, _) => {
+      case StructT(UMap(params), _, _, _) => {
         if (params.length == 1) {
           for {
             typeObj <- Evaluator(params.head._2, env)

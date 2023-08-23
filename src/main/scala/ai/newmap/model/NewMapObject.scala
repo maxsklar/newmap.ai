@@ -31,10 +31,10 @@ object NewMapO {
 
   def identifier(s: String): NewMapObject = NewMapObject(UIdentifier(s), IdentifierT)
 
-  def emptyStruct: NewMapType = StructT(Vector.empty, IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  def emptyStruct: NewMapType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 
   def taggedObjectT: NewMapType = CaseT(
-    Vector(UWildcardPattern("t") -> ParamId("t")),
+    UMap(Vector(UWildcardPattern("t") -> ParamId("t"))),
     fieldParentType = TypeT,
     featureSet = PatternMap,
   )

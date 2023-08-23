@@ -147,13 +147,13 @@ object TypeChecker {
               expectedTypeOutcome match {
                 case Success(CaseT(cases, IdentifierT, featureSet)) => {
                   for {
-                    caseType <- Evaluator.applyFunctionAttempt(UMap(cases), UIdentifier(s), env)
+                    caseType <- Evaluator.applyFunctionAttempt(cases, UIdentifier(s), env)
 
                     caseT <- env.typeSystem.convertToNewMapType(caseType)
 
                     // TODO - of course, we can formulize this better!
                     caseTypeIsEmptyStruct = caseT match {
-                      case StructT(params, _, _, _) => params.isEmpty
+                      case StructT(UMap(params), _, _, _) => params.isEmpty
                       case _ => false
                     }
 
@@ -173,7 +173,7 @@ object TypeChecker {
 
                     // TODO - of course, we can formulize this better!
                     parameterTypeIsEmptyStruct = parameterT match {
-                      case StructT(params, _, _, _) => params.isEmpty
+                      case StructT(UMap(params), _, _, _) => params.isEmpty
                       case _ => false
                     }
 
@@ -238,8 +238,10 @@ object TypeChecker {
           // TODO: Remove this in favor of other struct T
           case Success(StructT(parameterList, parentFieldType, _, _)) => {
             for {
+              parameterBindings <- RetrieveType.getMapBindings(parameterList)
+
               result <- typeCheckStruct(
-                parameterList,
+                parameterBindings,
                 parentFieldType, // Is this right - or do we need to pass in the subset??
                 values,
                 env,
@@ -306,7 +308,7 @@ object TypeChecker {
                 mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, featureSet, tcParameters)
               } yield {
                 TypeCheckResponse(
-                  env.typeSystem.typeToUntaggedObject(StructT(mapValues, IdentifierT, RequireCompleteness, BasicMap)),
+                  env.typeSystem.typeToUntaggedObject(StructT(UMap(mapValues), IdentifierT, RequireCompleteness, BasicMap)),
                   expectedType
                 )
               }
@@ -317,7 +319,7 @@ object TypeChecker {
                 val indexType = IndexT(UIndex(expressions.length))
                 TypeCheckResponse(
                   env.typeSystem.typeToUntaggedObject(StructT(
-                    expressions.zipWithIndex.map(x => UIndex(x._2) -> x._1),
+                    UMap(expressions.zipWithIndex.map(x => UIndex(x._2) -> x._1)),
                     indexType,
                     RequireCompleteness,
                     BasicMap
@@ -373,7 +375,7 @@ object TypeChecker {
               // must be a "simple map" type situation
               // can this be built into the evaluator?
               firstObj <- Evaluator(firstExp.nExpression, env)
-              secondType <- Evaluator.applyFunctionAttempt(UMap(simpleMap), firstObj, env)
+              secondType <- Evaluator.applyFunctionAttempt(simpleMap, firstObj, env)
 
               secondT <- Evaluator.asType(secondType, env)
               secondExp <- typeCheck(second, secondT, env, featureSet, tcParameters)
@@ -635,7 +637,7 @@ object TypeChecker {
         )
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (LiteralListParse(values, _), Success(StructT(structValues, parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (LiteralListParse(values, _), Success(StructT(UMap(structValues), parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
         } yield {
@@ -648,7 +650,7 @@ object TypeChecker {
           constructorTC <- typeCheckWithPatternMatching(constructorP, parentFieldType, env, externalFeatureSet, if (parentFieldType == IdentifierT) BasicMap else internalFeatureSet, tcParameters)
           constructor <- Evaluator(constructorTC.typeCheckResult, env)
 
-          inputTypeExpected <- Evaluator.applyFunctionAttempt(UMap(cases), constructor, env)
+          inputTypeExpected <- Evaluator.applyFunctionAttempt(cases, constructor, env)
           inputTExpected <- Evaluator.asType(inputTypeExpected, env)
 
           result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet, constructorTC.newParams)
@@ -863,9 +865,9 @@ object TypeChecker {
       untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
 
       resultingType <- typeOfFunction match {
-        case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
+        case StructT(UMap(params), _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, implementation) => {
-          outputTypeFromTypeClassParams(typeTransform, UMap(implementation), inputTC, inputType, env)
+          outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
         }
         case MapT(typeTransform, config) => {
           for {
@@ -883,7 +885,7 @@ object TypeChecker {
 
             result <- underlingT match {
               case TypeClassT(typeTransform, implementation) => {
-                outputTypeFromTypeClassParams(typeTransform, UMap(implementation), inputTC, inputType, env)
+                outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
               }
               case _ => Failure(s"Cannot get resulting type from function of Type ${functionTypeChecked.nExpression} -- $function -- $input")
             }
@@ -907,7 +909,7 @@ object TypeChecker {
 
             strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
 
-            patternMatchAttempted <- Evaluator.attemptPatternMatchInOrder(impl, untaggedInputType, env, TypeMatcher)
+            patternMatchAttempted <- Evaluator.applyFunctionAttempt(impl, untaggedInputType, env, TypeMatcher)
           } yield {
             patternMatchAttempted
           }

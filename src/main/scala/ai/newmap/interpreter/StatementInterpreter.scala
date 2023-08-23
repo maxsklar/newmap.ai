@@ -92,7 +92,7 @@ object StatementInterpreter {
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           ReturnValue(
-            NewParamTypeCommand(id.s, paramList, CaseT(Vector.empty, IdentifierT)),
+            NewParamTypeCommand(id.s, paramList, CaseT(UMap(Vector.empty), IdentifierT)),
             tcParameters
           )
         }

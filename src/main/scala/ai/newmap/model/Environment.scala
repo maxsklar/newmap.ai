@@ -194,7 +194,7 @@ case class Environment(
           paramList.head._2
         } else {
           StructT(
-            paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2)),
+            UMap(paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2))),
             IndexT(UIndex(paramList.length))
           )
         }
@@ -212,7 +212,7 @@ case class Environment(
         )
       }
       case NewTypeClassCommand(s, typeTransform) => {
-        val nType = TypeClassT(typeTransform, Vector.empty)
+        val nType = TypeClassT(typeTransform, UMap(Vector.empty))
         val uType = typeSystem.typeToUntaggedObject(nType)
 
         val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
@@ -494,7 +494,7 @@ object Environment {
       params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
     }
 
-    StructT(paramsToObject, IdentifierT)
+    StructT(UMap(paramsToObject), IdentifierT)
   }
 
   def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
@@ -502,7 +502,7 @@ object Environment {
       params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
     }
 
-    CaseT(paramsToObject, IdentifierT)
+    CaseT(UMap(paramsToObject), IdentifierT)
   }
 
   // For Debugging
@@ -523,7 +523,7 @@ object Environment {
     env: Environment
   ): NewMapObject = {
     val structT = StructT(
-      inputs.zipWithIndex.map(x => UIndex(x._2) -> Base.typeSystem.typeToUntaggedObject(x._1._2)),
+      UMap(inputs.zipWithIndex.map(x => UIndex(x._2) -> Base.typeSystem.typeToUntaggedObject(x._1._2))),
       IndexT(UIndex(inputs.length))
     )
 
@@ -608,8 +608,8 @@ object Environment {
     eCommand("GenericMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
     eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), false)),
     eCommand("Table", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), false)),
-    eCommand("CaseType", typeAsObject(CaseT(Vector.empty, IdentifierT, BasicMap))),
-    eCommand("StructSeq", typeAsObject(StructT(Vector.empty, IndexT(UIndex(0))))),
+    eCommand("CaseType", typeAsObject(CaseT(UMap(Vector.empty), IdentifierT, BasicMap))),
+    eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
       MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
@@ -631,12 +631,12 @@ object Environment {
       "Array",
       Vector("T" -> TypeT),
       CaseT(
-        Vector(UWildcardPattern("i") -> typeAsUntaggedObject(
+        UMap(Vector(UWildcardPattern("i") -> typeAsUntaggedObject(
           MapT(
             Base.toTypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
             MapConfig(RequireCompleteness, SimpleFunction)
           )
-        )),
+        ))),
         CountT,
         SimpleFunction
       )

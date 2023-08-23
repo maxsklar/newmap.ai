@@ -40,7 +40,7 @@ object PrintNewMapObject {
         case _ => Failure(s"Not a type class: ${dislayUnderlyingExpT.displayString(env)}")
       }
 
-      result <- Evaluator.applyFunctionAttempt(UMap(mapValues), nType, env, TypeMatcher) match {
+      result <- Evaluator.applyFunctionAttempt(mapValues, nType, env, TypeMatcher) match {
         case Success(s) => Success(s)
         case Failure(f) => Failure(f.toString)
       }
@@ -110,12 +110,12 @@ object PrintNewMapObject {
         s"Generic(${untagged(typeTransform)})"
       }
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
-      case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})"
+      case StructT(params, parentType, completeness, featureSet) => s"Struct(${untagged(params)})"
       case TypeClassT(typeTransform, implementation) => {
-        s"TypeClassT(${untagged(typeTransform)}, ${mapToString(implementation)})"
+        s"TypeClassT(${untagged(typeTransform)}, ${untagged(implementation)})"
       }
       case CaseT(cases, _, _) => {
-        s"Case${mapToString(cases)}"
+        s"Case${untagged(cases)}"
       }
       //TODO(2022): we might not want to print out the full parent here, because it could be large
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
