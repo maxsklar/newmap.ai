@@ -50,6 +50,7 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "1.4.0"
 
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.0.5"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.5" % "test"
+libraryDependencies += "org.jline" % "jline" % "3.21.0"
 resolvers += "Artima Maven Repository" at "https://repo.artima.com/releases"
 
 libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.5"

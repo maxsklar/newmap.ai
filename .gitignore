@@ -1,5 +1,10 @@
-target/
+.DS_Store
+.bloop/
 .bsp/
 .idea/
+.metals/
+.vscode/
+project/.bloop/
+project/metals.sbt
 project/project/
-.DS_Store
+target/
