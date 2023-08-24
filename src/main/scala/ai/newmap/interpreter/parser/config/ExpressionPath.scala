@@ -73,23 +73,25 @@ object ExpressionPath {
       for {
         firstExp <- firstParameter.generateOutput
         secondExp <- secondParameter.generateOutput
-      } yield symbol match {
-        case "." | "|" => ConstructCaseParse(firstExp, secondExp)
-        case ":" => KeyValueBinding(firstExp, secondExp)
-        case "," => {
-          firstExp match {
-            case LiteralListParse(items, MapType) => {
-              LiteralListParse(items :+ secondExp, MapType)
+
+        result <- symbol match {
+          case "." | "|" => Some(ConstructCaseParse(firstExp, secondExp))
+          case ":" => Some(KeyValueBinding(firstExp, secondExp))
+          case "," => {
+            firstExp match {
+              case LiteralListParse(items, MapType) => {
+                Some(LiteralListParse(items :+ secondExp, MapType))
+              }
+              case _ => Some(LiteralListParse(Vector(firstExp, secondExp), MapType))
             }
-            case _ => LiteralListParse(Vector(firstExp, secondExp), MapType)
+          }
+          case "=>" => Some(LambdaParse(firstExp, secondExp))
+          case "" => Some(ApplyParse(firstExp, secondExp))
+          case _ => {
+            None
           }
         }
-        case "=>" => LambdaParse(firstExp, secondExp)
-        case "" => ApplyParse(firstExp, secondExp)
-        case _ => {
-          throw new Exception("Unexpected symbol: " + symbol)
-        }
-      }
+      } yield result
     }
   }
 
@@ -301,7 +303,7 @@ object ExpressionPath {
     case "," => 3
     case "=>" => 1
     case _ => {
-      println("*** UNKNOWN SYMBOL: " + symbol)
+      println("Unknown Symbol: " + symbol)
       0
     }
   }
