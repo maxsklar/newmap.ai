@@ -962,7 +962,6 @@ object TypeChecker {
       resultingFunctionType <- Evaluator.applyFunctionAttempt(params, untaggedInputType, env)
       resultingFunctionT <- env.typeSystem.convertToNewMapType(resultingFunctionType)
     } yield {
-      println("Returning from outputTypeFromTypeClassParams: " + resultingFunctionT)
       resultingFunctionT
     }
   }

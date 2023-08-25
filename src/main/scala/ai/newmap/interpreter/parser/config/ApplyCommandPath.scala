@@ -2,7 +2,7 @@ package ai.newmap.interpreter.parser.config
 
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.Identifier
+import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model.{ApplyCommandStatementParse, EnvStatementParse, IdentifierParse, ParseElement, ParseTree}
 import ai.newmap.util.{Failure, Success, Outcome}
 import scala.collection.mutable.ListBuffer
@@ -30,9 +30,16 @@ object ApplyCommandPath {
     }
   }
 
+  case class Colon(id: String) extends ParseState[EnvStatementParse] {
+    override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {
+      case Symbol(":") => Success(ApplyCommand(id))
+      case _ => Failure("Expected =, got " + token.toString)
+    }
+  }
+
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseState.expectingIdentifier(token, id => ApplyCommand(id))
+      ParseState.expectingIdentifier(token, id => Colon(id))
     }
   }
 }

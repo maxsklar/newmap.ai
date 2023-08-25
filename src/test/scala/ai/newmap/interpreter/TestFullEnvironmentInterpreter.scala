@@ -265,7 +265,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be creatable as a versioned object" in {
     testCodeScript(Vector(
       CodeExpectation("ver x = new ()", GeneralSuccessCheck),
-      CodeExpectation("update x (myField, Count|3)", GeneralSuccessCheck),
+      CodeExpectation("update x: (myField, Count|3)", GeneralSuccessCheck),
     ))
   }
 
@@ -273,7 +273,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("ver x = new ()", GeneralSuccessCheck),
       CodeExpectation("val o: Object = Count|3", GeneralSuccessCheck),
-      CodeExpectation("update x (myField, o)", GeneralSuccessCheck),
+      CodeExpectation("update x: (myField, o)", GeneralSuccessCheck),
     ))
   }
 
@@ -303,8 +303,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     testCodeScript(Vector(
       CodeExpectation("data MyCase = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (a, 2)", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (b, 3)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (a, 2)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (b, 3)", GeneralSuccessCheck),
       // TODO - allow this check without knowing mycase id!
       CodeExpectation("val x: MyCase = a|0", GeneralSuccessCheck/*SuccessCheck(correctCommand)*/),
       CodeExpectation("val y: MyCase = a|b", FailureCheck),
@@ -513,10 +513,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " keep constant and updatable key type" in {
     testCodeScript(Vector(
       CodeExpectation("data n = 0", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("val m: ReqMap(n: 5) = (0: 3, 1: 4)", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("val newVersioned: n = 2", GeneralSuccessCheck),
       CodeExpectation("m newVersioned", FailureCheck), // m still takes inputs 0, 1 even though n was updated
       CodeExpectation("val nv: n = 0", GeneralSuccessCheck),
@@ -537,7 +537,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " not be allowed to call a full function map" in {
     testCodeScript(Vector(
       CodeExpectation("data Funny = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update Funny (FunMap, (Funny => 2))", GeneralSuccessCheck),
+      CodeExpectation("update Funny: (FunMap, (Funny => 2))", GeneralSuccessCheck),
       CodeExpectation("val funnyMap: ReqMap(Funny: 2) = (_: 1)", GeneralSuccessCheck),  
       CodeExpectation("val funnyItem: Funny = FunMap|funnyMap", GeneralSuccessCheck),      
       CodeExpectation("val m: ReqMap(Funny: 2) = (f: funnyMap f)", GeneralSuccessCheck),
@@ -550,7 +550,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " disallow self referential function calls" in {
     testCodeScript(Vector(
       CodeExpectation("data Funny = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update Funny (FunMap, ReqMap(Funny: 2))", GeneralSuccessCheck),
+      CodeExpectation("update Funny: (FunMap, ReqMap(Funny: 2))", GeneralSuccessCheck),
       CodeExpectation("val m: Funny = FunMap|(_: 1)", GeneralSuccessCheck),
       // Preventing Russell's paradox!
       CodeExpectation("val f: ReqMap(Funny: 2) = (FunMap|x: x FunMap|x)", FailureCheck),
@@ -576,9 +576,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A Subset Type " should "work" in {
     testCodeScript(Vector(
       CodeExpectation("data x = Subtype(8)", GeneralSuccessCheck),
-      CodeExpectation("update x 0", GeneralSuccessCheck),
-      CodeExpectation("update x 1", GeneralSuccessCheck),
-      CodeExpectation("update x 4", GeneralSuccessCheck),
+      CodeExpectation("update x: 0", GeneralSuccessCheck),
+      CodeExpectation("update x: 1", GeneralSuccessCheck),
+      CodeExpectation("update x: 4", GeneralSuccessCheck),
       CodeExpectation("val y: x = 1", GeneralSuccessCheck),
       CodeExpectation("val y: x = 6", FailureCheck)
     ))
@@ -588,8 +588,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       // TODO: should be able to call Subtype(True: 1, False: 1) - how can we make this work?
       CodeExpectation("data Bool = Subtype(Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update Bool True", GeneralSuccessCheck),
-      CodeExpectation("update Bool False", GeneralSuccessCheck),
+      CodeExpectation("update Bool: True", GeneralSuccessCheck),
+      CodeExpectation("update Bool: False", GeneralSuccessCheck),
       CodeExpectation("val shorten: Map(Bool: 2) = (True: 1, False: 0)", GeneralSuccessCheck),
       CodeExpectation("val x: 2 = shorten True", GeneralSuccessCheck)
     ))
@@ -612,9 +612,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Versioned Counts " should " be initialized and updated for Count" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
     ))
   }
@@ -622,9 +622,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " work with the alternative ordering and without specifying the empty command" in {
     testCodeScript(Vector(
       CodeExpectation("new Count as n", GeneralSuccessCheck),
-      CodeExpectation("update n", GeneralSuccessCheck),
-      CodeExpectation("update n", GeneralSuccessCheck),
-      CodeExpectation("update n", GeneralSuccessCheck),
+      CodeExpectation("update n:", GeneralSuccessCheck),
+      CodeExpectation("update n:", GeneralSuccessCheck),
+      CodeExpectation("update n:", GeneralSuccessCheck),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
     ))
   }
@@ -632,8 +632,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be allowed to have members" in {
     testCodeScript(Vector(
       CodeExpectation("data n = 0", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("val p: n = 1", GeneralSuccessCheck),
     ))
   }
@@ -641,9 +641,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Versioned Objects " should " be initialized and updated for Map" in {
     testCodeScript(Vector(
       CodeExpectation("ver m = new Map(Identifier: Count)", GeneralSuccessCheck),
-      CodeExpectation("update m (hello, ())", GeneralSuccessCheck),
-      CodeExpectation("update m (world, ())", GeneralSuccessCheck),
-      CodeExpectation("update m (world, ())", GeneralSuccessCheck),
+      CodeExpectation("update m: (hello, ())", GeneralSuccessCheck),
+      CodeExpectation("update m: (world, ())", GeneralSuccessCheck),
+      CodeExpectation("update m: (world, ())", GeneralSuccessCheck),
       CodeExpectation("m hello", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
       CodeExpectation("m world", SuccessCheck(ExpOnlyEnvironmentCommand(Index(2)))),
       CodeExpectation("m yo", SuccessCheck(ExpOnlyEnvironmentCommand(Index(0))))
@@ -653,10 +653,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be convertable to values and stop updating" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("val x: Count = n", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
     ))
@@ -665,17 +665,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be forked correctly" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Count", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
       CodeExpectation("fork n as nForked", GeneralSuccessCheck),
-      CodeExpectation("update nForked ()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update nForked ()", GeneralSuccessCheck),
-      CodeExpectation("update nForked ()", GeneralSuccessCheck),
-      CodeExpectation("update nForked ()", GeneralSuccessCheck),
-      CodeExpectation("update n()", GeneralSuccessCheck),
-      CodeExpectation("update nForked ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked: ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked: ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked: ()", GeneralSuccessCheck),
+      CodeExpectation("update n: ()", GeneralSuccessCheck),
+      CodeExpectation("update nForked: ()", GeneralSuccessCheck),
       CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
       CodeExpectation("nForked", SuccessCheck(ExpOnlyEnvironmentCommand(Index(8))))
     ))
@@ -691,8 +691,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Defining Bool as a Case " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data Bool = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update Bool (False, ())", GeneralSuccessCheck),
-      CodeExpectation("update Bool (True, ())", GeneralSuccessCheck),
+      CodeExpectation("update Bool: (False, ())", GeneralSuccessCheck),
+      CodeExpectation("update Bool: (True, ())", GeneralSuccessCheck),
       CodeExpectation("val t: Bool = True", GeneralSuccessCheck),
       CodeExpectation("val f: Bool = False", GeneralSuccessCheck)
     ))
@@ -701,8 +701,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A case pattern " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data MyCase = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (First, 5)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase: 5) = (First|x: x, Second|x: 2)", GeneralSuccessCheck),
       CodeExpectation("MyCaseTo5 First|4", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(4, IndexTN(5))))),
       CodeExpectation("MyCaseTo5 Second|hello", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, IndexTN(5)))))
@@ -712,8 +712,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be seen to the type if all cases are accounted for" in {
     testCodeScript(Vector(
       CodeExpectation("data MyCase = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (First, 5)", GeneralSuccessCheck),
-      CodeExpectation("update MyCase (Second, Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (First, 5)", GeneralSuccessCheck),
+      CodeExpectation("update MyCase: (Second, Identifier)", GeneralSuccessCheck),
       CodeExpectation("val MyCaseTo5: ReqMap(MyCase: 5) = ((First|x): x, (Second|x): 2)", GeneralSuccessCheck),
       CodeExpectation("val IncompleteMyCaseTo5: ReqMap(MyCase: 5) = ((First|x): x)", FailureCheck),
     ))
@@ -722,8 +722,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Defining a non-generic linked list " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
-      CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts: (Empty, ())", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts: (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
       CodeExpectation("val a: ListOfCounts = Empty", GeneralSuccessCheck),
       CodeExpectation("val b: ListOfCounts = Node|(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: ListOfCounts = Node|(1, b)", GeneralSuccessCheck),
@@ -734,8 +734,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be allowed to be equipted with a recursive length function" in {
     testCodeScript(Vector(
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
-      CodeExpectation("update ListOfCounts (Empty, ())", GeneralSuccessCheck),
-      CodeExpectation("update ListOfCounts (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts: (Empty, ())", GeneralSuccessCheck),
+      CodeExpectation("update ListOfCounts: (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
       CodeExpectation("val length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
       CodeExpectation("def length: ReqMaq(ListOfCounts, Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
       CodeExpectation("def length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", GeneralSuccessCheck),
@@ -748,8 +748,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A generic option case " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val maybeSix = Option|6", GeneralSuccessCheck),
       CodeExpectation("val x: maybeSix = None", GeneralSuccessCheck),
       CodeExpectation("val y: maybeSix = Some|1", GeneralSuccessCheck),
@@ -761,8 +761,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be callable without naming it" in {
     testCodeScript(Vector(
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val x: Option|Count = None|()", GeneralSuccessCheck),
       CodeExpectation("val x: Option|Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option|Count = Some|20", GeneralSuccessCheck),
@@ -773,8 +773,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be ok to equip with a getOrElse function" in {
     testCodeScript(Vector(
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
       CodeExpectation("val getOrElse: GenericMap (Option|T: ReqMap(T: T)) = (None|(): (t: t), Some|t: (_: t))", GeneralSuccessCheck),
       CodeExpectation("val x: Option|Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option|Count = Some|20", GeneralSuccessCheck),
@@ -786,10 +786,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be covariant" in {
     testCodeScript(Vector(
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update Option (None, ())", GeneralSuccessCheck),
-      CodeExpectation("update Option (Some, T)", GeneralSuccessCheck),
+      CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
+      CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
       CodeExpectation("data MyType = Subtype(Count)", GeneralSuccessCheck),
-      CodeExpectation("update MyType 3", GeneralSuccessCheck),
+      CodeExpectation("update MyType: 3", GeneralSuccessCheck),
       CodeExpectation("val myValue: Option|MyType = Some|3", GeneralSuccessCheck),
       CodeExpectation(
         "val myFunction: ReqMap(Option|Count: Identifier) = (_: ~hello)",
@@ -818,8 +818,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A generic LinkedList case " should " be possible" in {
     testCodeScript(Vector(
       CodeExpectation("data List (T: Type)", GeneralSuccessCheck),
-      CodeExpectation("update List (Empty, ())", GeneralSuccessCheck),
-      CodeExpectation("update List (Node, (head: T, tail: List|T))", GeneralSuccessCheck),
+      CodeExpectation("update List: (Empty, ())", GeneralSuccessCheck),
+      CodeExpectation("update List: (Node, (head: T, tail: List|T))", GeneralSuccessCheck),
       CodeExpectation("val a: List|Count = Empty", GeneralSuccessCheck),
       CodeExpectation("val b: List|Count = Node|(5, a)", GeneralSuccessCheck),
       CodeExpectation("val c: List|Count = Node|(1, b)", GeneralSuccessCheck),
@@ -830,10 +830,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Map conversions " should " have a contravariant input type" in {
     testCodeScript(Vector(
       CodeExpectation("data mySubset = Subtype(7)", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 0", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 1", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 4", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 6", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 0", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 1", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 4", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 6", GeneralSuccessCheck),
       CodeExpectation("val testInput1: ReqMap(7: Count) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val testInput2: ReqMap(mySubset: Count) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val supertypeInputFunc: ReqMap(7: Count) => Count = (_: 0)", GeneralSuccessCheck),
@@ -848,10 +848,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " have a covariant output type" in {
     testCodeScript(Vector(
       CodeExpectation("data mySubset = Subtype(7)", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 0", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 1", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 4", GeneralSuccessCheck),
-      CodeExpectation("update mySubset 6", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 0", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 1", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 4", GeneralSuccessCheck),
+      CodeExpectation("update mySubset: 6", GeneralSuccessCheck),
       CodeExpectation("val testInput1: ReqMap(Count: 7) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val testInput2: ReqMap(Count: mySubset) = (_: 0)", GeneralSuccessCheck),
       CodeExpectation("val supertypeInputFunc: ReqMap(Count: 7) => Count = (_: 0)", GeneralSuccessCheck),
@@ -866,9 +866,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Expanding Subsets " should " work for indecies" in {
     testCodeScript(Vector(
       CodeExpectation("data ID = Subtype(10)", GeneralSuccessCheck),
-      CodeExpectation("update ID 2", GeneralSuccessCheck),
-      CodeExpectation("update ID 7", GeneralSuccessCheck),
-      CodeExpectation("update ID 5", GeneralSuccessCheck),
+      CodeExpectation("update ID: 2", GeneralSuccessCheck),
+      CodeExpectation("update ID: 7", GeneralSuccessCheck),
+      CodeExpectation("update ID: 5", GeneralSuccessCheck),
       CodeExpectation("val x: ID = 2", GeneralSuccessCheck),
       CodeExpectation("val y: ID = 3", FailureCheck)
     ))
@@ -877,9 +877,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " work for counts" in {
     testCodeScript(Vector(
       CodeExpectation("data ID = Subtype(Count)", GeneralSuccessCheck),
-      CodeExpectation("update ID 2", GeneralSuccessCheck),
-      CodeExpectation("update ID 73", GeneralSuccessCheck),
-      CodeExpectation("update ID 5555", GeneralSuccessCheck),
+      CodeExpectation("update ID: 2", GeneralSuccessCheck),
+      CodeExpectation("update ID: 73", GeneralSuccessCheck),
+      CodeExpectation("update ID: 5555", GeneralSuccessCheck),
       CodeExpectation("val x: ID = 73", GeneralSuccessCheck),
       CodeExpectation("val y: ID = 1", FailureCheck)
     ))
@@ -888,8 +888,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " work for identifiers" in {
     testCodeScript(Vector(
       CodeExpectation("data ID = Subtype(Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update ID hello", GeneralSuccessCheck),
-      CodeExpectation("update ID world", GeneralSuccessCheck),
+      CodeExpectation("update ID: hello", GeneralSuccessCheck),
+      CodeExpectation("update ID: world", GeneralSuccessCheck),
       CodeExpectation("val x: ID = hello", GeneralSuccessCheck),
       CodeExpectation("val y: ID = hi", FailureCheck)
     ))
@@ -898,8 +898,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "Tables " should " be allowed to be created" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Table(0: Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update n hello", GeneralSuccessCheck),
-      CodeExpectation("update n world", GeneralSuccessCheck),
+      CodeExpectation("update n: hello", GeneralSuccessCheck),
+      CodeExpectation("update n: world", GeneralSuccessCheck),
       CodeExpectation("n", GeneralSuccessCheck),
       CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("world")))),
     ))
@@ -908,9 +908,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " have a Sequence shortcut if they are based on a count" in {
     testCodeScript(Vector(
       CodeExpectation("ver n = new Sequence(10)", GeneralSuccessCheck),
-      CodeExpectation("update n 2", GeneralSuccessCheck),
-      CodeExpectation("update n 7", GeneralSuccessCheck),
-      CodeExpectation("update n 5", GeneralSuccessCheck),
+      CodeExpectation("update n: 2", GeneralSuccessCheck),
+      CodeExpectation("update n: 7", GeneralSuccessCheck),
+      CodeExpectation("update n: 5", GeneralSuccessCheck),
       CodeExpectation("n 2", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, IndexTN(10))))),
       CodeExpectation("n 3", FailureCheck)
     ))
@@ -924,9 +924,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     testCodeScript(Vector(
       CodeExpectation("ver idChange = new Table(Subtype(Identifier): Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update idChange (Monday, MON)", GeneralSuccessCheck),
-      CodeExpectation("update idChange (Tuesday, TUE)", GeneralSuccessCheck),
-      CodeExpectation("update idChange (Wednesday, WED)", GeneralSuccessCheck),
+      CodeExpectation("update idChange: (Monday, MON)", GeneralSuccessCheck),
+      CodeExpectation("update idChange: (Tuesday, TUE)", GeneralSuccessCheck),
+      CodeExpectation("update idChange: (Wednesday, WED)", GeneralSuccessCheck),
       CodeExpectation("idChange Tuesday", SuccessCheck(ExpOnlyEnvironmentCommand(tuesdayResponse))),
       CodeExpectation("idChange Thursday", FailureCheck)
     ))
@@ -959,9 +959,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be updatable with new values" in {
     testCodeScript(Vector(
       CodeExpectation("ver myArray = new Array|10", GeneralSuccessCheck),
-      CodeExpectation("update myArray 1", GeneralSuccessCheck),
-      CodeExpectation("update myArray 3", GeneralSuccessCheck),
-      CodeExpectation("update myArray 1", GeneralSuccessCheck),
+      CodeExpectation("update myArray: 1", GeneralSuccessCheck),
+      CodeExpectation("update myArray: 3", GeneralSuccessCheck),
+      CodeExpectation("update myArray: 1", GeneralSuccessCheck),
       CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
       CodeExpectation("len myArray", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(3), CountT)))),
       CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
@@ -1051,10 +1051,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " work on subtypes " in {
     testCodeScript(Vector(
       CodeExpectation("data x = Subtype(Count)", GeneralSuccessCheck),
-      CodeExpectation("update x 10", GeneralSuccessCheck),
-      CodeExpectation("update x 3", GeneralSuccessCheck),
-      CodeExpectation("update x 10", GeneralSuccessCheck),
-      CodeExpectation("update x 2", GeneralSuccessCheck),
+      CodeExpectation("update x: 10", GeneralSuccessCheck),
+      CodeExpectation("update x: 3", GeneralSuccessCheck),
+      CodeExpectation("update x: 10", GeneralSuccessCheck),
+      CodeExpectation("update x: 2", GeneralSuccessCheck),
       CodeExpectation("ver a = new Array|Count", GeneralSuccessCheck),
       CodeExpectation("iterate x into a", GeneralSuccessCheck),
       CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
@@ -1067,8 +1067,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
       CodeExpectation("val emptyString: String = \"\"", GeneralSuccessCheck),
       CodeExpectation("ver updatedString = new String", GeneralSuccessCheck),
-      CodeExpectation("update updatedString `a", GeneralSuccessCheck),
-      CodeExpectation("update updatedString `b", GeneralSuccessCheck)
+      CodeExpectation("update updatedString: `a", GeneralSuccessCheck),
+      CodeExpectation("update updatedString: `b", GeneralSuccessCheck)
     ))
   }
 
