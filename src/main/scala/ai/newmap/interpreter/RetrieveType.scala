@@ -9,14 +9,6 @@ import ai.newmap.util.{Outcome, Success, Failure}
  * TODO: Either move these methods to different places, or rename this as a util object.
  */
 object RetrieveType {
-  def isTermPatternFree(uObject: UntaggedObject): Boolean = uObject match {
-    case UWildcardPattern(_) => false
-    case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
-    case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
-    case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))
-    case _ => true
-  }
-
   // Ensures that there are no free variables in this term
   // TODO: See if this can be handled by a specialized type-checker on UntaggedObject (ripe for removing this code)
   // - But it's not that simple yet
@@ -32,6 +24,10 @@ object RetrieveType {
     case UCase(_, input) => isTermClosedLiteral(input, knownVariables)
     case UMap(values) => {
       isMapValuesClosed(values, knownVariables)
+    }
+    case UMapPattern(key, value) => {
+      isTermClosedLiteral(key, knownVariables) &&
+        isTermClosedLiteral(value, knownVariables)
     }
     case UStruct(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
     case constant => true
@@ -120,13 +116,5 @@ object RetrieveType {
         }
       }
     } yield answer
-  }
-
-  def getMapBindings(
-    map: UntaggedObject
-  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = map match {
-    case UMap(values) => Success(values)
-    case UMapPattern(key, value) => Success(Vector(key -> value))
-    case _ => Failure("Could not get bindings: " + map)
   }
 }

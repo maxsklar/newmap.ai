@@ -238,7 +238,7 @@ object TypeChecker {
           // TODO: Remove this in favor of other struct T
           case Success(StructT(parameterList, parentFieldType, _, _)) => {
             for {
-              parameterBindings <- RetrieveType.getMapBindings(parameterList)
+              parameterBindings <- parameterList.getMapBindings()
 
               result <- typeCheckStruct(
                 parameterBindings,

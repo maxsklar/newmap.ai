@@ -68,7 +68,7 @@ object IterationUtils {
   def enumerateMapKeys(values: Vector[UntaggedObject]): Outcome[Vector[UntaggedObject], String] = {
     values match {
       case value +: additionalValues => {
-        if (RetrieveType.isTermPatternFree(value)) {
+        if (isTermPatternFree(value)) {
           for {
             addlValues <- enumerateMapKeys(additionalValues)
           } yield value +: addlValues
@@ -254,5 +254,13 @@ object IterationUtils {
         result <- isIteratableToType(firstIt, secondType, env)
       } yield result
     }
+  }
+
+  def isTermPatternFree(uObject: UntaggedObject): Boolean = uObject match {
+    case UWildcardPattern(_) => false
+    case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
+    case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
+    case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))
+    case _ => true
   }
 }
