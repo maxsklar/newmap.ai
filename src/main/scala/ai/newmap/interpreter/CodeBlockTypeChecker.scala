@@ -18,7 +18,6 @@ object CodeBlockTypeChecker {
     } else {
       var envCommands: Seq[EnvironmentCommand] = Vector.empty
 
-      // TODO - what if the command is not executable yet due to unset variables, but we still know what the types are going to be?
       var newParams: Map[String, NewMapType] = tcParameters
 
       statements.foreach(statement => {
