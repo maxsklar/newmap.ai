@@ -65,8 +65,6 @@ libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % 
 
 scalacOptions ++= Seq("-unchecked", "-deprecation")
 
-mainClass in Compile := Some("ai.newmap.interpreter.repl")
-
 // ============================================================================
 
 // Most moderately interesting Scala projects don't make use of the very simple
