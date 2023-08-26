@@ -273,7 +273,7 @@ object SubtypeUtils {
       }
       case (_, StructT(values, fieldParentType, _, _)) => {
         for {
-          valueBindings <- RetrieveType.getMapBindings(values)
+          valueBindings <- values.getMapBindings()
           singularOutputResponse <- convertToStructWithSingleValue(valueBindings, env)
           singularObj <- Evaluator(singularOutputResponse.inputType, env)
           singularObjT <- Evaluator.asType(singularObj, env)

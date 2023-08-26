@@ -1,12 +1,19 @@
 package ai.newmap.model
 
 import java.util.UUID
+import ai.newmap.util.{Outcome, Success, Failure}
 
 /*
  * The objects in the NewMap Language
  */
 sealed abstract class UntaggedObject {
   override def toString = PrintNewMapObject.untagged(this)
+
+  def getMapBindings(): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = this match {
+    case UMap(values) => Success(values)
+    case UMapPattern(key, value) => Success(Vector(key -> value))
+    case _ => Failure("Could not get bindings: " + this)
+  }
 }
 
 // Todo - replace with "user defined type" in prelude

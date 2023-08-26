@@ -37,7 +37,7 @@ object CommandMaps {
         case _ => Failure(s"Not a type class: ${defaultUnderlyingExpT.displayString(env)}")
       }
 
-      mapValues <- RetrieveType.getMapBindings(mapValuesU)
+      mapValues <- mapValuesU.getMapBindings()
 
       // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
       // otherwise, we get an infinite loop
@@ -184,7 +184,7 @@ object CommandMaps {
       }
       case CaseT(cases, parentType, featureSet) => {
         for {
-          caseBindings <- RetrieveType.getMapBindings(cases)
+          caseBindings <- cases.getMapBindings()
 
           uConstructors = caseBindings.map(x => x._1 -> UIndex(1))
           constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
@@ -253,7 +253,7 @@ object CommandMaps {
             val keys = mappings.map(_._1)
 
             for {
-              implementationBindings <- RetrieveType.getMapBindings(implementation)
+              implementationBindings <- implementation.getMapBindings()
             } yield {
               val newImplementation = mappings ++ implementationBindings.filter(x => !keys.contains(x._1))
 
@@ -605,8 +605,8 @@ object CommandMaps {
             Failure(s"channelParentType doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
           }
 
-          currentChannels <- RetrieveType.getMapBindings(currentFunctionMapConfig.channels)
-          newChannels <- RetrieveType.getMapBindings(newFunctionMapConfig.channels)
+          currentChannels <- currentFunctionMapConfig.channels.getMapBindings()
+          newChannels <- newFunctionMapConfig.channels.getMapBindings()
         } yield {
           val composedTypeTransForm = newFunctionTypeTransform ++ currentFunctionTypeTransform
 
@@ -650,7 +650,7 @@ object CommandMaps {
             case _ => Failure(s"Wrong update for complete struct: $newValueAsNewMapObject")
           }
 
-          parameterListValues <- RetrieveType.getMapBindings(parameterList)
+          parameterListValues <- parameterList.getMapBindings()
 
         } yield {
           val typeOfField = uCaseValue.constructor
