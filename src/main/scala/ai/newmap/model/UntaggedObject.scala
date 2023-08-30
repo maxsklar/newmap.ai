@@ -75,6 +75,9 @@ case class Uuuid(value: UUID) extends UntaggedObject
 // TODO: making this a basic class is temporary for now
 case object IsCommandFunc extends UntaggedObject
 
+// This takes a pair of numbers are returns their sum
+case object UPlus extends UntaggedObject
+
 // Only for Expressions
 case class ApplyFunction(
   func: UntaggedObject,

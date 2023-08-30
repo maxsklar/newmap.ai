@@ -48,6 +48,7 @@ object ExpressionPath {
 
         val thisSymbolAssociation = symbolAssociation(connectiveSymbol)
 
+
         val applyToSecondParam = (thisPrecedence > currPrecedence) || (
           (connectiveSymbol == symbol) && (thisSymbolAssociation == Right)
         )
@@ -86,6 +87,10 @@ object ExpressionPath {
             }
           }
           case "=>" => Some(LambdaParse(firstExp, secondExp))
+          case "+" => Some(ApplyParse(
+            IdentifierParse("+"),
+            LiteralListParse(Vector(firstExp, secondExp), ArrayType)
+          ))
           case "" => Some(ApplyParse(firstExp, secondExp))
           case _ => {
             None

@@ -208,6 +208,7 @@ object PrintNewMapObject {
     case ApplyFunction(func, input, matchingRules) => {
       "(" + untagged(func) + " " + untagged(input) + ")"
     }
+  case UPlus => "+"
   }
 
   def mapToString(values: Vector[(UntaggedObject, UntaggedObject)]): String = {

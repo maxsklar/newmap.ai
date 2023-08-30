@@ -36,8 +36,9 @@ object Lexer extends RegexParsers {
   }
 
   def symbol: Parser[Symbol] = {
-    "[\\.,:`=~><\\|][\\.,:`=~><\\|]*".r ^^ { str => Symbol(str)}
+    """[\.,:`=~><\|\+]+""".r ^^ { str => Symbol(str)}
   }
+
 
   def dquote: Parser[DQuote] = {
     "\"([^\"]*)\"".r ^^ { str => DQuote(str) }

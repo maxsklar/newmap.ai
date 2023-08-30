@@ -642,6 +642,13 @@ object Environment {
       )
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
-    NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty))
+    NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),
+    eCommand("+", NewMapObject(
+      UPlus,
+      MapT(Base.toTypeTransform(
+        MapT(Base.toTypeTransform(IndexT(UIndex(2)), CountT), MapConfig(RequireCompleteness, BasicMap)),
+        CountT
+      ), MapConfig(RequireCompleteness, SimpleFunction))
+    ))
   ))
 }

@@ -191,9 +191,18 @@ object Evaluator {
           fSystemV <- env.lookupVersionedObject("__FunctionSystem")
           uFunction <- applyFunctionAttempt(ULink(fSystemV.key), name, env)
           result <- applyFunctionAttempt(uFunction, input, env)
-        } yield {
-          result
-        }
+        } yield result
+      }
+      case UPlus => {
+        for {
+          first <- applyFunctionAttempt(input, UIndex(0), env)
+          second <- applyFunctionAttempt(input, UIndex(1), env)
+
+          result <- (first, second) match {
+            case (UIndex(n1), UIndex(n2)) => Success(n1 + n2)
+            case _ => Failure("Can't add: " + first + " -- " + second)
+          }
+        } yield UIndex(result)
       }
       case _ => {
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
