@@ -1120,7 +1120,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("1 + 1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(2), CountT)))),
       CodeExpectation("8 + 0", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(8), CountT)))),
-      CodeExpectation("4 + 7", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(11), CountT))))
+      CodeExpectation("4 + 7", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(11), CountT)))),
+      CodeExpectation("1 + 1 + 5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(7), CountT))))
     ))
   }
 
