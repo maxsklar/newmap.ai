@@ -281,8 +281,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val myStructSimple: Type = (first: 1, second: 1)", GeneralSuccessCheck),
       CodeExpectation("val myMap: ReqMap(myStructSimple: Identifier) = ((0, 0): x)", GeneralSuccessCheck),
-      // Figure out why this direct approach doesn't work.
-      //CodeExpectation("val myMap: ReqMap((first: 1, second: 1): Identifier) = ((0, 0): x)", GeneralSuccessCheck),
+      CodeExpectation("val myMap: ReqMap((first: 1, second: 1): Identifier) = ((0, 0): x)", GeneralSuccessCheck),
       CodeExpectation("val myStruct: Type = (first: 2, second: 3)", GeneralSuccessCheck),
       CodeExpectation("val myMap: ReqMap(myStruct: Identifier) = ((0, 0): a, (0, 1): b, (0, 2): c, (1, 0): d, (1, 1): e, (1, 2): f)", GeneralSuccessCheck),
       CodeExpectation("val myMap: ReqMap(myStruct: Identifier) = ((0, 0): a, (0, 1): b, (1, 0): d, (1, 1): e, (1, 2): f)", FailureCheck),
