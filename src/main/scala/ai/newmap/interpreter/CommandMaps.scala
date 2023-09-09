@@ -55,7 +55,6 @@ object CommandMaps {
     nType match {
       // TODO - start removing these in favor of newmap code!
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
-      //case MapT(_, _, MapConfig(CommandOutput, _, _)) => Success(defaultUMap)
       case MapT(_, MapConfig(CommandOutput, _, _, _, _)) => Success(defaultUMap)
       case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
         if (typeTransformHasEmptyKey(typeTransform, env)) {
@@ -190,10 +189,13 @@ object CommandMaps {
           constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
           mapConfig = MapConfig(RequireCompleteness, BasicMap)
 
-          caseMap = NewMapObject(cases, MapT(
-            env.toTypeTransform(constructorsSubtype, TypeT), 
-            mapConfig
-          ))
+          caseMap = NewMapObject(
+            cases,
+            MapT(
+              env.toTypeTransform(constructorsSubtype, TypeT), 
+              mapConfig
+            )
+          )
 
           newCaseMap <- updateVersionedObject(caseMap, command, env)
 
@@ -225,26 +227,6 @@ object CommandMaps {
             Vector(command),
             untaggedIdentity
           )
-        }
-      }
-      case MapT(typeTransform, config) => {
-        for {
-          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
-
-          keyType = typeTransformKeyValue._1
-          valueType = typeTransformKeyValue._2
-
-          keyT <- env.typeSystem.convertToNewMapType(keyType)
-          valueT <- env.typeSystem.convertToNewMapType(valueType)
-          expandedValueInfo <- expandType(valueT, command, env)
-        } yield {
-          val newType = MapT(env.toTypeTransform(keyT, expandedValueInfo.newType), config)
-
-          // TODO - the valueTypes need to be converted - figure out a way to do this!!
-          // - Sort of an implementation of mapValues
-          //expandedValeInfo.converter
-          
-          ExpandKeyResponse(nType, Nil, untaggedIdentity)
         }
       }
       case TypeClassT(typeTransform, implementation) => {
