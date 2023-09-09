@@ -1125,6 +1125,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " work for doubles" ignore {
+    testCodeScript(Vector(
+      CodeExpectation("1.0 + 1.", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), CountT)))),
+      CodeExpectation("0.0 + 4.5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(4.5), CountT)))),
+   ))
+  }
+
   /*
   TODOs with the arrays:
   - startsWith function (or general regular expression?)

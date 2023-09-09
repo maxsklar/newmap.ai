@@ -390,6 +390,15 @@ object SubtypeUtils {
           response
         }
       }
+
+      case (CountT, DoubleT) => {
+        Success(
+          IsTypeConvertibleResponse(
+            Vector(FunctionWithMatchingRules(UCountToDecimal, StandardMatcher)),
+            DoubleT
+          ),
+        )
+      }
       case _ => {
         Failure(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
       }

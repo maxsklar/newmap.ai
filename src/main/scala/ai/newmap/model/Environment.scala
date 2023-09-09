@@ -643,6 +643,13 @@ object Environment {
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
     NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),
+    NewTypeClassCommand(
+      "Addable",
+      UMapPattern(
+        UMapPattern(Base.typeSystem.typeToUntaggedObject(IndexT(UIndex(2))), UWildcardPattern("t")),
+        ParamId("t")
+      )
+    ),
     eCommand("+", NewMapObject(
       UPlus,
       MapT(Base.toTypeTransform(

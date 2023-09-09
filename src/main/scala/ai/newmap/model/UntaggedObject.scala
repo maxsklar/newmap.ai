@@ -78,6 +78,9 @@ case object IsCommandFunc extends UntaggedObject
 // This takes a pair of numbers are returns their sum
 case object UPlus extends UntaggedObject
 
+// More Numerical Operations
+case object UCountToDecimal extends UntaggedObject
+
 // Only for Expressions
 case class ApplyFunction(
   func: UntaggedObject,

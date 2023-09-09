@@ -62,7 +62,7 @@ case object IdentifierT extends NewMapType
  */
 case class MapT(
   typeTransform: UntaggedObject, // Must be a PatternMap
-  config: MapConfig
+  config: MapConfig,
 ) extends NewMapType
 
 case class MapConfig(

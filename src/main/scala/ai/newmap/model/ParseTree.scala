@@ -8,6 +8,7 @@ class ParseElement()
 sealed abstract class ParseTree extends ParseElement
 
 case class NaturalNumberParse(i: Long) extends ParseTree
+case class FloatParse(d: Double) extends ParseTree
 
 case class IdentifierParse(
   s: String,

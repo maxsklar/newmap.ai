@@ -13,11 +13,6 @@ case class NewMapObject(
   def displayString(env: Environment) = PrintNewMapObject(this, env)
 }
 
-// This always points to the latest version of a versioned object
-//case class VersionedObjectLink(
-//  key: VersionedObjectKey
-//) extends NewMapObject
-
 object NewMapO {
   def Index(i: Long): NewMapObject = NewMapObject(UIndex(i), CountT)
   

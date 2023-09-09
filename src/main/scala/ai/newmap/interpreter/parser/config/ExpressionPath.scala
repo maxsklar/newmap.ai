@@ -286,6 +286,7 @@ object ExpressionPath {
       }
       case Identifier(id) => Success(ExpressionStart(IdentifierParse(id)))
       case Number(i) => Success(ExpressionStart(NaturalNumberParse(i)))
+      case Decimal(d) => Success(ExpressionStart(FloatParse(d)))
       case Symbol("~") => Success(ExpressionForceId())
       case Symbol("`") => Success(ExpressionTickMark())
       case Symbol(s) => Success(UnaryExpression(s, InitState))

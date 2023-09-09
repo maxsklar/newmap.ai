@@ -199,10 +199,15 @@ object Evaluator {
           second <- applyFunctionAttempt(input, UIndex(1), env)
 
           result <- (first, second) match {
-            case (UIndex(n1), UIndex(n2)) => Success(n1 + n2)
+            case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 + n2))
+            case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 + d2))
             case _ => Failure("Can't add: " + first + " -- " + second)
           }
-        } yield UIndex(result)
+        } yield result
+      }
+      case UCountToDecimal => input match {
+        case UIndex(i) => Success(UDouble(i.toDouble))
+        case _ => Failure("Can't convert to decimal: " + input)
       }
       case _ => {
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")

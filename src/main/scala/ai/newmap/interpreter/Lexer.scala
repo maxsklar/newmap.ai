@@ -12,6 +12,7 @@ object Lexer extends RegexParsers {
   case class Enc(symbol: EnclosureSymbol, isOpen: Boolean) extends Token
   case class Identifier(s: String) extends Token
   case class Number(i: Long = 0) extends Token
+  case class Decimal(d: Double) extends Token
   case class Symbol(s: String) extends Token
   case class DQuote(s: String) extends Token
   case class Comment(s: String) extends Token
@@ -33,6 +34,10 @@ object Lexer extends RegexParsers {
 
   def number: Parser[Number] = {
     "0|([1-9][0-9]*)".r ^^ { str => Number(str.toLong) }
+  }
+
+  def decimal: Parser[Decimal] = {
+    "([0-9]+\\.[0-9]*)|(\\.[0-9]+)".r ^^ { str => Decimal(str.toDouble) }
   }
 
   def symbol: Parser[Symbol] = {
@@ -78,7 +83,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | number | symbol | dquote | enclosure | comment | newline)) ^^ { rawTokens =>
+    phrase(rep1(identifier | decimal | number | symbol | dquote | enclosure | comment | newline)) ^^ { rawTokens =>
       rawTokens
     }
   }

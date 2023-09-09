@@ -57,6 +57,10 @@ object TypeChecker {
           Failure(s"Character not recognized because it has length > 1: $s")
         }
       }
+      case FloatParse(d: Double) => {
+        val tObject = NewMapObject(UDouble(d), DoubleT)
+        responseFromConversion(tObject, expectedType, env)
+      }
       case StringParse(s: String) => {
         val fixedS = s.replace("\\n", "\n").replace("\\t", "\t")
 
