@@ -287,7 +287,7 @@ class TestParser extends FlatSpec {
 
   "Multiline parse " should "work" in {
     val multilineCode = """{
-      new Count as y
+      ver y = new Count
       update y:
       update y:
       y

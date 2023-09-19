@@ -37,7 +37,7 @@ object Lexer extends RegexParsers {
   }
 
   def decimal: Parser[Decimal] = {
-    "([0-9]+\\.[0-9]*)|(\\.[0-9]+)".r ^^ { str => Decimal(str.toDouble) }
+    "([0-9]+\\.[0-9]+)|(\\.[0-9]+)".r ^^ { str => Decimal(str.toDouble) }
   }
 
   def symbol: Parser[Symbol] = {

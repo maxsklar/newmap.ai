@@ -1,5 +1,5 @@
 val x: Count = {
-  new Count as y
+  ver y = new Count
   update y: ()
   update y: ()
   update y: ()

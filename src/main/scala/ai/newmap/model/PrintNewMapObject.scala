@@ -208,6 +208,10 @@ object PrintNewMapObject {
     case ApplyFunction(func, input, matchingRules) => {
       "(" + untagged(func) + " " + untagged(input) + ")"
     }
+    case AccessField(value@UIndex(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value@ULong(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value@UDouble(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value, _, field) => untagged(value) + "." + untagged(field)
     case UPlus => "+"
     case UCountToDecimal => "CountToDecimal"
   }

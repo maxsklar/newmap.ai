@@ -237,6 +237,46 @@ object TypeChecker {
           TypeCheckResponse(applyParseResult, result.resultingType)
         }
       }
+      case AccessFieldAsMapParse(value, field) => {
+        for {
+          tcValue <- typeCheckUnknownType(value, env, tcParameters)
+
+          uTypeClass = env.typeSystem.typeToUntaggedObject(tcValue.refinedTypeClass)
+
+          fieldsToTypeMap <- Evaluator.applyFunctionAttempt(
+            env.typeToFieldMapping,
+            uTypeClass,
+            env,
+            TypeMatcher
+          )
+
+          typeOfPotentialFields = SubtypeT(fieldsToTypeMap, IdentifierT)
+
+          theFieldTC <- typeCheck(field, typeOfPotentialFields, env, SimpleFunction, tcParameters)
+
+          // Do not pass tcParameters to the evaluator, because the field must be evaluated
+          //  in its entirety in order to be used in the expression
+          evaluatedField <- Evaluator(theFieldTC.nExpression, env)
+
+          returnValue <- Evaluator.applyFunctionAttempt(
+            fieldsToTypeMap,
+            evaluatedField,
+            env
+          )
+
+          returnType <- returnValue match {
+            case UCase(t, _) => Success(t)
+            case _ => Failure("Unknown return value: " + returnValue)
+          }
+
+          returnT <- env.typeSystem.convertToNewMapType(returnType)
+
+          response <- SubtypeUtils.isTypeConvertible(returnT, expectedType, env)
+        } yield {
+          val accessFieldResult = AccessField(tcValue.nExpression, uTypeClass, evaluatedField)
+          TypeCheckResponse(accessFieldResult, returnT)
+        }
+      }
       case LiteralListParse(values: Vector[ParseTree], llType: LiteralListType) => {
         expectedTypeOutcome match {
           // TODO: Remove this in favor of other struct T
@@ -617,6 +657,8 @@ object TypeChecker {
     newParams: Map[String, NewMapType]
   )
 
+  // TODO - I suspect that this can be folded into the main typeCheck function
+  //  where the input specifies whether we are looking for patterns or not
   def typeCheckWithPatternMatching(
     expression: ParseTree,
     expectedType: NewMapType,
@@ -630,7 +672,7 @@ object TypeChecker {
     val patternMatchingAllowed = internalFeatureSet.getLevel >= PatternMap.getLevel
     
     // Use this??
-    //val parentTypeIsIdentifier = TypeClassUtils.typeIsExpectingAnIdentifier(expectedType, s, env)
+    // val parentTypeIsIdentifier = TypeClassUtils.typeIsExpectingAnIdentifier(expectedType, s, env)
 
     val expectedTypeOutcome = getFinalUnderlyingType(expectedType, env, env.typeSystem.currentState)
 

@@ -2,8 +2,6 @@ package ai.newmap.model
 
 import ai.newmap.interpreter.Lexer.Identifier
 
-sealed abstract class StatementOrExpressionParse
-
 class ParseElement()
 sealed abstract class ParseTree extends ParseElement
 
@@ -38,6 +36,11 @@ case class LiteralCode(
 case class ApplyParse(
   function: ParseTree,
   input: ParseTree
+) extends ParseTree
+
+case class AccessFieldAsMapParse(
+  value: ParseTree,
+  field: ParseTree
 ) extends ParseTree
 
 case class ConstructCaseParse(
@@ -137,6 +140,15 @@ case class NewTypeClassStatementParse(
 case class IterateIntoStatementParse(
   iterableObject: ParseTree,
   destinationObject: Identifier
+) extends EnvStatementParse
+
+//new basic map on 3 as f returning String = (...)
+case class NewVersionedFieldParse(
+  featureSet: MapFeatureSet,
+  typeParse: ParseTree,
+  id: String,
+  returnTypeParse: ParseTree,
+  expression: ParseTree
 ) extends EnvStatementParse
 
 case object EmptyStatement extends EnvStatementParse

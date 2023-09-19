@@ -489,7 +489,7 @@ object CommandMaps {
 
           result <- keyExpansionCommandT match {
             case StructT(UMap(Vector()), _, _, _) => {
-              // TODO - this is an ugle exception.. we need a better way to add fields to a struct
+              // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
               Success((NewMapObject(UMap(Vector.empty), keyExpansionCommandT), command))
             }

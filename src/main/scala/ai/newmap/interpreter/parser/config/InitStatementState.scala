@@ -27,7 +27,7 @@ case object InitStatementState extends ParseState[EnvStatementParse] {
     "updates" -> ApplyCommandsPath.InitState(),
     "typeclass" -> TypeClassPath.InitState(),
     "ver" -> VersionedPath.InitState(),
-    "new" -> VersionedPath.InitStateNew(),
+    "new" -> NewFieldVersionedPath.InitState(),
     "val" -> ValPath.InitState(ValStatement),
     "def" -> ValPath.InitState(DefStatement),
   )

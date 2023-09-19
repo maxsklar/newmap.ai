@@ -25,6 +25,16 @@ case class NewVersionedStatementCommand(
   }
 }
 
+case class NewVersionedFieldCommand(
+  id: String,
+  mapT: NewMapType,
+  value: UntaggedObject
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = {
+    s"new ${mapT.displayString(env)} as $id = $value"
+  }
+}
+
 case class NewTypeCommand(
   id: String,
   nType: NewMapType
@@ -123,7 +133,6 @@ case class OutputToStdout(
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = s"write $nObject"
 }
-
 
 case class IterateIntoChannel(
   nObject: UntaggedObject,

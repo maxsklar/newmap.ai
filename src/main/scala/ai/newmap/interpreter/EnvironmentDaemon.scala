@@ -20,8 +20,6 @@ object EnvironmentDaemon {
       case other => sender() ! s"Can't interpret: $other"
     }
 
-
-
     def passCode(code: String): CodeResponse = {
       val response = envInterpreter(code)
 

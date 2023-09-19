@@ -618,16 +618,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " work with the alternative ordering and without specifying the empty command" in {
-    testCodeScript(Vector(
-      CodeExpectation("new Count as n", GeneralSuccessCheck),
-      CodeExpectation("update n:", GeneralSuccessCheck),
-      CodeExpectation("update n:", GeneralSuccessCheck),
-      CodeExpectation("update n:", GeneralSuccessCheck),
-      CodeExpectation("n", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3))))
-    ))
-  }
-
   it should " be allowed to have members" in {
     testCodeScript(Vector(
       CodeExpectation("data n = 0", GeneralSuccessCheck),
@@ -1129,6 +1119,23 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("1.0 + 1.", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), CountT)))),
       CodeExpectation("0.0 + 4.5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(4.5), CountT)))),
    ))
+  }
+
+  "Field Maps " should " work" in {
+    testCodeScript(Vector(
+      CodeExpectation(
+        """new basic map on 3 as numName returning Identifier = (0: ~zero, 1: ~one, 2: ~two)""",
+        GeneralSuccessCheck
+      ),
+      CodeExpectation("val x: 3 = 1", GeneralSuccessCheck),
+      CodeExpectation(
+        "x.numName",
+        SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIdentifier("one"), IdentifierT)))
+      ),
+      CodeExpectation("numName(1)", FailureCheck),
+      CodeExpectation("x.numName(1)", FailureCheck),
+      CodeExpectation("3.f()", FailureCheck),
+    ))
   }
 
   /*

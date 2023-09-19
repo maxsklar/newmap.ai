@@ -76,7 +76,8 @@ object ExpressionPath {
         secondExp <- secondParameter.generateOutput
 
         result <- symbol match {
-          case "." | "|" => Some(ConstructCaseParse(firstExp, secondExp))
+          case "|" => Some(ConstructCaseParse(firstExp, secondExp))
+          case "." => Some(AccessFieldAsMapParse(firstExp, secondExp))
           case ":" => Some(KeyValueBinding(firstExp, secondExp))
           case "," => {
             firstExp match {

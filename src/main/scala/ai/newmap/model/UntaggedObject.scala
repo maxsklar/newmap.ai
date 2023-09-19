@@ -63,7 +63,6 @@ case class UFunctionLink(
 // To be moved into user-defined types soon
 case class UByte(value: Byte) extends UntaggedObject
 case class UCharacter(value: Char) extends UntaggedObject
-//case class UString(length: Long, value: String) extends UntaggedObject
 case class ULong(value: Long) extends UntaggedObject
 case class UDouble(value: Double) extends UntaggedObject
 case class Uuuid(value: UUID) extends UntaggedObject
@@ -86,6 +85,14 @@ case class ApplyFunction(
   func: UntaggedObject,
   input: UntaggedObject,
   matchingRules: MatchingRules // See Class Comment
+) extends UntaggedObject
+
+case class AccessField(
+  value: UntaggedObject,
+  // TODO(max): we might not actually need the full type class here - but we do need some indicator of how to get the field from the value.
+  // - Rework how this is done, or confirm that this is the best way to do it.
+  uTypeClass: UntaggedObject,
+  field: UntaggedObject
 ) extends UntaggedObject
 
 case class FunctionWithMatchingRules(

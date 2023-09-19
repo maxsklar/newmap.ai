@@ -12,6 +12,7 @@ object NewMapParser {
     curState: ParseState[OutT]
   ): Outcome[OutT, String] = tokens match {
     case firstToken +: otherTokens => {
+      //println("curState: " + curState + " --- " + firstToken)
       for {
         newState <- curState.update(firstToken)
         result <- run(otherTokens, newState)

@@ -21,6 +21,24 @@ object Evaluator {
           result <- applyFunctionAttempt(evalFunc, evalInput, env, matchingRules)
         } yield result
       }
+      case AccessField(value, uTypeClass, field) => {
+        for {
+          evalValue <- this(value, env)
+
+          // The field and type class should already be evaluated, so no need to re-evaluate it here
+          fieldsToMap <- applyFunctionAttempt(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
+
+          result <- applyFunctionAttempt(fieldsToMap, field, env)
+
+          resultValue <- result match {
+            case UCase(t, v) => Success(v)
+            case _ => Failure("Can't access value: " + result)
+          }
+          answer <- applyFunctionAttempt(resultValue, value, env)
+        } yield {
+          answer
+        }
+      }
       case ParamId(s) => {
         env.lookupValue(s) match {
           case Some(nObject) => Success(nObject.uObject)

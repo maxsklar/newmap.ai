@@ -18,6 +18,14 @@ case class Environment(
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
 
+
+  // This is a (pattern) mapping from TypeT to a map from the fields on that type to the
+  //  functions returned from those fields
+  // TODO - this must be versioned!
+  // TODO - can we use an UntaggedObject here and use the NewMap mapping system?
+  // This is a map from NewMapType => (String => NewMapObject)
+  typeToFieldMapping: UntaggedObject = UMap(Vector.empty),
+
   // Also a stored versioned type, but a special one!
   typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem,
   channelIdToType: Map[String, NewMapType] = Environment.initialChannelToType,
@@ -166,6 +174,39 @@ case class Environment(
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
           storedVersionedTypes = storedVersionedTypes + (key -> NewMapObject(initValue, nType))
         )
+      }
+      case NewVersionedFieldCommand(id, mapT, value) => {
+        val resultO = for {
+          typeTransformBindings <- mapT match {
+            // TODO - lots of potential exceptions here!
+            case MapT(tt, config) => tt.getMapBindings()
+            case _ => Failure("unexpected type: " + mapT)
+          }
+
+          typeTransform <- Outcome(typeTransformBindings.headOption, "typeTransformBindings too large")
+
+          currentFields <- Evaluator.applyFunctionAttempt(typeToFieldMapping, typeTransform._1, this, TypeMatcher)
+
+          newFieldMapping = (UIdentifier(id), UCase(typeTransform._2, value))
+
+          newFieldMappings <- currentFields match {
+            case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings)
+            case UInit => Success(Vector(newFieldMapping))
+            case _ => Failure("unexpected currentFields: " + currentFields)
+          }
+
+          newTypeToFieldMapping <- typeToFieldMapping match {
+            case UMap(mappings) => {
+              val newMappings: Vector[(UntaggedObject, UntaggedObject)] = (typeTransform._1 -> UMap(newFieldMappings)) +: mappings  
+              Success(UMap(newMappings))
+            }
+            case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
+          }
+        } yield {
+          this.copy(typeToFieldMapping = newTypeToFieldMapping)
+        }
+
+        resultO.toOption.get
       }
       case NewTypeCommand(s, nType) => {
         val uType = typeSystem.typeToUntaggedObject(nType)
