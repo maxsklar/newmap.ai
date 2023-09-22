@@ -46,7 +46,7 @@ case class NewMapTypeSystem(
   typesThatUseType: Map[NewMapTypeSystem.TypeId, Vector[NewMapTypeSystem.TypeId]] = Map.empty,
 
   // Doesn't include conversion rules for base types like Map and Struct
-  // Maybe it will in the future! It'd save us some code in SubtypeUtils.scala
+  // Maybe it will in the future! It'd save us some code in TypeConversionCalculator.scala
   // Parameters: Starting Type, Ending Type
   // Result: Partial Function: Starting Parameter => (Ending Parameter => ConvertibilityRules)
   // Convertibility rule is a complete function from StartingType => EndingType (must be 1:1)

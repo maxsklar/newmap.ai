@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, SubtypeUtils, TypeChecker}
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, TypeConversionCalculator, TypeChecker}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -182,7 +182,7 @@ case class Environment(
         val outputType = typeSystem.typeToUntaggedObject(typeTransform.valueType)
 
         val resultO = for {
-          currentFields <- Evaluator.applyFunctionAttempt(typeToFieldMapping, inputType, this, TypeMatcher)
+          currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, TypeMatcher)
 
           newFieldMapping = (UIdentifier(id), UCase(outputType, value))
 
@@ -281,7 +281,7 @@ case class Environment(
                 commandObj = NewMapObject(command, itemType)
                 
                 inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
-                convertedCommand <- SubtypeUtils.attemptConvertObjectToType(commandObj, inputT, this)
+                convertedCommand <- TypeConversionCalculator.attemptConvertObjectToType(commandObj, inputT, this)
               } yield {
                 convertedCommand.uObject
               }

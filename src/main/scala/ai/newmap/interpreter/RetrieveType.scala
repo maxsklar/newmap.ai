@@ -76,7 +76,7 @@ object RetrieveType {
         case (_, UWildcardPattern(x)) => Success(Map(x -> nType))
         case (CaseT(cases, _, _), UCase(constructor, resultPattern)) => {
           for {
-            valueTypeExpression <- Evaluator.applyFunctionAttempt(cases, constructor, env)
+            valueTypeExpression <- Evaluator.applyFunction(cases, constructor, env)
             valueType <- Evaluator(valueTypeExpression, env)
             valueT <- env.typeSystem.convertToNewMapType(valueType)
             result <- fetchParamsFromPattern(valueT, resultPattern, env)

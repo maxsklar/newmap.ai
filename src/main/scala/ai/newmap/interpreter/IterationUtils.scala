@@ -134,7 +134,7 @@ object IterationUtils {
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
-          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+          patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
@@ -197,7 +197,7 @@ object IterationUtils {
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
-          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+          patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
@@ -216,7 +216,7 @@ object IterationUtils {
   // This means that the first type is either convertible into the second type, or it's iteration type can be convertible.
   // For example, if my second type is Int, then I can certainly give it an Int. But I can also give it an array of Int because I'm stil getting Ints out of it!
   def isIteratableToType(firstType: NewMapType, secondType: NewMapType, env: Environment): Outcome[Boolean, String] = {
-    if (SubtypeUtils.isTypeConvertible(firstType, secondType, env).isSuccess) {
+    if (TypeConversionCalculator.isTypeConvertible(firstType, secondType, env).isSuccess) {
       Success(true)
     } else {
       for {

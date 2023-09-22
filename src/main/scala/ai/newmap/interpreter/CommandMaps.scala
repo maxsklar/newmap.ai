@@ -42,7 +42,7 @@ object CommandMaps {
       // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
       // otherwise, we get an infinite loop
       // TODO - try again?
-      result <- Evaluator.attemptPatternMatchInOrder(mapValues, nType, env, TypeMatcher) match {
+      result <- Evaluator.patternMatchInOrder(mapValues, nType, env, TypeMatcher) match {
         case Success(s) => Success(s)
         case Failure(f) => Failure(f.toString)
       }
@@ -182,7 +182,7 @@ object CommandMaps {
 
           newCaseMap <- updateVersionedObject(caseMap, command, env)
 
-          newCaseName <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+          newCaseName <- Evaluator.applyFunction(command, UIndex(0), env)
         } yield {
           ExpandKeyResponse(
             CaseT(newCaseMap.uObject, parentType, featureSet),
@@ -365,7 +365,7 @@ object CommandMaps {
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
-          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+          patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
@@ -429,10 +429,10 @@ object CommandMaps {
         val outputType = typeTransform.valueType
 
         for {
-          input <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-          commandForInput <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+          input <- Evaluator.applyFunction(command, UIndex(0), env)
+          commandForInput <- Evaluator.applyFunction(command, UIndex(1), env)
 
-          currentResultForInput <- Evaluator.applyFunctionAttempt(current.uObject, input, env)
+          currentResultForInput <- Evaluator.applyFunction(current.uObject, input, env)
 
           newResultForInput <- updateVersionedObject(
             NewMapObject(currentResultForInput, outputType),
@@ -471,9 +471,9 @@ object CommandMaps {
                   case _ => Failure(s"Unexpected command shape $command")
                 }
 
-                keyField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+                keyField <- Evaluator.applyFunction(command, UIndex(0), env)
 
-                valueExpression <- Evaluator.attemptPatternMatchInOrder(commandPatterns, UIndex(1), env)
+                valueExpression <- Evaluator.patternMatchInOrder(commandPatterns, UIndex(1), env)
               } yield {
                 (NewMapObject(keyField, keyT), valueExpression)
               }
@@ -523,11 +523,11 @@ object CommandMaps {
 
           _ = println("currentMapping: " + currentMapping)
 
-          newFunctionNameObj <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
+          newFunctionNameObj <- Evaluator.applyFunction(command, UIndex(0), env)
 
           _ = println("newFunctionNameObj: " + newFunctionNameObj)
 
-          newFunctionObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+          newFunctionObject <- Evaluator.applyFunction(command, UIndex(1), env)
 
           newFunctionObjectComponents <- newFunctionObject match {
             case UCase(t, UMap(pairs)) => Success(t -> pairs)
@@ -573,8 +573,8 @@ object CommandMaps {
             case _ => Failure(s"Couldn't get map values from $current")
           }
 
-          nameOfField <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
-          newValueAsNewMapObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
+          nameOfField <- Evaluator.applyFunction(command, UIndex(0), env)
+          newValueAsNewMapObject <- Evaluator.applyFunction(command, UIndex(1), env)
 
           uCaseValue <- newValueAsNewMapObject match {
             case u@UCase(_, _) => Success(u)
@@ -642,7 +642,7 @@ object CommandMaps {
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
-          patternMatchSubstitutions <- Evaluator.attemptPatternMatch(underlyingPattern, params, StandardMatcher, env)
+          patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 

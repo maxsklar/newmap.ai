@@ -18,7 +18,7 @@ object Evaluator {
         for {
           evalFunc <- this(func, env)
           evalInput <- this(input, env)
-          result <- applyFunctionAttempt(evalFunc, evalInput, env, matchingRules)
+          result <- applyFunction(evalFunc, evalInput, env, matchingRules)
         } yield result
       }
       case AccessField(value, uTypeClass, field) => {
@@ -26,15 +26,15 @@ object Evaluator {
           evalValue <- this(value, env)
 
           // The field and type class should already be evaluated, so no need to re-evaluate it here
-          fieldsToMap <- applyFunctionAttempt(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
+          fieldsToMap <- applyFunction(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
 
-          result <- applyFunctionAttempt(fieldsToMap, field, env)
+          result <- applyFunction(fieldsToMap, field, env)
 
           resultValue <- result match {
             case UCase(t, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
-          answer <- applyFunctionAttempt(resultValue, value, env)
+          answer <- applyFunction(resultValue, value, env)
         } yield {
           answer
         }
@@ -181,7 +181,7 @@ object Evaluator {
 
 
   // Assume that both the function and the input have been evaluated
-  def applyFunctionAttempt(
+  def applyFunction(
     func: UntaggedObject,
     input: UntaggedObject,
     env: Environment,
@@ -189,7 +189,7 @@ object Evaluator {
   ): Outcome[UntaggedObject, String] = {
     stripVersioningU(func, env) match {
       case UMap(values) => {
-        val keyMatchResult = attemptPatternMatchInOrder(values, input, env, matchingRules) match {
+        val keyMatchResult = patternMatchInOrder(values, input, env, matchingRules) match {
           case Success(result) => result
           case Failure(_) => {
             // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
@@ -202,7 +202,7 @@ object Evaluator {
       }
       case UMapPattern(key, value) => {
         // Treat it like a small map
-        applyFunctionAttempt(UMap(Vector(key -> value)), input, env, matchingRules)
+        applyFunction(UMap(Vector(key -> value)), input, env, matchingRules)
       }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
@@ -218,14 +218,14 @@ object Evaluator {
         for {
           // TODO - don't ignore the uuid if we're using an old functional system
           fSystemV <- env.lookupVersionedObject("__FunctionSystem")
-          uFunction <- applyFunctionAttempt(ULink(fSystemV.key), name, env)
-          result <- applyFunctionAttempt(uFunction, input, env)
+          uFunction <- applyFunction(ULink(fSystemV.key), name, env)
+          result <- applyFunction(uFunction, input, env)
         } yield result
       }
       case UPlus => {
         for {
-          first <- applyFunctionAttempt(input, UIndex(0), env)
-          second <- applyFunctionAttempt(input, UIndex(1), env)
+          first <- applyFunction(input, UIndex(0), env)
+          second <- applyFunction(input, UIndex(1), env)
 
           result <- (first, second) match {
             case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 + n2))
@@ -244,7 +244,7 @@ object Evaluator {
     }
   }
 
-  def attemptPatternMatchInOrder(
+  def patternMatchInOrder(
     remainingPatterns: Vector[(UntaggedObject, UntaggedObject)],
     input: UntaggedObject,
     env: Environment,
@@ -252,11 +252,11 @@ object Evaluator {
   ): Outcome[UntaggedObject, String] = {
     remainingPatterns match {
       case (pattern, answer) +: addlPatterns => {
-        attemptPatternMatch(pattern, input, matchingRules, env) match {
+        patternMatch(pattern, input, matchingRules, env) match {
           case Success(paramsToSubsitute) => {
             Success(MakeSubstitution(answer, paramsToSubsitute))
           }
-          case Failure(_) => attemptPatternMatchInOrder(addlPatterns, input, env, matchingRules)
+          case Failure(_) => patternMatchInOrder(addlPatterns, input, env, matchingRules)
         }
       }
       case _ => Failure(
@@ -266,7 +266,7 @@ object Evaluator {
   }
 
 
-  def attemptPatternMatch(
+  def patternMatch(
     pattern: UntaggedObject,
     input: UntaggedObject,
     matchingRules: MatchingRules, // See comment in type definition
@@ -277,17 +277,17 @@ object Evaluator {
       case UWildcardPattern(name) => Success(Map(name -> input))
       case UMapPattern(key, value) => {
         for {
-          valueForKey <- applyFunctionAttempt(input, key, env, matchingRules)
-          result <-  attemptPatternMatch(value, valueForKey, matchingRules, env)
+          valueForKey <- applyFunction(input, key, env, matchingRules)
+          result <-  patternMatch(value, valueForKey, matchingRules, env)
         } yield result
       }
       case _ => matchingRules match {
-        case StandardMatcher => attemptStandardPatternMatch(pattern, input, env)
+        case StandardMatcher => standardPatternMatch(pattern, input, env)
         case TypeMatcher => {
           for {
             patternT <- env.typeSystem.convertToNewMapType(pattern)
             inputT <- env.typeSystem.convertToNewMapType(input)
-            response <- SubtypeUtils.isTypeConvertible(inputT, patternT, env)
+            response <- TypeConversionCalculator.isTypeConvertible(inputT, patternT, env)
           } yield {
             // Do we make use of the conversion rules at all?
             response.newParameters
@@ -300,7 +300,7 @@ object Evaluator {
   // TODO: IMPORTANT
   // We must be able to deal with using the same variable in a pattern, like StructPattern(x, x) to
   //  denote that these are the same... Should only be available in struct and map patterns
-  def attemptStandardPatternMatch(
+  def standardPatternMatch(
     pattern: UntaggedObject,
     input: UntaggedObject,
     env: Environment
@@ -322,17 +322,17 @@ object Evaluator {
         patternMatchOnStruct(params, inputParams, env)
       }
       case (UStruct(params), singleValue) if (params.length == 1) => {
-        attemptPatternMatch(params.head, singleValue, StandardMatcher, env)
+        patternMatch(params.head, singleValue, StandardMatcher, env)
       }
       case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
         for {
-          resultConstructors <- attemptPatternMatch(constructorP, constructor, StandardMatcher, env)
-          result <- attemptPatternMatch(inputP, cInput, StandardMatcher, env)
+          resultConstructors <- patternMatch(constructorP, constructor, StandardMatcher, env)
+          result <- patternMatch(inputP, cInput, StandardMatcher, env)
         } yield (resultConstructors ++ result)
       }
       case (UCase(UIdentifier("Inc"), i), UIndex(j)) if j > 0 => {
         // This is the kind of thing that needs to be in a custom matcher for counts!!
-        attemptPatternMatch(i, UIndex(j - 1), StandardMatcher, env)
+        patternMatch(i, UIndex(j - 1), StandardMatcher, env)
       }
       case (_, UWildcardPattern(wildcard)) => {
         //throw new Exception(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
@@ -357,7 +357,7 @@ object Evaluator {
     (structPattern, inputs) match {
       case (firstPattern +: restOfPatterns, firstInput +: restOfInputs) => {
         for {
-          newParameters <- attemptPatternMatch(firstPattern, firstInput, StandardMatcher, env)
+          newParameters <- patternMatch(firstPattern, firstInput, StandardMatcher, env)
           otherParameters <- patternMatchOnStruct(restOfPatterns, restOfInputs, env)
         } yield {
           newParameters ++ otherParameters
@@ -394,7 +394,7 @@ object Evaluator {
     listOfFunctions match {
       case instruction +: followingInstructions => {
         for {
-          newObject <- applyFunctionAttempt(instruction.func, original, env, instruction.matchingRules)
+          newObject <- applyFunction(instruction.func, original, env, instruction.matchingRules)
           result <- applyListOfFunctions(newObject, followingInstructions, env)
         } yield result
       }

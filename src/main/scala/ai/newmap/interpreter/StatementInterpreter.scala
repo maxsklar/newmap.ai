@@ -146,7 +146,7 @@ object StatementInterpreter {
           command <- channelTypeOpt match {
             case Some(channelType) => {
               for {
-                tObject <- SubtypeUtils.attemptConvertObjectToType(iterableObject, channelType, env)
+                tObject <- TypeConversionCalculator.attemptConvertObjectToType(iterableObject, channelType, env)
               } yield {
                 IterateIntoChannel(tObject.uObject, UIdentifier(destination.s))
               }

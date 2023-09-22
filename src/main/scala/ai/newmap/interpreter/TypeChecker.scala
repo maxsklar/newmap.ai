@@ -39,7 +39,7 @@ object TypeChecker {
           t <- expectedTypeOutcome
           refinedType <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
         } yield {
-          val expectingType = SubtypeUtils.isTypeConvertible(refinedType, TypeT, env).isSuccess
+          val expectingType = TypeConversionCalculator.isTypeConvertible(refinedType, TypeT, env).isSuccess
 
           if (expectingType) {
             val untaggedValue = env.typeSystem.typeToUntaggedObject(IndexT(UIndex(i)))
@@ -89,7 +89,7 @@ object TypeChecker {
           }
 
           // Herin Lies the problem!!!
-          result <- SubtypeUtils.attemptConvertObjectToType(NewMapObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
+          result <- TypeConversionCalculator.attemptConvertObjectToType(NewMapObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
         } yield ()
 
         if (useLiteralIdentifier.nonEmpty) {
@@ -99,21 +99,14 @@ object TypeChecker {
           val nType = tcParameters.get(s).get
 
           for {
-            response <- SubtypeUtils.isTypeConvertible(nType, expectedType, env)
+            response <- TypeConversionCalculator.isTypeConvertible(nType, expectedType, env)
             // TODO - execute convert instructions?
             // response.convertInstructions
           } yield TypeCheckResponse(ParamId(s), nType)
         } else {
           env.lookupValue(s) match {
             case Some(nObject) => {
-              for { 
-                tObject <- SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env)
-              } yield {
-                // TODO: why can't we use tObject.nType?
-                // We can once we solve the parameter-in-key problem (they need to be abolished except in singleton maps)
-                val nType = nObject.nType
-                TypeCheckResponse(tObject.uObject, nType)
-              }
+              responseFromConversion(nObject, expectedType, env)
             }
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
               typeCheckIdentifierFromTypeSystem(s, expectedTypeOutcome, env, featureSet, tcParameters)
@@ -122,7 +115,7 @@ object TypeChecker {
               expectedTypeOutcome match {
                 case Success(CaseT(cases, IdentifierT, featureSet)) => {
                   for {
-                    caseType <- Evaluator.applyFunctionAttempt(cases, UIdentifier(s), env)
+                    caseType <- Evaluator.applyFunction(cases, UIdentifier(s), env)
 
                     caseT <- env.typeSystem.convertToNewMapType(caseType)
 
@@ -174,7 +167,6 @@ object TypeChecker {
       }
       case ApplyParse(function, input) => {
         for {
-          // TODO! We need to use the type transform in here
           result <- typeCheckUnknownFunction(function, input, env, tcParameters)
 
           // Is member of Subtype check here?
@@ -182,7 +174,7 @@ object TypeChecker {
 
           // If the function is a simplemap, and if it has no internal parameters, it can be executed now, and considered a basic
           functionFeatureSetFixed = if (functionFeatureSet.getLevel <= SimpleFunction.getLevel) {
-            Evaluator.applyFunctionAttempt(result.functionExpression, result.inputExpression, env) match {
+            Evaluator.applyFunction(result.functionExpression, result.inputExpression, env) match {
               case Success(result) => BasicMap // TODO - save the actual result we got!
               case Failure(_) => functionFeatureSet
             }
@@ -190,7 +182,7 @@ object TypeChecker {
 
           // Validate that this is allowed from the feature set
           _ <- Outcome.failWhen(
-            !SubtypeUtils.isFeatureSetConvertible(functionFeatureSetFixed, featureSet),
+            !TypeConversionCalculator.isFeatureSetConvertible(functionFeatureSetFixed, featureSet),
             s"Cannot allow function with feature set $functionFeatureSetFixed in expression that should be featureSet $featureSet"
           )
 
@@ -201,7 +193,7 @@ object TypeChecker {
             s"Function ${result.functionExpression} is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet"
           )
 
-          response <- SubtypeUtils.isTypeConvertible(result.resultingType, expectedType, env)
+          response <- TypeConversionCalculator.isTypeConvertible(result.resultingType, expectedType, env)
           // TODO - execute response.convertInstructions
         } yield {
           val applyParseResult = ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher)
@@ -214,7 +206,7 @@ object TypeChecker {
 
           uTypeClass = env.typeSystem.typeToUntaggedObject(tcValue.refinedTypeClass)
 
-          fieldsToTypeMap <- Evaluator.applyFunctionAttempt(
+          fieldsToTypeMap <- Evaluator.applyFunction(
             env.typeToFieldMapping,
             uTypeClass,
             env,
@@ -229,7 +221,7 @@ object TypeChecker {
           //  in its entirety in order to be used in the expression
           evaluatedField <- Evaluator(theFieldTC.nExpression, env)
 
-          returnValue <- Evaluator.applyFunctionAttempt(
+          returnValue <- Evaluator.applyFunction(
             fieldsToTypeMap,
             evaluatedField,
             env
@@ -242,7 +234,7 @@ object TypeChecker {
 
           returnT <- env.typeSystem.convertToNewMapType(returnType)
 
-          response <- SubtypeUtils.isTypeConvertible(returnT, expectedType, env)
+          response <- TypeConversionCalculator.isTypeConvertible(returnT, expectedType, env)
         } yield {
           val accessFieldResult = AccessField(tcValue.nExpression, uTypeClass, evaluatedField)
           TypeCheckResponse(accessFieldResult, returnT)
@@ -291,7 +283,7 @@ object TypeChecker {
                 if (config.completeness != RequireCompleteness) Success(true)
                 else {
                   val headTypePattern = typeTransform.keyType
-                  SubtypeUtils.doPatternsCoverType(mapValues.map(_._1), headTypePattern, env)
+                  PatternCoverageCalculator.doPatternsCoverType(mapValues.map(_._1), headTypePattern, env)
                 }
               }
 
@@ -367,10 +359,8 @@ object TypeChecker {
         // Also - why do these need to be evaluated? seems like they do!
         for {
           inputType <- typeCheck(input, TypeT, env, featureSet, tcParameters)
-
           outputType <- typeCheck(output, TypeT, env, featureSet, tcParameters)
 
-          // TODO - do we need to evaluate this? Re-examine!
           evalInputType <- Evaluator(inputType.nExpression, env, tcParameters)
 
           inputT <- env.typeSystem.convertToNewMapType(evalInputType)
@@ -379,6 +369,7 @@ object TypeChecker {
           val typeTransform = TypeTransform(inputT, outputT)
 
           // TODO - how do we make the mapConfig customizable in the LambdaParse Symbol?
+          // - Is there anything we can do with more equals signs, or -> or maybe ~> (I don't know)
           val mapConfig = MapConfig(RequireCompleteness, FullFunction)
 
           TypeCheckResponse(
@@ -397,7 +388,7 @@ object TypeChecker {
               // must be a "simple map" type situation
               // can this be built into the evaluator?
               firstObj <- Evaluator(firstExp.nExpression, env)
-              secondType <- Evaluator.applyFunctionAttempt(simpleMap, firstObj, env)
+              secondType <- Evaluator.applyFunction(simpleMap, firstObj, env)
 
               secondT <- Evaluator.asType(secondType, env)
               secondExp <- typeCheck(second, secondT, env, featureSet, tcParameters)
@@ -471,7 +462,7 @@ object TypeChecker {
     expectedType: NewMapType,
     env: Environment
   ): Outcome[TypeCheckResponse, String] = {
-    SubtypeUtils.attemptConvertObjectToType(nObject, expectedType, env).map(tObject => {
+    TypeConversionCalculator.attemptConvertObjectToType(nObject, expectedType, env).map(tObject => {
       TypeCheckResponse(tObject.uObject, tObject.nType)
     })
   }
@@ -518,7 +509,7 @@ object TypeChecker {
           untaggedTypeTransformKey = env.typeSystem.typeToUntaggedObject(typeTransform.keyType)
           untaggedTypeTransformValue = env.typeSystem.typeToUntaggedObject(typeTransform.valueType)
 
-          paramsToSubsitute <- Evaluator.attemptPatternMatch(
+          paramsToSubsitute <- Evaluator.patternMatch(
             untaggedTypeTransformKey,
             env.typeSystem.typeToUntaggedObject(resultKey.expectedTypeRefinement),
             TypeMatcher,
@@ -560,7 +551,7 @@ object TypeChecker {
       parameterPattern = underlyingTypeInfo._1
       genericUnderlyingType = underlyingTypeInfo._2
 
-      substitutions <- Evaluator.attemptPatternMatch(parameterPattern, params, StandardMatcher, env)
+      substitutions <- Evaluator.patternMatch(parameterPattern, params, StandardMatcher, env)
 
       underlyingType = MakeSubstitution(genericUnderlyingType, substitutions)
     } yield underlyingType
@@ -672,7 +663,7 @@ object TypeChecker {
           constructorTC <- typeCheckWithPatternMatching(constructorP, parentFieldType, env, externalFeatureSet, if (parentFieldType == IdentifierT) BasicMap else internalFeatureSet, tcParameters)
           constructor <- Evaluator(constructorTC.typeCheckResult, env)
 
-          inputTypeExpected <- Evaluator.applyFunctionAttempt(cases, constructor, env)
+          inputTypeExpected <- Evaluator.applyFunction(cases, constructor, env)
           inputTExpected <- Evaluator.asType(inputTypeExpected, env)
 
           result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet, constructorTC.newParams)
@@ -770,7 +761,7 @@ object TypeChecker {
           valueId <- typeCheck(valueIdentifier, nTypeForStructFieldName, env, featureSet, tcParameters)
           valueIdObj <- Evaluator(valueId.nExpression, env)
 
-          newParams <- Evaluator.attemptPatternMatch(paramId, valueIdObj, StandardMatcher, env)
+          newParams <- Evaluator.patternMatch(paramId, valueIdObj, StandardMatcher, env)
 
           // Is this substitution neccesary??
           typeOfIdentifierObj <- Evaluator(MakeSubstitution(typeOfIdentifier, newParams), env)
@@ -872,7 +863,7 @@ object TypeChecker {
         }
         case MapT(typeTransform, config) => {
           for {
-            newParams <- Evaluator.attemptPatternMatch(
+            newParams <- Evaluator.patternMatch(
               env.typeSystem.typeToUntaggedObject(typeTransform.keyType),
               untaggedInputType,
               TypeMatcher,
@@ -885,8 +876,7 @@ object TypeChecker {
             )
 
             nType <- Evaluator.asType(typeAsObj, env)
-            // TODO: This should be uncommented when we can build "convertible to" into the type transform
-            //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
+            _ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
           } yield nType
         }
         case TypeT => {
@@ -921,7 +911,7 @@ object TypeChecker {
 
             strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
 
-            patternMatchAttempted <- Evaluator.applyFunctionAttempt(impl, untaggedInputType, env, TypeMatcher)
+            patternMatchAttempted <- Evaluator.applyFunction(impl, untaggedInputType, env, TypeMatcher)
           } yield {
             patternMatchAttempted
           }
@@ -963,7 +953,7 @@ object TypeChecker {
     val untaggedInputType = env.typeSystem.typeToUntaggedObject(inputType)
     
     for {
-      resultingFunctionType <- Evaluator.applyFunctionAttempt(params, untaggedInputType, env)
+      resultingFunctionType <- Evaluator.applyFunction(params, untaggedInputType, env)
       resultingFunctionT <- env.typeSystem.convertToNewMapType(resultingFunctionType)
     } yield {
       resultingFunctionT
@@ -977,7 +967,7 @@ object TypeChecker {
   ): Outcome[NewMapType, String] = {
     for {
       inputObj <- Evaluator(input, env)
-      resultingType <- Evaluator.applyFunctionAttempt(UMap(params), inputObj, env)
+      resultingType <- Evaluator.applyFunction(UMap(params), inputObj, env)
 
       // This will (correctly) fail when resultingType == UInit (ie, it's not in params)
       resultingT <- Evaluator.asType(resultingType, env)

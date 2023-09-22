@@ -40,7 +40,7 @@ object PrintNewMapObject {
         case _ => Failure(s"Not a type class: ${dislayUnderlyingExpT.displayString(env)}")
       }
 
-      result <- Evaluator.applyFunctionAttempt(mapValues, nType, env, TypeMatcher) match {
+      result <- Evaluator.applyFunction(mapValues, nType, env, TypeMatcher) match {
         case Success(s) => Success(s)
         case Failure(f) => Failure(f.toString)
       }

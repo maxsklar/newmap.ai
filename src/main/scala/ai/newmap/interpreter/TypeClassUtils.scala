@@ -48,7 +48,7 @@ object TypeClassUtils {
       case SubtypeT(isMember, parentType, _) => {
         for {
           refinedType <- typeIsExpectingAnIndex(parentType, i, env)
-          membershipCheck <- Evaluator.applyFunctionAttempt(isMember, UIndex(i), env)
+          membershipCheck <- Evaluator.applyFunction(isMember, UIndex(i), env)
           _ <- Outcome.failWhen(membershipCheck == UInit, s"Value $i not a member of subtype $nType")
         } yield refinedType
       }
