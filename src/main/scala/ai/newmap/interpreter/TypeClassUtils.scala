@@ -36,9 +36,7 @@ object TypeClassUtils {
           currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
 
           currentParameterPattern = currentUnderlyingType._1
-          currentUnderlyingExp = currentUnderlyingType._2
-
-          underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+          underlyingT <- currentUnderlyingType._2.asType
 
           //TODO: The env should. be updated with currentParameterPattern
           result <- typeIsExpectingAnIndex(underlyingT, i, env)
@@ -56,7 +54,7 @@ object TypeClassUtils {
         if (params.length == 1) {
           for {
             typeObj <- Evaluator(params.head._2, env)
-            t <- Evaluator.asType(typeObj, env)
+            t <- typeObj.asType
             result <- typeIsExpectingAnIndex(t, i, env)
           } yield result
         } else {

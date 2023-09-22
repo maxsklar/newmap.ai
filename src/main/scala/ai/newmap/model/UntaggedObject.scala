@@ -14,6 +14,8 @@ sealed abstract class UntaggedObject {
     case UMapPattern(key, value) => Success(Vector(key -> value))
     case _ => Failure("Could not get bindings: " + this)
   }
+
+  def asType: Outcome[NewMapType, String] = NewMapType.convertToNewMapType(this)
 }
 
 // Todo - replace with "user defined type" in prelude

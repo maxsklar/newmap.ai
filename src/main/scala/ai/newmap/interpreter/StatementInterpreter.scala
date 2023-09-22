@@ -26,7 +26,7 @@ object StatementInterpreter {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
 
-          nType <- Evaluator.asType(nTypeObj, env)
+          nType <- nTypeObj.asType
 
 
           // If prefix is DefStatement then make sure nType is a potentially recursive function!
@@ -52,7 +52,7 @@ object StatementInterpreter {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
-          nType <- Evaluator.asType(nTypeObj, env)
+          nType <- nTypeObj.asType
 
           // Problem is WITH_TYPE!!
 
@@ -70,7 +70,7 @@ object StatementInterpreter {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
-          nType <- Evaluator.asType(nTypeObj, env)
+          nType <- nTypeObj.asType
         } yield {
           ReturnValue(
             NewTypeCommand(id.s, nType),
@@ -209,9 +209,7 @@ object StatementInterpreter {
               currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find underlying type for ${id.s}")
 
               currentParameterPattern = currentUnderlyingType._1
-              currentUnderlyingExp = currentUnderlyingType._2
-
-              underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+              underlyingT <- currentUnderlyingType._2.asType
 
               inputT <- CommandMaps.getTypeExpansionCommandInput(underlyingT, typeSystem)
 
@@ -235,7 +233,7 @@ object StatementInterpreter {
         for {
           tcType <- TypeChecker.typeCheck(channelTypeParse, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
-          nType <- Evaluator.asType(nTypeObj, env)
+          nType <- nTypeObj.asType
         } yield {
           ReturnValue(
             AddChannel(channel, nType),
@@ -337,14 +335,14 @@ object StatementInterpreter {
           // - Think about this more, and try to make it more obvious what to use in the future.
           typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, SimpleFunction, Map.empty)
 
-          typeTransform <- env.typeSystem.convertToTypeTransform(typeTransformTC.nExpression)
+          typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
 
           // TODO - what if typeTransform.valueType has a parameter?
           useCommandMap = CommandMaps.getDefaultValueOfCommandType(typeTransform.valueType, env).isSuccess
           completeness = if (useCommandMap) CommandOutput else RequireCompleteness
           mapConfig = MapConfig(completeness, featureSet)
 
-          typeTransform <- env.typeSystem.convertToTypeTransform(typeTransformTC.nExpression)
+          typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
 
           mapType = MapT(typeTransform, mapConfig)
 
@@ -374,7 +372,7 @@ object StatementInterpreter {
           }
 
           uObject <- Evaluator(expression, env)
-          v <- Evaluator.asType(uObject, env)
+          v <- uObject.asType
 
           restOfResult <- convertMapValuesToParamList(restOfMapValues, env)
         } yield (k -> v) +: restOfResult

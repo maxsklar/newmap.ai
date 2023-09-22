@@ -28,7 +28,7 @@ object TypeConversionCalculator {
         Success(IsTypeConvertibleResponse(
           Vector.empty,
           startingType,
-          Map(name -> env.typeSystem.typeToUntaggedObject(startingType))
+          Map(name -> startingType.asUntagged)
         ))
       }
       case (CustomT(name1, param1), CustomT(name2, param2)) if (name1 == name2) => {
@@ -103,7 +103,7 @@ object TypeConversionCalculator {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, fieldParentType, env)
           singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
+          singularObjT <- singularObj.asType
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
@@ -112,7 +112,7 @@ object TypeConversionCalculator {
           valueBindings <- values.getMapBindings()
           singularOutputResponse <- convertToStructWithSingleValue(valueBindings, env)
           singularObj <- Evaluator(singularOutputResponse.inputType, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
+          singularObjT <- singularObj.asType
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response.copy(convertInstructions = singularOutputResponse.conversionRules ++ response.convertInstructions)
       }
@@ -134,7 +134,7 @@ object TypeConversionCalculator {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, startingFieldType, env)
           singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
+          singularObjT <- singularObj.asType
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
@@ -153,7 +153,7 @@ object TypeConversionCalculator {
         for {
           singularOutput <- outputIfFunctionHasSingularInput(values, endingFieldType, env)
           singularObj <- Evaluator(singularOutput, env)
-          singularObjT <- Evaluator.asType(singularObj, env)
+          singularObjT <- singularObj.asType
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
       }

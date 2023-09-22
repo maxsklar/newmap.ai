@@ -12,7 +12,7 @@ object PrintNewMapObject {
 
     printObjectFromEnv(
       nObject.uObject,
-      env.typeSystem.typeToUntaggedObject(nObject.nType),
+      nObject.nType.asUntagged,
       env
     ).toOption.getOrElse(defaultString)
   }
@@ -31,9 +31,7 @@ object PrintNewMapObject {
       displayUnderlyingType <- Outcome(env.typeSystem.typeToUnderlyingType.get(displayTypeId), "Couldn't find _display underlying typeclass")
 
       displayParameterPattern = displayUnderlyingType._1
-      displayUnderlyingExp = displayUnderlyingType._2
-
-      dislayUnderlyingExpT <- env.typeSystem.convertToNewMapType(displayUnderlyingExp)
+      dislayUnderlyingExpT <- displayUnderlyingType._2.asType
 
       mapValues <- dislayUnderlyingExpT match {
         case TypeClassT(_, values) => Success(values)

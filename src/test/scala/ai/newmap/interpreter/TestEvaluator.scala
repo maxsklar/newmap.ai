@@ -20,17 +20,17 @@ class TestEvaluator extends FlatSpec {
   def mapConfig = MapConfig(CommandOutput, SimpleFunction)
 
   "isCommandFunc " should " work properly on ranges" in {
-    val result = Evaluator.applyFunction(IsCommandFunc, env.typeSystem.typeToUntaggedObject(IndexT(UIndex(10))), env)
+    val result = Evaluator.applyFunction(IsCommandFunc, IndexT(UIndex(10)).asUntagged, env)
     assertFunctionWorkedAndReturnedResult(result, UIndex(1))
   }
 
   it should " work properly on count" in {
-    val result = Evaluator.applyFunction(IsCommandFunc, env.typeSystem.typeToUntaggedObject(CountT), env)
+    val result = Evaluator.applyFunction(IsCommandFunc, CountT.asUntagged, env)
     assertFunctionWorkedAndReturnedResult(result, UIndex(1))
   }
 
   it should " work properly on TypeT" in {
-    val result = Evaluator.applyFunction(IsCommandFunc, env.typeSystem.typeToUntaggedObject(TypeT), env)
+    val result = Evaluator.applyFunction(IsCommandFunc, TypeT.asUntagged, env)
     assertFunctionWorkedAndReturnedResult(result, UIndex(1))
   }
 }

@@ -114,7 +114,7 @@ case class Environment(
           ApplyIndividualCommand(
             "__FunctionSystem",
             UMap(
-              Vector(UIndex(0) -> UIdentifier(s), UIndex(1) -> UCase(typeSystem.typeToUntaggedObject(nType), uObject))
+              Vector(UIndex(0) -> UIdentifier(s), UIndex(1) -> UCase(nType.asUntagged, uObject))
             )
           )
         )
@@ -178,8 +178,8 @@ case class Environment(
       case NewVersionedFieldCommand(id, mapT, value) => {
         val typeTransform = mapT.typeTransform
 
-        val inputType = typeSystem.typeToUntaggedObject(typeTransform.keyType)
-        val outputType = typeSystem.typeToUntaggedObject(typeTransform.valueType)
+        val inputType = typeTransform.keyType.asUntagged
+        val outputType = typeTransform.valueType.asUntagged
 
         val resultO = for {
           currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, TypeMatcher)
@@ -206,9 +206,9 @@ case class Environment(
         resultO.toOption.get
       }
       case NewTypeCommand(s, nType) => {
-        val uType = typeSystem.typeToUntaggedObject(nType)
+        val uType = nType.asUntagged
 
-        val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
+        val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
         val parameterPattern = UStruct(Vector.empty)
 
         val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
@@ -232,14 +232,14 @@ case class Environment(
           paramList.head._2
         } else {
           StructT(
-            UMap(paramList.zipWithIndex.map(x => UIndex(x._2) -> typeSystem.typeToUntaggedObject(x._1._2))),
+            UMap(paramList.zipWithIndex.map(x => UIndex(x._2) -> x._1._2.asUntagged)),
             IndexT(UIndex(paramList.length))
           )
         }
 
-        val uType = typeSystem.typeToUntaggedObject(nType)
+        val uType = nType.asUntagged
 
-        val newTypeSystem = typeSystem.createNewCustomType(s, typeSystem.typeToUntaggedObject(paramT), parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, paramT.asUntagged, parameterPattern, uType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -251,9 +251,9 @@ case class Environment(
       }
       case NewTypeClassCommand(s, typeTransform) => {
         val nType = TypeClassT(typeTransform, UMap(Vector.empty))
-        val uType = typeSystem.typeToUntaggedObject(nType)
+        val uType = nType.asUntagged
 
-        val parameterType = typeSystem.typeToUntaggedObject(NewMapTypeSystem.emptyStruct)
+        val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
         val parameterPattern = UStruct(Vector.empty)
 
         val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
@@ -343,11 +343,11 @@ case class Environment(
               currentParameterPattern = currentUnderlyingType._1
               currentUnderlyingExp = currentUnderlyingType._2
 
-              underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+              underlyingT <- currentUnderlyingExp.asType
 
               response <- CommandMaps.expandType(underlyingT, command, this)
 
-              newUnderlyingType = typeSystem.typeToUntaggedObject(response.newType)
+              newUnderlyingType = response.newType.asUntagged
 
               newTypeSystem <- typeSystem.upgradeCustomType(s, newUnderlyingType, response.converter)
             } yield {
@@ -380,7 +380,7 @@ case class Environment(
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {
-        val uType = typeSystem.typeToUntaggedObject(nObject.nType)
+        val uType = nObject.nType.asUntagged
         this.newCommand(ApplyIndividualCommand("res", UCase(uType, nObject.uObject)))
       }
       case AddChannel(channel, nType) => {
@@ -506,7 +506,7 @@ case class Environment(
   }
 
   def typeAsObject(nType: NewMapType): NewMapObject = {
-    val uType = typeSystem.typeToUntaggedObject(nType)
+    val uType = nType.asUntagged
     NewMapObject(uType, TypeT)
   }
 
@@ -514,7 +514,7 @@ case class Environment(
     inputT: NewMapType,
     outputT: NewMapType
   ): UntaggedObject = {
-    UMapPattern(typeSystem.typeToUntaggedObject(inputT), typeSystem.typeToUntaggedObject(outputT))
+    UMapPattern(inputT.asUntagged, outputT.asUntagged)
   }
 }
 
@@ -529,7 +529,7 @@ object Environment {
 
   def structTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
+      params.map(x => UIdentifier(x._1) -> x._2.asUntagged)
     }
 
     StructT(UMap(paramsToObject), IdentifierT)
@@ -537,7 +537,7 @@ object Environment {
 
   def caseTypeFromParams(params: Vector[(String, NewMapType)]) = {
     val paramsToObject = {
-      params.map(x => UIdentifier(x._1) -> Base.typeSystem.typeToUntaggedObject(x._2))
+      params.map(x => UIdentifier(x._1) -> x._2.asUntagged)
     }
 
     CaseT(UMap(paramsToObject), IdentifierT)
@@ -561,7 +561,7 @@ object Environment {
     env: Environment
   ): NewMapObject = {
     val structT = StructT(
-      UMap(inputs.zipWithIndex.map(x => UIndex(x._2) -> Base.typeSystem.typeToUntaggedObject(x._1._2))),
+      UMap(inputs.zipWithIndex.map(x => UIndex(x._2) -> x._1._2.asUntagged)),
       IndexT(UIndex(inputs.length))
     )
 
@@ -579,7 +579,7 @@ object Environment {
   }
 
   def typeAsUntaggedObject(nType: NewMapType): UntaggedObject = {
-    Base.typeSystem.typeToUntaggedObject(nType)
+    nType.asUntagged
   }
 
   // TODO - eventually make this empty and add it elsewhere!!
@@ -607,7 +607,7 @@ object Environment {
     val transformMapT = {
       UCase(UIdentifier("Map"), UStruct(Vector(
         ParamId("typeTransform"),
-        Base.typeSystem.mapConfigToUntagged(config)
+        NewMapType.mapConfigToUntagged(config)
       )))
     }
 
@@ -681,7 +681,7 @@ object Environment {
     NewTypeClassCommand(
       "Addable",
       UMapPattern(
-        UMapPattern(Base.typeSystem.typeToUntaggedObject(IndexT(UIndex(2))), UWildcardPattern("t")),
+        UMapPattern(IndexT(UIndex(2)).asUntagged, UWildcardPattern("t")),
         ParamId("t")
       )
     ),

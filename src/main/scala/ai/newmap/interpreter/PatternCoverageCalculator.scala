@@ -79,9 +79,7 @@ object PatternCoverageCalculator {
           // - Some of the parameters in the expression with map to patterns instead of objects
           // - Whole new Evaluator line!!
 
-          //println(s"inputType: $inputType\n --- ${Evaluator.asType(inputType, env)}")
-
-          Evaluator.asType(inputType, env) match {
+          inputType.asType match {
             case Failure(_) => returnVal = false
             case Success(inputTypeT) => {
               doPatternsCoverType(patternsWithThisConstructor, inputTypeT, env) match {
@@ -122,7 +120,7 @@ object PatternCoverageCalculator {
           case StructT(UMap(params), _, _, _) if (params.length == patterns.length) => {
             (patterns, params.map(_._2)).zipped.toVector.forall(x => {
               Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, Evaluator.asType(nObject, env).toOption.get, env)
+                isCatchallPattern(x._1, nObject.asType.toOption.get, env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
           }

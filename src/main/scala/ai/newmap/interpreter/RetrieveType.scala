@@ -78,7 +78,7 @@ object RetrieveType {
           for {
             valueTypeExpression <- Evaluator.applyFunction(cases, constructor, env)
             valueType <- Evaluator(valueTypeExpression, env)
-            valueT <- env.typeSystem.convertToNewMapType(valueType)
+            valueT <- valueType.asType
             result <- fetchParamsFromPattern(valueT, resultPattern, env)
           } yield result
         }
@@ -91,7 +91,7 @@ object RetrieveType {
             } {
               for {
                 uType <- Evaluator(params(i)._2, env)
-                nType <- env.typeSystem.convertToNewMapType(uType)
+                nType <- uType.asType
                 patterns <- fetchParamsFromPattern(nType, values(i), env)
               } {
                 resultMap = resultMap ++ patterns.toVector

@@ -9,7 +9,7 @@ object CommandMaps {
   def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
-    getDefaultValueOfCommandTypeFromEnv(env.typeSystem.typeToUntaggedObject(nType), env).rescue(f => {
+    getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(f => {
       getDefaultValueOfCommandTypeHardcoded(nType, env)
     })
   }
@@ -30,7 +30,7 @@ object CommandMaps {
       defaultParameterPattern = defaultUnderlyingType._1
       defaultUnderlyingExp = defaultUnderlyingType._2
 
-      defaultUnderlyingExpT <- env.typeSystem.convertToNewMapType(defaultUnderlyingExp)
+      defaultUnderlyingExpT <- defaultUnderlyingExp.asType
 
       mapValuesU <- defaultUnderlyingExpT match {
         case TypeClassT(_, values) => Success(values)
@@ -104,8 +104,8 @@ object CommandMaps {
       case CaseT(cases, parentType, featureSet) => {
         Success(StructT(
           UMap(Vector(
-            UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
-            UIndex(1) -> typeSystem.typeToUntaggedObject(HistoricalTypeT(typeSystem.currentState))
+            UIndex(0) -> parentType.asUntagged,
+            UIndex(1) -> HistoricalTypeT(typeSystem.currentState).asUntagged
           )),
           IndexTN(2)
         ))
@@ -113,8 +113,8 @@ object CommandMaps {
       case StructT(cases, parentType, _, featureSet) => {
         Success(StructT(
           UMap(Vector(
-            UIndex(0) -> typeSystem.typeToUntaggedObject(parentType),
-            UIndex(1) -> typeSystem.typeToUntaggedObject(SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState)))
+            UIndex(0) -> parentType.asUntagged,
+            UIndex(1) -> SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState)).asUntagged
           )),
           IndexTN(2)
         ))
@@ -135,9 +135,7 @@ object CommandMaps {
           currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
 
           currentParameterPattern = currentUnderlyingType._1
-          currentUnderlyingExp = currentUnderlyingType._2
-
-          underlyingT <- typeSystem.convertToNewMapType(currentUnderlyingExp)
+          underlyingT <- currentUnderlyingType._2.asType
 
           commandInput <- getTypeExpansionCommandInput(underlyingT, typeSystem)
         } yield commandInput
@@ -246,7 +244,7 @@ object CommandMaps {
 
           currentParameterPattern = currentUnderlyingTypeInfo._1
           currentUnderlyingType = currentUnderlyingTypeInfo._2
-          currentUnderlyingT <- env.typeSystem.convertToNewMapType(currentUnderlyingType)
+          currentUnderlyingT <- currentUnderlyingType.asType
           response <- expandType(currentUnderlyingT, command, env)
         } yield response
       }
@@ -272,18 +270,13 @@ object CommandMaps {
         // the type of the expression depends on the value of the pattern??
         // -- therefore, this is a binding!
         // -- should we make a binding a first class object, and should typeTransform just be a binding?
-        
-        val keyType = env.typeSystem.typeToUntaggedObject(typeTransform.keyType)
-        val valuesType = env.typeSystem.typeToUntaggedObject(typeTransform.valueType)
-        
         for {
-          valuesT <- Evaluator.asType(valuesType, env)
-          outputCommandT <- getCommandInputOfCommandType(valuesT, env)
+          outputCommandT <- getCommandInputOfCommandType(typeTransform.valueType, env)
         } yield {
           StructT(
             UMap(Vector(
-              UIndex(0) -> keyType,
-              UIndex(1) -> env.typeSystem.typeToUntaggedObject(outputCommandT)
+              UIndex(0) -> typeTransform.keyType.asUntagged,
+              UIndex(1) -> outputCommandT.asUntagged
             )),
             IndexTN(2)
           )
@@ -311,8 +304,8 @@ object CommandMaps {
             case _ => {
               StructT(
                 UMap(Vector(
-                  UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
-                  UIndex(1) -> env.typeSystem.typeToUntaggedObject(requiredValuesT)
+                  UIndex(0) -> keyExpansionCommandT.asUntagged,
+                  UIndex(1) -> requiredValuesT.asUntagged
                 )),
                 IndexTN(2)
               )
@@ -323,8 +316,8 @@ object CommandMaps {
       case FunctionalSystemT(functionTypes) => {
         Success(StructT(
           UMap(Vector(
-            UIndex(0) -> env.typeSystem.typeToUntaggedObject(IdentifierT),
-            UIndex(1) -> env.typeSystem.typeToUntaggedObject(NewMapO.taggedObjectT)
+            UIndex(0) -> IdentifierT.asUntagged,
+            UIndex(1) -> NewMapO.taggedObjectT.asUntagged
           )),
           IndexTN(2)
         ))
@@ -342,8 +335,8 @@ object CommandMaps {
         // B) The tagged object that goes in there (so both type and object)
         Success(StructT(
           UMap(Vector(
-            UIndex(0) -> env.typeSystem.typeToUntaggedObject(fieldExpansionCommandT),
-            UIndex(1) -> env.typeSystem.typeToUntaggedObject(NewMapO.taggedObjectT)
+            UIndex(0) -> fieldExpansionCommandT.asUntagged,
+            UIndex(1) -> NewMapO.taggedObjectT.asUntagged
           )),
           IndexTN(2)
         ))
@@ -354,7 +347,7 @@ object CommandMaps {
         Success(CaseT(parameterList, parentFieldType, featureSet))
       }
       // This should be custom defined
-      case CustomT("Array", nType) => env.typeSystem.convertToNewMapType(nType)
+      case CustomT("Array", nType) => nType.asType
       case CustomT(typeName, params) => {
         val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
         val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
@@ -369,7 +362,7 @@ object CommandMaps {
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
-          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          underlyingT <- underlyingType.asType
           result <- getCommandInputOfCommandType(underlyingT, env)
         } yield {
           result
@@ -535,7 +528,7 @@ object CommandMaps {
           }
 
           uNewFunctionType = newFunctionObjectComponents._1
-          newFunctionT <- env.typeSystem.convertToNewMapType(uNewFunctionType)
+          newFunctionT <- uNewFunctionType.asType
 
           _ = println("newFunctionT: " + newFunctionT)
 
@@ -556,7 +549,7 @@ object CommandMaps {
           )
 
           // Object to upgrade the functionalSystemT
-          val composedTypeObject = env.typeSystem.typeToUntaggedObject(MapT(newFunctionTypeTransform, newFunctionMapConfig))
+          val composedTypeObject = MapT(newFunctionTypeTransform, newFunctionMapConfig).asUntagged
 
           // Also upgrade the function itself
           // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
@@ -646,7 +639,7 @@ object CommandMaps {
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
-          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          underlyingT <- underlyingType.asType
           currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
 
           result <- updateVersionedObject(currentResolved, command, env)
@@ -682,7 +675,7 @@ object CommandMaps {
       case (fieldName, typeOfFieldExp) +: restOfParams => {
         for {
           typeOfField <- Evaluator(typeOfFieldExp, env)
-          typeOfFieldT<- Evaluator.asType(typeOfField, env)
+          typeOfFieldT<- typeOfField.asType
           paramDefault <- getDefaultValueOfCommandType(typeOfFieldT, env)
           restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
         } yield {

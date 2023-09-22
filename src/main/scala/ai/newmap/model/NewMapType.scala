@@ -1,10 +1,13 @@
 package ai.newmap.model
 
 import java.util.UUID
+import ai.newmap.util.{Outcome, Success, Failure}
 
 sealed abstract class NewMapType {
   override def toString = PrintNewMapObject.newMapType(this, Environment.Base.typeSystem)
   def displayString(env: Environment) = PrintNewMapObject.newMapType(this, env.typeSystem)
+
+  def asUntagged: UntaggedObject = NewMapType.typeToUntaggedObject(this)
 }
 
 /*
@@ -216,3 +219,226 @@ case class WithStateT(
   typeSystemId: UUID,
   nType: NewMapType 
 ) extends NewMapType
+
+object NewMapType {
+  def typeToUntaggedObject(nType: NewMapType): UntaggedObject = nType match {
+    case CountT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
+    case IndexT(i) => UCase(UIdentifier("Index"), i)
+    case BooleanT => UCase(UIdentifier("Boolean"), UStruct(Vector.empty))
+    case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
+    case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
+    case LongT => UCase(UIdentifier("Long"), UStruct(Vector.empty))
+    case DoubleT => UCase(UIdentifier("Double"), UStruct(Vector.empty))
+    case UuidT => UCase(UIdentifier("Uuid"), UStruct(Vector.empty))
+    case UndefinedT => UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty))
+    case TypeT => UCase(UIdentifier("Type"), UStruct(Vector.empty))
+    case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
+    case IdentifierT => UCase(UIdentifier("Identifier"), UStruct(Vector.empty))
+    case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UStruct(Vector(
+      UMapPattern(typeToUntaggedObject(key), typeToUntaggedObject(value)),
+      mapConfigToUntagged(config)
+    )))
+    case TypeTransformT => UCase(UIdentifier("TypeTransform"), UStruct(Vector.empty))
+    case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
+      params,
+      typeToUntaggedObject(fieldParentType),
+      UIdentifier(completenesss.getName),
+      UIdentifier(featureSet.getName)
+    )))
+    case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UStruct(Vector(
+      typeTransform,
+      typesInTypeClass
+    )))
+    case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UStruct(Vector(
+      cases,
+      typeToUntaggedObject(fieldParentType),
+      UIdentifier(featureSet.getName)
+    )))
+    case SubtypeT(isMember, parentType, featureSet) => UCase(UIdentifier("Subtype"), UStruct(Vector(
+      isMember,
+      typeToUntaggedObject(parentType),
+      UIdentifier(featureSet.getName)
+    )))
+    case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
+    case CustomT(name, params) => UCase(UIdentifier(name), params)
+    case WithStateT(uuid, nType) => {
+      UCase(
+        UIdentifier("WithState"),
+        UCase(
+          Uuuid(uuid),
+          typeToUntaggedObject(nType)
+        )
+      )
+    }
+    case WildcardPatternT(name) => UWildcardPattern(name)
+    case ParamIdT(name) => ParamId(name)
+  }
+
+  def mapConfigToUntagged(config: MapConfig): UntaggedObject = {
+    UStruct(Vector(
+      UIdentifier(config.completeness.getName),
+      UIdentifier(config.featureSet.getName),
+      UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
+      config.channels,
+      typeToUntaggedObject(config.channelParentType)
+    ))
+  }
+
+  def convertToNewMapType(
+    uType: UntaggedObject
+  ): Outcome[NewMapType, String] = uType match {
+    case UCase(UIdentifier(identifier), params) => identifier match {
+      case "Count" => Success(CountT)
+      case "Index" => Success(IndexT(params))
+      case "Boolean" => Success(BooleanT)
+      case "Byte" => Success(ByteT)
+      case "Character" => Success(CharacterT)
+      //case "String" => Success(StringT)
+      case "Long" => Success(LongT)
+      case "Double" => Success(DoubleT)
+      case "Uuid" => Success(UuidT)
+      case "UndefinedType" => Success(UndefinedT)
+      case "Type" => Success(TypeT)
+      case "HistoricalType" => params match {
+        case Uuuid(uuid) => Success(HistoricalTypeT(uuid))
+        case _ => Failure(s"Couldn't convert HistoricalType to NewMapType with params: $params")
+      }
+      case "Identifier" => Success(IdentifierT)
+      case "Map" => params match {
+        case UStruct(items) if (items.length == 2) => {
+          for {
+            typeTransform <- convertToTypeTransform(items(0))
+
+            config <- items(1) match {
+              case UStruct(v) if (v.length == 5) => Success(v)
+              case _ => Failure(s"Incorrect config: ${items(1)}")
+            }
+
+            completeness <- config(0) match {
+              case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
+              case UIdentifier("CommandOutput") => Success(CommandOutput)
+              case _ => Failure(s"Can't allow feature set in struct type: ${items(1)}")
+            }
+
+            featureSet <- convertFeatureSet(config(1))
+
+            // TODO: config(2) for the preservation rules
+            // TODO: config(3) for channels
+            // TODO: config(4) for parent of channel names
+
+          } yield {
+            MapT(typeTransform, MapConfig(completeness, featureSet))
+          }
+        }
+        case _ => Failure(s"Couldn't convert Map to NewMapType with params: $params")
+      }
+      case "Struct" => params match {
+        case UStruct(items) if (items.length == 4) => {
+          for {
+            parentT <- convertToNewMapType(items(1))
+
+            completeness <- items(2) match {
+              case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
+              case UIdentifier("CommandOutput") => Success(CommandOutput)
+              case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
+            }
+
+            featureSet <- convertFeatureSet(items(3))
+          } yield {
+            StructT(items(0), parentT, completeness, featureSet)
+          }
+        }
+        case _ => Failure(s"Couldn't convert Struct to NewMapType with params: $params")
+      }
+      case "TypeClass" => params match {
+        case UStruct(items) if (items.length == 2) => {
+          for {
+            typeTransform <- items(0) match {
+              case ump@UMapPattern(key, value) => Success(ump)
+              case UMap(uMap) if (uMap.length <= 1) => uMap.headOption match {
+                case Some(singleton) => Success(UMapPattern(singleton._1, singleton._2))
+                case None => Failure("Empty Type Class Pattern")
+              }
+              case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
+            }
+          } yield {
+            TypeClassT(typeTransform, items(1))
+          }
+        }
+        case _ => Failure(s"Couldn't convert TypeClass to NewMapType with params: $params")
+      }
+      case "Case" => params match {
+        case UStruct(items) if items.length == 3 => {
+          for {
+            parentT <- convertToNewMapType(items(1))
+
+            featureSet <- convertFeatureSet(items(2))
+          } yield CaseT(items(0), parentT, featureSet)
+        }
+        case _ => Failure(s"Couldn't convert Case to NewMapType with params: $params")
+      }
+      case "Subtype" => params match {
+        case UStruct(items) if items.length == 3 => {
+          for {
+            parentT <- convertToNewMapType(items(1))
+
+            featureSet <- convertFeatureSet(items(2))
+
+            _ <- Outcome.failWhen(
+              featureSet.getLevel > SimpleFunction.getLevel,
+              s"Can't allow feature set in subtype: ${items(2)}"
+            )
+          } yield SubtypeT(items(0), parentT, featureSet)
+        }
+        case _ => Failure(s"Couldn't convert Subtype to NewMapType with params: $params")
+      }
+      case "WithState" => params match {
+        case UCase(Uuuid(uuid), t) => {
+          for {
+            resultT <- convertToNewMapType(t)
+          } yield {
+            WithStateT(uuid, resultT)
+          }
+        }
+        case _ => Failure(s"Couldn't convert WithState to NewMapType with params: $params")
+      }
+      case custom => Success(CustomT(custom, params))
+    }
+    case UInit => Success(UndefinedT)
+    case UIndex(i) => Success(IndexT(UIndex(i)))
+    case UIdentifier(name) => convertToNewMapType(UCase(UIdentifier(name), UInit))
+    case UWildcardPattern(name) => Success(WildcardPatternT(name))
+    case ParamId(name) => Success(ParamIdT(name))
+    case _ => {
+      throw new Exception(s"Couldn't convert to NewMapType: $uType")
+      Failure(s"Couldn't convert to NewMapType: $uType")
+    }
+  }
+
+  def convertToTypeTransform(uObject: UntaggedObject): Outcome[TypeTransform, String] = {
+    uObject match {
+      case UMapPattern(key, value) => {
+        for {
+          keyType <- convertToNewMapType(key)
+          valueType <- convertToNewMapType(value)
+        } yield TypeTransform(keyType, valueType)
+      }
+      case UMap(Vector(pair)) => {
+        for {
+          keyType <- convertToNewMapType(pair._1)
+          valueType <- convertToNewMapType(pair._2)
+        } yield TypeTransform(keyType, valueType)
+      }
+      case _ => Failure("Couldn't build type transform for " + uObject)
+    }
+  }
+
+  def convertFeatureSet(uObject: UntaggedObject): Outcome[MapFeatureSet, String] = uObject match {
+    case UIdentifier("BasicMap") => Success(BasicMap)
+    case UIdentifier("PatternMap") => Success(PatternMap)
+    case UIdentifier("SimpleFunction") => Success(SimpleFunction)
+    case UIdentifier("WellFoundedFunction") => Success(WellFoundedFunction)
+    case UIdentifier("FullFunction") => Success(FullFunction)
+    case _ => Failure(s"Can't allow feature set in struct type: $uObject")
+  }
+}

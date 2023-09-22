@@ -33,7 +33,7 @@ object IterationUtils {
         params match {
           case (name, firstParamType) +: otherParams => {
             for {
-              firstParamT <- env.typeSystem.convertToNewMapType(firstParamType)
+              firstParamT <- firstParamType.asType
               firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
               otherParamValues <- enumerateAllValuesIfPossible(StructT(UMap(otherParams), parentFieldType, RequireCompleteness, BasicMap), env)
             } yield {
@@ -138,7 +138,7 @@ object IterationUtils {
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
-          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          underlyingT <- underlyingType.asType
 
           currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
 
@@ -153,7 +153,7 @@ object IterationUtils {
       }
       case NewMapObject(untaggedCurrent, TypeT) => {
         for {
-          nType <- env.typeSystem.convertToNewMapType(untaggedCurrent)
+          nType <- untaggedCurrent.asType
           result <- enumerateAllValuesIfPossible(nType, env)
         } yield result
       }
@@ -185,7 +185,7 @@ object IterationUtils {
         Success(typeTransform.valueType)
       }
       case CustomT("Array", itemType) => {
-        env.typeSystem.convertToNewMapType(itemType)
+        itemType.asType
       }
       case CustomT(typeName, params) => {
         val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
@@ -201,7 +201,7 @@ object IterationUtils {
 
           underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
-          underlyingT <- env.typeSystem.convertToNewMapType(underlyingType)
+          underlyingT <- underlyingType.asType
           result <- iterationItemType(underlyingT, env, typeSystemIdOpt)
         } yield result
       }

@@ -110,7 +110,7 @@ class EnvironmentInterpreter(
       parseTree <- NewMapParser.expressionParse(tokens)
       tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction, Map.empty)
       nObject <- Evaluator(tc.nExpression, env)
-      nType <- env.typeSystem.convertToNewMapType(nObject)
+      nType <- nObject.asType
       underlyingType <- TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
     } yield {
       underlyingType.displayString(env)

@@ -206,7 +206,7 @@ object Evaluator {
       }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
-          inputT <- env.typeSystem.convertToNewMapType(input)
+          inputT <- input.asType
           defaultValue <- CommandMaps.getDefaultValueOfCommandType(inputT, env)
         } yield defaultValue
 
@@ -285,8 +285,8 @@ object Evaluator {
         case StandardMatcher => standardPatternMatch(pattern, input, env)
         case TypeMatcher => {
           for {
-            patternT <- env.typeSystem.convertToNewMapType(pattern)
-            inputT <- env.typeSystem.convertToNewMapType(input)
+            patternT <- pattern.asType
+            inputT <- input.asType
             response <- TypeConversionCalculator.isTypeConvertible(inputT, patternT, env)
           } yield {
             // Do we make use of the conversion rules at all?
@@ -407,9 +407,5 @@ object Evaluator {
       case ULink(key) => currentState(key.uuid, env).toOption.get.uObject
       case _ => uObject
     }
-  }
-
-  def asType(uObject: UntaggedObject, env: Environment): Outcome[NewMapType, String] = {
-    env.typeSystem.convertToNewMapType(uObject)
   }
 }
