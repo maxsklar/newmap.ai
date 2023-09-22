@@ -1,6 +1,6 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.TypeChecker.{patternToExpression, typeCheck, typeCheckGenericMap}
+import ai.newmap.interpreter.TypeChecker.{typeCheck, typeCheckGenericMap}
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Outcome, Success}
 

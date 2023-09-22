@@ -302,11 +302,8 @@ object TypeChecker {
             // OR we are just being given a list of types
             // TODO - can this be simplified by combining with the MapT section above?
             {
+              val typeTransform = TypeTransform(IdentifierT, typeT)
               for {
-                convertedExpectedT <- env.typeSystem.convertToNewMapType(patternToExpression(env.typeSystem.typeToUntaggedObject(typeT)))
-
-                typeTransform = TypeTransform(IdentifierT, convertedExpectedT)
-
                 mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, featureSet, tcParameters)
               } yield {
                 TypeCheckResponse(
@@ -592,21 +589,6 @@ object TypeChecker {
 
       paramValue <- typeCheck(second, typeOfParameter, env, featureSet, tcParameters)
     } yield UCase(UIdentifier(firstAsString), paramValue.nExpression)
-  }
-
-  def patternToExpression(nPattern: UntaggedObject): UntaggedObject = {
-    nPattern match {
-      case UWildcardPattern(name) => ParamId(name)
-      case UStruct(params) => {
-        val structOrdering = params.zipWithIndex.map(param => {
-          UIndex(param._2) -> patternToExpression(param._1)
-        })
-
-        UMap(structOrdering)
-      }
-      case UCase(constructor, input) => UCase(constructor, patternToExpression(input))
-      case uObject => uObject
-    }
   }
 
   case class TypeCheckWithPatternMatchingResult(
