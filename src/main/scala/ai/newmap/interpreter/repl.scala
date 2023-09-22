@@ -29,6 +29,12 @@ object repl extends App {
   val history = lineReader.getHistory.asInstanceOf[DefaultHistory]
   history.attach(lineReader)
   history.load()
+
+  // This ensures that the environment daemon is initialized
+  val unit: Unit = ()
+  val pingResponseF = (EnvironmentDaemon.daemonActor ? unit)
+  val pingResponse = Await.result(pingResponseF, 5.seconds)
+  println(pingResponse)
   
   var continue = true
   while(continue) {

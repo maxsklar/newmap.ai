@@ -17,6 +17,7 @@ object EnvironmentDaemon {
 
     def receive = {
       case (code: String) => sender() ! passCode(code)
+      case (unit: Unit) => sender() ! s"Connected to the Environment Daemon"
       case other => sender() ! s"Can't interpret: $other"
     }
 
