@@ -27,7 +27,7 @@ case class NewVersionedStatementCommand(
 
 case class NewVersionedFieldCommand(
   id: String,
-  mapT: NewMapType,
+  mapT: MapT,
   value: UntaggedObject
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {

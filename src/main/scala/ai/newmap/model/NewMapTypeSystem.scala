@@ -69,16 +69,11 @@ case class NewMapTypeSystem(
     case TypeT => UCase(UIdentifier("Type"), UStruct(Vector.empty))
     case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
     case IdentifierT => UCase(UIdentifier("Identifier"), UStruct(Vector.empty))
-    case MapT(typeTransform, config) => UCase(UIdentifier("Map"), UStruct(Vector(
-      typeTransform,
-      UStruct(Vector(
-        UIdentifier(config.completeness.getName),
-        UIdentifier(config.featureSet.getName),
-        UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
-        config.channels,
-        typeToUntaggedObject(config.channelParentType)
-      ))
+    case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UStruct(Vector(
+      UMapPattern(typeToUntaggedObject(key), typeToUntaggedObject(value)),
+      mapConfigToUntagged(config)
     )))
+    case TypeTransformT => UCase(UIdentifier("TypeTransform"), UStruct(Vector.empty))
     case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
       params,
       typeToUntaggedObject(fieldParentType),
@@ -112,6 +107,16 @@ case class NewMapTypeSystem(
     }
     case WildcardPatternT(name) => UWildcardPattern(name)
     case ParamIdT(name) => ParamId(name)
+  }
+
+  def mapConfigToUntagged(config: MapConfig): UntaggedObject = {
+    UStruct(Vector(
+      UIdentifier(config.completeness.getName),
+      UIdentifier(config.featureSet.getName),
+      UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
+      config.channels,
+      typeToUntaggedObject(config.channelParentType)
+    ))
   }
 
   def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
@@ -153,6 +158,7 @@ case class NewMapTypeSystem(
         SimpleFunction
       )
     )
+    case "TypeTransform" => Success(emptyStructType)
     case custom => {
       for {
         identifierToIdMapping <- Outcome(historicalMapping.get(typeSystemId), s"Couldn't get historical type mapping for $typeSystemId")
@@ -234,6 +240,8 @@ case class NewMapTypeSystem(
       case "Map" => params match {
         case UStruct(items) if (items.length == 2) => {
           for {
+            typeTransform <- convertToTypeTransform(items(0))
+
             config <- items(1) match {
               case UStruct(v) if (v.length == 5) => Success(v)
               case _ => Failure(s"Incorrect config: ${items(1)}")
@@ -250,8 +258,9 @@ case class NewMapTypeSystem(
             // TODO: config(2) for the preservation rules
             // TODO: config(3) for channels
             // TODO: config(4) for parent of channel names
+
           } yield {
-            MapT(items(0), MapConfig(completeness, featureSet))
+            MapT(typeTransform, MapConfig(completeness, featureSet))
           }
         }
         case _ => Failure(s"Couldn't convert Map to NewMapType with params: $params")
@@ -336,6 +345,24 @@ case class NewMapTypeSystem(
     case _ => {
       throw new Exception(s"Couldn't convert to NewMapType: $uType")
       Failure(s"Couldn't convert to NewMapType: $uType")
+    }
+  }
+
+  def convertToTypeTransform(uObject: UntaggedObject): Outcome[TypeTransform, String] = {
+    uObject match {
+      case UMapPattern(key, value) => {
+        for {
+          keyType <- convertToNewMapType(key)
+          valueType <- convertToNewMapType(value)
+        } yield TypeTransform(keyType, valueType)
+      }
+      case UMap(Vector(pair)) => {
+        for {
+          keyType <- convertToNewMapType(pair._1)
+          valueType <- convertToNewMapType(pair._2)
+        } yield TypeTransform(keyType, valueType)
+      }
+      case _ => Failure("Couldn't build type transform for " + uObject)
     }
   }
 

@@ -116,36 +116,7 @@ object TypeChecker {
               }
             }
             case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
-              for {
-                tcResult <- typeCheck(
-                  ConstructCaseParse(expression, LiteralListParse(Vector.empty, MapType)),
-                  HistoricalTypeT(env.typeSystem.currentState),
-                  env,
-                  featureSet,
-                  tcParameters
-                )
-              } yield {
-                expectedTypeOutcome match {
-                  case Success(HistoricalTypeT(uuid)) => {
-                    TypeCheckResponse(
-                      tcResult.nExpression,
-                      HistoricalTypeT(uuid)
-                    )
-                  }
-                  case _ => {
-                    TypeCheckResponse(
-                      UCase(
-                        UIdentifier("WithState"),
-                        UCase(
-                          Uuuid(env.typeSystem.currentState),
-                          tcResult.nExpression
-                        )
-                      ),
-                      TypeT
-                    )
-                  }
-                }
-              }
+              typeCheckIdentifierFromTypeSystem(s, expectedTypeOutcome, env, featureSet, tcParameters)
             }
             case None => {
               expectedTypeOutcome match {
@@ -300,8 +271,10 @@ object TypeChecker {
             for {
               _ <- Outcome.failWhen(values.length > 1, "Map Pattern can only have 1 key-value pair: " + values)
               value <- Outcome(values.headOption, "Empty Map Pattern")
-              mapValue <- typeCheckMapPattern(value, typeTransform, internalFeatureSet, env, featureSet, tcParameters)
-            } yield TypeCheckResponse(mapValue, expectedType)
+              mapValue <- typeCheckGenericMap(Vector(value), typeTransform, internalFeatureSet, env, featureSet, tcParameters)
+            } yield {
+              TypeCheckResponse(UMap(mapValue), expectedType)
+            }
           }
           case Success(MapT(typeTransform, config)) => {
             val isArrayInput = llType == ArrayType
@@ -314,24 +287,17 @@ object TypeChecker {
             for {
               mapValues <- typeCheckGenericMap(correctedValues, typeTransform, config.featureSet, env, featureSet, tcParameters)
 
-              ttInputs <- typeTransformInputTypes(typeTransform)
-
-              _ <- Outcome.failWhen(ttInputs.length > 1, s"Could not handle type transform: $typeTransform")
-
               isCovered <- {
                 if (config.completeness != RequireCompleteness) Success(true)
-                else if (ttInputs.length == 0) Success(true)
                 else {
-                  for {
-                    headTypePattern <- env.typeSystem.convertToNewMapType(ttInputs.head)
-                    result <- SubtypeUtils.doPatternsCoverType(mapValues.map(_._1), headTypePattern, env)
-                  } yield result
+                  val headTypePattern = typeTransform.keyType
+                  SubtypeUtils.doPatternsCoverType(mapValues.map(_._1), headTypePattern, env)
                 }
               }
 
               _ <- Outcome.failWhen(
                 !isCovered,
-                "Incomplete mapping of " + ttInputs.head
+                "Incomplete mapping of " + typeTransform.keyType.displayString(env)
               )
             } yield {
               TypeCheckResponse(UMap(mapValues), expectedType)
@@ -340,15 +306,15 @@ object TypeChecker {
           case Success(TypeT) | Success(HistoricalTypeT(_)) => {
             val typeT = expectedTypeOutcome.toOption.get
 
-            val typeTransform = UMapPattern(
-              env.typeSystem.typeToUntaggedObject(IdentifierT), patternToExpression(env.typeSystem.typeToUntaggedObject(typeT))
-            )
-
             // Here we assume that we are looking at a struct type, and that we are being given a Map from an identifier to a Type
             // OR we are just being given a list of types
             // TODO - can this be simplified by combining with the MapT section above?
             {
               for {
+                convertedExpectedT <- env.typeSystem.convertToNewMapType(patternToExpression(env.typeSystem.typeToUntaggedObject(typeT)))
+
+                typeTransform = TypeTransform(IdentifierT, convertedExpectedT)
+
                 mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, featureSet, tcParameters)
               } yield {
                 TypeCheckResponse(
@@ -379,6 +345,15 @@ object TypeChecker {
           case Success(UndefinedT) => {
             throw new Exception(s"our bug: $values")
           }
+          case Success(TypeTransformT) => {
+            for {
+              _ <- Outcome.failWhen(values.length > 1, "Type transform cannot have multiple values")
+              value <- Outcome(values.headOption, "Type transform must contain a key and a value")
+              mapValue <- typeCheckGenericMap(Vector(value), TypeTransform(TypeT, TypeT), PatternMap, env, featureSet, tcParameters)
+            } yield {
+              TypeCheckResponse(UMapPattern(mapValue.head._1, mapValue.head._2), expectedType)
+            }
+          }
           case _ => {
             Failure(s"Lists not working yet with this expected type: $values exp: $expectedType -- $expectedTypeOutcome")
           }
@@ -397,8 +372,11 @@ object TypeChecker {
 
           // TODO - do we need to evaluate this? Re-examine!
           evalInputType <- Evaluator(inputType.nExpression, env, tcParameters)
+
+          inputT <- env.typeSystem.convertToNewMapType(evalInputType)
+          outputT <- env.typeSystem.convertToNewMapType(outputType.nExpression)
         } yield {
-          val typeTransform = UMapPattern(evalInputType, outputType.nExpression)
+          val typeTransform = TypeTransform(inputT, outputT)
 
           // TODO - how do we make the mapConfig customizable in the LambdaParse Symbol?
           val mapConfig = MapConfig(RequireCompleteness, FullFunction)
@@ -448,6 +426,46 @@ object TypeChecker {
     }
   }
 
+  def typeCheckIdentifierFromTypeSystem(
+    id: String,
+    expectedTypeOutcome: Outcome[NewMapType, String],
+    env: Environment,
+    featureSet: MapFeatureSet,
+    tcParameters: Map[String, NewMapType]
+  ): Outcome[TypeCheckResponse, String] = {
+    val expression = IdentifierParse(id, false)
+    for {
+      tcResult <- typeCheck(
+        ConstructCaseParse(expression, LiteralListParse(Vector.empty, MapType)),
+        HistoricalTypeT(env.typeSystem.currentState),
+        env,
+        featureSet,
+        tcParameters
+      )
+    } yield {
+      expectedTypeOutcome match {
+        case Success(HistoricalTypeT(uuid)) => {
+          TypeCheckResponse(
+            tcResult.nExpression,
+            HistoricalTypeT(uuid)
+          )
+        }
+        case _ => {
+          TypeCheckResponse(
+            UCase(
+              UIdentifier("WithState"),
+              UCase(
+                Uuuid(env.typeSystem.currentState),
+                tcResult.nExpression
+              )
+            ),
+            TypeT
+          )
+        }
+      }
+    }
+  }
+
   def responseFromConversion(
     nObject: NewMapObject,
     expectedType: NewMapType,
@@ -480,38 +498,34 @@ object TypeChecker {
     }
   }
 
-  def typeTransformInputTypes(
-    typeTransform: UntaggedObject
-  ): Outcome[Vector[UntaggedObject], String] = typeTransform match {
-    case UMap(values) => Success(values.map(_._1))
-    case UMapPattern(k, v) => Success(Vector(k))
-    case _ => Failure(s"Unrecognized type transform: $typeTransform")
-  }
-
   def typeCheckGenericMap(
     values: Vector[ParseTree],
-    typeTransform: UntaggedObject,
+    typeTransform: TypeTransform,
     internalFeatureSet: MapFeatureSet,
     env: Environment,
     externalFeatureSet: MapFeatureSet, // This is the external feature set, the map feature set can be found in mapT
     tcParameters: Map[String, NewMapType]
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
+
     values match {
       case KeyValueBinding(k, v) +: restOfValues => {
         for {
-          expectedTypeInputs <- typeTransformInputTypes(typeTransform)
-          resultKey <- typeCheckWithPatternMatchingMultipleExpectedTypes(k, expectedTypeInputs, env, externalFeatureSet, internalFeatureSet, tcParameters)
+          resultKey <- typeCheckWithPatternMatching(k, typeTransform.keyType, env, externalFeatureSet, internalFeatureSet, tcParameters)
 
           // Keys must be evaluated on the spot
           foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env, resultKey.newParams)
 
-          valueTypePatternUntagged <- Evaluator.applyFunctionAttempt(
-            typeTransform,
+          untaggedTypeTransformKey = env.typeSystem.typeToUntaggedObject(typeTransform.keyType)
+          untaggedTypeTransformValue = env.typeSystem.typeToUntaggedObject(typeTransform.valueType)
+
+          paramsToSubsitute <- Evaluator.attemptPatternMatch(
+            untaggedTypeTransformKey,
             env.typeSystem.typeToUntaggedObject(resultKey.expectedTypeRefinement),
-            env,
-            TypeMatcher
+            TypeMatcher,
+            env
           )
 
+          valueTypePatternUntagged = MakeSubstitution(untaggedTypeTransformValue, paramsToSubsitute)
           valueTypePattern <- env.typeSystem.convertToNewMapType(valueTypePatternUntagged)
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
@@ -533,53 +547,6 @@ object TypeChecker {
         Failure(s"No binding found in map for item $s in $values -- $typeTransform")
       }
       case _ => Success(Vector.empty)
-    }
-  }
-
-  def typeCheckMapPattern(
-    value: ParseTree,
-    typeTransform: UntaggedObject,
-    internalFeatureSet: MapFeatureSet,
-    env: Environment,
-    externalFeatureSet: MapFeatureSet, // This is the external feature set, the map feature set can be found in mapT
-    tcParameters: Map[String, NewMapType]
-  ): Outcome[UntaggedObject, String] = {
-    value match {
-      case KeyValueBinding(k, v) => {
-        // TODO - this is mostly a copy of type check generic map for now
-        // - definitely opportunities to combine
-        for {
-          expectedTypeInputs <- typeTransformInputTypes(typeTransform)
-          resultKey <- typeCheckWithPatternMatchingMultipleExpectedTypes(k, expectedTypeInputs, env, externalFeatureSet, internalFeatureSet, tcParameters)
-
-          // Keys must be evaluated on the spot
-          foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
-
-          valueTypePatternUntagged <- Evaluator.applyFunctionAttempt(
-            typeTransform,
-            env.typeSystem.typeToUntaggedObject(resultKey.expectedTypeRefinement),
-            env,
-            TypeMatcher
-          )
-
-          valueTypePattern <- env.typeSystem.convertToNewMapType(valueTypePatternUntagged)
-
-          // Now we want to type check the object, but we have to tell it what kind of map we're in
-          //  in order to ensure that the right features are being used
-          objectFoundValue <- typeCheck(
-            v,
-            valueTypePattern,
-            env,
-            featureSet = internalFeatureSet,
-            resultKey.newParams
-          )
-        } yield {
-          UMapPattern(foundKeyPattern, objectFoundValue.nExpression)
-        }
-      }
-      case _ => {
-        Failure(s"No binding found in map pattern for value $value -- $typeTransform")
-      }
     }
   }
 
@@ -678,9 +645,18 @@ object TypeChecker {
 
     (expression, expectedTypeOutcome) match {
       case (IdentifierParse(s, false), _) if (patternMatchingAllowed) => {
-        Success(
-          TypeCheckWithPatternMatchingResult(UWildcardPattern(s), expectedType, tcParameters + (s -> expectedType))
-        )
+        env.lookupValue(s) match {
+          // It's unclear if this is the right way to go!
+          case Some(value) => Success(TypeCheckWithPatternMatchingResult(value.uObject, value.nType, Map.empty))
+          case None if (env.typeSystem.currentMapping.get(s).nonEmpty) => {
+            for {
+              tcResponse <- typeCheckIdentifierFromTypeSystem(s, expectedTypeOutcome, env, externalFeatureSet, tcParameters)
+            } yield {
+              TypeCheckWithPatternMatchingResult(tcResponse.nExpression, tcResponse.refinedTypeClass, tcParameters)
+            }
+          }
+          case None => Success(TypeCheckWithPatternMatchingResult(UWildcardPattern(s), expectedType, tcParameters + (s -> expectedType)))
+        }
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
       case (LiteralListParse(values, _), Success(StructT(UMap(structValues), parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
@@ -747,27 +723,6 @@ object TypeChecker {
         }
       }
     }
-  }
-
-  def typeCheckWithPatternMatchingMultipleExpectedTypes(
-    expression: ParseTree,
-    expectedTypes: Vector[UntaggedObject],
-    env: Environment,
-
-    // TODO - I want to get rid of this!
-    externalFeatureSet: MapFeatureSet, // Am I inside a map with restricted features already?
-    internalFeatureSet: MapFeatureSet, // Which feature set is this map allowed to use
-    tcParameters: Map[String, NewMapType]
-  ): Outcome[TypeCheckWithPatternMatchingResult, String] = expectedTypes match {
-    case expectedType +: others => {
-      for {
-        expectedT <- env.typeSystem.convertToNewMapType(expectedType)
-        result <- typeCheckWithPatternMatching(expression, expectedT, env, externalFeatureSet, internalFeatureSet, tcParameters).rescue(f => {
-          typeCheckWithPatternMatchingMultipleExpectedTypes(expression, others, env, externalFeatureSet, internalFeatureSet, tcParameters)
-        })    
-      } yield result
-    }
-    case _ => Failure(s"No more expected types to check with expression: $expression")
   }
 
   case class TypeCheckWithMultiplePatternMatchingResult(
@@ -917,7 +872,18 @@ object TypeChecker {
         }
         case MapT(typeTransform, config) => {
           for {
-            typeAsObj <- Evaluator.applyFunctionAttempt(typeTransform, untaggedInputType, env, TypeMatcher)
+            newParams <- Evaluator.attemptPatternMatch(
+              env.typeSystem.typeToUntaggedObject(typeTransform.keyType),
+              untaggedInputType,
+              TypeMatcher,
+              env
+            )
+
+            typeAsObj = MakeSubstitution(
+              env.typeSystem.typeToUntaggedObject(typeTransform.valueType),
+              newParams
+            )
+
             nType <- Evaluator.asType(typeAsObj, env)
             // TODO: This should be uncommented when we can build "convertible to" into the type transform
             //_ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
@@ -981,15 +947,7 @@ object TypeChecker {
         None
       }
       case Success(MapT(typeTransform, config)) => {
-        for {
-          ttInputs <- typeTransformInputTypes(typeTransform).toOption
-
-          // TODO: Really we want a list of the type patterns in typeTransform, but that's going to require a larger change to the type checker
-          if (ttInputs.length == 1)
-
-          result <- Evaluator.asType(ttInputs.head, env).toOption
-        } yield result
-        
+        Some(typeTransform.keyType)
       }
       case other => None
     }

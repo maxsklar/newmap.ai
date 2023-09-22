@@ -176,18 +176,15 @@ case class Environment(
         )
       }
       case NewVersionedFieldCommand(id, mapT, value) => {
+        val typeTransform = mapT.typeTransform
+
+        val inputType = typeSystem.typeToUntaggedObject(typeTransform.keyType)
+        val outputType = typeSystem.typeToUntaggedObject(typeTransform.valueType)
+
         val resultO = for {
-          typeTransformBindings <- mapT match {
-            // TODO - lots of potential exceptions here!
-            case MapT(tt, config) => tt.getMapBindings()
-            case _ => Failure("unexpected type: " + mapT)
-          }
+          currentFields <- Evaluator.applyFunctionAttempt(typeToFieldMapping, inputType, this, TypeMatcher)
 
-          typeTransform <- Outcome(typeTransformBindings.headOption, "typeTransformBindings too large")
-
-          currentFields <- Evaluator.applyFunctionAttempt(typeToFieldMapping, typeTransform._1, this, TypeMatcher)
-
-          newFieldMapping = (UIdentifier(id), UCase(typeTransform._2, value))
+          newFieldMapping = (UIdentifier(id), UCase(outputType, value))
 
           newFieldMappings <- currentFields match {
             case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings)
@@ -197,7 +194,7 @@ case class Environment(
 
           newTypeToFieldMapping <- typeToFieldMapping match {
             case UMap(mappings) => {
-              val newMappings: Vector[(UntaggedObject, UntaggedObject)] = (typeTransform._1 -> UMap(newFieldMappings)) +: mappings  
+              val newMappings: Vector[(UntaggedObject, UntaggedObject)] = (inputType -> UMap(newFieldMappings)) +: mappings  
               Success(UMap(newMappings))
             }
             case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
@@ -513,7 +510,7 @@ case class Environment(
     NewMapObject(uType, TypeT)
   }
 
-  def toTypeTransform(
+  def TypeTransform(
     inputT: NewMapType,
     outputT: NewMapType
   ): UntaggedObject = {
@@ -526,7 +523,7 @@ object Environment {
     FullEnvironmentCommand(id, nObject)
   }
 
-  def fullFuncT(typeTransform: UntaggedObject): NewMapType = {
+  def fullFuncT(typeTransform: TypeTransform): NewMapType = {
     MapT(typeTransform, MapConfig(RequireCompleteness, FullFunction))
   }
 
@@ -572,7 +569,7 @@ object Environment {
 
     NewMapObject(
       UMap(Vector(structP -> expression)),
-      MapT(env.toTypeTransform(structT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
+      MapT(TypeTransform(structT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )
   }
 
@@ -592,7 +589,7 @@ object Environment {
 
   var Base: Environment = Environment()
 
-  def buildSimpleMapT(typeTransform: UntaggedObject): UntaggedObject = {
+  def buildSimpleMapT(typeTransform: TypeTransform): UntaggedObject = {
     val config = MapConfig(RequireCompleteness, SimpleFunction)
     val nType = MapT(typeTransform, config)
     typeAsUntaggedObject(nType)
@@ -607,22 +604,18 @@ object Environment {
   }
 
   def buildMapCreator(config: MapConfig, allowGenerics: Boolean): NewMapObject = {
-    // Probably 
-    val transformOfTransformConfig = MapConfig(
-      CommandOutput,
-      if (allowGenerics) SimpleFunction else BasicMap
-    )
-
-    val transformMapT = Base.typeSystem.typeToUntaggedObject(MapT(ParamId("typeTransform"), config))
+    val transformMapT = {
+      UCase(UIdentifier("Map"), UStruct(Vector(
+        ParamId("typeTransform"),
+        Base.typeSystem.mapConfigToUntagged(config)
+      )))
+    }
 
     NewMapObject(
       UMap(Vector(UWildcardPattern("typeTransform") -> transformMapT)),
       MapT(
-        Base.toTypeTransform(
-          MapT(Base.toTypeTransform(TypeT, TypeT), transformOfTransformConfig),
-          TypeT
-        ),
-        config
+        TypeTransform(TypeTransformT, TypeT),
+        MapConfig(RequireCompleteness, PatternMap)
       )
     )
   }
@@ -634,16 +627,19 @@ object Environment {
     eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", NewMapObject(
       UMap(Vector(UWildcardPattern("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),
-      MapT(Base.toTypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction))
+      MapT(TypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("IsCommand", NewMapObject(
       IsCommandFunc,
-      MapT(Base.toTypeTransform(TypeT, BooleanT), MapConfig(CommandOutput, SimpleFunction))
+      MapT(TypeTransform(TypeT, BooleanT), MapConfig(CommandOutput, SimpleFunction))
     )),
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", NewMapObject(
-      UMap(Vector(UWildcardPattern("key") -> buildSimpleMapT(UMap(Vector(UIndex(0) -> ParamId("key")))))),
-      MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
+      UMapPattern(
+        UWildcardPattern("key"), 
+        buildSimpleMapT(TypeTransform(IndexT(UIndex(0)),ParamIdT("key")))
+      ),
+      MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("Map", buildMapCreator(MapConfig(CommandOutput, BasicMap), false)),
     eCommand("GenericMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
@@ -653,15 +649,13 @@ object Environment {
     eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
-      MapT(Base.toTypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
+      MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewTypeClassCommand("_default", UMapPattern(UWildcardPattern("t"), ParamId("t"))),
     NewTypeClassCommand("_typeOf", 
       UMapPattern(
         UWildcardPattern("t"),
-        buildSimpleMapT(
-          UMap(Vector(UWildcardPattern("_") -> typeAsUntaggedObject(TypeT))),
-        )
+        buildSimpleMapT(TypeTransform(WildcardPatternT("_"), TypeT))
       )
     ),
     ApplyIndividualCommand(
@@ -674,7 +668,7 @@ object Environment {
       CaseT(
         UMap(Vector(UWildcardPattern("i") -> typeAsUntaggedObject(
           MapT(
-            Base.toTypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
+            TypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
             MapConfig(RequireCompleteness, SimpleFunction)
           )
         ))),
@@ -693,8 +687,8 @@ object Environment {
     ),
     eCommand("+", NewMapObject(
       UPlus,
-      MapT(Base.toTypeTransform(
-        MapT(Base.toTypeTransform(IndexT(UIndex(2)), CountT), MapConfig(RequireCompleteness, BasicMap)),
+      MapT(TypeTransform(
+        MapT(TypeTransform(IndexT(UIndex(2)), CountT), MapConfig(RequireCompleteness, BasicMap)),
         CountT
       ), MapConfig(RequireCompleteness, SimpleFunction))
     ))

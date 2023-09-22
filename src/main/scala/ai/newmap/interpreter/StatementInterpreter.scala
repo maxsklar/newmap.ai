@@ -25,6 +25,7 @@ object StatementInterpreter {
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
+
           nType <- Evaluator.asType(nTypeObj, env)
 
 
@@ -83,9 +84,7 @@ object StatementInterpreter {
           case _ => Vector(params) 
         }
 
-        val typeTransform = UMapPattern(
-          env.typeSystem.typeToUntaggedObject(IdentifierT), patternToExpression(env.typeSystem.typeToUntaggedObject(TypeT))
-        )
+        val typeTransform = TypeTransform(IdentifierT, TypeT)
 
         for {
           mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction, Map.empty)
@@ -98,15 +97,13 @@ object StatementInterpreter {
         }
       }
       case NewTypeClassStatementParse(id, typeTransformParse) => {
-        val typeOfTypeTransform = MapT(
-          UMap(Vector(env.typeSystem.typeToUntaggedObject(TypeT) -> env.typeSystem.typeToUntaggedObject(TypeT))),
-          MapConfig(MapPattern, PatternMap)
-        )
-
         for {
-          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, FullFunction, tcParameters)
+          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, FullFunction, tcParameters)
 
           typeTransform <- typeTransformResult.nExpression match {
+            case result@UMap(values) if (values.length == 1) => {
+              Success(UMapPattern(values.head._1, values.head._2))
+            }
             case result@UMapPattern(_, _) => Success(result)
             case _ => Failure(s"Invalid type transform: ${typeTransformResult.nExpression}")
           }
@@ -335,31 +332,21 @@ object StatementInterpreter {
       case NewVersionedFieldParse(featureSet, typeParse, id, returnTypeParse, parseTree) => {
         val typeTransformParse = KeyValueBinding(typeParse, returnTypeParse)
 
-        val typeOfTypeTransform = MapT(
-          UMap(Vector(env.typeSystem.typeToUntaggedObject(TypeT) -> env.typeSystem.typeToUntaggedObject(TypeT))),
-          MapConfig(MapPattern, PatternMap)
-        )
-
         for {
           // TODO: I'm not sure if "SimpleFunction" is what we want here.
           // - Think about this more, and try to make it more obvious what to use in the future.
-          typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, typeOfTypeTransform, env, SimpleFunction, Map.empty)
+          typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, SimpleFunction, Map.empty)
 
-          uTypeTransform = typeTransformTC.nExpression
+          typeTransform <- env.typeSystem.convertToTypeTransform(typeTransformTC.nExpression)
 
-          typeBindings <- uTypeTransform.getMapBindings()
-
-          _ <- Outcome.failWhen(typeBindings.length > 1, "multiple typebindings: " + typeBindings)
-
-          typeBinding <- Outcome(typeBindings.headOption, "No typebindings found")
-          
-          returnT <- env.typeSystem.convertToNewMapType(typeBinding._2)
-
-          useCommandMap = CommandMaps.getDefaultValueOfCommandType(returnT, env).isSuccess
+          // TODO - what if typeTransform.valueType has a parameter?
+          useCommandMap = CommandMaps.getDefaultValueOfCommandType(typeTransform.valueType, env).isSuccess
           completeness = if (useCommandMap) CommandOutput else RequireCompleteness
           mapConfig = MapConfig(completeness, featureSet)
 
-          mapType = MapT(typeTransformTC.nExpression, mapConfig)
+          typeTransform <- env.typeSystem.convertToTypeTransform(typeTransformTC.nExpression)
+
+          mapType = MapT(typeTransform, mapConfig)
 
           // I still don't know if "FullFunction" is right here
           valueTC <- TypeChecker.typeCheck(parseTree, mapType, env, FullFunction, Map.empty)

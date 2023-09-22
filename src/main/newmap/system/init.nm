@@ -8,6 +8,7 @@ update _default: (Type: UndefinedType)
 //update _default ((Array:T):(0: ()))
 
 data String = Array|Char
+
 typeclass _display (t: (t => String))
 update _display: (String: (s: s))
 

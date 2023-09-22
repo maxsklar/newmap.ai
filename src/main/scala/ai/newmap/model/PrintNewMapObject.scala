@@ -97,17 +97,13 @@ object PrintNewMapObject {
       case LongT => "Long"
       case DoubleT => "Double"
       case UuidT => "UUID"
-      case MapT(UMap(typeTransform), config) => {
-        if (typeTransform.length == 1) {
-          val inputType = typeTransform.head._1
-          val outputTypeExp = typeTransform.head._2
-          printMapT(untagged(inputType), untagged(outputTypeExp), config)
-        } else {
-          s"Generic(${mapToString(typeTransform)})"
-        }
-      }
-      case MapT(typeTransform, config) => {
-        s"Generic(${untagged(typeTransform)})"
+      case TypeTransformT => "TypeTransform"
+      case MapT(TypeTransform(key, value), config) => {
+        printMapT(
+          newMapType(key, typeSystem, typeSystemStateOpt),
+          newMapType(value, typeSystem, typeSystemStateOpt),
+          config
+        )
       }
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
       case StructT(params, parentType, completeness, featureSet) => s"Struct(${untagged(params)})"

@@ -178,8 +178,8 @@ object SubtypeUtils {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(startingTypeTransform, MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
-        MapT(endingTypeTransform, MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
+        MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
+        MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -187,45 +187,6 @@ object SubtypeUtils {
         val isMapCompletenessConvertible = true
 
         for {
-          startingTypePair <- startingTypeTransform match {
-            case UMap(Vector((inputT, outputT))) => {
-              for {
-                inT <- Evaluator.asType(inputT, env)
-                ouT <- Evaluator.asType(outputT, env)
-              } yield (inT, ouT)
-            }
-            case UMapPattern(inputT, outputT) => {
-              for {
-                inT <- Evaluator.asType(inputT, env)
-                ouT <- Evaluator.asType(outputT, env)
-              } yield (inT, ouT)
-            }
-            case _ => {
-              Failure(s"Not implement for generic type transform: $startingTypeTransform")
-            }
-          }
-
-          endingTypePair <- endingTypeTransform match {
-            case UMap(Vector((inputT, outputT)))  => {
-              for {
-                inT <- Evaluator.asType(inputT, env)
-                ouT <- Evaluator.asType(outputT, env)
-              } yield (inT, ouT)
-            }
-            case UMapPattern(inputT, outputT) => {
-              for {
-                inT <- Evaluator.asType(inputT, env)
-                ouT <- Evaluator.asType(outputT, env)
-              } yield (inT, ouT)
-            }
-            case _ => {
-              Failure(s"Not implement for generic type transform: $endingTypeTransform")
-            }
-          }
-
-          (startingInputType, startingOutputType) = startingTypePair
-          (endingInputType, endingOutputType) = endingTypePair
-
           // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
           // Eventually, we'll have to implement covariance in generic types
 
@@ -400,7 +361,8 @@ object SubtypeUtils {
         )
       }
       case _ => {
-        Failure(s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}")
+        val str = s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}"
+        Failure(str)
       }
     }
   }

@@ -57,7 +57,7 @@ object CommandMaps {
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
       case MapT(_, MapConfig(CommandOutput, _, _, _, _)) => Success(defaultUMap)
       case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
-        if (typeTransformHasEmptyKey(typeTransform, env)) {
+        if (typeTransformHasEmptyKey(typeTransform)) {
           Success(defaultUMap)
         } else {
           throw new Exception(s"Can't start off map with key in typeTransform $typeTransform")
@@ -86,28 +86,11 @@ object CommandMaps {
     }
   }
 
-  def typeTransformHasEmptyKey(
-    typeTransform: UntaggedObject,
-    env: Environment
-  ): Boolean = {
-    TypeChecker.typeTransformInputTypes(typeTransform) match {
-      case Success(patterns) => {
-        if (patterns.length == 0) {
-          true
-        } else if (patterns.length == 1) {
-          env.typeSystem.convertToNewMapType(patterns.head) match {
-            case Failure(_) => false
-            case Success(nType) => nType match {
-              case IndexT(UIndex(0)) | IndexT(UInit) => true
-              case SubtypeT(UMap(m), _, _) => m.isEmpty
-              case _ => false // TODO - unimplemented
-            }
-          }
-        } else {
-          false
-        }
-      }
-      case Failure(_) => false
+  def typeTransformHasEmptyKey(typeTransform: TypeTransform): Boolean = {
+    typeTransform.keyType match {
+      case IndexT(UIndex(0)) | IndexT(UInit) => true
+      case SubtypeT(UMap(m), _, _) => m.isEmpty
+      case _ => false // TODO - unimplemented
     }
   }
 
@@ -192,7 +175,7 @@ object CommandMaps {
           caseMap = NewMapObject(
             cases,
             MapT(
-              env.toTypeTransform(constructorsSubtype, TypeT), 
+              TypeTransform(constructorsSubtype, TypeT), 
               mapConfig
             )
           )
@@ -210,7 +193,7 @@ object CommandMaps {
       }
       case SubtypeT(isMember, parentType, featureSet) => {
         val isMemberMap = NewMapObject(isMember, MapT(
-          env.toTypeTransform(parentType, BooleanT),
+          TypeTransform(parentType, BooleanT),
           MapConfig(CommandOutput, BasicMap)
         ))
 
@@ -290,11 +273,10 @@ object CommandMaps {
         // -- therefore, this is a binding!
         // -- should we make a binding a first class object, and should typeTransform just be a binding?
         
+        val keyType = env.typeSystem.typeToUntaggedObject(typeTransform.keyType)
+        val valuesType = env.typeSystem.typeToUntaggedObject(typeTransform.valueType)
+        
         for {
-          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
-          keyType = typeTransformKeyValue._1
-          valuesType = typeTransformKeyValue._2
-
           valuesT <- Evaluator.asType(valuesType, env)
           outputCommandT <- getCommandInputOfCommandType(valuesT, env)
         } yield {
@@ -314,13 +296,10 @@ object CommandMaps {
         // Key Expansion + requiredValue expansion
         // What if Key expansion is a case? (for now we don't allow this, only basic map)
 
-        for {
-          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
-          keyType = typeTransformKeyValue._1
-          requiredValuesType = typeTransformKeyValue._2
+        val keyT = typeTransform.keyType
+        val requiredValuesT = typeTransform.valueType
 
-          keyT <- env.typeSystem.convertToNewMapType(keyType)
-          requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
+        for {
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
         } yield {
           keyExpansionCommandT match {
@@ -333,7 +312,7 @@ object CommandMaps {
               StructT(
                 UMap(Vector(
                   UIndex(0) -> env.typeSystem.typeToUntaggedObject(keyExpansionCommandT),
-                  UIndex(1) -> requiredValuesType
+                  UIndex(1) -> env.typeSystem.typeToUntaggedObject(requiredValuesT)
                 )),
                 IndexTN(2)
               )
@@ -447,14 +426,9 @@ object CommandMaps {
         }
       }
       case mapT@MapT(typeTransform, MapConfig(CommandOutput, featureSet, _, _, _)) => {
+        val outputType = typeTransform.valueType
+
         for {
-          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
-
-          inputPattern = typeTransformKeyValue._1
-          outputT = typeTransformKeyValue._2
-
-          outputType <- Evaluator.asType(outputT, env)
-
           input <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
           commandForInput <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
 
@@ -477,14 +451,10 @@ object CommandMaps {
         }
       }
       case MapT(typeTransform, MapConfig(style, features, _, _, _)) => {
+        val keyT = typeTransform.keyType
+        val requiredValuesT = typeTransform.valueType
+
         for {
-          typeTransformKeyValue <- checkTypeTransformForSingleBinding(typeTransform)
-          keyType = typeTransformKeyValue._1
-          requiredValuesType = typeTransformKeyValue._2
-
-          keyT <- env.typeSystem.convertToNewMapType(keyType)
-          requiredValuesT <- env.typeSystem.convertToNewMapType(requiredValuesType)
-
           keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
 
           result <- keyExpansionCommandT match {
@@ -518,7 +488,7 @@ object CommandMaps {
 
 
           newTableType = MapT(
-            env.toTypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
+            TypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
             MapConfig(style, features)
           )
                   
@@ -544,20 +514,18 @@ object CommandMaps {
         }
       }
       case FunctionalSystemT(functionTypes) => {
+        println("functionTypes: " + functionTypes)
         for {
           currentMapping <- current.uObject match {
             case UMap(m) => Success(m)
             case _ => Failure(s"Function not a mapping: ${current.uObject}")
           }
 
+          _ = println("currentMapping: " + currentMapping)
+
           newFunctionNameObj <- Evaluator.applyFunctionAttempt(command, UIndex(0), env)
 
-          currentFunctionType <- Evaluator.applyFunctionAttempt(UMap(functionTypes), newFunctionNameObj, env)
-          currentFunctionT <- env.typeSystem.convertToNewMapType(currentFunctionType)
-
-          currentFunctionTPair <- componentsOfMapType(currentFunctionT, env)
-          currentFunctionTypeTransform = currentFunctionTPair._1
-          currentFunctionMapConfig = currentFunctionTPair._2
+          _ = println("newFunctionNameObj: " + newFunctionNameObj)
 
           newFunctionObject <- Evaluator.applyFunctionAttempt(command, UIndex(1), env)
 
@@ -569,45 +537,26 @@ object CommandMaps {
           uNewFunctionType = newFunctionObjectComponents._1
           newFunctionT <- env.typeSystem.convertToNewMapType(uNewFunctionType)
 
+          _ = println("newFunctionT: " + newFunctionT)
+
           newFunctionTPair <- componentsOfMapType(newFunctionT, env)
           newFunctionTypeTransform = newFunctionTPair._1
           newFunctionMapConfig = newFunctionTPair._2
 
           uNewFunctionMapping = newFunctionObjectComponents._2
 
-          composedCompleteness <- if (currentFunctionMapConfig.completeness == newFunctionMapConfig.completeness) {
-            Success(currentFunctionMapConfig.completeness)
-          } else {
-            Failure(s"Completeness doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
-          }
-
-          composedChannelParentType <- if (currentFunctionMapConfig.channelParentType == newFunctionMapConfig.channelParentType) {
-            Success(currentFunctionMapConfig.channelParentType)
-          } else {
-            Failure(s"channelParentType doesn't match $currentFunctionMapConfig -- $newFunctionMapConfig")
-          }
-
-          currentChannels <- currentFunctionMapConfig.channels.getMapBindings()
           newChannels <- newFunctionMapConfig.channels.getMapBindings()
         } yield {
-          val composedTypeTransForm = newFunctionTypeTransform ++ currentFunctionTypeTransform
-
-          val composedFeatureSet = if (currentFunctionMapConfig.featureSet.getLevel > newFunctionMapConfig.featureSet.getLevel) {
-            currentFunctionMapConfig.featureSet
-          } else {
-            newFunctionMapConfig.featureSet
-          }
-
           val composedMapConfig = MapConfig(
-            composedCompleteness,
-            composedFeatureSet,
-            currentFunctionMapConfig.preservationRules ++ newFunctionMapConfig.preservationRules,
-            UMap(newChannels ++ currentChannels),
-            composedChannelParentType
+            newFunctionMapConfig.completeness,
+            newFunctionMapConfig.featureSet,
+            newFunctionMapConfig.preservationRules,
+            UMap(newChannels),
+            newFunctionMapConfig.channelParentType
           )
 
           // Object to upgrade the functionalSystemT
-          val composedTypeObject = env.typeSystem.typeToUntaggedObject(MapT(UMap(composedTypeTransForm), composedMapConfig))
+          val composedTypeObject = env.typeSystem.typeToUntaggedObject(MapT(newFunctionTypeTransform, newFunctionMapConfig))
 
           // Also upgrade the function itself
           // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
@@ -720,25 +669,9 @@ object CommandMaps {
   def componentsOfMapType(
     nType: NewMapType,
     env: Environment
-  ): Outcome[(Vector[(UntaggedObject, UntaggedObject)], MapConfig), String] = nType match {
-    case MapT(UMap(typeTransform), config) => Success(typeTransform -> config)
-    case MapT(UMapPattern(key, value), config) => Success(Vector(key -> value) -> config)
-    case UndefinedT => Success(
-      Vector.empty,
-      MapConfig(RequireCompleteness, BasicMap)
-    )
+  ): Outcome[(TypeTransform, MapConfig), String] = nType match {
+    case MapT(typeTransform, config) => Success(typeTransform -> config)
     case _ => Failure(s"Unexpected function type: ${nType.displayString(env)}")
-  }
-
-  def checkTypeTransformForSingleBinding(
-    typeTransform: UntaggedObject
-  ): Outcome[(UntaggedObject, UntaggedObject), String] = typeTransform match {
-    case UMap(Vector((key, value))) => Success(key -> value)
-    case UMapPattern(key, value) => Success(key -> value)
-    case UMap(_) => {
-      Failure("Type transform  must have a single binding. Instead it was: " + typeTransform)
-    }
-    case _ => Failure("Could not handle type transform: " + typeTransform)
   }
 
   def getDefaultValueFromStructParams(

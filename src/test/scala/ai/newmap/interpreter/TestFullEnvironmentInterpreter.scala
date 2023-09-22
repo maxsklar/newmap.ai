@@ -29,19 +29,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   def IndexValue(i: Long, nType: NewMapType): NewMapObject = NewMapObject(UIndex(i), nType)
   def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
 
-  def toTypeTransform(
-    inputT: NewMapType,
-    outputT: NewMapType,
-    useMapPattern: Boolean = false
-  ): UntaggedObject = {
-    val typeSystem = Environment.Base.typeSystem
-    val inputType = typeSystem.typeToUntaggedObject(inputT)
-    val outputType = typeSystem.typeToUntaggedObject(outputT)
-    
-    if (useMapPattern) UMapPattern(inputType, outputType)
-    else UMap(Vector(inputType -> outputType))
-  }
-
   /**
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 
@@ -127,7 +114,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(2), UIndex(67))
         )),
         MapT(
-          toTypeTransform(IndexTN(3), IndexTN(100)),
+          TypeTransform(IndexTN(3), IndexTN(100)),
           MapConfig(CommandOutput, BasicMap)
         )
       )
@@ -141,7 +128,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
     val correctCommand = Environment.eCommand(
       "m",
-      Environment.typeAsObject(MapT(toTypeTransform(IndexTN(3), IndexTN(100)), MapConfig(CommandOutput, BasicMap)))
+      Environment.typeAsObject(MapT(TypeTransform(IndexTN(3), IndexTN(100)), MapConfig(CommandOutput, BasicMap)))
     )
 
     testCodeLine(CodeExpectation(code, SuccessCheck(correctCommand)))
@@ -176,7 +163,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
           bind(UIndex(0), UIndex(10)),
           bind(UIndex(2), UIndex(3))
         )),
-        MapT(toTypeTransform(IndexTN(3), IndexTN(100)), MapConfig(CommandOutput, BasicMap))
+        MapT(TypeTransform(IndexTN(3), IndexTN(100)), MapConfig(CommandOutput, BasicMap))
       )
     )
 
@@ -237,7 +224,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     val correctCommand = Environment.eCommand(
       "testType",
       Environment.typeAsObject(MapT(
-        toTypeTransform(
+        TypeTransform(
           Environment.structTypeFromParams(
             Vector(
               "a" -> IndexTN(3),
@@ -327,7 +314,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
             StandardMatcher
           )
         )),
-        MapT(toTypeTransform(IndexTN(3), IndexTN(4), true), MapConfig(RequireCompleteness, FullFunction))
+        MapT(TypeTransform(IndexTN(3), IndexTN(4)), MapConfig(RequireCompleteness, FullFunction))
       )
     )
 
@@ -349,7 +336,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val fSig: Type = (3 => 4)", SuccessCheck(Environment.eCommand(
         "fSig",
-        Environment.typeAsObject(Environment.fullFuncT(toTypeTransform(IndexTN(3), IndexTN(4))))
+        Environment.typeAsObject(Environment.fullFuncT(TypeTransform(IndexTN(3), IndexTN(4))))
       ))),
       CodeExpectation("val m: Map(3: 4) = (0: 2, 1: 3, 2: 1)", GeneralSuccessCheck),
       CodeExpectation("val f: fSig = (a: m a)", SuccessCheck(correctCommandCreateFunc)),
@@ -490,10 +477,10 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " be able to handle a nested ReqMap properly" in {
     val expectedResult = Environment.typeAsObject(
       MapT(
-        toTypeTransform(
+        TypeTransform(
           IndexTN(2),
           MapT(
-            toTypeTransform(IndexTN(4), CountT),
+            TypeTransform(IndexTN(4), CountT),
             MapConfig(RequireCompleteness, SimpleFunction)
           )
         ),

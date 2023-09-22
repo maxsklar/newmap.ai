@@ -44,16 +44,13 @@ case object IdentifierT extends NewMapType
 
 /* Note on maps:
  *
- * A map is essentially a function or key-value store, and there are 3 levels:
+ * A map is essentially a function or key-value store, and there are 5 levels:
  * - The first (BasicMap) is a map where each key-value pair needs to be specified directly.
  *   BasicMap has the distinction of always being finite!
- * - The second is a simple function, which can be coded but it's likely to be executed quickly
+ * - The third is a simple function, which can be coded but it's likely to be executed quickly
  *   (In other words, the coding set is not turing complete and infinite loops are avoided.
  *    we can thus execute simple functions without too much worry about compute time
- * - The third is the full function - which has a full coding set to turn an input into an output
- *
- * Note that a map can be used as a simple function and a full function,
- *  and a simple function can be used as a full function.
+ * - The fifth is the full function - which has a full coding set to turn an input into an output
  *
  * The completeness field also has several options:
  * - requireAllFields tells us that we are required to specify an output for
@@ -61,9 +58,18 @@ case object IdentifierT extends NewMapType
  * - commandOutput means that the output types must all be command types, which means they start at an initial value.
  */
 case class MapT(
-  typeTransform: UntaggedObject, // Must be a PatternMap
+  typeTransform: TypeTransform,
   config: MapConfig,
 ) extends NewMapType
+
+case class TypeTransform(
+  keyType: NewMapType,
+  valueType: NewMapType
+)
+
+// This is the type of a type transform
+// It's not just a pair of types because the keyType is a pattern that feeds into the value type.
+case object TypeTransformT extends NewMapType
 
 case class MapConfig(
   completeness: MapCompleteness,

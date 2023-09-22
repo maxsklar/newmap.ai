@@ -59,6 +59,17 @@ object Evaluator {
           evalValues <- evalMapInstanceVals(values, env)
         } yield UMap(evalValues)
       }
+      case UMapPattern(key, value) => {
+        for {
+          evalKey <- this(key, env)
+
+          // TODO - use "params to allow" in this
+          evalValue = Evaluator(value, env) match {
+            case Success(vObj) => vObj
+            case _ => value
+          }
+        } yield UMapPattern(evalKey, evalValue)
+      }
       case UStruct(values) => {
         for {
           evalValues <- evalStructVals(values, env)

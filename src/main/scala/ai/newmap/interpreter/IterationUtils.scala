@@ -114,10 +114,7 @@ object IterationUtils {
         Success(values)
       }
       case NewMapObject(UStruct(values), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
-        for {
-          ttv <- typeTransformValues(typeTransform, env.typeSystem)
-          enumeration <- enumerateAllValuesIfPossible(ttv.keyType, env)
-        } yield enumeration
+        enumerateAllValuesIfPossible(typeTransform.keyType, env)
       }
       case NewMapObject(UCase(UIndex(i), UStruct(values)), CustomT("Array", itemType)) => {
         Success(values)
@@ -178,41 +175,14 @@ object IterationUtils {
     }
   }
 
-  case class TypeTransformValuesResponse(
-    keyType: NewMapType,
-    valueType: NewMapType
-  )
-
-  def typeTransformValues(
-    values: UntaggedObject,
-    typeSystem: NewMapTypeSystem
-  ): Outcome[TypeTransformValuesResponse, String] = {
-    for {
-      ttItem <- CommandMaps.checkTypeTransformForSingleBinding(values)
-      (keyType, valueType) = ttItem
-      keyT <- typeSystem.convertToNewMapType(keyType)
-      valueT <- typeSystem.convertToNewMapType(valueType)
-    } yield {
-      TypeTransformValuesResponse(keyT, valueT)
-    }
-  }
-
   // Give a type, what's going to come out of the iteration?
   def iterationItemType(nType: NewMapType, env: Environment, typeSystemIdOpt: Option[UUID] = None): Outcome[NewMapType, String] = {
     nType match {
       case MapT(typeTransform, MapConfig(CommandOutput, BasicMap, _, _, _)) => {
-        for {
-          ttv <- typeTransformValues(typeTransform, env.typeSystem)
-        } yield {
-          ttv.keyType
-        }
+        Success(typeTransform.keyType)
       }
       case MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _)) => {
-        for {
-          ttv <- typeTransformValues(typeTransform, env.typeSystem)
-        } yield {
-          ttv.valueType
-        }
+        Success(typeTransform.valueType)
       }
       case CustomT("Array", itemType) => {
         env.typeSystem.convertToNewMapType(itemType)
