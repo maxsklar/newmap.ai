@@ -691,6 +691,13 @@ object Environment {
         MapT(TypeTransform(IndexT(UIndex(2)), CountT), MapConfig(RequireCompleteness, BasicMap)),
         CountT
       ), MapConfig(RequireCompleteness, SimpleFunction))
+    )),
+    eCommand("*", NewMapObject(
+      UTimes,
+      MapT(TypeTransform(
+        MapT(TypeTransform(IndexT(UIndex(2)), DoubleT), MapConfig(RequireCompleteness, BasicMap)),
+        DoubleT
+      ), MapConfig(RequireCompleteness, SimpleFunction))
     ))
   ))
 }

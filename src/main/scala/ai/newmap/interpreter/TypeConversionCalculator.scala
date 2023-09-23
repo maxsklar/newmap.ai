@@ -208,25 +208,23 @@ object TypeConversionCalculator {
           IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
         }
       }
-      case (WithStateT(typeSystemId, CustomT(_, _)), _) => {
+      case (WithStateT(typeSystemId, _), _) => {
         for {
           underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
-          
-          _ <- underlyingStartingType match {
-            case SubtypeT(_, _, _) => Success(())
-            case CustomT(_, _) => Success(())
-            case _ => {
-              //throw new Exception(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
-              Failure(s"underlying type is only directly convertible on subtype - instead was $underlyingStartingType to $endingType")
-            }
-          }
-
           response <- isTypeConvertible(underlyingStartingType, endingType, env)
         } yield {
           response
         }
       }
-
+      case (_, WithStateT(typeSystemId, _)) => {
+        for {
+          // Maybe we don't want the final underlying type here, just the state!!
+          underlyingEndingType <- TypeChecker.getFinalUnderlyingType(endingType, env, typeSystemId)
+          response <- isTypeConvertible(startingType, underlyingEndingType, env)
+        } yield {
+          response
+        }
+      }
       case (CountT, DoubleT) => {
         Success(
           IsTypeConvertibleResponse(
@@ -236,7 +234,7 @@ object TypeConversionCalculator {
         )
       }
       case _ => {
-        val str = s"No rule to convert ${startingType.displayString(env)} to ${endingType.displayString(env)}"
+        val str = s"No rule to convert ${startingType} to ${endingType} -- ${startingType == endingType}"
         Failure(str)
       }
     }

@@ -51,7 +51,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
         }
         case SuccessCheck(com) => {
           interpretation match {
-            case Success(msg) => assert(msg == com.toString)
+            case Success(msg) => assert(msg == com.displayString(interpreter.env))
             case Failure(msg) => fail(msg)
           }
         }
@@ -209,11 +209,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   it should " not allow fields that cannnot be evaluated to literals " in {
-    val correctCommand = Environment.eCommand(
-      "q",
-      Index(1)
-    )
-
     testCodeScript(Vector(
       CodeExpectation("val s: (a: 2, b: 3) = (a:0, b:1)", GeneralSuccessCheck),
       CodeExpectation("val q: Field => 3 = (x: s|x)", FailureCheck)
@@ -280,11 +275,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A case " should " be created and instantiated" in {
-    val caseT = Environment.caseTypeFromParams(Vector(("a",IndexTN(2)), ("b",IndexTN(3))))
-
     val correctCommand = Environment.eCommand(
       "x",
-      NewMapObject(UCase(UIdentifier("a"), UIndex(0)), caseT)
+      NewMapObject(UCase(UIdentifier("a"), UIndex(0)), CustomT("MyCase", UStruct(Vector.empty)))
     )
 
     testCodeScript(Vector(
@@ -292,7 +285,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update MyCase: (a, 2)", GeneralSuccessCheck),
       CodeExpectation("update MyCase: (b, 3)", GeneralSuccessCheck),
       // TODO - allow this check without knowing mycase id!
-      CodeExpectation("val x: MyCase = a|0", GeneralSuccessCheck/*SuccessCheck(correctCommand)*/),
+      CodeExpectation("val x: MyCase = a|0", SuccessCheck(correctCommand)),
       CodeExpectation("val y: MyCase = a|b", FailureCheck),
       CodeExpectation("val x: MyCase = c", FailureCheck),
     ))
@@ -1122,6 +1115,25 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("numName(1)", FailureCheck),
       CodeExpectation("x.numName(1)", FailureCheck),
       CodeExpectation("3.f()", FailureCheck),
+    ))
+  }
+
+  it should " work for shape area" in {
+    testCodeScript(Vector(
+      CodeExpectation("data Shape = CaseType", GeneralSuccessCheck),
+      CodeExpectation("update Shape: (Square, Double)", GeneralSuccessCheck),
+      CodeExpectation("update Shape: (Rect, [Double, Double])", GeneralSuccessCheck),
+      CodeExpectation("new simple map on Shape as area returning Double = (Square|x: x * x, Rect|[x, y]: x * y)", GeneralSuccessCheck),
+      CodeExpectation("val s: Shape = Square|2.0", GeneralSuccessCheck),
+      CodeExpectation(
+        "s.area",
+        SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(4.0), DoubleT)))
+      ),
+      CodeExpectation("val t: Shape = Rect|[2.0, 5.0]", GeneralSuccessCheck),
+      CodeExpectation(
+        "t.area",
+        SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(10.0), DoubleT)))
+      ),
     ))
   }
 

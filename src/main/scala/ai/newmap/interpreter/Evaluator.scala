@@ -34,7 +34,7 @@ object Evaluator {
             case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
-          answer <- applyFunction(resultValue, value, env)
+          answer <- applyFunction(resultValue, evalValue, env)
         } yield {
           answer
         }
@@ -230,6 +230,18 @@ object Evaluator {
           result <- (first, second) match {
             case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 + n2))
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 + d2))
+            case _ => Failure("Can't add: " + first + " -- " + second)
+          }
+        } yield result
+      }
+      case UTimes => {
+        for {
+          first <- applyFunction(input, UIndex(0), env)
+          second <- applyFunction(input, UIndex(1), env)
+
+          result <- (first, second) match {
+            case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 * n2))
+            case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 * d2))
             case _ => Failure("Can't add: " + first + " -- " + second)
           }
         } yield result

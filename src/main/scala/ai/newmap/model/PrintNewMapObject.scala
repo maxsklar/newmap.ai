@@ -207,6 +207,7 @@ object PrintNewMapObject {
     case AccessField(value@UDouble(_), _, field) => "(" + untagged(value) + ")." + untagged(field)
     case AccessField(value, _, field) => untagged(value) + "." + untagged(field)
     case UPlus => "+"
+    case UTimes => "*"
     case UCountToDecimal => "CountToDecimal"
   }
 

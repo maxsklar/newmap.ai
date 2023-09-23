@@ -89,7 +89,7 @@ object TypeChecker {
           }
 
           // Herin Lies the problem!!!
-          result <- TypeConversionCalculator.attemptConvertObjectToType(NewMapObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
+          _ <- TypeConversionCalculator.attemptConvertObjectToType(NewMapObject(UIdentifier(s), IdentifierT), underlyingExpectedT, env).toOption
         } yield ()
 
         if (useLiteralIdentifier.nonEmpty) {

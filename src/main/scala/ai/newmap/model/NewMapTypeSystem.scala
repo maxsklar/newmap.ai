@@ -265,6 +265,7 @@ case class NewMapTypeSystem(
       }
 
       unprocessedTypes = unprocessedTypes.drop(1)
+      processedTypes = processedTypes :+ firstType
     }
 
     Outcome(foundConversions.get(typeId2), s"Convertibility not found: $typeId1 -- $typeId2\n -- $foundConversions\n")

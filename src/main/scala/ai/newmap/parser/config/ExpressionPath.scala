@@ -91,6 +91,10 @@ object ExpressionPath {
             IdentifierParse("+"),
             LiteralListParse(Vector(firstExp, secondExp), ArrayType)
           ))
+          case "*" => Some(ApplyParse(
+            IdentifierParse("*"),
+            LiteralListParse(Vector(firstExp, secondExp), ArrayType)
+          ))
           case "" => Some(ApplyParse(firstExp, secondExp))
           case _ => {
             None

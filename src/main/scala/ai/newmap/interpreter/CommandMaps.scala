@@ -507,18 +507,13 @@ object CommandMaps {
         }
       }
       case FunctionalSystemT(functionTypes) => {
-        println("functionTypes: " + functionTypes)
         for {
           currentMapping <- current.uObject match {
             case UMap(m) => Success(m)
             case _ => Failure(s"Function not a mapping: ${current.uObject}")
           }
 
-          _ = println("currentMapping: " + currentMapping)
-
           newFunctionNameObj <- Evaluator.applyFunction(command, UIndex(0), env)
-
-          _ = println("newFunctionNameObj: " + newFunctionNameObj)
 
           newFunctionObject <- Evaluator.applyFunction(command, UIndex(1), env)
 
@@ -529,8 +524,6 @@ object CommandMaps {
 
           uNewFunctionType = newFunctionObjectComponents._1
           newFunctionT <- uNewFunctionType.asType
-
-          _ = println("newFunctionT: " + newFunctionT)
 
           newFunctionTPair <- componentsOfMapType(newFunctionT, env)
           newFunctionTypeTransform = newFunctionTPair._1
