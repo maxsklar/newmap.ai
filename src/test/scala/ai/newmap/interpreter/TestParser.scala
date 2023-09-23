@@ -1,7 +1,8 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.Lexer.{Enc, Identifier, Number, Symbol}
-import ai.newmap.interpreter.parser.NewMapParser
+import ai.newmap.parser.Lexer
+import ai.newmap.parser.Lexer.{Enc, Identifier, Number, Symbol}
+import ai.newmap.parser.NewMapParser
 import org.scalatest._
 import ai.newmap.model._
 import ai.newmap.util.Success
@@ -169,6 +170,7 @@ class TestParser extends FlatSpec {
       Symbol(":"),
       Identifier("Type"),
       Enc(Paren, false))
+
     assert(NewMapParser.expressionParse(tokens) == Success(
       LiteralListParse(
         Vector(
@@ -183,8 +185,10 @@ class TestParser extends FlatSpec {
   it should " be parsed with zero elements" in {
     val tokens = Vector(
       Enc(Paren, true),
-      Identifier("3"),
+      Number(3),
       Enc(Paren, false))
+
+    assert(NewMapParser.expressionParse(tokens) == Success(NaturalNumberParse(3)))
   }
 
   it should " work with singleton elements" in {

@@ -1,7 +1,7 @@
-package ai.newmap.interpreter.parser.config
+package ai.newmap.parser.config
 
-import ai.newmap.interpreter.parser.ParseState
-import ai.newmap.interpreter.Lexer
+import ai.newmap.parser.ParseState
+import ai.newmap.parser.Lexer
 import ai.newmap.model._
 import ai.newmap.util.Outcome
 

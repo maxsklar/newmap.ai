@@ -1,6 +1,7 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.Lexer.{Enc, Identifier, Number, Symbol}
+import ai.newmap.parser.Lexer
+import ai.newmap.parser.Lexer.{Enc, Identifier, Number, Symbol}
 import org.scalatest._
 import ai.newmap.model.Paren
 import ai.newmap.util.Success

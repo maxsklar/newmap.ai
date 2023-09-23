@@ -1,6 +1,6 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.parser.{NewMapCodeParser, NewMapParser}
+import ai.newmap.parser.{Lexer, NewMapCodeParser, NewMapParser}
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
@@ -93,7 +93,7 @@ class EnvironmentInterpreter(
       tokens <- getTokens(code)
       parseTree <- NewMapParser.expressionParse(tokens)
       tc <- TypeChecker.typeCheckUnknownType(parseTree, env, Map.empty)
-      nObject <- Evaluator(tc.nExpression, env)
+      _ <- Evaluator(tc.nExpression, env)
     } yield {
       tc.refinedTypeClass
     }

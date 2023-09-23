@@ -1,9 +1,9 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.Lexer.{DQuote, Enc, Identifier, Number, Symbol}
+import ai.newmap.parser.Lexer
+import ai.newmap.parser.Lexer.{DQuote, Identifier, Number, Symbol}
 import org.scalatest._
-import ai.newmap.model._
-import ai.newmap.util.{Failure, Success}
+import ai.newmap.util.Success
 import scala.io.Source
 
 

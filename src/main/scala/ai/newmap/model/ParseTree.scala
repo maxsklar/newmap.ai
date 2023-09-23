@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.Lexer.Identifier
+import ai.newmap.parser.Lexer.Identifier
 
 class ParseElement()
 sealed abstract class ParseTree extends ParseElement

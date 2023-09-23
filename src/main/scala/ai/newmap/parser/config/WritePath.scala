@@ -1,16 +1,12 @@
-package ai.newmap.interpreter.parser.config
+package ai.newmap.parser.config
 
-import ai.newmap.interpreter.parser.ParseState
-import ai.newmap.interpreter.Lexer
-import ai.newmap.model.{ApplyCommandsStatementParse, EnvStatementParse, IdentifierParse, ParseTree}
+import ai.newmap.parser.ParseState
+import ai.newmap.parser.Lexer
+import ai.newmap.model.{EnvStatementParse, IdentifierParse, ParseTree, WriteToChannelParse}
 import ai.newmap.util.Outcome
 
-object ApplyCommandsPath {
-  case class ApplyCommands(
-    val identifier: String,
-    val expressionState: ParseState[ParseTree] = ExpressionPath.InitState
-  ) extends ParseState[EnvStatementParse] {
-
+object WritePath {
+  case class WriteIdenfitier(val id: String, val expressionState: ParseState[ParseTree] = ExpressionPath.InitState) extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
       for {
         newExpressionState <- expressionState.update(token)
@@ -23,14 +19,14 @@ object ApplyCommandsPath {
       for {
         parseTree <- expressionState.generateOutput
       } yield {
-        ApplyCommandsStatementParse(IdentifierParse(identifier), parseTree)
+        WriteToChannelParse(IdentifierParse(id), parseTree)
       }
     }
   }
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseState.expectingIdentifier(token, id => ApplyCommands(id))
+      ParseState.expectingIdentifier(token, id => WriteIdenfitier(id))
     }
   }
 }

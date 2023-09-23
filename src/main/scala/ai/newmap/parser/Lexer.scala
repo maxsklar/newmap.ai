@@ -1,4 +1,4 @@
-package ai.newmap.interpreter
+package ai.newmap.parser
 
 import ai.newmap.model._
 import scala.util.parsing.combinator.RegexParsers

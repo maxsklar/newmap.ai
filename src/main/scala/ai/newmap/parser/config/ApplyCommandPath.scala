@@ -1,8 +1,8 @@
-package ai.newmap.interpreter.parser.config
+package ai.newmap.parser.config
 
-import ai.newmap.interpreter.parser.ParseState
-import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.Symbol
+import ai.newmap.parser.ParseState
+import ai.newmap.parser.Lexer
+import ai.newmap.parser.Lexer.Symbol
 import ai.newmap.model.{ApplyCommandStatementParse, EnvStatementParse, IdentifierParse, ParseTree}
 import ai.newmap.util.{Failure, Success, Outcome}
 
