@@ -2,10 +2,9 @@ package ai.newmap.interpreter.parser.config
 
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.{Identifier, Number}
-import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseElement, ParseTree, IdentifierParse, NaturalNumberParse}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.interpreter.Lexer.Identifier
+import ai.newmap.model.{EnvStatementParse, IterateIntoStatementParse, ParseTree}
+import ai.newmap.util.{Failure, Outcome}
 
 object IteratePath {
   case class IterateIntoIdentifier(expression: ParseTree, id: String) extends ParseState[EnvStatementParse] {

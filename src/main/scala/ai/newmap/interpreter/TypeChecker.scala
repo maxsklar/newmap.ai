@@ -113,7 +113,7 @@ object TypeChecker {
             }
             case None => {
               expectedTypeOutcome match {
-                case Success(CaseT(cases, IdentifierT, featureSet)) => {
+                case Success(CaseT(cases, IdentifierT, _)) => {
                   for {
                     caseType <- Evaluator.applyFunction(cases, UIdentifier(s), env)
 
@@ -175,7 +175,7 @@ object TypeChecker {
           // If the function is a simplemap, and if it has no internal parameters, it can be executed now, and considered a basic
           functionFeatureSetFixed = if (functionFeatureSet.getLevel <= SimpleFunction.getLevel) {
             Evaluator.applyFunction(result.functionExpression, result.inputExpression, env) match {
-              case Success(result) => BasicMap // TODO - save the actual result we got!
+              case Success(_) => BasicMap // TODO - save the actual result we got!
               case Failure(_) => functionFeatureSet
             }
           } else functionFeatureSet
@@ -311,7 +311,7 @@ object TypeChecker {
                   expectedType
                 )
               }
-            }.rescue(f => {
+            }.rescue(_ => {
               for {
                 expressions <- typeCheckSequence(values, typeT, env, tcParameters)
               } yield {
@@ -348,7 +348,7 @@ object TypeChecker {
           }
         }
       }
-      case KeyValueBinding(key, value) => {
+      case KeyValueBinding(_, _) => {
         typeCheck(LiteralListParse(Vector(expression), MapType), expectedType, env, featureSet, tcParameters)
       }
       case LambdaParse(input, output) => {
@@ -632,7 +632,7 @@ object TypeChecker {
         }
       }
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
-      case (LiteralListParse(values, _), Success(StructT(UMap(structValues), parentFieldType, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+      case (LiteralListParse(values, _), Success(StructT(UMap(structValues), _, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
         } yield {
@@ -843,7 +843,7 @@ object TypeChecker {
         case TypeClassT(typeTransform, implementation) => {
           outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
         }
-        case MapT(typeTransform, config) => {
+        case MapT(typeTransform, _) => {
           for {
             newParams <- Evaluator.patternMatch(
               typeTransform.keyType.asUntagged,
@@ -911,17 +911,17 @@ object TypeChecker {
     val underlyingTOutcome =  getFinalUnderlyingType(nFunctionTypeClass, env, env.typeSystem.currentState)
 
     underlyingTOutcome match {
-      case Success(StructT(params, parentFieldType, _, _)) => {
+      case Success(StructT(_, parentFieldType, _, _)) => {
         Some(parentFieldType)
       }
-      case Success(TypeClassT(typeTransform, implementation)) => {
+      case Success(TypeClassT(_, _)) => {
         //eventually send typesInTypeClass to the type checker
         None
       }
-      case Success(MapT(typeTransform, config)) => {
+      case Success(MapT(typeTransform, _)) => {
         Some(typeTransform.keyType)
       }
-      case other => None
+      case _ => None
     }
   }
 
@@ -932,10 +932,8 @@ object TypeChecker {
     inputType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
-    val untaggedInputType = inputType.asUntagged
-    
     for {
-      resultingFunctionType <- Evaluator.applyFunction(params, untaggedInputType, env)
+      resultingFunctionType <- Evaluator.applyFunction(params, inputType.asUntagged, env)
       resultingFunctionT <- resultingFunctionType.asType
     } yield {
       resultingFunctionT

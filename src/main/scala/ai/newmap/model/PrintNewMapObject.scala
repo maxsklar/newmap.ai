@@ -104,7 +104,7 @@ object PrintNewMapObject {
         )
       }
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
-      case StructT(params, parentType, completeness, featureSet) => s"Struct(${untagged(params)})"
+      case StructT(params, _, _, _) => s"Struct(${untagged(params)})"
       case TypeClassT(typeTransform, implementation) => {
         s"TypeClassT(${untagged(typeTransform)}, ${untagged(implementation)})"
       }
@@ -113,7 +113,7 @@ object PrintNewMapObject {
       }
       //TODO(2022): we might not want to print out the full parent here, because it could be large
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
-      case SubtypeT(isMember, parentType, _) => s"Subtype(${untagged(isMember)})"
+      case SubtypeT(isMember, _, _) => s"Subtype(${untagged(isMember)})"
       case FunctionalSystemT(functionTypes) => s"FunctionalSystem(${untagged(UMap(functionTypes))})"
       case WithStateT(uuid, nType) => {
         newMapType(nType, typeSystem, Some(uuid))
@@ -199,12 +199,12 @@ object PrintNewMapObject {
     }
     case UWildcardPattern(name) => "W~" + name
     case ParamId(name) => s"$name~pi"
-    case ApplyFunction(func, input, matchingRules) => {
+    case ApplyFunction(func, input, _) => {
       "(" + untagged(func) + " " + untagged(input) + ")"
     }
-    case AccessField(value@UIndex(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
-    case AccessField(value@ULong(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
-    case AccessField(value@UDouble(n), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value@UIndex(_), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value@ULong(_), _, field) => "(" + untagged(value) + ")." + untagged(field)
+    case AccessField(value@UDouble(_), _, field) => "(" + untagged(value) + ")." + untagged(field)
     case AccessField(value, _, field) => untagged(value) + "." + untagged(field)
     case UPlus => "+"
     case UCountToDecimal => "CountToDecimal"

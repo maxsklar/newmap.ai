@@ -11,7 +11,7 @@ object IterationUtils {
     TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
-      case Success(SubtypeT(UMap(values), parentType, _)) => {
+      case Success(SubtypeT(UMap(values), _, _)) => {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
@@ -31,7 +31,7 @@ object IterationUtils {
         // This is dangerous because the multiplications can cause a large blowout of allowed types
         
         params match {
-          case (name, firstParamType) +: otherParams => {
+          case (_, firstParamType) +: otherParams => {
             for {
               firstParamT <- firstParamType.asType
               firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
@@ -113,13 +113,13 @@ object IterationUtils {
       case NewMapObject(UStruct(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
         Success(values)
       }
-      case NewMapObject(UStruct(values), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
+      case NewMapObject(UStruct(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         enumerateAllValuesIfPossible(typeTransform.keyType, env)
       }
-      case NewMapObject(UCase(UIndex(i), UStruct(values)), CustomT("Array", itemType)) => {
+      case NewMapObject(UCase(UIndex(_), UStruct(values)), CustomT("Array", _)) => {
         Success(values)
       }
-      case NewMapObject(UCase(UIndex(i), UMap(values)), CustomT("Array", itemType)) => {
+      case NewMapObject(UCase(UIndex(_), UMap(values)), CustomT("Array", _)) => {
         // We should be more careful about the ordering here!!
         Success(values.map(_._2))
       }

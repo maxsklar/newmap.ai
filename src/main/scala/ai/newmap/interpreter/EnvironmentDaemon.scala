@@ -1,7 +1,7 @@
 package ai.newmap.interpreter
 
 import akka.actor.{Actor, ActorSystem, Props}
-import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.util.{Success, Failure}
 
 object EnvironmentDaemon {
   val system = ActorSystem("DaemonActorSystem")
@@ -17,7 +17,7 @@ object EnvironmentDaemon {
 
     def receive = {
       case (code: String) => sender() ! passCode(code)
-      case (unit: Unit) => sender() ! s"Connected to the Environment Daemon"
+      case (_: Unit) => sender() ! s"Connected to the Environment Daemon"
       case other => sender() ! s"Can't interpret: $other"
     }
 

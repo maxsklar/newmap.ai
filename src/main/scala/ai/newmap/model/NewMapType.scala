@@ -354,7 +354,7 @@ object NewMapType {
         case UStruct(items) if (items.length == 2) => {
           for {
             typeTransform <- items(0) match {
-              case ump@UMapPattern(key, value) => Success(ump)
+              case ump@UMapPattern(_, _) => Success(ump)
               case UMap(uMap) if (uMap.length <= 1) => uMap.headOption match {
                 case Some(singleton) => Success(UMapPattern(singleton._1, singleton._2))
                 case None => Failure("Empty Type Class Pattern")

@@ -101,7 +101,7 @@ object StatementInterpreter {
           typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, FullFunction, tcParameters)
 
           typeTransform <- typeTransformResult.nExpression match {
-            case result@UMap(values) if (values.length == 1) => {
+            case UMap(values) if (values.length == 1) => {
               Success(UMapPattern(values.head._1, values.head._2))
             }
             case result@UMapPattern(_, _) => Success(result)
@@ -225,7 +225,7 @@ object StatementInterpreter {
           }
         }
       }
-      case ApplyCommandsStatementParse(id, commands) => {
+      case ApplyCommandsStatementParse(_, _) => {
         throw new Exception("Apply multiple commands not yet implemented")
       }
       case AddChannelParse(channelId, channelTypeParse) => {
@@ -268,7 +268,7 @@ object StatementInterpreter {
               )
             }
           }
-          case Failure(reason) => {
+          case Failure(_) => {
             throw new Exception("Cannot yet connect channel to a type")
           }
         }
@@ -276,7 +276,7 @@ object StatementInterpreter {
       case DisconnectChannelParse(channelId, obj) => {
         val channel = UIdentifier(channelId.s)
         env.lookupVersionedObject(obj.s) match {
-          case Success(versionedObjectLink) => {
+          case Success(_) => {
             // No need for type checking when we are disconnecting
             Success(
               ReturnValue(
@@ -285,7 +285,7 @@ object StatementInterpreter {
               )
             )
           }
-          case Failure(reason) => {
+          case Failure(_) => {
             throw new Exception("Cannot yet disconnect channel from a type")
           }
         }

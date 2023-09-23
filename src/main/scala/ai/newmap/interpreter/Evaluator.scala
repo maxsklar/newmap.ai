@@ -31,7 +31,7 @@ object Evaluator {
           result <- applyFunction(fieldsToMap, field, env)
 
           resultValue <- result match {
-            case UCase(t, v) => Success(v)
+            case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
           answer <- applyFunction(resultValue, value, env)
@@ -214,7 +214,7 @@ object Evaluator {
 
         Success(if (isCommand) UIndex(1) else UInit)
       }
-      case UFunctionLink(name, uuid) => {
+      case UFunctionLink(name, _) => {
         for {
           // TODO - don't ignore the uuid if we're using an old functional system
           fSystemV <- env.lookupVersionedObject("__FunctionSystem")
@@ -379,7 +379,7 @@ object Evaluator {
       }
       case _ => Vector.empty
     }
-    case UCase(constructor, input) => {
+    case UCase(_, input) => {
       newParametersFromPattern(input)
     }
     case UMap(values) => newParametersFromPattern(UStruct(values.map(_._2)))

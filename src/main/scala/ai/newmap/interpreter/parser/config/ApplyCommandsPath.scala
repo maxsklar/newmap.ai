@@ -2,10 +2,8 @@ package ai.newmap.interpreter.parser.config
 
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{ApplyCommandsStatementParse, EnvStatementParse, IdentifierParse, ParseElement, ParseTree}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.model.{ApplyCommandsStatementParse, EnvStatementParse, IdentifierParse, ParseTree}
+import ai.newmap.util.Outcome
 
 object ApplyCommandsPath {
   case class ApplyCommands(

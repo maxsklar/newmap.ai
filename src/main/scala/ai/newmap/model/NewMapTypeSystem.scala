@@ -96,7 +96,7 @@ case class NewMapTypeSystem(
       )
     )
     case "TypeTransform" => Success(emptyStructType)
-    case custom => {
+    case _ => {
       for {
         identifierToIdMapping <- Outcome(historicalMapping.get(typeSystemId), s"Couldn't get historical type mapping for $typeSystemId")
 
@@ -137,7 +137,7 @@ case class NewMapTypeSystem(
     case "Case" => Failure("Case not implemented")
     case "Subtype" => Failure("Subtype not implemented")
     case "WithState" => Failure("WithState not implemented")
-    case custom => {
+    case _ => {
       for {
         identifierToIdMapping <- Outcome(historicalMapping.get(typeSystemId), s"Couldn't get historical type mapping for $typeSystemId")
         typeId <- Outcome(identifierToIdMapping.get(identifier), s"Couldn't get typeId for identifier $identifier")

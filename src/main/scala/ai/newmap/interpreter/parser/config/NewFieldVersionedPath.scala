@@ -5,7 +5,6 @@ import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
 
 /** Parse map/field creation like so:
  * new basic map on 3 as f returning String = ...

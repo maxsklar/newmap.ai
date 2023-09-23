@@ -30,7 +30,7 @@ object RetrieveType {
         isTermClosedLiteral(value, knownVariables)
     }
     case UStruct(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
-    case constant => true
+    case _ => true
   }
 
   def isMapValuesClosed(
@@ -103,10 +103,10 @@ object RetrieveType {
             Failure(s"params and values don't match in length: $params --- $values")
           }
         }
-        case (StructT(params, _, _, BasicMap), UMap(values)) => {
+        case (StructT(_, _, _, BasicMap), UMap(_)) => {
           Failure("not implemented - fetchParamsFromPattern on StructT with Map pattern")
         }
-        case (MapT(typeTransform, config), UMap(values)) => {
+        case (MapT(_, _), UMap(_)) => {
           Failure("not implemented - fetchParamsFromPattern on MapT")
         }
         case (SubtypeT(_, parentType, _), _) => fetchParamsFromPattern(parentType, pattern, env)

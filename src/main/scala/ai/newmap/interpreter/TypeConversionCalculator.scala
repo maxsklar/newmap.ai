@@ -46,15 +46,15 @@ object TypeConversionCalculator {
         }
       }
       case _ if (startingType == endingType) => Success(emptyResponse)
-      case (SubtypeT(isMember, parentType, featureSet), _) => {
+      case (SubtypeT(_, parentType, _), _) => {
         isTypeConvertible(parentType, endingType, env)
       }
-      case (_, SubtypeT(isMember, parentType, featureSet)) => {
+      case (_, SubtypeT(_, _, _)) => {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
-        MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
+        MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(_, startingFeatureSet, _, _, _)),
+        MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(_, endingFeatureSet, _, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
@@ -85,7 +85,7 @@ object TypeConversionCalculator {
           emptyResponse
         }
       }
-      case(StructT(startingParams, startingFieldType, _, _), StructT(endingParams, endingFieldType, _, _)) => {
+      case(StructT(_, _, _, _), StructT(_, _, _, _)) => {
         // 1) Can we convert starting field type to ending field type?
         // - For each param in startingParams:
         //   - Convert to ending param
@@ -107,7 +107,7 @@ object TypeConversionCalculator {
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
-      case (_, StructT(values, fieldParentType, _, _)) => {
+      case (_, StructT(values, _, _, _)) => {
         for {
           valueBindings <- values.getMapBindings()
           singularOutputResponse <- convertToStructWithSingleValue(valueBindings, env)
@@ -116,7 +116,7 @@ object TypeConversionCalculator {
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response.copy(convertInstructions = singularOutputResponse.conversionRules ++ response.convertInstructions)
       }
-      case (CaseT(startingCases, startingFieldType, _), CaseT(endingCases, endingFieldType, _)) => {
+      case (CaseT(_, _, _), CaseT(_, _, _)) => {
         // Note the contravariance (ending cases first)
         // This is because a case class with fewer cases can be converted into one with more
         /*for {
@@ -138,7 +138,7 @@ object TypeConversionCalculator {
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
-      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, endingFieldType, _)) if (isSingularMap(values)) => {
+      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, _, _)) if (isSingularMap(values)) => {
         // TODO: It's confusing why we would need this, but it prevents the case directly below from firing
         // -- Eventually this whole method should be refactored.
         for {
@@ -208,7 +208,7 @@ object TypeConversionCalculator {
           IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
         }
       }
-      case (WithStateT(typeSystemId, CustomT(name, params)), _) => {
+      case (WithStateT(typeSystemId, CustomT(_, _)), _) => {
         for {
           underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
           
@@ -251,7 +251,7 @@ object TypeConversionCalculator {
     env: Environment
   ): Outcome[NewMapObject, String] = {
     endingType match {
-      case SubtypeT(isMember, parentType, featureSet) => {
+      case SubtypeT(isMember, parentType, _) => {
         for {
           tObject <- attemptConvertObjectToType(startingObject, parentType, env)
           membershipCheck <- Evaluator.applyFunction(isMember, tObject.uObject, env)

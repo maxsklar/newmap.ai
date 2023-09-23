@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, RetrieveType, TypeConversionCalculator, TypeChecker}
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConversionCalculator, TypeChecker}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -146,7 +146,7 @@ case class Environment(
               idToObject = idToObject + (s -> nObject)
             )
           }
-          case Failure(s) => throw new Exception("FullEnvironmentCommand: " + nObject.displayString(this))
+          case Failure(_) => throw new Exception("FullEnvironmentCommand: " + nObject.displayString(this))
         }
 
 

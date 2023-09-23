@@ -54,7 +54,7 @@ object Lexer extends RegexParsers {
   }
 
   def newline: Parser[NewLine] = {
-    "\n".r ^^ { str => NewLine() }
+    "\n".r ^^ { _ => NewLine() }
   }
 
   def enclosure: Parser[Enc] = {
@@ -90,8 +90,8 @@ object Lexer extends RegexParsers {
 
   def apply(code: String): Outcome[List[Token], String] = {
     parse(tokens, code) match {
-      case NoSuccess(msg, next) => ai.newmap.util.Failure(msg)
-      case Success(result, next) => ai.newmap.util.Success(result)
+      case NoSuccess(msg, _) => ai.newmap.util.Failure(msg)
+      case Success(result, _) => ai.newmap.util.Success(result)
     }
   }
 }

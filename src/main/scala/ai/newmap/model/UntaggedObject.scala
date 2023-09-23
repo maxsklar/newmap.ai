@@ -78,6 +78,9 @@ case object IsCommandFunc extends UntaggedObject
 
 // This takes a pair of numbers are returns their sum
 case object UPlus extends UntaggedObject
+//case object UMinus extends UntaggedObject
+//case object UTimes extends UntaggedObject
+//case object UDivide extends UntaggedObject
 
 // More Numerical Operations
 case object UCountToDecimal extends UntaggedObject

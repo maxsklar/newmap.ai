@@ -1,8 +1,7 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.TypeChecker.{typeCheck, typeCheckGenericMap}
 import ai.newmap.model._
-import ai.newmap.util.{Failure, Outcome, Success}
+import ai.newmap.util.{Outcome, Success}
 
 object StatementEvaluator {
   /*
@@ -15,7 +14,7 @@ object StatementEvaluator {
     env: Environment
   ): Outcome[EnvironmentCommand, String] = {
     command match {
-      case c@FullEnvironmentCommand(id, nExpression, isDef) => {
+      case c@FullEnvironmentCommand(_, nExpression, _) => {
         for {
           evaluatedObject <- Evaluator(nExpression.uObject, env)
 
@@ -25,7 +24,7 @@ object StatementEvaluator {
           c.copy(nObject = nObject)
         }
       }
-      case c@ApplyIndividualCommand(id, command) => {
+      case c@ApplyIndividualCommand(_, command) => {
         for {
           evaluatedCommand <- Evaluator(command, env)
           constantCommand = Evaluator.stripVersioningU(evaluatedCommand, env)

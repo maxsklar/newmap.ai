@@ -3,9 +3,8 @@ package ai.newmap.interpreter.parser.config
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{DisconnectChannelParse, EnvStatementParse, ParseElement}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.model.{DisconnectChannelParse, EnvStatementParse}
+import ai.newmap.util.{Failure, Outcome}
 
 object DisconnectChannelPath {
   case class DisconnectChannelIdentifierIdentifier(firstId: String, secondId: String) extends ParseState[EnvStatementParse] {

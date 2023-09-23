@@ -26,7 +26,7 @@ object TypeClassUtils {
           _ <- Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
         } yield nType
       }
-      case CustomT(name, params) => {
+      case CustomT(name, _) => {
         val typeSystem = env.typeSystem
         val currentState = typeSystem.currentState
 
@@ -61,7 +61,7 @@ object TypeClassUtils {
           Failure(s"Struct Type couldn't accept index $i as value: $nType")
         }
       }
-      case ParamIdT(name) => {
+      case ParamIdT(_) => {
         Success(nType) // Is this right?
       }
       case _ => {

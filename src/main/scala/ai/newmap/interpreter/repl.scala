@@ -1,6 +1,5 @@
 package ai.newmap.interpreter
 
-import ai.newmap.util.{Success, Failure}
 import org.jline.reader.impl.history.DefaultHistory
 import org.jline.reader.{LineReader, LineReaderBuilder}
 import org.jline.terminal.TerminalBuilder
@@ -8,8 +7,7 @@ import akka.util.Timeout
 import akka.pattern.ask
 import java.nio.file.Paths
 import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
 /**
  * This is the main class that opens a repl to the appropriate environment daemon.

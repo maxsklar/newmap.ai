@@ -3,9 +3,8 @@ package ai.newmap.interpreter.parser.config
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{ConnectChannelParse, EnvStatementParse, ParseElement}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.model.{ConnectChannelParse, EnvStatementParse}
+import ai.newmap.util.{Failure, Outcome}
 
 object ConnectChannelPath {
   case class ConnectChannelIdentifierIdentifier(firstId: String, secondId: String) extends ParseState[EnvStatementParse] {

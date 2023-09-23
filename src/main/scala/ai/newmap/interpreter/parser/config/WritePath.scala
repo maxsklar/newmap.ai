@@ -2,10 +2,8 @@ package ai.newmap.interpreter.parser.config
 
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
-import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{EnvStatementParse, IdentifierParse, ParseElement, ParseTree, WriteToChannelParse}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.model.{EnvStatementParse, IdentifierParse, ParseTree, WriteToChannelParse}
+import ai.newmap.util.Outcome
 
 object WritePath {
   case class WriteIdenfitier(val id: String, val expressionState: ParseState[ParseTree] = ExpressionPath.InitState) extends ParseState[EnvStatementParse] {

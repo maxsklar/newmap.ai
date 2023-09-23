@@ -5,7 +5,6 @@ import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer._
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
 
 object ExpressionPath {
 
@@ -59,7 +58,7 @@ object ExpressionPath {
           } yield this.copy(secondParameter = newSecondParameter)
         } else {
           token match {
-            case Symbol(s) => Success(ExpressionInBinaryOpNoRight(connectiveSymbol, this))
+            case Symbol(_) => Success(ExpressionInBinaryOpNoRight(connectiveSymbol, this))
             case _ => {
               for {
                 newSecondParameter <- InitState.update(token)
@@ -105,7 +104,7 @@ object ExpressionPath {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = token match {
       // TODO - these items shouldn't be lexed as symbols!!! 
       case Symbol(s) if (s != "`" && s != "~") => {
-        val thisPredecence = symbolPrecedence(s)
+        symbolPrecedence(s)
         Success(ExpressionInBinaryOpNoRight(s, this))
       }
       case NewLine() => Success(this)

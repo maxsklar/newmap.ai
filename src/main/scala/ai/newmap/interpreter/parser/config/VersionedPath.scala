@@ -5,7 +5,6 @@ import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Identifier, Symbol}
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
 
 object VersionedPath {
   case class VersionedIdentifierEqualsNew(id: String, val expressionState: ParseState[ParseTree] = ExpressionPath.InitState) extends ParseState[EnvStatementParse] {

@@ -1,8 +1,7 @@
 package ai.newmap.interpreter
 
 import ai.newmap.model._
-import ai.newmap.util.{Outcome, Success, Failure}
-import java.util.UUID
+import ai.newmap.util.Outcome
 
 object CodeBlockTypeChecker {
   def apply(
@@ -21,7 +20,7 @@ object CodeBlockTypeChecker {
       var newParams: Map[String, NewMapType] = tcParameters
 
       statements.foreach(statement => {
-        val result = for {
+        for {
           interpreted <- StatementInterpreter(statement, env, newParams)
         } yield {
           envCommands = envCommands :+ interpreted.command

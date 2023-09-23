@@ -9,7 +9,7 @@ object CommandMaps {
   def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
-    getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(f => {
+    getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(_ => {
       getDefaultValueOfCommandTypeHardcoded(nType, env)
     })
   }
@@ -64,7 +64,7 @@ object CommandMaps {
           Failure(s"Can't start off map with key in typeTransform $typeTransform")
         }
       }
-      case StructT(params, _, CommandOutput, _) => {
+      case StructT(_, _, CommandOutput, _) => {
         Success(defaultUMap)
       }
       case StructT(UMap(Vector()), _, _, _) => {
@@ -77,9 +77,9 @@ object CommandMaps {
         Success(defaultUMap)
       }*/
       case CharacterT => Success(UCharacter('\u0000'))
-      case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
+      case CustomT("Array", _) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
       case CustomT("String", _) => Success(UCase(UIndex(0), UStruct(Vector.empty))) // Replace this line with a conversion!
-      case WithStateT(uuid, underlying) => {
+      case WithStateT(_, underlying) => {
         getDefaultValueOfCommandTypeHardcoded(underlying, env)
       }
       case _ => Failure(s"Type ${nType.displayString(env)} has no default value")
@@ -101,7 +101,7 @@ object CommandMaps {
   ): Outcome[NewMapType, String] = {
     nType match {
       case IndexT(_) => Success(NewMapO.emptyStruct) // Where to insert the new value?
-      case CaseT(cases, parentType, featureSet) => {
+      case CaseT(_, parentType, _) => {
         Success(StructT(
           UMap(Vector(
             UIndex(0) -> parentType.asUntagged,
@@ -110,7 +110,7 @@ object CommandMaps {
           IndexTN(2)
         ))
       }
-      case StructT(cases, parentType, _, featureSet) => {
+      case StructT(_, parentType, _, _) => {
         Success(StructT(
           UMap(Vector(
             UIndex(0) -> parentType.asUntagged,
@@ -119,14 +119,14 @@ object CommandMaps {
           IndexTN(2)
         ))
       }
-      case SubtypeT(isMember, parentType, featureSet) => Success(parentType)
+      case SubtypeT(_, parentType, _) => Success(parentType)
         
 
-      case TypeClassT(typeTransform, implementation) => {
+      case TypeClassT(typeTransform, _) => {
         Success(StructT(typeTransform, TypeT, CommandOutput, BasicMap))
       }
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
-      case CustomT(name, UStruct(params)) => {
+      case CustomT(name, UStruct(_)) => {
         val currentState = typeSystem.currentState
 
         for {
@@ -232,7 +232,7 @@ object CommandMaps {
           }
         }
       }
-      case CustomT(name, params) => {
+      case CustomT(name, _) => {
         // This only occurs if we have a custom type within a custom type - so this won't be called for a while.
         // strategy: get underlying type from the type system, turn it into a NewMapType, and then call this on it!
         val typeSystem = env.typeSystem
@@ -313,7 +313,7 @@ object CommandMaps {
           }
         }
       }
-      case FunctionalSystemT(functionTypes) => {
+      case FunctionalSystemT(_) => {
         Success(StructT(
           UMap(Vector(
             UIndex(0) -> IdentifierT.asUntagged,
@@ -322,7 +322,7 @@ object CommandMaps {
           IndexTN(2)
         ))
       }
-      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
+      case StructT(_, parentFieldType, RequireCompleteness, _) => {
         // We may have the option to wanting to expand this struct!
         // TODO: This is one of the cases where the type CHANGES when you update the object
         // - should this be allowed? This may be a problem.
@@ -341,7 +341,7 @@ object CommandMaps {
           IndexTN(2)
         ))
       }
-      case structT@StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
+      case StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
         // Are we allowed to change an old parameter? Let's say sure.
         Success(CaseT(parameterList, parentFieldType, featureSet))
@@ -418,7 +418,7 @@ object CommandMaps {
           NewMapObject(UIndex(result), BooleanT)
         }
       }
-      case mapT@MapT(typeTransform, MapConfig(CommandOutput, featureSet, _, _, _)) => {
+      case mapT@MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
         val outputType = typeTransform.valueType
 
         for {
@@ -540,7 +540,7 @@ object CommandMaps {
 
           newChannels <- newFunctionMapConfig.channels.getMapBindings()
         } yield {
-          val composedMapConfig = MapConfig(
+          MapConfig(
             newFunctionMapConfig.completeness,
             newFunctionMapConfig.featureSet,
             newFunctionMapConfig.preservationRules,
@@ -559,7 +559,7 @@ object CommandMaps {
           )
         }
       }
-      case structT@StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
+      case StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         for {
           mapValues <- current.uObject match {
             case UMap(values) => Success(values)
@@ -609,7 +609,7 @@ object CommandMaps {
           }
         }
       }
-      case nType@CustomT("Array", uType) => {
+      case nType@CustomT("Array", _) => {
 
         for {
           untaggedResult <- current.uObject match {

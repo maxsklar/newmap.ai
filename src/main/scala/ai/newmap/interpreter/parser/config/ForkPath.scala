@@ -3,9 +3,8 @@ package ai.newmap.interpreter.parser.config
 import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.Identifier
-import ai.newmap.model.{EnvStatementParse, ForkedVersionedStatementParse, IdentifierParse, ParseElement}
-import ai.newmap.util.{Failure, Success, Outcome}
-import scala.collection.mutable.ListBuffer
+import ai.newmap.model.{EnvStatementParse, ForkedVersionedStatementParse}
+import ai.newmap.util.{Failure, Outcome}
 
 object ForkPath {
   case class ForkIdentifierAsIdentifier(firstId: String, secondId: String) extends ParseState[EnvStatementParse] {

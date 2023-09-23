@@ -4,7 +4,7 @@ import ai.newmap.interpreter.parser.ParseState
 import ai.newmap.interpreter.Lexer
 import ai.newmap.interpreter.Lexer.{Comment, Identifier}
 import ai.newmap.model.{DefStatement, EmptyStatement, EnvStatementParse, ExpressionOnlyStatementParse, ParseTree, ValStatement}
-import ai.newmap.util.{Failure, Success, Outcome}
+import ai.newmap.util.{Success, Outcome}
 
 case object InitStatementState extends ParseState[EnvStatementParse] {
   override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = token match {

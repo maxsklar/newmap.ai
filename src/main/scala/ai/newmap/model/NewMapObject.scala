@@ -1,6 +1,5 @@
 package ai.newmap.model
 
-import java.util.UUID
 
 /*
  * The objects in the NewMap Language
