@@ -37,8 +37,6 @@ class EnvironmentInterpreter(
   case object CommandExit extends CommandInterpResponse
   case object CommandPassThrough extends CommandInterpResponse
 
-  val Pattern = "(:parse )(.*)".r
-
   def applyInterpCommand(code: String): CommandInterpResponse = {
     code match {
       case ":env" => CommandPrintSomething(env.toString)
@@ -47,6 +45,9 @@ class EnvironmentInterpreter(
       case ":exit" | ":quit" => CommandExit
       case _ if (code.startsWith(":parse ")) => {
         CommandPrintSomething(formatStatementParserCode(code.drop(7)))
+      }
+      case _ if (code.startsWith(":parseLoud ")) => {
+        CommandPrintSomething(formatStatementParserCode(code.drop(11), true))
       }
       case _ if (code.startsWith(":tokenize ")) => {
         CommandPrintSomething(formatStatementLexerCode(code.drop(10)))
@@ -64,11 +65,17 @@ class EnvironmentInterpreter(
         CommandPrintSomething(getTypeOf(code.drop(8)))
       }
       case ":uuid" => CommandPrintSomething(java.util.UUID.randomUUID.toString)
+      case ":reset" => {
+        env = Environment.Base
+        CommandPrintSomething("Environment reset")
+      }
       case ":help" => CommandPrintSomething(
         "List of environment commands\n" ++
         ":env\tPrint the current environment\n" ++
         ":types\tPrint the types in the current environment\n" ++
-        ":parse [Expression]\tPrint how [Expression] is parsed and type checked\n" ++
+        ":parse [Expression]\tPrint how [Expression] is parsed\n" ++
+        ":parseLoud [Expression]\tPrint how [Expression] is parsed with each step in the state machine\n" ++
+        ":reset Reset the environment back to its original state\n" ++        
         ":tokenize [Expression]\tPrint how [Expression] is Tokenized by running the lexer\n" ++
         ":typeOf [Expression]\tPrint out the type of the expression\n" ++
         ":channels\tPrint the channels in this environment\n" ++
@@ -122,8 +129,8 @@ class EnvironmentInterpreter(
     }
   }
 
-  private def formatStatementParserCode(code: String): String = {
-    statementParser(code) match {
+  private def formatStatementParserCode(code: String, loud: Boolean = false): String = {
+    statementParser(code, loud) match {
       case Success(p) => p.toString
       case Failure(s) => s"Parse Failed: $s"
     }
@@ -216,10 +223,10 @@ class EnvironmentInterpreter(
     s"directory: $files"
   }
 
-  private def statementParser(code: String): Outcome[EnvStatementParse, String] = {
+  private def statementParser(code: String, loud: Boolean = false): Outcome[EnvStatementParse, String] = {
     for {
       tokens <- getTokens(code)
-      statementParse <- NewMapParser.statementParse(tokens)
+      statementParse <- NewMapParser.statementParse(tokens, loud)
     } yield statementParse
   }
 

@@ -8,17 +8,18 @@ import ai.newmap.util.{Failure, Outcome, Success}
 object NewMapParser {
   private def run[OutT](
     tokens: Seq[Lexer.Token],
-    curState: ParseState[OutT]
+    curState: ParseState[OutT],
+    parseLoud: Boolean = false
   ): Outcome[OutT, String] = tokens match {
     case firstToken +: otherTokens => {
-      //println("curState: " + curState + " --- " + firstToken)
+      if (parseLoud) println("curState: " + curState + " --- " + firstToken)
       for {
         newState <- curState.update(firstToken)
-        result <- run(otherTokens, newState)
+        result <- run(otherTokens, newState, parseLoud)
       } yield result
     }
     case Nil => {
-      //println("end state: " + curState)
+      if (parseLoud) println("end state: " + curState)
       Outcome(curState.generateOutput, "Unimplemented")
     }
   }
@@ -27,8 +28,8 @@ object NewMapParser {
     run(tokens, ExpressionPath.InitState)
   }
 
-  def statementParse(tokens: Seq[Lexer.Token]): Outcome[EnvStatementParse, String] = {
-    run(tokens, InitStatementState)
+  def statementParse(tokens: Seq[Lexer.Token], loud: Boolean = false): Outcome[EnvStatementParse, String] = {
+    run(tokens, InitStatementState, loud)
   }
 }
 

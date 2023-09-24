@@ -199,7 +199,7 @@ case class Environment(
             }
             case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
           }
-        } yield {
+      } yield {
           this.copy(typeToFieldMapping = newTypeToFieldMapping)
         }
 
@@ -553,26 +553,6 @@ object Environment {
     }
   }
 
-  // Somewhat complex for now, but this is how a pattern/function definition is built up!
-  // In code, this should be done somewhat automatically
-  def buildDefinitionWithParameters(
-    inputs: Vector[(String, NewMapType)], // A map from parameters and their type
-    expression: UntaggedObject,
-    env: Environment
-  ): NewMapObject = {
-    val structT = StructT(
-      UMap(inputs.zipWithIndex.map(x => UIndex(x._2) -> x._1._2.asUntagged)),
-      IndexT(UIndex(inputs.length))
-    )
-
-    val structP = UStruct(inputs.map(x => UWildcardPattern(x._1)))
-
-    NewMapObject(
-      UMap(Vector(structP -> expression)),
-      MapT(TypeTransform(structT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
-    )
-  }
-
   // TODO - can we say that these are already in the type name space, so we can remove these?
   def typeAsObject(nType: NewMapType): NewMapObject = {
     Base.typeAsObject(nType)
@@ -595,7 +575,7 @@ object Environment {
     typeAsUntaggedObject(nType)
   }
 
-  def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject, env: Environment): UntaggedObject = {
+  def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject): UntaggedObject = {
     UCase(UIdentifier("Subtype"), UStruct(Vector(
       isMember,
       parentType,
@@ -614,7 +594,7 @@ object Environment {
     NewMapObject(
       UMap(Vector(UWildcardPattern("typeTransform") -> transformMapT)),
       MapT(
-        TypeTransform(TypeTransformT, TypeT),
+        TypeTransform(TypeTransformT(allowGenerics), TypeT),
         MapConfig(RequireCompleteness, PatternMap)
       )
     )
@@ -643,12 +623,12 @@ object Environment {
     )),
     eCommand("Map", buildMapCreator(MapConfig(CommandOutput, BasicMap), false)),
     eCommand("GenericMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
-    eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), false)),
-    eCommand("Table", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), false)),
+    eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
+    eCommand("Table", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
     eCommand("CaseType", typeAsObject(CaseT(UMap(Vector.empty), IdentifierT, BasicMap))),
     eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
-      UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t"), Base))),
+      UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     NewTypeClassCommand("_default", UMapPattern(UWildcardPattern("t"), ParamId("t"))),
@@ -694,6 +674,13 @@ object Environment {
     )),
     eCommand("*", NewMapObject(
       UTimes,
+      MapT(TypeTransform(
+        MapT(TypeTransform(IndexT(UIndex(2)), DoubleT), MapConfig(RequireCompleteness, BasicMap)),
+        DoubleT
+      ), MapConfig(RequireCompleteness, SimpleFunction))
+    )),
+    eCommand("/", NewMapObject(
+      UDivide,
       MapT(TypeTransform(
         MapT(TypeTransform(IndexT(UIndex(2)), DoubleT), MapConfig(RequireCompleteness, BasicMap)),
         DoubleT

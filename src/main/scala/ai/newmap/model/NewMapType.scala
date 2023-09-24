@@ -72,7 +72,7 @@ case class TypeTransform(
 
 // This is the type of a type transform
 // It's not just a pair of types because the keyType is a pattern that feeds into the value type.
-case object TypeTransformT extends NewMapType
+case class TypeTransformT(allowGenerics: Boolean) extends NewMapType
 
 case class MapConfig(
   completeness: MapCompleteness,
@@ -238,7 +238,7 @@ object NewMapType {
       UMapPattern(typeToUntaggedObject(key), typeToUntaggedObject(value)),
       mapConfigToUntagged(config)
     )))
-    case TypeTransformT => UCase(UIdentifier("TypeTransform"), UStruct(Vector.empty))
+    case TypeTransformT(allowGenerics) => UCase(UIdentifier("TypeTransform"), UIndex(if (allowGenerics) 1 else 0))
     case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
       params,
       typeToUntaggedObject(fieldParentType),

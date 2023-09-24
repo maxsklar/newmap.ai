@@ -24,6 +24,7 @@ object StatementInterpreter {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
+
           nTypeObj <- Evaluator(tcType.nExpression, env)
 
           nType <- nTypeObj.asType
@@ -58,7 +59,7 @@ object StatementInterpreter {
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
-          initValue <- CommandMaps.getDefaultValueOfCommandType(nType, env)
+          _ <- CommandMaps.getDefaultValueOfCommandType(nType, env)
         } yield {
           ReturnValue(
             NewVersionedStatementCommand(id.s, nType),
@@ -98,7 +99,7 @@ object StatementInterpreter {
       }
       case NewTypeClassStatementParse(id, typeTransformParse) => {
         for {
-          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, FullFunction, tcParameters)
+          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT(true), env, FullFunction, tcParameters)
 
           typeTransform <- typeTransformResult.nExpression match {
             case UMap(values) if (values.length == 1) => {
@@ -333,7 +334,7 @@ object StatementInterpreter {
         for {
           // TODO: I'm not sure if "SimpleFunction" is what we want here.
           // - Think about this more, and try to make it more obvious what to use in the future.
-          typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT, env, SimpleFunction, Map.empty)
+          typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT(true), env, SimpleFunction, Map.empty)
 
           typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
 

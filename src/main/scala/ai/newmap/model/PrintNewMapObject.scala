@@ -95,7 +95,7 @@ object PrintNewMapObject {
       case LongT => "Long"
       case DoubleT => "Double"
       case UuidT => "UUID"
-      case TypeTransformT => "TypeTransform"
+      case TypeTransformT(_) => "TypeTransform"
       case MapT(TypeTransform(key, value), config) => {
         printMapT(
           newMapType(key, typeSystem, typeSystemStateOpt),
@@ -172,7 +172,7 @@ object PrintNewMapObject {
   def untagged(uObject: UntaggedObject): String = uObject match {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
-    case UMapPattern(key, value) => mapToString(Vector(key -> value))
+    case UMapPattern(key, value) => "UMP~" + mapToString(Vector(key -> value))
     case UStruct(values) => sequenceToString(values)
     case UCase(constructor, value) => {
       if (isEmptyMap(value)) {
@@ -189,7 +189,6 @@ object PrintNewMapObject {
     }
     case UByte(value: Byte) => s"$value"
     case UCharacter(value: Char) => s"$value"
-    //case UString(value) => s"$value~str"
     case ULet(envCommands, nObject) => s"{${envCommands.mkString("; ")}; ${untagged(nObject)}"
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
@@ -208,6 +207,8 @@ object PrintNewMapObject {
     case AccessField(value, _, field) => untagged(value) + "." + untagged(field)
     case UPlus => "+"
     case UTimes => "*"
+    case UDivide => "/"
+    //case UMinus => "-"
     case UCountToDecimal => "CountToDecimal"
   }
 

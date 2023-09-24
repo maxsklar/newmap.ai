@@ -95,6 +95,10 @@ object ExpressionPath {
             IdentifierParse("*"),
             LiteralListParse(Vector(firstExp, secondExp), ArrayType)
           ))
+          case "/" => Some(ApplyParse(
+            IdentifierParse("/"),
+            LiteralListParse(Vector(firstExp, secondExp), ArrayType)
+          ))
           case "" => Some(ApplyParse(firstExp, secondExp))
           case _ => {
             None
@@ -125,6 +129,10 @@ object ExpressionPath {
     exp: ParseState[ParseTree] = InitState
   ) extends ParseState[ParseTree] {
     override def update(token: Lexer.Token): Outcome[ParseState[ParseTree], String] = {
+      if (token == NewLine()) {
+        println("NewLine for " + exp)
+      }
+
       exp.update(token) match {
         case Success(result) => Success(ExpressionInEnc(enc, result))
         case Failure(reason) => token match {

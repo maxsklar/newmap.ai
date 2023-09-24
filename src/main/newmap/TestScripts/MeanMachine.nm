@@ -1,0 +1,15 @@
+data MeanMachine = (sum: Double, count: Double)
+
+new simple map on MeanMachine as mean returning Double = (x: x(sum) / x(count))
+
+//new simple command on MeanMachine as include Double = (self:
+//  (self)
+//)
+
+//ver mm: MeanMachine = (0, 0)
+//update mm: include(4.0)
+//update mm: include(5.0)
+//update mm: include(6.0)
+//update mm: include(7.0)
+
+//mm.mean // Return 5.5

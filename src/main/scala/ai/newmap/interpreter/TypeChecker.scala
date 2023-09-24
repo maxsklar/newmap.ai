@@ -170,7 +170,8 @@ object TypeChecker {
           result <- typeCheckUnknownFunction(function, input, env, tcParameters)
 
           // Is member of Subtype check here?
-          functionFeatureSet <- retrieveFeatureSetFromFunctionTypePattern(result.typeOfFunction)
+          underlyingTypeOfFunction <- getFinalUnderlyingType(result.typeOfFunction, env, env.typeSystem.currentState)
+          functionFeatureSet <- retrieveFeatureSetFromFunctionTypePattern(underlyingTypeOfFunction)
 
           // If the function is a simplemap, and if it has no internal parameters, it can be executed now, and considered a basic
           functionFeatureSetFixed = if (functionFeatureSet.getLevel <= SimpleFunction.getLevel) {
@@ -187,10 +188,11 @@ object TypeChecker {
           )
 
           // If the function is a parameter, then there's no guarantee that it's not self-referential
+          // If functionFeatureSet is basicMap, then this can't cause a self-referential issue
           // TODO - flesh out these rules a little bit more
           _ <- Outcome.failWhen(
-            !RetrieveType.isTermClosedLiteral(result.functionExpression) && (featureSet != FullFunction),
-            s"Function ${result.functionExpression} is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet"
+            !RetrieveType.isTermClosedLiteral(result.functionExpression) && (functionFeatureSet != BasicMap) && (featureSet != FullFunction),
+            s"Function ${result.functionExpression} is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet -- $functionFeatureSetFixed"
           )
 
           response <- TypeConversionCalculator.isTypeConvertible(result.resultingType, expectedType, env)
@@ -334,11 +336,18 @@ object TypeChecker {
           case Success(UndefinedT) => {
             throw new Exception(s"our bug: $values")
           }
-          case Success(TypeTransformT) => {
+          case Success(TypeTransformT(allowGenerics)) => {
             for {
               _ <- Outcome.failWhen(values.length > 1, "Type transform cannot have multiple values")
               value <- Outcome(values.headOption, "Type transform must contain a key and a value")
-              mapValue <- typeCheckGenericMap(Vector(value), TypeTransform(TypeT, TypeT), PatternMap, env, featureSet, tcParameters)
+              mapValue <- typeCheckGenericMap(
+                Vector(value),
+                TypeTransform(TypeT, TypeT),
+                if (allowGenerics) PatternMap else BasicMap,
+                env,
+                featureSet,
+                tcParameters
+              )
             } yield {
               TypeCheckResponse(UMapPattern(mapValue.head._1, mapValue.head._2), expectedType)
             }
@@ -358,7 +367,7 @@ object TypeChecker {
           inputType <- typeCheck(input, TypeT, env, featureSet, tcParameters)
           outputType <- typeCheck(output, TypeT, env, featureSet, tcParameters)
 
-          evalInputType <- Evaluator(inputType.nExpression, env, tcParameters)
+          evalInputType <- Evaluator(inputType.nExpression, env, tcParameters.keys.toVector)
 
           inputT <- evalInputType.asType
           outputT <- outputType.nExpression.asType
@@ -494,14 +503,13 @@ object TypeChecker {
     externalFeatureSet: MapFeatureSet, // This is the external feature set, the map feature set can be found in mapT
     tcParameters: Map[String, NewMapType]
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
-
     values match {
       case KeyValueBinding(k, v) +: restOfValues => {
         for {
           resultKey <- typeCheckWithPatternMatching(k, typeTransform.keyType, env, externalFeatureSet, internalFeatureSet, tcParameters)
 
           // Keys must be evaluated on the spot
-          foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env, resultKey.newParams)
+          foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env, resultKey.newParams.keys.toVector)
 
           untaggedTypeTransformKey = typeTransform.keyType.asUntagged
           untaggedTypeTransformValue = typeTransform.valueType.asUntagged
@@ -820,8 +828,13 @@ object TypeChecker {
       functionTypeChecked <- typeCheckUnknownType(function, env, tcParameters)
 
       typeOfFunction = functionTypeChecked.refinedTypeClass
+      underlyingTypeOfFunction <- getFinalUnderlyingType(
+        typeOfFunction,
+        env,
+        env.typeSystem.currentState
+      )
 
-      inputTypeOption = inputTypeCheckFromFunctionType(typeOfFunction, env)
+      inputTypeOption = inputTypeCheckFromFunctionType(underlyingTypeOfFunction, env)
 
       inputTagged <- inputTypeOption match {
         case Some(inputT) => for {
@@ -838,7 +851,7 @@ object TypeChecker {
 
       untaggedInputType = inputType.asUntagged
 
-      resultingType <- typeOfFunction match {
+      resultingType <- underlyingTypeOfFunction match {
         case StructT(UMap(params), _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, implementation) => {
           outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
@@ -875,7 +888,7 @@ object TypeChecker {
             }
           } yield result
         }
-        case _ => Failure(s"Cannot get resulting type from function type $typeOfFunction -- $function -- $input")
+        case _ => Failure(s"Cannot get resulting type from function type ${typeOfFunction.displayString(env)} -- $function -- $input")
       }
 
       resultingFunctionExpression <- typeOfFunction match {
@@ -907,20 +920,12 @@ object TypeChecker {
 
   // Returns a set of patterns representing newmap types
   // TODO - it should not return an option of NewMapType, rather some patterns!!
-  def inputTypeCheckFromFunctionType(nFunctionTypeClass: NewMapType, env: Environment): Option[NewMapType] = {
-    val underlyingTOutcome =  getFinalUnderlyingType(nFunctionTypeClass, env, env.typeSystem.currentState)
-
-    underlyingTOutcome match {
-      case Success(StructT(_, parentFieldType, _, _)) => {
-        Some(parentFieldType)
-      }
-      case Success(TypeClassT(_, _)) => {
-        //eventually send typesInTypeClass to the type checker
-        None
-      }
-      case Success(MapT(typeTransform, _)) => {
-        Some(typeTransform.keyType)
-      }
+  def inputTypeCheckFromFunctionType(underlyingT: NewMapType, env: Environment): Option[NewMapType] = {
+    underlyingT match {
+      case StructT(_, parentFieldType, _, _) => Some(parentFieldType)
+      //eventually send typesInTypeClass to the type checker
+      case TypeClassT(_, _) => None
+      case MapT(typeTransform, _) =>  Some(typeTransform.keyType)
       case _ => None
     }
   }

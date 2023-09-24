@@ -41,7 +41,7 @@ object Lexer extends RegexParsers {
   }
 
   def symbol: Parser[Symbol] = {
-    """[\.,:`=~><\|\+\*]+""".r ^^ { str => Symbol(str)}
+    """[\.,:`=~><\|\+\*\/]+""".r ^^ { str => Symbol(str)}
   }
 
 
@@ -83,7 +83,7 @@ object Lexer extends RegexParsers {
   }
 
   def tokens: Parser[List[Token]] = {
-    phrase(rep1(identifier | decimal | number | symbol | dquote | enclosure | comment | newline)) ^^ { rawTokens =>
+    phrase(rep1(comment | identifier | decimal | number | symbol | dquote | enclosure | newline)) ^^ { rawTokens =>
       rawTokens
     }
   }

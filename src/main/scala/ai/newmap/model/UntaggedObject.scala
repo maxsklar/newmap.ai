@@ -80,7 +80,7 @@ case object IsCommandFunc extends UntaggedObject
 case object UPlus extends UntaggedObject
 //case object UMinus extends UntaggedObject
 case object UTimes extends UntaggedObject
-//case object UDivide extends UntaggedObject
+case object UDivide extends UntaggedObject
 
 // More Numerical Operations
 case object UCountToDecimal extends UntaggedObject

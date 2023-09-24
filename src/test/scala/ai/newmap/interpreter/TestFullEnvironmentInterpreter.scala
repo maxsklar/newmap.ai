@@ -1137,6 +1137,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "The mean machine " should " work for getting the mean" in {
+    testCodeScript(Vector(
+      CodeExpectation(":load TestScripts/MeanMachine.nm", GeneralSuccessCheck),
+      CodeExpectation("val mm: MeanMachine = (6.0, 3.0)", GeneralSuccessCheck),
+      CodeExpectation("mm.mean", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), DoubleT)))),
+    ))
+  }
+
   /*
   TODOs with the arrays:
   - startsWith function (or general regular expression?)

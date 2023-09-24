@@ -11,19 +11,21 @@ object Evaluator {
     env: Environment,
 
     // TODO: any way we can get rid of this?
-    paramsToAllow: Map[String, NewMapType] = Map.empty
+    paramsToAllow: Vector[String] = Vector.empty
   ): Outcome[UntaggedObject, String] = {
     nExpression match {
       case ApplyFunction(func, input, matchingRules) => {
         for {
-          evalFunc <- this(func, env)
-          evalInput <- this(input, env)
+          evalFunc <- this(func, env, paramsToAllow)
+
+          evalInput <- this(input, env, paramsToAllow)
+
           result <- applyFunction(evalFunc, evalInput, env, matchingRules)
         } yield result
       }
       case AccessField(value, uTypeClass, field) => {
         for {
-          evalValue <- this(value, env)
+          evalValue <- this(value, env, paramsToAllow)
 
           // The field and type class should already be evaluated, so no need to re-evaluate it here
           fieldsToMap <- applyFunction(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
@@ -42,41 +44,43 @@ object Evaluator {
       case ParamId(s) => {
         env.lookupValue(s) match {
           case Some(nObject) => Success(nObject.uObject)
-          case None => if (paramsToAllow.get(s).nonEmpty) Success(ParamId(s)) else {
+          case None => if (paramsToAllow.contains(s)) Success(ParamId(s)) else {
             Failure(s"Unbound identifier: $s")
           }
         }
       }
       case UCase(constructor, input) => {
         for {
-          evalInput <- this(input, env)
+          evalInput <- this(input, env, paramsToAllow)
         } yield {
           UCase(constructor, evalInput)
         }
       }
       case UMap(values) => {
         for {
-          evalValues <- evalMapInstanceVals(values, env)
+          evalValues <- evalMapInstanceVals(values, env, paramsToAllow)
         } yield UMap(evalValues)
       }
       case UMapPattern(key, value) => {
         for {
-          evalKey <- this(key, env)
+          evalKey <- this(key, env, paramsToAllow)
+
+          newParams = newParametersFromPattern(evalKey)
 
           // TODO - use "params to allow" in this
-          evalValue = Evaluator(value, env) match {
+          evalValue = this(value, env, paramsToAllow ++ newParams) match {
             case Success(vObj) => vObj
-            case _ => value
+            case Failure(f) => value
           }
         } yield UMapPattern(evalKey, evalValue)
       }
       case UStruct(values) => {
         for {
-          evalValues <- evalStructVals(values, env)
+          evalValues <- evalStructVals(values, env, paramsToAllow)
         } yield UStruct(evalValues)
       }
       case ULet(statements, expression) => {
-        evalLet(statements, expression, env)
+        evalLet(statements, expression, env, paramsToAllow)
       }
       case constant => Success(constant)
     }
@@ -107,22 +111,20 @@ object Evaluator {
 
   def evalMapInstanceVals(
     values: Vector[(UntaggedObject, UntaggedObject)],
-    env: Environment
+    env: Environment,
+    paramsToAllow: Vector[String]
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     values match {
       case (k, v) +: restOfValues => {
-        for {
-          evalRest <- evalMapInstanceVals(restOfValues, env)
-        } yield {
-          // TODO - rethink about "when to evaluate" what's inside a map
-          val newV = Evaluator(v, env) match {
-            case Success(vObj) => vObj
-            case _ => v
-          }
-          //val newV = v
+        //val newParams = newParametersFromPattern(k)
+        val newParams = Vector.empty
 
-          (k -> newV) +: evalRest
-        }
+        // TODO - rethink about "when to evaluate" what's inside a map
+        val newV = this(v, env, paramsToAllow ++ newParams).toOption.getOrElse(v)
+
+        for {
+          evalRest <- evalMapInstanceVals(restOfValues, env, paramsToAllow)
+        } yield (k -> newV) +: evalRest
       }
       case _ => Success(Vector.empty)
     }
@@ -130,13 +132,14 @@ object Evaluator {
 
   def evalStructVals(
     values: Vector[UntaggedObject],
-    env: Environment
+    env: Environment,
+    paramsToAllow: Vector[String]
   ): Outcome[Vector[UntaggedObject], String] = {
     values match {
       case v +: restOfValues => {
         for {
-          evalRest <- evalStructVals(restOfValues, env)
-          evalV <- this(v, env)
+          evalRest <- evalStructVals(restOfValues, env, paramsToAllow)
+          evalV <- this(v, env, paramsToAllow)
         } yield {
           evalV +: evalRest
         }
@@ -148,16 +151,17 @@ object Evaluator {
   def evalLet(
     commands: Vector[EnvironmentCommand],
     expression: UntaggedObject,
-    env: Environment
+    env: Environment,
+    paramsToAllow: Vector[String]
   ): Outcome[UntaggedObject, String] = commands match {
     case command +: otherCommands => {
       // If there are still parameters in the command, it cannot be evaluated
       val newEnv = env.newCommand(command)
-      evalLet(otherCommands, expression, newEnv)
+      evalLet(otherCommands, expression, newEnv, paramsToAllow)
     }
     case _ => {
       for {
-        result <- this(expression, env)
+        result <- this(expression, env, paramsToAllow)
       } yield {
         stripVersioningU(result, env)
       }
@@ -191,7 +195,7 @@ object Evaluator {
       case UMap(values) => {
         val keyMatchResult = patternMatchInOrder(values, input, env, matchingRules) match {
           case Success(result) => result
-          case Failure(_) => {
+          case Failure(f) => {
             // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
             // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
             UInit
@@ -242,6 +246,17 @@ object Evaluator {
           result <- (first, second) match {
             case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 * n2))
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 * d2))
+            case _ => Failure("Can't add: " + first + " -- " + second)
+          }
+        } yield result
+      }
+      case UDivide => {
+        for {
+          first <- applyFunction(input, UIndex(0), env)
+          second <- applyFunction(input, UIndex(1), env)
+
+          result <- (first, second) match {
+            case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 / d2))
             case _ => Failure("Can't add: " + first + " -- " + second)
           }
         } yield result
