@@ -282,7 +282,7 @@ object TypeConversionCalculator {
 
   def isSingularMap(uObject: UntaggedObject): Boolean = uObject match {
     case UMap(values) if (values.length == 1) => true
-    case UMapPattern(_, _) => true
+    case USingularMap(_, _) => true
     case _ => false
   }
 
@@ -301,7 +301,7 @@ object TypeConversionCalculator {
         _ <- Outcome.failWhen(newParameters.size > 0, "Function had a pattern")
       } yield head._2
     }
-    case UMapPattern(key, value) => {
+    case USingularMap(key, value) => {
       for {
         newParameters <- RetrieveType.fetchParamsFromPattern(fieldType, key, env)
         _ <- Outcome.failWhen(newParameters.size > 0, "Function had a pattern")

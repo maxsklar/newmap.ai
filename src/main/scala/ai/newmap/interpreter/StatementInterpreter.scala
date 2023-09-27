@@ -103,9 +103,9 @@ object StatementInterpreter {
 
           typeTransform <- typeTransformResult.nExpression match {
             case UMap(values) if (values.length == 1) => {
-              Success(UMapPattern(values.head._1, values.head._2))
+              Success(USingularMap(values.head._1, values.head._2))
             }
-            case result@UMapPattern(_, _) => Success(result)
+            case result@USingularMap(_, _) => Success(result)
             case _ => Failure(s"Invalid type transform: ${typeTransformResult.nExpression}")
           }
         } yield {

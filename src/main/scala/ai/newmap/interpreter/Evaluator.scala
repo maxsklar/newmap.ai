@@ -61,7 +61,7 @@ object Evaluator {
           evalValues <- evalMapInstanceVals(values, env, paramsToAllow)
         } yield UMap(evalValues)
       }
-      case UMapPattern(key, value) => {
+      case USingularMap(key, value) => {
         for {
           evalKey <- this(key, env, paramsToAllow)
 
@@ -72,7 +72,7 @@ object Evaluator {
             case Success(vObj) => vObj
             case Failure(f) => value
           }
-        } yield UMapPattern(evalKey, evalValue)
+        } yield USingularMap(evalKey, evalValue)
       }
       case UArray(values) => {
         for {
@@ -204,7 +204,7 @@ object Evaluator {
 
         this(keyMatchResult, env)
       }
-      case UMapPattern(key, value) => {
+      case USingularMap(key, value) => {
         // Treat it like a small map
         applyFunction(UMap(Vector(key -> value)), input, env, matchingRules)
       }
@@ -302,7 +302,7 @@ object Evaluator {
     pattern match {
       // Always look for wildcard first, no matter what the matching rules are!
       case UWildcardPattern(name) => Success(Map(name -> input))
-      case UMapPattern(key, value) => {
+      case USingularMap(key, value) => {
         for {
           valueForKey <- applyFunction(input, key, env, matchingRules)
           result <-  patternMatch(value, valueForKey, matchingRules, env)

@@ -29,17 +29,17 @@ object MakeSubstitution {
 
           // Note that UMap keys should NOT contain parameters.
           // - This is because a map cannot be organized into a data structure if the keys are unknown
-          // - If there needs to be a parameters in the key, use the single-pair version of UMap, which is UMapPattern
+          // - If there needs to be a parameters in the key, use the single-pair version of UMap, which is USingularMap
           k -> newValue
         }
 
         UMap(newMapValues)
       }
-      case UMapPattern(k, v) => {
+      case USingularMap(k, v) => {
         val newKey = this(k, parameters)
         val nps = Evaluator.newParametersFromPattern(k).toSet
         val newValue = this(v, parameters.filter(x => !nps.contains(x._1)))
-        UMapPattern(newKey, newValue)
+        USingularMap(newKey, newValue)
       }
       case UArray(values) => UArray(values.map(v => this(v, parameters)))
       case _ => expression

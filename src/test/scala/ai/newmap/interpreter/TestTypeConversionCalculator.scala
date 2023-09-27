@@ -2,7 +2,6 @@ package ai.newmap.interpreter
 
 import org.scalatest._
 import ai.newmap.model._
-import ai.newmap.util.{Outcome, Success, Failure}
 
 class TestTypeConversionCalculator extends FlatSpec {
   "Subtype " should " be convertible into the parent type" in {

@@ -25,7 +25,7 @@ object RetrieveType {
     case UMap(values) => {
       isMapValuesClosed(values, knownVariables)
     }
-    case UMapPattern(key, value) => {
+    case USingularMap(key, value) => {
       isTermClosedLiteral(key, knownVariables) &&
         isTermClosedLiteral(value, knownVariables)
     }

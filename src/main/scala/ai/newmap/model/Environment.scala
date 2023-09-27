@@ -514,7 +514,7 @@ case class Environment(
     inputT: NewMapType,
     outputT: NewMapType
   ): UntaggedObject = {
-    UMapPattern(inputT.asUntagged, outputT.asUntagged)
+    USingularMap(inputT.asUntagged, outputT.asUntagged)
   }
 }
 
@@ -615,7 +615,7 @@ object Environment {
     )),
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", NewMapObject(
-      UMapPattern(
+      USingularMap(
         UWildcardPattern("key"), 
         buildSimpleMapT(TypeTransform(IndexT(UIndex(0)),ParamIdT("key")))
       ),
@@ -631,9 +631,9 @@ object Environment {
       UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewTypeClassCommand("_default", UMapPattern(UWildcardPattern("t"), ParamId("t"))),
+    NewTypeClassCommand("_default", USingularMap(UWildcardPattern("t"), ParamId("t"))),
     NewTypeClassCommand("_typeOf", 
-      UMapPattern(
+      USingularMap(
         UWildcardPattern("t"),
         buildSimpleMapT(TypeTransform(WildcardPatternT("_"), TypeT))
       )
@@ -660,8 +660,8 @@ object Environment {
     NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),
     NewTypeClassCommand(
       "Addable",
-      UMapPattern(
-        UMapPattern(IndexT(UIndex(2)).asUntagged, UWildcardPattern("t")),
+      USingularMap(
+        USingularMap(IndexT(UIndex(2)).asUntagged, UWildcardPattern("t")),
         ParamId("t")
       )
     ),

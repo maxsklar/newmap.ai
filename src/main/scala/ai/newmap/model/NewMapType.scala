@@ -101,7 +101,7 @@ object CommandOutput extends MapCompleteness {
 }
 
 // This is actually not a full map, but a pattern that may match a map
-// The untagged object of this is going to be UMapPattern
+// The untagged object of this is going to be USingularMap
 object MapPattern extends MapCompleteness {
   override def getName: String = "MapPattern"
 }
@@ -171,7 +171,7 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransformPattern: UMapPattern,
+  typeTransformPattern: USingularMap,
 
   // List of the actual types in the class
   // Along with their implementation
@@ -235,7 +235,7 @@ object NewMapType {
     case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
     case IdentifierT => UCase(UIdentifier("Identifier"), UArray(Array.empty))
     case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UArray(Array(
-      UMapPattern(typeToUntaggedObject(key), typeToUntaggedObject(value)),
+      USingularMap(typeToUntaggedObject(key), typeToUntaggedObject(value)),
       mapConfigToUntagged(config)
     )))
     case TypeTransformT(allowGenerics) => UCase(UIdentifier("TypeTransform"), UIndex(if (allowGenerics) 1 else 0))
@@ -354,9 +354,9 @@ object NewMapType {
         case UArray(items) if (items.length == 2) => {
           for {
             typeTransform <- items(0) match {
-              case ump@UMapPattern(_, _) => Success(ump)
+              case ump@USingularMap(_, _) => Success(ump)
               case UMap(uMap) if (uMap.length <= 1) => uMap.headOption match {
-                case Some(singleton) => Success(UMapPattern(singleton._1, singleton._2))
+                case Some(singleton) => Success(USingularMap(singleton._1, singleton._2))
                 case None => Failure("Empty Type Class Pattern")
               }
               case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
@@ -417,7 +417,7 @@ object NewMapType {
 
   def convertToTypeTransform(uObject: UntaggedObject): Outcome[TypeTransform, String] = {
     uObject match {
-      case UMapPattern(key, value) => {
+      case USingularMap(key, value) => {
         for {
           keyType <- convertToNewMapType(key)
           valueType <- convertToNewMapType(value)

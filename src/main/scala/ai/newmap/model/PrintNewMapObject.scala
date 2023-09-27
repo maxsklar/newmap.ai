@@ -172,7 +172,7 @@ object PrintNewMapObject {
   def untagged(uObject: UntaggedObject): String = uObject match {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
-    case UMapPattern(key, value) => "UMP~" + mapToString(Vector(key -> value))
+    case USingularMap(key, value) => "UMP~" + mapToString(Vector(key -> value))
     case UArray(values) => sequenceToString(values)
     case UCase(constructor, value) => {
       if (isEmptyMap(value)) {

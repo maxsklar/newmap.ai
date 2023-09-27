@@ -349,7 +349,7 @@ object TypeChecker {
                 tcParameters
               )
             } yield {
-              TypeCheckResponse(UMapPattern(mapValue.head._1, mapValue.head._2), expectedType)
+              TypeCheckResponse(USingularMap(mapValue.head._1, mapValue.head._2), expectedType)
             }
           }
           case _ => {
