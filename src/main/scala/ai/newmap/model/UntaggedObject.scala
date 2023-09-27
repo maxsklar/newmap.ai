@@ -25,7 +25,7 @@ case class UIdentifier(s: String) extends UntaggedObject
 case class UMap(values: Vector[(UntaggedObject, UntaggedObject)]) extends UntaggedObject
 
 // This is equivalent to UMap where the keys are indecies
-case class UStruct(values: Vector[UntaggedObject]) extends UntaggedObject
+case class UArray(values: Array[UntaggedObject]) extends UntaggedObject
 
 // Represents any object (of a given type)
 case class UWildcardPattern(s: String) extends UntaggedObject

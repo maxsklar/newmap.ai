@@ -32,7 +32,7 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case EmptyParse => {
-        responseFromConversion(NewMapObject(UStruct(Vector.empty), NewMapO.emptyStruct), expectedType, env)
+        responseFromConversion(NewMapObject(UArray(Array.empty), NewMapO.emptyStruct), expectedType, env)
       }
       case NaturalNumberParse(i: Long) => {
         for {
@@ -66,10 +66,10 @@ object TypeChecker {
 
         val uObject = UCase(
           UIndex(fixedS.length - 2),
-          UStruct(fixedS.toCharArray().toVector.drop(1).dropRight(1).map(c => UCharacter(c)))
+          UArray(fixedS.toCharArray().drop(1).dropRight(1).map(c => UCharacter(c)))
         )
 
-        val stringType = CustomT("String", UStruct(Vector.empty))
+        val stringType = CustomT("String", UArray(Array.empty))
 
         responseFromConversion(NewMapObject(uObject, stringType), expectedType, env)
       }
@@ -644,7 +644,7 @@ object TypeChecker {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
         } yield {
-          TypeCheckWithPatternMatchingResult(UStruct(tcmp.patterns), expectedType, tcmp.newParams)
+          TypeCheckWithPatternMatchingResult(UArray(tcmp.patterns.toArray), expectedType, tcmp.newParams)
         }
       }
       case (ConstructCaseParse(constructorP, input), Success(CaseT(cases, parentFieldType, _))) if (patternMatchingAllowed) => {

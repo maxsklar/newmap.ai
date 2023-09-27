@@ -46,7 +46,7 @@ object PrintNewMapObject {
       evalResult <- Evaluator(ApplyFunction(result, uObject, StandardMatcher), env)
 
       finalString <-  evalResult match {
-        case UCase(_, UStruct(chars)) => {
+        case UCase(_, UArray(chars)) => {
           Success(chars.mkString)
         }
         case _ => Failure(s"Couldn't interpret result as string: $evalResult")
@@ -164,7 +164,7 @@ object PrintNewMapObject {
   }
 
   def isEmptyMap(value: UntaggedObject): Boolean = value match {
-    case UStruct(v) => v.isEmpty
+    case UArray(v) => v.isEmpty
     case UMap(v) => v.isEmpty
     case _ => false
   }
@@ -173,7 +173,7 @@ object PrintNewMapObject {
     case UIdentifier(s) => s
     case UMap(values) => mapToString(values)
     case UMapPattern(key, value) => "UMP~" + mapToString(Vector(key -> value))
-    case UStruct(values) => sequenceToString(values)
+    case UArray(values) => sequenceToString(values)
     case UCase(constructor, value) => {
       if (isEmptyMap(value)) {
         untagged(constructor)
@@ -228,7 +228,7 @@ object PrintNewMapObject {
     sb.toString
   }
 
-  def sequenceToString(values: Vector[UntaggedObject]): String = {
+  def sequenceToString(values: Seq[UntaggedObject]): String = {
     val sb: StringBuilder = new StringBuilder()
     sb.append("(")
 

@@ -74,10 +74,10 @@ object Evaluator {
           }
         } yield UMapPattern(evalKey, evalValue)
       }
-      case UStruct(values) => {
+      case UArray(values) => {
         for {
           evalValues <- evalStructVals(values, env, paramsToAllow)
-        } yield UStruct(evalValues)
+        } yield UArray(evalValues)
       }
       case ULet(statements, expression) => {
         evalLet(statements, expression, env, paramsToAllow)
@@ -131,20 +131,20 @@ object Evaluator {
   }
 
   def evalStructVals(
-    values: Vector[UntaggedObject],
+    values: Array[UntaggedObject],
     env: Environment,
     paramsToAllow: Vector[String]
-  ): Outcome[Vector[UntaggedObject], String] = {
-    values match {
+  ): Outcome[Array[UntaggedObject], String] = {
+    values.toVector match {
       case v +: restOfValues => {
         for {
-          evalRest <- evalStructVals(restOfValues, env, paramsToAllow)
+          evalRest <- evalStructVals(restOfValues.toArray, env, paramsToAllow)
           evalV <- this(v, env, paramsToAllow)
         } yield {
-          evalV +: evalRest
+          (evalV +: evalRest.toVector).toArray
         }
       }
-      case _ => Success(Vector.empty)
+      case _ => Success(Array.empty)
     }
   }
 
@@ -333,22 +333,22 @@ object Evaluator {
     env: Environment
   ): Outcome[Map[String, UntaggedObject], String] = {
     (pattern, stripVersioningU(input, env)) match {
-      case (UStruct(params), UMap(paramValues)) => {
+      case (UArray(params), UMap(paramValues)) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
-          result <- patternMatchOnStruct(params, inputs, env)
+          result <- patternMatchOnStruct(params.toVector, inputs, env)
         } yield result 
       }
-      case (UMap(paramValues), UStruct(params)) => {
+      case (UMap(paramValues), UArray(params)) => {
         for {
           inputs <- expressionListToObjects(paramValues.map(_._2), env)
-          result <- patternMatchOnStruct(inputs, params, env)
+          result <- patternMatchOnStruct(inputs, params.toVector, env)
         } yield result 
       }
-      case (UStruct(params), UStruct(inputParams)) => {
-        patternMatchOnStruct(params, inputParams, env)
+      case (UArray(params), UArray(inputParams)) => {
+        patternMatchOnStruct(params.toVector, inputParams.toVector, env)
       }
-      case (UStruct(params), singleValue) if (params.length == 1) => {
+      case (UArray(params), singleValue) if (params.length == 1) => {
         patternMatch(params.head, singleValue, StandardMatcher, env)
       }
       case (UCase(constructorP, inputP), UCase(constructor, cInput)) => {
@@ -400,16 +400,9 @@ object Evaluator {
   // TODO - move this elsewhere, maybe to environment!
   def newParametersFromPattern(pattern: UntaggedObject): Vector[String] = pattern match {
     case UWildcardPattern(name) => Vector(name)
-    case UStruct(patterns) => patterns match {
-      case firstPattern +: otherPatterns => {
-        newParametersFromPattern(firstPattern) ++ newParametersFromPattern(UStruct(otherPatterns))
-      }
-      case _ => Vector.empty
-    }
-    case UCase(_, input) => {
-      newParametersFromPattern(input)
-    }
-    case UMap(values) => newParametersFromPattern(UStruct(values.map(_._2)))
+    case UArray(patterns) => patterns.map(newParametersFromPattern).flatten.toVector
+    case UCase(_, input) => newParametersFromPattern(input)
+    case UMap(values) => values.map(_._2).map(newParametersFromPattern).flatten.toVector
     case _ => Vector.empty
   }
 

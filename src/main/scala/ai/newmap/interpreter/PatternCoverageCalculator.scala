@@ -113,7 +113,7 @@ object PatternCoverageCalculator {
   def isCatchallPattern(pattern: UntaggedObject, nType: NewMapType, env: Environment): Boolean = {
     pattern match {
       case UWildcardPattern(_) => true
-      case UStruct(patterns)  => {
+      case UArray(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
           // - That would require isCatchallPattern to match an nType that's a UntaggedObject, not just a NewMapObject

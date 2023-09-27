@@ -12,7 +12,7 @@ data String = Array|Char
 typeclass _display (t: (t => String))
 update _display: (String: (s: s))
 
-//case CustomT("Array", nType) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
+//case CustomT("Array", nType) => Success(UCase(UIndex(0), UArray(Array.empty)))
 
 //data Option (T: Type)
 //update Option: (None, ())

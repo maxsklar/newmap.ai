@@ -277,7 +277,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   "A case " should " be created and instantiated" in {
     val correctCommand = Environment.eCommand(
       "x",
-      NewMapObject(UCase(UIdentifier("a"), UIndex(0)), CustomT("MyCase", UStruct(Vector.empty)))
+      NewMapObject(UCase(UIdentifier("a"), UIndex(0)), CustomT("MyCase", UArray(Array.empty)))
     )
 
     testCodeScript(Vector(
@@ -935,7 +935,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("len myArray", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(3), CountT)))),
       CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
         NewMapObject(
-          UCase(UIndex(3), UStruct(Vector(UIndex(1), UIndex(3), UIndex(1)))),
+          UCase(UIndex(3), UArray(Array(UIndex(1), UIndex(3), UIndex(1)))),
           CustomT("Array", UCase(UIdentifier("Index"), UIndex(10)))
         )
       ))),

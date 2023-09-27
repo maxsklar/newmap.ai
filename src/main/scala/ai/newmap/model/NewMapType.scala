@@ -83,7 +83,7 @@ case class MapConfig(
 )
 
 sealed abstract class PreservationRule {
-  def toUntaggedObject: UntaggedObject = UStruct(Vector.empty)
+  def toUntaggedObject: UntaggedObject = UArray(Array.empty)
 }
 // Preservation
 // Preserving Equality: [a == b] == [f(a) == f(b)]
@@ -222,39 +222,39 @@ case class WithStateT(
 
 object NewMapType {
   def typeToUntaggedObject(nType: NewMapType): UntaggedObject = nType match {
-    case CountT => UCase(UIdentifier("Count"), UStruct(Vector.empty))
+    case CountT => UCase(UIdentifier("Count"), UArray(Array.empty))
     case IndexT(i) => UCase(UIdentifier("Index"), i)
-    case BooleanT => UCase(UIdentifier("Boolean"), UStruct(Vector.empty))
-    case ByteT => UCase(UIdentifier("Byte"), UStruct(Vector.empty))
-    case CharacterT => UCase(UIdentifier("Character"), UStruct(Vector.empty))
-    case LongT => UCase(UIdentifier("Long"), UStruct(Vector.empty))
-    case DoubleT => UCase(UIdentifier("Double"), UStruct(Vector.empty))
-    case UuidT => UCase(UIdentifier("Uuid"), UStruct(Vector.empty))
-    case UndefinedT => UCase(UIdentifier("UndefinedType"), UStruct(Vector.empty))
-    case TypeT => UCase(UIdentifier("Type"), UStruct(Vector.empty))
+    case BooleanT => UCase(UIdentifier("Boolean"), UArray(Array.empty))
+    case ByteT => UCase(UIdentifier("Byte"), UArray(Array.empty))
+    case CharacterT => UCase(UIdentifier("Character"), UArray(Array.empty))
+    case LongT => UCase(UIdentifier("Long"), UArray(Array.empty))
+    case DoubleT => UCase(UIdentifier("Double"), UArray(Array.empty))
+    case UuidT => UCase(UIdentifier("Uuid"), UArray(Array.empty))
+    case UndefinedT => UCase(UIdentifier("UndefinedType"), UArray(Array.empty))
+    case TypeT => UCase(UIdentifier("Type"), UArray(Array.empty))
     case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
-    case IdentifierT => UCase(UIdentifier("Identifier"), UStruct(Vector.empty))
-    case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UStruct(Vector(
+    case IdentifierT => UCase(UIdentifier("Identifier"), UArray(Array.empty))
+    case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UArray(Array(
       UMapPattern(typeToUntaggedObject(key), typeToUntaggedObject(value)),
       mapConfigToUntagged(config)
     )))
     case TypeTransformT(allowGenerics) => UCase(UIdentifier("TypeTransform"), UIndex(if (allowGenerics) 1 else 0))
-    case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UStruct(Vector(
+    case StructT(params, fieldParentType, completenesss, featureSet) => UCase(UIdentifier("Struct"), UArray(Array(
       params,
       typeToUntaggedObject(fieldParentType),
       UIdentifier(completenesss.getName),
       UIdentifier(featureSet.getName)
     )))
-    case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UStruct(Vector(
+    case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UArray(Array(
       typeTransform,
       typesInTypeClass
     )))
-    case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UStruct(Vector(
+    case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UArray(Array(
       cases,
       typeToUntaggedObject(fieldParentType),
       UIdentifier(featureSet.getName)
     )))
-    case SubtypeT(isMember, parentType, featureSet) => UCase(UIdentifier("Subtype"), UStruct(Vector(
+    case SubtypeT(isMember, parentType, featureSet) => UCase(UIdentifier("Subtype"), UArray(Array(
       isMember,
       typeToUntaggedObject(parentType),
       UIdentifier(featureSet.getName)
@@ -275,10 +275,10 @@ object NewMapType {
   }
 
   def mapConfigToUntagged(config: MapConfig): UntaggedObject = {
-    UStruct(Vector(
+    UArray(Array(
       UIdentifier(config.completeness.getName),
       UIdentifier(config.featureSet.getName),
-      UStruct(config.preservationRules.map(_.toUntaggedObject)), // This should be a map in the future, not a struct
+      UArray(config.preservationRules.map(_.toUntaggedObject).toArray), // This should be a map in the future, not a struct
       config.channels,
       typeToUntaggedObject(config.channelParentType)
     ))
@@ -305,12 +305,12 @@ object NewMapType {
       }
       case "Identifier" => Success(IdentifierT)
       case "Map" => params match {
-        case UStruct(items) if (items.length == 2) => {
+        case UArray(items) if (items.length == 2) => {
           for {
             typeTransform <- convertToTypeTransform(items(0))
 
             config <- items(1) match {
-              case UStruct(v) if (v.length == 5) => Success(v)
+              case UArray(v) if (v.length == 5) => Success(v)
               case _ => Failure(s"Incorrect config: ${items(1)}")
             }
 
@@ -333,7 +333,7 @@ object NewMapType {
         case _ => Failure(s"Couldn't convert Map to NewMapType with params: $params")
       }
       case "Struct" => params match {
-        case UStruct(items) if (items.length == 4) => {
+        case UArray(items) if (items.length == 4) => {
           for {
             parentT <- convertToNewMapType(items(1))
 
@@ -351,7 +351,7 @@ object NewMapType {
         case _ => Failure(s"Couldn't convert Struct to NewMapType with params: $params")
       }
       case "TypeClass" => params match {
-        case UStruct(items) if (items.length == 2) => {
+        case UArray(items) if (items.length == 2) => {
           for {
             typeTransform <- items(0) match {
               case ump@UMapPattern(_, _) => Success(ump)
@@ -368,7 +368,7 @@ object NewMapType {
         case _ => Failure(s"Couldn't convert TypeClass to NewMapType with params: $params")
       }
       case "Case" => params match {
-        case UStruct(items) if items.length == 3 => {
+        case UArray(items) if items.length == 3 => {
           for {
             parentT <- convertToNewMapType(items(1))
 
@@ -378,7 +378,7 @@ object NewMapType {
         case _ => Failure(s"Couldn't convert Case to NewMapType with params: $params")
       }
       case "Subtype" => params match {
-        case UStruct(items) if items.length == 3 => {
+        case UArray(items) if items.length == 3 => {
           for {
             parentT <- convertToNewMapType(items(1))
 

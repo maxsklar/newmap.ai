@@ -77,8 +77,8 @@ object CommandMaps {
         Success(defaultUMap)
       }*/
       case CharacterT => Success(UCharacter('\u0000'))
-      case CustomT("Array", _) => Success(UCase(UIndex(0), UStruct(Vector.empty)))
-      case CustomT("String", _) => Success(UCase(UIndex(0), UStruct(Vector.empty))) // Replace this line with a conversion!
+      case CustomT("Array", _) => Success(UCase(UIndex(0), UArray(Array.empty)))
+      case CustomT("String", _) => Success(UCase(UIndex(0), UArray(Array.empty))) // Replace this line with a conversion!
       case WithStateT(_, underlying) => {
         getDefaultValueOfCommandTypeHardcoded(underlying, env)
       }
@@ -126,7 +126,7 @@ object CommandMaps {
         Success(StructT(typeTransform, TypeT, CommandOutput, BasicMap))
       }
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
-      case CustomT(name, UStruct(_)) => {
+      case CustomT(name, UArray(_)) => {
         val currentState = typeSystem.currentState
 
         for {
@@ -606,8 +606,8 @@ object CommandMaps {
 
         for {
           untaggedResult <- current.uObject match {
-            case UCase(UIndex(length), UStruct(values)) => {
-              Success(UCase(UIndex(length + 1), UStruct(values :+ command)))
+            case UCase(UIndex(length), UArray(values)) => {
+              Success(UCase(UIndex(length + 1), UArray(values :+ command)))
             }
             case UCase(UIndex(length), UMap(values)) => {
               Success(UCase(UIndex(length + 1), UMap(values :+ (UIndex(length), command))))

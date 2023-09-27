@@ -15,7 +15,7 @@ object IterationUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      case Success(CaseT(UMap(cases), CustomT("String", UStruct(v)), BasicMap)) if (v.isEmpty) => {
+      case Success(CaseT(UMap(cases), CustomT("String", UArray(v)), BasicMap)) if (v.isEmpty) => {
         for {
           paramList <- StatementInterpreter.convertMapValuesToParamList(cases, env)
           result <- enumerateCaseValues(paramList, env)
@@ -42,18 +42,18 @@ object IterationUtils {
                 otherParam <- otherParamValues
 
                 otherParamValues <- otherParam match {
-                  case UStruct(values) => Some(values)
+                  case UArray(values) => Some(values)
                   case _ => None
                 }
               } yield {
                 firstParam +: otherParamValues
               }
 
-              valueList.map(v => UStruct(v))
+              valueList.map(v => UArray(v))
             }
           }
           case _ => {
-            Success(Vector(UStruct(Vector.empty)))
+            Success(Vector(UArray(Array.empty)))
           }
         }
       }
@@ -110,14 +110,14 @@ object IterationUtils {
       case NewMapObject(UMap(values), MapT(_, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         Success(values.map(_._2))
       }
-      case NewMapObject(UStruct(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
-        Success(values)
+      case NewMapObject(UArray(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
+        Success(values.toVector)
       }
-      case NewMapObject(UStruct(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
+      case NewMapObject(UArray(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         enumerateAllValuesIfPossible(typeTransform.keyType, env)
       }
-      case NewMapObject(UCase(UIndex(_), UStruct(values)), CustomT("Array", _)) => {
-        Success(values)
+      case NewMapObject(UCase(UIndex(_), UArray(values)), CustomT("Array", _)) => {
+        Success(values.toVector)
       }
       case NewMapObject(UCase(UIndex(_), UMap(values)), CustomT("Array", _)) => {
         // We should be more careful about the ordering here!!
@@ -229,7 +229,7 @@ object IterationUtils {
   def isTermPatternFree(uObject: UntaggedObject): Boolean = uObject match {
     case UWildcardPattern(_) => false
     case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
-    case UStruct(patterns) => patterns.forall(isTermPatternFree(_))
+    case UArray(patterns) => patterns.forall(isTermPatternFree(_))
     case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))
     case _ => true
   }

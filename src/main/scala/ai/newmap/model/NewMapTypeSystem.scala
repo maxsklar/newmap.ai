@@ -57,7 +57,7 @@ case class NewMapTypeSystem(
   }
 
   def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
-  def emptyStructPattern = UStruct(Vector.empty)
+  def emptyStructPattern = UArray(Array.empty)
 
   def getParameterType(
     typeSystemId: NewMapTypeSystem.Id,

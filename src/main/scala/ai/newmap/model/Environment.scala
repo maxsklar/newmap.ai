@@ -209,7 +209,7 @@ case class Environment(
         val uType = nType.asUntagged
 
         val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
-        val parameterPattern = UStruct(Vector.empty)
+        val parameterPattern = UArray(Array.empty)
 
         val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
           case Success(s) => s
@@ -225,7 +225,7 @@ case class Environment(
         val parameterPattern = if (paramList.length == 1) {
           UWildcardPattern(paramList.head._1)
         } else {
-          UStruct(paramList.map(param => UWildcardPattern(param._1)))
+          UArray(paramList.toArray.map(param => UWildcardPattern(param._1)))
         }
 
         val paramT = if (paramList.length == 1) {
@@ -254,7 +254,7 @@ case class Environment(
         val uType = nType.asUntagged
 
         val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
-        val parameterPattern = UStruct(Vector.empty)
+        val parameterPattern = UArray(Array.empty)
 
         val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
           case Success(s) => s
@@ -449,7 +449,7 @@ case class Environment(
         returnedEnv
       }
       case OutputToStdout(nObject) => {
-        val taggedObject = NewMapObject(nObject, CustomT("String", UStruct(Vector.empty)))
+        val taggedObject = NewMapObject(nObject, CustomT("String", UArray(Array.empty)))
 
         // TODO: obviously this can be way more efficient!
         for {
@@ -564,7 +564,7 @@ object Environment {
 
   // TODO - eventually make this empty and add it elsewhere!!
   val initialChannelToType = Map(
-    "stdout" -> CustomT("String", UStruct(Vector.empty))
+    "stdout" -> CustomT("String", UArray(Array.empty))
   )
 
   var Base: Environment = Environment()
@@ -576,7 +576,7 @@ object Environment {
   }
 
   def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject): UntaggedObject = {
-    UCase(UIdentifier("Subtype"), UStruct(Vector(
+    UCase(UIdentifier("Subtype"), UArray(Array(
       isMember,
       parentType,
       UIdentifier("BasicMap")
@@ -585,7 +585,7 @@ object Environment {
 
   def buildMapCreator(config: MapConfig, allowGenerics: Boolean): NewMapObject = {
     val transformMapT = {
-      UCase(UIdentifier("Map"), UStruct(Vector(
+      UCase(UIdentifier("Map"), UArray(Array(
         ParamId("typeTransform"),
         NewMapType.mapConfigToUntagged(config)
       )))

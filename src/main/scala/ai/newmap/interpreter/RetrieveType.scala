@@ -29,7 +29,7 @@ object RetrieveType {
       isTermClosedLiteral(key, knownVariables) &&
         isTermClosedLiteral(value, knownVariables)
     }
-    case UStruct(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
+    case UArray(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
     case _ => true
   }
 
@@ -82,7 +82,7 @@ object RetrieveType {
             result <- fetchParamsFromPattern(valueT, resultPattern, env)
           } yield result
         }
-        case (StructT(UMap(params), _, _, BasicMap), UStruct(values)) => {
+        case (StructT(UMap(params), _, _, BasicMap), UArray(values)) => {
           if (params.length == values.length) {
             var resultMap: Map[String, NewMapType] = Map.empty
 
