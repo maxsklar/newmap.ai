@@ -36,7 +36,7 @@ class TestTypeCheck extends FlatSpec {
   "A keyword " should " be interpreted as that keyword" in {
   	TypeChecker(IdentifierParse("Type")) match {
   	  case Success(nObject) => {
-  	  	assert(nObject.nExpression == Environment.typeAsUntaggedObject(TypeT))
+  	  	assert(nObject.nExpression == TypeT.asUntagged)
   	  }
   	  case Failure(reason) => fail(reason)
   	}
@@ -45,7 +45,7 @@ class TestTypeCheck extends FlatSpec {
   it should " be interpreted as an identifier if forced" in {
     TypeChecker(IdentifierParse("Type", true)) match {
       case Success(result) => {
-        assert(result.nExpression== UIdentifier("Type"))
+        assert(result.nExpression == UIdentifier("Type"))
   	  }
   	  case Failure(reason) => fail(reason)
   	}

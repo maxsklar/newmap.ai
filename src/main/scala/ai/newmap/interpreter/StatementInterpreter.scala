@@ -351,7 +351,7 @@ object StatementInterpreter {
           valueTC <- TypeChecker.typeCheck(parseTree, mapType, env, FullFunction, Map.empty)
         } yield {
           ReturnValue(
-            NewVersionedFieldCommand(id, mapType, valueTC.nExpression),
+            NewVersionedFieldCommand(id, valueTC.refinedTypeClass, valueTC.nExpression, false),
             tcParameters
           )
         }
@@ -370,7 +370,7 @@ object StatementInterpreter {
         println(s"patterns: $selfPattern -- $commandName -- $inputPattern")
         println(s"outputRule: $outputRule")
 
-        val result = for {
+        for {
           baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, FullFunction, PatternMap, Map.empty)
           takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.newParams)
 
@@ -386,14 +386,14 @@ object StatementInterpreter {
             )
           )
 
-          _ = println("Type transform: " + fullTypeTransform)
+          fullMapType = MapT(fullTypeTransform, MapConfig(RequireCompleteness, featureSet))
 
           resultTypeCheck <- TypeChecker.typeCheck(
             KeyValueBinding(
               IdentifierParse(selfPattern),
               KeyValueBinding(inputPattern, outputRule)
             ),
-            MapT(fullTypeTransform, MapConfig(RequireCompleteness, featureSet)),
+            fullMapType,
             env,
             FullFunction, // TODO - is this right?
             Map.empty
@@ -402,13 +402,15 @@ object StatementInterpreter {
           _ = println("resultTypeCheck: " + resultTypeCheck)
 
         } yield {
-          // Use CommandName in here
-          ()
-        }
-
-        result match {
-          case Success(_) => Failure("not implemented")
-          case Failure(s) => Failure(s)
+          ReturnValue(
+            NewVersionedFieldCommand(
+              commandName,
+              resultTypeCheck.refinedTypeClass,
+              resultTypeCheck.nExpression,
+              true
+            ),
+            tcParameters
+          )
         }
       }
       case EmptyStatement => Success(ReturnValue(EmptyEnvironmentCommand, tcParameters))

@@ -175,13 +175,16 @@ case class Environment(
           storedVersionedTypes = storedVersionedTypes + (key -> NewMapObject(initValue, nType))
         )
       }
-      case NewVersionedFieldCommand(id, mapT, value) => {
-        val typeTransform = mapT.typeTransform
-
-        val inputType = typeTransform.keyType.asUntagged
-        val outputType = typeTransform.valueType.asUntagged
-
+      case NewVersionedFieldCommand(id, mapT, value, _) => {
         val resultO = for {
+          typeTransform <- mapT match {
+            case MapT(typeTransform, _) => Success(typeTransform)
+            case _ => Failure("Cannot get type transform: mapT")
+          }
+
+          inputType = typeTransform.keyType.asUntagged
+          outputType = typeTransform.valueType.asUntagged
+
           currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, TypeMatcher)
 
           newFieldMapping = (UIdentifier(id), UCase(outputType, value))
