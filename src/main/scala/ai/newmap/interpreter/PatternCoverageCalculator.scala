@@ -26,8 +26,18 @@ object PatternCoverageCalculator {
     }
     else {
       val piecemealCompletenessOutcome = nTypeOutcome match {
-        case Success(CaseT(UMap(cases), _, _)) => Success(checkCaseComplete(keys, cases, env))
-        case Success(StructT(UMap(params), _, _, _)) => checkStructComplete(keys, params, env)
+        case Success(CaseT(cases, _, _)) => {
+          for {
+            caseBindings <- cases.getMapBindings
+          } yield {
+            checkCaseComplete(keys, caseBindings, env)
+          }
+        }
+        case Success(StructT(params, _, _, _)) => for {
+          paramBindings <- params.getMapBindings
+        } yield {
+          checkStructComplete(keys, paramBindings, env)
+        }
         case _ => Success(false)
       }
 
@@ -123,6 +133,21 @@ object PatternCoverageCalculator {
                 isCatchallPattern(x._1, nObject.asType.toOption.get, env)
               }).getOrElse(false) // We're not really set up for this yet!
             })
+          }
+          case StructT(params, _, _, _) => {
+            val x = for {
+              paramBindings <- params.getMapBindings.toOption
+
+              if (paramBindings.length == patterns.length)
+            } yield {
+              (patterns, paramBindings.map(_._2)).zipped.toVector.forall(x => {
+                Evaluator(x._2, env).toOption.map(nObject => {
+                  isCatchallPattern(x._1, nObject.asType.toOption.get, env)
+                }).getOrElse(false) // We're not really set up for this yet!
+              })
+            }
+
+            x.getOrElse(false)
           }
           case _ => false 
         }

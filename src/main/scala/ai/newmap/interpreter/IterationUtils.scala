@@ -15,9 +15,10 @@ object IterationUtils {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      case Success(CaseT(UMap(cases), CustomT("String", UArray(v)), BasicMap)) if (v.isEmpty) => {
+      case Success(CaseT(cases, CustomT("String", UArray(v)), BasicMap)) if (v.isEmpty) => {
         for {
-          paramList <- StatementInterpreter.convertMapValuesToParamList(cases, env)
+          caseMapBindings <- cases.getMapBindings
+          paramList <- StatementInterpreter.convertMapValuesToParamList(caseMapBindings, env)
           result <- enumerateCaseValues(paramList, env)
         } yield result
       }
@@ -27,39 +28,43 @@ object IterationUtils {
       case Success(BooleanT) => {
         Success(Vector(UIndex(0), UIndex(1)))
       }
-      case Success(StructT(UMap(params), parentFieldType, RequireCompleteness, BasicMap)) => {
+      case Success(StructT(params, parentFieldType, RequireCompleteness, BasicMap)) => {
         // This is dangerous because the multiplications can cause a large blowout of allowed types
         
-        params match {
-          case (_, firstParamType) +: otherParams => {
-            for {
-              firstParamT <- firstParamType.asType
-              firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
-              otherParamValues <- enumerateAllValuesIfPossible(StructT(UMap(otherParams), parentFieldType, RequireCompleteness, BasicMap), env)
-            } yield {
-              val valueList = for {
-                firstParam <- firstParamValues
-                otherParam <- otherParamValues
+        for {
+          mapBindings <- params.getMapBindings
 
-                otherParamValues <- otherParam match {
-                  case UArray(values) => Some(values)
-                  case _ => None
-                }
+          result <- mapBindings match {
+            case (_, firstParamType) +: otherParams => {
+              for {
+                firstParamT <- firstParamType.asType
+                firstParamValues <- enumerateAllValuesIfPossible(firstParamT, env)
+                otherParamValues <- enumerateAllValuesIfPossible(StructT(UMap(otherParams), parentFieldType, RequireCompleteness, BasicMap), env)
               } yield {
-                firstParam +: otherParamValues
-              }
+                val valueList = for {
+                  firstParam <- firstParamValues
+                  otherParam <- otherParamValues
 
-              valueList.map(v => UArray(v))
+                  otherParamValues <- otherParam match {
+                    case UArray(values) => Some(values)
+                    case _ => None
+                  }
+                } yield {
+                  firstParam +: otherParamValues
+                }
+
+                valueList.map(v => UArray(v))
+              }
+            }
+            case _ => {
+              Success(Vector(UArray(Array.empty)))
             }
           }
-          case _ => {
-            Success(Vector(UArray(Array.empty)))
-          }
-        }
+        } yield result
       }
       case Success(undertype) => {
         //throw new Exception(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
-        Failure(s"Can't enumerate the allowed values of $nType with underlying Type $undertype -- could be unimplemented")
+        Failure(s"Can't enumerate the allowed values of ${nType.displayString(env)} with underlying Type $undertype -- could be unimplemented")
       }
       case Failure(f) => Failure(f)
     }

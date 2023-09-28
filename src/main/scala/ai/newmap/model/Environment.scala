@@ -22,7 +22,7 @@ case class Environment(
   // This is a (pattern) mapping from TypeT to a map from the fields on that type to the
   //  functions returned from those fields
   // TODO - this must be versioned!
-  // TODO - can we use an UntaggedObject here and use the NewMap mapping system?
+  // TODO - how to include commands as well
   // This is a map from NewMapType => (String => NewMapObject)
   typeToFieldMapping: UntaggedObject = UMap(Vector.empty),
 

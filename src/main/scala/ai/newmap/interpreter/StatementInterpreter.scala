@@ -356,6 +356,61 @@ object StatementInterpreter {
           )
         }
       }
+      case NewCommandParse(
+        featureSet: MapFeatureSet,
+        typeParse: ParseTree,
+        takingTypeParse: ParseTree,
+        selfPattern: String,
+        commandName: String,
+        inputPattern: ParseTree,
+        outputRule: ParseTree
+      ) => {
+        println(s"NewCommandParse: $featureSet on $typeParse")
+        println(s"taking: $takingTypeParse")
+        println(s"patterns: $selfPattern -- $commandName -- $inputPattern")
+        println(s"outputRule: $outputRule")
+
+        val result = for {
+          baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, FullFunction, PatternMap, Map.empty)
+          takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.newParams)
+
+          baseT <- baseTypePatternTC.typeCheckResult.asType
+          takingTypeT <- takingTypePatternTC.nExpression.asType
+          innerTypeTransform = TypeTransform(baseT, takingTypeT)
+
+          fullTypeTransform = TypeTransform(
+            baseT,
+            MapT(
+              innerTypeTransform,
+              MapConfig(RequireCompleteness, featureSet)
+            )
+          )
+
+          _ = println("Type transform: " + fullTypeTransform)
+
+          resultTypeCheck <- TypeChecker.typeCheck(
+            KeyValueBinding(
+              IdentifierParse(selfPattern),
+              KeyValueBinding(inputPattern, outputRule)
+            ),
+            MapT(fullTypeTransform, MapConfig(RequireCompleteness, featureSet)),
+            env,
+            FullFunction, // TODO - is this right?
+            Map.empty
+          )
+
+          _ = println("resultTypeCheck: " + resultTypeCheck)
+
+        } yield {
+          // Use CommandName in here
+          ()
+        }
+
+        result match {
+          case Success(_) => Failure("not implemented")
+          case Failure(s) => Failure(s)
+        }
+      }
       case EmptyStatement => Success(ReturnValue(EmptyEnvironmentCommand, tcParameters))
     }
   }

@@ -151,6 +151,16 @@ case class NewVersionedFieldParse(
   expression: ParseTree
 ) extends EnvStatementParse
 
+case class NewCommandParse(
+  featureSet: MapFeatureSet,
+  typeParse: ParseTree,
+  takingTypeParse: ParseTree,
+  selfPattern: String,
+  commandName: String,
+  inputPattern: ParseTree,
+  outputRule: ParseTree
+) extends EnvStatementParse
+
 case object EmptyStatement extends EnvStatementParse
 
 sealed abstract class StatementPrefix

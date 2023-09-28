@@ -320,7 +320,7 @@ object TypeChecker {
                 val indexType = IndexT(UIndex(expressions.length))
                 TypeCheckResponse(
                   StructT(
-                    UMap(expressions.zipWithIndex.map(x => UIndex(x._2) -> x._1)),
+                    UArray(expressions.toArray),
                     indexType,
                     RequireCompleteness,
                     BasicMap
@@ -643,6 +643,13 @@ object TypeChecker {
       case (LiteralListParse(values, _), Success(StructT(UMap(structValues), _, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
           tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
+        } yield {
+          TypeCheckWithPatternMatchingResult(UArray(tcmp.patterns.toArray), expectedType, tcmp.newParams)
+        }
+      }
+      case (LiteralListParse(values, _), Success(StructT(UArray(structValues), _, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
+        for {
+          tcmp <- typeCheckWithMultiplePatterns((values,structValues).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
         } yield {
           TypeCheckWithPatternMatchingResult(UArray(tcmp.patterns.toArray), expectedType, tcmp.newParams)
         }

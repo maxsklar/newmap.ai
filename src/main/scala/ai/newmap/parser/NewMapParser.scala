@@ -73,4 +73,8 @@ object ParseState {
       case _ => Failure("Expected keyword " + keyword)
     }
   }
+
+  def expectingSpecificToken[OutT](token: Token, expecting: Token, result: ParseState[OutT]): Outcome[ParseState[OutT], String] = {
+    if (token == expecting) Success(result) else Failure("Expected token " + token)
+  }
 }

@@ -12,6 +12,7 @@ sealed abstract class UntaggedObject {
   def getMapBindings(): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = this match {
     case UMap(values) => Success(values)
     case USingularMap(key, value) => Success(Vector(key -> value))
+    case UArray(values) => Success(values.zipWithIndex.map(x => UIndex(x._2) -> x._1).toVector)
     case _ => Failure("Could not get bindings: " + this)
   }
 

@@ -1137,6 +1137,29 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "The sum machine " should " work" ignore {
+    testCodeScript(Vector(
+      CodeExpectation("data Sum = Count", GeneralSuccessCheck),
+      CodeExpectation("new simple command on Sum taking Count where self.add(v) = self + v", GeneralSuccessCheck),
+      CodeExpectation("ver s = new Sum", GeneralSuccessCheck),
+      CodeExpectation("s.add(5)", GeneralSuccessCheck),
+      CodeExpectation("s.add(6)", GeneralSuccessCheck),
+      CodeExpectation("s.add(9)", GeneralSuccessCheck),
+      CodeExpectation("s(value)", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(19), CountT)))),
+    ))
+  }
+
+  // Then it should work with type classes
+
+  // Implement equality on ratio
+  // Make ratio a part of typeclass addable
+  // Make ratio a part of typeclass summable
+  // "The ratio type " should " work" in {
+  //  testCodeScript(Vector(
+  //    CodeExpectation("data Ratio = Map(2: Count)", GeneralSuccessCheck),
+  //    
+  //}
+
   "The mean machine " should " work for getting the mean" in {
     testCodeScript(Vector(
       CodeExpectation(":load TestScripts/MeanMachine.nm", GeneralSuccessCheck),
@@ -1144,6 +1167,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("mm.mean", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), DoubleT)))),
     ))
   }
+
+
 
   /*
   TODOs with the arrays:
