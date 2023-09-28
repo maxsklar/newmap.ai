@@ -561,10 +561,6 @@ object Environment {
     Base.typeAsObject(nType)
   }
 
-  def typeAsUntaggedObject(nType: NewMapType): UntaggedObject = {
-    nType.asUntagged
-  }
-
   // TODO - eventually make this empty and add it elsewhere!!
   val initialChannelToType = Map(
     "stdout" -> CustomT("String", UArray(Array.empty))
@@ -575,7 +571,7 @@ object Environment {
   def buildSimpleMapT(typeTransform: TypeTransform): UntaggedObject = {
     val config = MapConfig(RequireCompleteness, SimpleFunction)
     val nType = MapT(typeTransform, config)
-    typeAsUntaggedObject(nType)
+    nType.asUntagged
   }
 
   def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject): UntaggedObject = {
@@ -649,12 +645,12 @@ object Environment {
       "Array",
       Vector("T" -> TypeT),
       CaseT(
-        UMap(Vector(UWildcardPattern("i") -> typeAsUntaggedObject(
+        UMap(Vector(UWildcardPattern("i") ->
           MapT(
             TypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
             MapConfig(RequireCompleteness, SimpleFunction)
-          )
-        ))),
+          ).asUntagged
+        )),
         CountT,
         SimpleFunction
       )
