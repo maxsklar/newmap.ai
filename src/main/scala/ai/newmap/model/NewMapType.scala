@@ -8,6 +8,8 @@ sealed abstract class NewMapType {
   def displayString(env: Environment) = PrintNewMapObject.newMapType(this, env.typeSystem)
 
   def asUntagged: UntaggedObject = NewMapType.typeToUntaggedObject(this)
+
+  def inputTypeOpt: Option[NewMapType] = NewMapType.getInputType(this)
 }
 
 /*
@@ -440,5 +442,16 @@ object NewMapType {
     case UIdentifier("WellFoundedFunction") => Success(WellFoundedFunction)
     case UIdentifier("FullFunction") => Success(FullFunction)
     case _ => Failure(s"Can't allow feature set in struct type: $uObject")
+  }
+
+  // Return the input type of a function type
+  def getInputType(underlyingT: NewMapType): Option[NewMapType] = {
+    underlyingT match {
+      case StructT(_, parentFieldType, _, _) => Some(parentFieldType)
+      // TODO: when we overhaul the type class functionality
+      case TypeClassT(_, _) => None
+      case MapT(typeTransform, _) =>  Some(typeTransform.keyType)
+      case _ => None
+    }
   }
 }

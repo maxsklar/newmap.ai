@@ -18,9 +18,8 @@ case class Environment(
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
   storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
 
-
   // This is a (pattern) mapping from TypeT to a map from the fields on that type to the
-  //  functions returned from those fields
+  //  functions returned from those fields (and including whether it is a command)
   // TODO - this must be versioned!
   // TODO - how to include commands as well
   // This is a map from NewMapType => (String => NewMapObject)
@@ -148,8 +147,6 @@ case class Environment(
           }
           case Failure(_) => throw new Exception("FullEnvironmentCommand: " + nObject.displayString(this))
         }
-
-
       }
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
@@ -175,7 +172,7 @@ case class Environment(
           storedVersionedTypes = storedVersionedTypes + (key -> NewMapObject(initValue, nType))
         )
       }
-      case NewVersionedFieldCommand(id, mapT, value, _) => {
+      case NewVersionedFieldCommand(id, mapT, value, isCommand) => {
         val resultO = for {
           typeTransform <- mapT match {
             case MapT(typeTransform, _) => Success(typeTransform)
@@ -187,7 +184,9 @@ case class Environment(
 
           currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, TypeMatcher)
 
-          newFieldMapping = (UIdentifier(id), UCase(outputType, value))
+          isCommandU = if (isCommand) UIndex(1) else UIndex(0)
+
+          newFieldMapping = (UIdentifier(id), UArray(Array(UCase(outputType, value), isCommandU)))
 
           newFieldMappings <- currentFields match {
             case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings)
@@ -202,8 +201,10 @@ case class Environment(
             }
             case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
           }
-      } yield {
-          this.copy(typeToFieldMapping = newTypeToFieldMapping)
+        } yield {
+          this.copy(
+            typeToFieldMapping = newTypeToFieldMapping
+          )
         }
 
         resultO.toOption.get
@@ -315,7 +316,6 @@ case class Environment(
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
-
               newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid

@@ -223,9 +223,15 @@ object TypeChecker {
           //  in its entirety in order to be used in the expression
           evaluatedField <- Evaluator(theFieldTC.nExpression, env)
 
-          returnValue <- Evaluator.applyFunction(
+          returnValuePair <- Evaluator.applyFunction(
             fieldsToTypeMap,
             evaluatedField,
+            env
+          )
+
+          returnValue <- Evaluator.applyFunction(
+            returnValuePair,
+            UIndex(0),
             env
           )
 
@@ -294,7 +300,8 @@ object TypeChecker {
                 "Incomplete mapping of " + typeTransform.keyType.displayString(env)
               )
             } yield {
-              TypeCheckResponse(UMap(mapValues), expectedType)
+              val uObject = if (isArrayInput) UArray(mapValues.map(_._2).toArray) else UMap(mapValues)
+              TypeCheckResponse(uObject, expectedType)
             }
           }
           case Success(TypeT) | Success(HistoricalTypeT(_)) => {
@@ -841,9 +848,7 @@ object TypeChecker {
         env.typeSystem.currentState
       )
 
-      inputTypeOption = inputTypeCheckFromFunctionType(underlyingTypeOfFunction, env)
-
-      inputTagged <- inputTypeOption match {
+      inputTagged <- underlyingTypeOfFunction.inputTypeOpt match {
         case Some(inputT) => for {
           inputTypeChecked <- typeCheck(input, inputT, env, FullFunction, tcParameters)
         } yield (inputTypeChecked.nExpression -> inputTypeChecked.refinedTypeClass)
@@ -923,18 +928,6 @@ object TypeChecker {
     } yield {
       TypeCheckUnknownFunctionResult(resultingFunctionExpression, typeOfFunction, inputTC, resultingType)
     }    
-  }
-
-  // Returns a set of patterns representing newmap types
-  // TODO - it should not return an option of NewMapType, rather some patterns!!
-  def inputTypeCheckFromFunctionType(underlyingT: NewMapType, env: Environment): Option[NewMapType] = {
-    underlyingT match {
-      case StructT(_, parentFieldType, _, _) => Some(parentFieldType)
-      //eventually send typesInTypeClass to the type checker
-      case TypeClassT(_, _) => None
-      case MapT(typeTransform, _) =>  Some(typeTransform.keyType)
-      case _ => None
-    }
   }
 
   def outputTypeFromTypeClassParams(

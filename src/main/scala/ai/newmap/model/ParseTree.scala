@@ -102,6 +102,12 @@ case class ApplyCommandsStatementParse(
   expression: ParseTree // Represents a list of commands to apply
 ) extends EnvStatementParse
 
+case class ApplyCustomCommandParse(
+  identifier: IdentifierParse,
+  commandName: IdentifierParse, // Represents the command to apply
+  expression: ParseTree  // Represents the command parameters
+) extends EnvStatementParse
+
 case class AddChannelParse(
   identifier: IdentifierParse,
   typeOfChannel: ParseTree

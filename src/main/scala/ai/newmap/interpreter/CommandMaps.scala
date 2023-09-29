@@ -258,9 +258,7 @@ object CommandMaps {
     typeSystemIdOpt: Option[UUID] = None
   ): Outcome[NewMapType, String] = {
     nType match {
-      case CountT => Success(
-        NewMapO.emptyStruct
-      )
+      case CountT => Success(NewMapO.emptyStruct)
       case BooleanT => Success(IndexTN(2))
       case MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
@@ -619,25 +617,41 @@ object CommandMaps {
         } yield result
       }
       case nType@CustomT(typeName, params) => {
-        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
-        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
+        val customResultOutcome = {
+          command match {
+            case UCase(name, value) => {
+              for {
+                // TODO - what if this intercepts a field that's not a command?
+                func <- Evaluator(AccessField(current.uObject, current.nType.asUntagged, name), env)
+                afterCommand <- Evaluator.applyFunction(func, value, env, StandardMatcher)
+                resultResolved <- TypeChecker.tagAndNormalizeObject(afterCommand, nType, env)
+              } yield resultResolved
+            }
+            case _ => Failure("command $command in the wrong format for custom result")
+          }
+        }
 
-        for {
-          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
-          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+        customResultOutcome.rescue(f => {
+          val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
+          val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
 
-          (underlyingPattern, underlyingExp) = underlyingTypeInfo
+          for {
+            typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
+            underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
 
-          patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
+            (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
-          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+            patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-          underlyingT <- underlyingType.asType
-          currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
+            underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
 
-          result <- updateVersionedObject(currentResolved, command, env)
-          resultResolved <- TypeChecker.tagAndNormalizeObject(result.uObject, nType, env)
-        } yield resultResolved
+            underlyingT <- underlyingType.asType
+            currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
+
+            result <- updateVersionedObject(currentResolved, command, env)
+            resultResolved <- TypeChecker.tagAndNormalizeObject(result.uObject, nType, env)
+          } yield resultResolved
+        })
       }
       case WithStateT(typeSystemId, nType) => {
         for {

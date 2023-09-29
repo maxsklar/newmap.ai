@@ -311,8 +311,8 @@ object ExpressionPath {
 
   def symbolPrecedence(symbol: String): Int = symbol match {
     case "|" => 11
-    case "" => 10
-    case "." => 9
+    case "." => 10
+    case "" => 9
     case "^" => 8
     case "*" | "/" => 7
     case "+" | "-" => 6

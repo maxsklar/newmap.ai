@@ -229,6 +229,56 @@ object StatementInterpreter {
       case ApplyCommandsStatementParse(_, _) => {
         throw new Exception("Apply multiple commands not yet implemented")
       }
+      case ApplyCustomCommandParse(id, commandName, commandParams) => {
+        for {
+          // TODO: what if this is a type expansion?
+          versionedObjectLink <- env.lookupVersionedObject(id.s)
+
+          currentFields <- Evaluator.applyFunction(
+            env.typeToFieldMapping,
+            versionedObjectLink.nType.asUntagged,
+            env,
+            TypeMatcher
+          )
+
+          fieldMapping <- Evaluator.applyFunction(
+            currentFields,
+            UIdentifier(commandName.s),
+            env
+          )
+
+          fieldMappingIsCommand <- Evaluator.applyFunction(
+            fieldMapping,
+            UIndex(1),
+            env
+          )
+
+          _ <- fieldMappingIsCommand match {
+            case UIndex(1) => Success(())
+            case _ => Failure("Field " + commandName + " is not a command.")
+          }
+
+          fieldMappingResult <- Evaluator.applyFunction(
+            fieldMapping,
+            UIndex(0),
+            env
+          )
+
+          returnType <- fieldMappingResult match {
+            case UCase(t, _) => Success(t)
+            case _ => Failure("Unknown fieldMappingResult: " + fieldMappingResult)
+          }
+
+          returnT <- returnType.asType
+
+          returnInputT <- Outcome(returnT.inputTypeOpt, "Input type not found: " + returnT.displayString(env))
+
+          commandParams <- typeCheck(commandParams, returnInputT, env, FullFunction, tcParameters)
+        } yield {
+          val command  = ApplyIndividualCommand(id.s, UCase(UIdentifier(commandName.s), commandParams.nExpression))
+          ReturnValue(command, tcParameters)
+        }
+      }
       case AddChannelParse(channelId, channelTypeParse) => {
         val channel = UIdentifier(channelId.s)
         for {
@@ -365,11 +415,6 @@ object StatementInterpreter {
         inputPattern: ParseTree,
         outputRule: ParseTree
       ) => {
-        println(s"NewCommandParse: $featureSet on $typeParse")
-        println(s"taking: $takingTypeParse")
-        println(s"patterns: $selfPattern -- $commandName -- $inputPattern")
-        println(s"outputRule: $outputRule")
-
         for {
           baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, FullFunction, PatternMap, Map.empty)
           takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.newParams)
@@ -398,9 +443,6 @@ object StatementInterpreter {
             FullFunction, // TODO - is this right?
             Map.empty
           )
-
-          _ = println("resultTypeCheck: " + resultTypeCheck)
-
         } yield {
           ReturnValue(
             NewVersionedFieldCommand(

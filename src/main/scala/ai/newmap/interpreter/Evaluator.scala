@@ -32,10 +32,13 @@ object Evaluator {
 
           result <- applyFunction(fieldsToMap, field, env)
 
-          resultValue <- result match {
+          func <- applyFunction(result, UIndex(0), env)
+
+          resultValue <- func match {
             case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
+          
           answer <- applyFunction(resultValue, evalValue, env)
         } yield {
           answer
@@ -208,6 +211,15 @@ object Evaluator {
         // Treat it like a small map
         applyFunction(UMap(Vector(key -> value)), input, env, matchingRules)
       }
+      case UArray(array) => {
+        for {
+          count <- TypeChecker.normalizeCount(input)
+
+          _ <- Outcome.failWhen(count >= array.length, s"Array out of bounds for count $count: $array")
+        } yield {
+          array(count.toInt)
+        }
+      }
       case IsCommandFunc => {
         val defaultValueOutcome = for {
           inputT <- input.asType
@@ -231,7 +243,7 @@ object Evaluator {
           first <- applyFunction(input, UIndex(0), env)
           second <- applyFunction(input, UIndex(1), env)
 
-          result <- (first, second) match {
+          result <- (stripVersioningU(first, env), stripVersioningU(second, env)) match {
             case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 + n2))
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 + d2))
             case _ => Failure("Can't add: " + first + " -- " + second)
@@ -243,10 +255,10 @@ object Evaluator {
           first <- applyFunction(input, UIndex(0), env)
           second <- applyFunction(input, UIndex(1), env)
 
-          result <- (first, second) match {
+          result <- (stripVersioningU(first, env), stripVersioningU(second, env)) match {
             case (UIndex(n1), UIndex(n2)) => Success(UIndex(n1 * n2))
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 * d2))
-            case _ => Failure("Can't add: " + first + " -- " + second)
+            case _ => Failure("Can't multiple: " + first + " -- " + second)
           }
         } yield result
       }
@@ -255,9 +267,9 @@ object Evaluator {
           first <- applyFunction(input, UIndex(0), env)
           second <- applyFunction(input, UIndex(1), env)
 
-          result <- (first, second) match {
+          result <- (stripVersioningU(first, env), stripVersioningU(second, env)) match {
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 / d2))
-            case _ => Failure("Can't add: " + first + " -- " + second)
+            case _ => Failure("Can't divide: " + first + " -- " + second)
           }
         } yield result
       }
