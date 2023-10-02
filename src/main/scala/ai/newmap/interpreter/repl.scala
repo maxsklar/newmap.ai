@@ -30,7 +30,8 @@ object repl extends App {
 
   // This ensures that the environment daemon is initialized
   val unit: Unit = ()
-  val pingResponseF = (EnvironmentDaemon.daemonActor ? unit)
+  val envDaemon = new EnvironmentDaemon()
+  val pingResponseF = (envDaemon.daemonActor ? unit)
   val pingResponse = Await.result(pingResponseF, 5.seconds)
   println(pingResponse)
   
@@ -38,12 +39,12 @@ object repl extends App {
   while(continue) {
     val code = lineReader.readLine("> ")
 
-    val responseF = EnvironmentDaemon.daemonActor ? code
+    val responseF = envDaemon.daemonActor ? code
 
     val response = Await.result(responseF, 5.seconds)
 
     response match {
-      case (s: EnvironmentDaemon.CodeResponse) =>
+      case (s: DaemonActor.CodeResponse) =>
         if (s.timeToQuit) {
           history.save()
           continue = false
@@ -54,5 +55,5 @@ object repl extends App {
     }
   }
 
-  EnvironmentDaemon.system.terminate()
+  envDaemon.system.terminate()
 }
