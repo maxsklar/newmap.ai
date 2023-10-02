@@ -10,6 +10,8 @@ sealed abstract class NewMapType {
   def asUntagged: UntaggedObject = NewMapType.typeToUntaggedObject(this)
 
   def inputTypeOpt: Option[NewMapType] = NewMapType.getInputType(this)
+
+  def upgradeCustom(custom: String, newVersion: Long): NewMapType = NewMapType.upgradeCustomType(this, custom, newVersion)
 }
 
 /*
@@ -30,11 +32,8 @@ case object LongT extends NewMapType
 case object DoubleT extends NewMapType
 case object UuidT extends NewMapType
 
-case class WildcardPatternT(s: String) extends NewMapType
+case class WildcardT(s: String) extends NewMapType
 case class ParamIdT(s: String) extends NewMapType
-
-// Type of types that exist in the given state
-case class HistoricalTypeT(uuid: UUID) extends NewMapType
 
 // Type of all types
 case object TypeT extends NewMapType
@@ -85,7 +84,7 @@ case class MapConfig(
 )
 
 sealed abstract class PreservationRule {
-  def toUntaggedObject: UntaggedObject = UArray(Array.empty)
+  def toUntaggedObject: UntaggedObject = UArray()
 }
 // Preservation
 // Preserving Equality: [a == b] == [f(a) == f(b)]
@@ -211,31 +210,23 @@ case class FunctionalSystemT(
 
 case class CustomT(
   name: String,
-  params: UntaggedObject
-) extends NewMapType
-
-// Inside should be a UCase(Uuuid(id), t)
-// where id is the type system id that created the type
-// and t is the actual type
-case class WithStateT(
-  typeSystemId: UUID,
-  nType: NewMapType 
+  params: UntaggedObject,
+  typeSystemId: Long // TODO - expand this with an ID!
 ) extends NewMapType
 
 object NewMapType {
   def typeToUntaggedObject(nType: NewMapType): UntaggedObject = nType match {
-    case CountT => UCase(UIdentifier("Count"), UArray(Array.empty))
+    case CountT => UCase(UIdentifier("Count"), UArray())
     case IndexT(i) => UCase(UIdentifier("Index"), i)
-    case BooleanT => UCase(UIdentifier("Boolean"), UArray(Array.empty))
-    case ByteT => UCase(UIdentifier("Byte"), UArray(Array.empty))
-    case CharacterT => UCase(UIdentifier("Character"), UArray(Array.empty))
-    case LongT => UCase(UIdentifier("Long"), UArray(Array.empty))
-    case DoubleT => UCase(UIdentifier("Double"), UArray(Array.empty))
-    case UuidT => UCase(UIdentifier("Uuid"), UArray(Array.empty))
-    case UndefinedT => UCase(UIdentifier("UndefinedType"), UArray(Array.empty))
-    case TypeT => UCase(UIdentifier("Type"), UArray(Array.empty))
-    case HistoricalTypeT(uuid) => UCase(UIdentifier("HistoricalType"), Uuuid(uuid))
-    case IdentifierT => UCase(UIdentifier("Identifier"), UArray(Array.empty))
+    case BooleanT => UCase(UIdentifier("Boolean"), UArray())
+    case ByteT => UCase(UIdentifier("Byte"), UArray())
+    case CharacterT => UCase(UIdentifier("Character"), UArray())
+    case LongT => UCase(UIdentifier("Long"), UArray())
+    case DoubleT => UCase(UIdentifier("Double"), UArray())
+    case UuidT => UCase(UIdentifier("Uuid"), UArray())
+    case UndefinedT => UCase(UIdentifier("UndefinedType"), UArray())
+    case TypeT => UCase(UIdentifier("Type"), UArray())
+    case IdentifierT => UCase(UIdentifier("Identifier"), UArray())
     case MapT(TypeTransform(key, value), config) => UCase(UIdentifier("Map"), UArray(Array(
       USingularMap(typeToUntaggedObject(key), typeToUntaggedObject(value)),
       mapConfigToUntagged(config)
@@ -262,17 +253,8 @@ object NewMapType {
       UIdentifier(featureSet.getName)
     )))
     case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
-    case CustomT(name, params) => UCase(UIdentifier(name), params)
-    case WithStateT(uuid, nType) => {
-      UCase(
-        UIdentifier("WithState"),
-        UCase(
-          Uuuid(uuid),
-          typeToUntaggedObject(nType)
-        )
-      )
-    }
-    case WildcardPatternT(name) => UWildcardPattern(name)
+    case CustomT(name, params, typeSystemId) => UCase(UIdentifier(name), UArray(params, UIndex(typeSystemId)))
+    case WildcardT(name) => UWildcard(name)
     case ParamIdT(name) => ParamId(name)
   }
 
@@ -301,10 +283,6 @@ object NewMapType {
       case "Uuid" => Success(UuidT)
       case "UndefinedType" => Success(UndefinedT)
       case "Type" => Success(TypeT)
-      case "HistoricalType" => params match {
-        case Uuuid(uuid) => Success(HistoricalTypeT(uuid))
-        case _ => Failure(s"Couldn't convert HistoricalType to NewMapType with params: $params")
-      }
       case "Identifier" => Success(IdentifierT)
       case "Map" => params match {
         case UArray(items) if (items.length == 2) => {
@@ -386,6 +364,7 @@ object NewMapType {
 
             featureSet <- convertFeatureSet(items(2))
 
+            // TODO: do we need this failWhen?
             _ <- Outcome.failWhen(
               featureSet.getLevel > SimpleFunction.getLevel,
               s"Can't allow feature set in subtype: ${items(2)}"
@@ -394,25 +373,34 @@ object NewMapType {
         }
         case _ => Failure(s"Couldn't convert Subtype to NewMapType with params: $params")
       }
-      case "WithState" => params match {
-        case UCase(Uuuid(uuid), t) => {
-          for {
-            resultT <- convertToNewMapType(t)
-          } yield {
-            WithStateT(uuid, resultT)
-          }
+      case "TypeTransform" => params match {
+        case UIndex(i) if (i > 0) => {
+          Success(TypeTransformT(true))
         }
-        case _ => Failure(s"Couldn't convert WithState to NewMapType with params: $params")
+        case _ => Success(TypeTransformT(false))
       }
-      case custom => Success(CustomT(custom, params))
+      case custom => params match {
+        case UArray(items) if items.length == 2 => {
+          val customParams = items(0)
+          for {
+            typeSystemId <- items(1) match {
+              case UIndex(id) => Success(id)
+              case _ => Failure("Unknown type system id: " + items(1))
+            }
+          } yield CustomT(custom, customParams, typeSystemId)
+        }
+        case _ => {
+          Failure(s"Couldn't handle custom params for $custom: + $params")
+        }
+      }
     }
     case UInit => Success(UndefinedT)
     case UIndex(i) => Success(IndexT(UIndex(i)))
     case UIdentifier(name) => convertToNewMapType(UCase(UIdentifier(name), UInit))
-    case UWildcardPattern(name) => Success(WildcardPatternT(name))
+    case UWildcard(name) => Success(WildcardT(name))
     case ParamId(name) => Success(ParamIdT(name))
     case _ => {
-      throw new Exception(s"Couldn't convert to NewMapType: $uType")
+      //throw new Exception(s"Couldn't convert to NewMapType: $uType")
       Failure(s"Couldn't convert to NewMapType: $uType")
     }
   }
@@ -452,6 +440,56 @@ object NewMapType {
       case TypeClassT(_, _) => None
       case MapT(typeTransform, _) =>  Some(typeTransform.keyType)
       case _ => None
+    }
+  }
+
+  def upgradeCustomType(nType: NewMapType, custom: String, newVersion: Long): NewMapType = {
+    nType match {
+      case MapT(TypeTransform(keyT, valueT), config) => {
+        // TODO - there are going to be problems with upgrading the key, but we need to do it for now
+        // - solution: check field maps and make sure they are all upgraded!
+        val newKeyT = keyT.upgradeCustom(custom, newVersion)
+
+        MapT(TypeTransform(newKeyT, valueT.upgradeCustom(custom, newVersion)), config)
+      }
+      case StructT(params, fieldParentType, completenesss, featureSet) => {
+        val newParams = for {
+          mapBinding <- params.getMapBindings.toOption.getOrElse(Vector.empty)
+        } yield {
+          val newParam = mapBinding._2.asType match {
+            case Success(paramT) => paramT.upgradeCustom(custom, newVersion).asUntagged
+            case _ => mapBinding._2
+          }
+          mapBinding._1 -> newParam
+        }
+
+        StructT(UMap(newParams), fieldParentType.upgradeCustom(custom, newVersion), completenesss, featureSet)
+      }
+      case TypeClassT(_, _) => {
+        // TODO - we're going to have to redo these when we redo type classes
+        nType
+      }
+      case CaseT(cases, fieldParentType, featureSet) => {
+        val newCases = for {
+          mapBinding <- cases.getMapBindings.toOption.getOrElse(Vector.empty)
+        } yield {
+          val newParam = mapBinding._2.asType match {
+            case Success(paramT) => paramT.upgradeCustom(custom, newVersion).asUntagged
+            case _ => mapBinding._2
+          }
+
+          mapBinding._1 -> newParam
+        }
+
+        CaseT(UMap(newCases), fieldParentType.upgradeCustom(custom, newVersion), featureSet)
+      }
+      case SubtypeT(isMember, parentType, featureSet) => {
+        SubtypeT(isMember, parentType.upgradeCustom(custom, newVersion), featureSet) 
+      }
+      case CustomT(name, params, version) if (name == custom && version < newVersion) => {
+        CustomT(name, params, newVersion)
+      }
+      case _ => nType
     }
   }
 }

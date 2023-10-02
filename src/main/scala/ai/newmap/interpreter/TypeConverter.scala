@@ -6,7 +6,7 @@ import ai.newmap.util.{Outcome, Success, Failure}
 /**
  * Handles checking if two subtypes are comparable to one another
  */
-object TypeConversionCalculator {
+object TypeConverter {
 
   case class IsTypeConvertibleResponse(
     convertInstructions: Vector[FunctionWithMatchingRules],
@@ -24,16 +24,17 @@ object TypeConversionCalculator {
     val emptyResponse = IsTypeConvertibleResponse(Vector.empty, endingType)
 
     (startingType, endingType) match {
-      case (startingType, WildcardPatternT(name)) => {
+      case (startingType, WildcardT(name)) => {
         Success(IsTypeConvertibleResponse(
           Vector.empty,
           startingType,
           Map(name -> startingType.asUntagged)
         ))
       }
-      case (CustomT(name1, param1), CustomT(name2, param2)) if (name1 == name2) => {
+      // Do we need this case?
+      case (CustomT(name1, param1, typeSystemId1), CustomT(name2, param2, typeSystemId2)) if (name1 == name2 && typeSystemId1 == typeSystemId2) => {
         for {
-          parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentState, name1)
+          parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentVersion, name1)
 
           // TODO: eventually, there should be a general way to convert a type to a matcher
           matcher = if (isTypeConvertible(parameterType, TypeT, env).isSuccess) TypeMatcher else StandardMatcher
@@ -138,15 +139,28 @@ object TypeConversionCalculator {
           response <- isTypeConvertible(singularObjT, endingType, env)
         } yield response
       }
-      case (WithStateT(typeSystemId, CustomT(_, _)), CaseT(values, _, _)) if (isSingularMap(values)) => {
-        // TODO: It's confusing why we would need this, but it prevents the case directly below from firing
-        // -- Eventually this whole method should be refactored.
+      case (CustomT(name1, params1, typeSystemId1), CustomT(name2, params2, typeSystemId2)) if (name1 == name2) => {
         for {
-          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
-          response <- isTypeConvertible(underlyingStartingType, endingType, env)
+          _ <- Evaluator.standardPatternMatch(params1, params2, env)
+
+          convertInstructions <- env.typeSystem.searchForForwardConvertibility(name1, typeSystemId1, typeSystemId2)
         } yield {
-          response
+          IsTypeConvertibleResponse(convertInstructions, endingType)
         }
+      }
+      case (CustomT(name, params, typeSystemId), _) => {
+        for {
+          underlyingT <- TypeChecker.getUnderlyingType(name, params, env, typeSystemId)
+          response <- isTypeConvertible(underlyingT, endingType, env)
+        } yield response
+      }
+      case (_, CustomT(name, params, typeSystemId)) => {
+        // TODO: We should be converting in this direction automatically
+        // - perhaps some logic in the type checker can replace this!
+        for {
+          underlyingT <- TypeChecker.getUnderlyingType(name, params, env, typeSystemId)
+          response <- isTypeConvertible(startingType, underlyingT, env)
+        } yield response
       }
       case (_, CaseT(values, endingFieldType, _)) if (isSingularMap(values)) => {
         //Check to see if this is a singleton case, if so, see if that's convertible into the other
@@ -156,74 +170,6 @@ object TypeConversionCalculator {
           singularObjT <- singularObj.asType
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
-      }
-      case (HistoricalTypeT(uuid), TypeT) if (uuid == env.typeSystem.currentState) => {
-        // I feel like more needs to be done here
-        // TypeT requires the uuid as a case?
-        // - Perhaps that's our next step
-        Success(emptyResponse)
-      }
-      case (TypeT, HistoricalTypeT(uuid)) if (uuid == env.typeSystem.currentState) => {
-        Success(emptyResponse)
-      }
-      case (WithStateT(typeSystemId1, CustomT(name1, params1)), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
-        for {
-          typeId1 <- env.typeSystem.getTypeIdFromName(typeSystemId1, name1)
-          typeId2 <- env.typeSystem.getTypeIdFromName(typeSystemId2, name2)
-
-          _ <- Evaluator.standardPatternMatch(params1, params2, env)
-
-          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
-        } yield {
-          val refinedEndingType = endingType // TODO - recheck this!
-
-          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
-        }
-      }
-      case (WithStateT(typeSystemId1, CustomT(name1, params1)), CustomT(name2, params2)) => {
-        for {
-          typeId1 <- env.typeSystem.getTypeIdFromName(typeSystemId1, name1)
-          typeId2 <- env.typeSystem.getTypeIdFromName(env.typeSystem.currentState, name2)
-
-          _ <- Evaluator.standardPatternMatch(params1, params2, env)
-
-          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
-        } yield {
-          val refinedEndingType = endingType // TODO - recheck this!
-
-          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
-        }
-      }
-      case (CustomT(name1, params1), WithStateT(typeSystemId2, CustomT(name2, params2))) => {
-        for {
-          typeId1 <- env.typeSystem.getTypeIdFromName(env.typeSystem.currentState, name1)
-          typeId2 <- env.typeSystem.getTypeIdFromName(typeSystemId2, name2)
-          
-          _ <- Evaluator.standardPatternMatch(params1, params2, env)
-
-          convertInstructions <- env.typeSystem.searchForConvertibility(typeId1, typeId2)
-        } yield {
-          val refinedEndingType = endingType // TODO - recheck this!
-
-          IsTypeConvertibleResponse(convertInstructions, refinedEndingType)
-        }
-      }
-      case (WithStateT(typeSystemId, _), _) => {
-        for {
-          underlyingStartingType <- TypeChecker.getFinalUnderlyingType(startingType, env, typeSystemId)
-          response <- isTypeConvertible(underlyingStartingType, endingType, env)
-        } yield {
-          response
-        }
-      }
-      case (_, WithStateT(typeSystemId, _)) => {
-        for {
-          // Maybe we don't want the final underlying type here, just the state!!
-          underlyingEndingType <- TypeChecker.getFinalUnderlyingType(endingType, env, typeSystemId)
-          response <- isTypeConvertible(startingType, underlyingEndingType, env)
-        } yield {
-          response
-        }
       }
       case (CountT, DoubleT) => {
         Success(
@@ -328,7 +274,7 @@ object TypeConversionCalculator {
         // How do I convert this?
 
         val conversionRule = UMap(Vector(
-          UWildcardPattern("item") ->
+          UWildcard("item") ->
             UMap(Vector(mapValues.head._1 -> ParamId("item")) ++ defaultStruct)
         ))
 

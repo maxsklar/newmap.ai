@@ -26,12 +26,8 @@ object PrintNewMapObject {
     env: Environment
   ): Outcome[String, String] = {
     for {
-      displayTypeId <- Outcome(env.typeSystem.currentMapping.get("_display"), "Couldn't find _display typeClass")
-
-      displayUnderlyingType <- Outcome(env.typeSystem.typeToUnderlyingType.get(displayTypeId), "Couldn't find _display underlying typeclass")
-
-      displayParameterPattern = displayUnderlyingType._1
-      dislayUnderlyingExpT <- displayUnderlyingType._2.asType
+      displayUnderlyingType <- env.typeSystem.currentUnderlyingType("_display")
+      dislayUnderlyingExpT = displayUnderlyingType._2
 
       mapValues <- dislayUnderlyingExpT match {
         case TypeClassT(_, values) => Success(values)
@@ -57,49 +53,31 @@ object PrintNewMapObject {
   // TODO - convert nType into an untagged type instead of using this!
   def newMapType(
     nType: NewMapType,
-    typeSystem: NewMapTypeSystem,
-    typeSystemStateOpt: Option[UUID] = None
+    typeSystem: NewMapTypeSystem
   ): String = {
-    val typeSystemState = typeSystemStateOpt.getOrElse(typeSystem.currentState)
-
     nType match {
       case CountT => "Count"
       case IndexT(i) => "Index." + untagged(i)
-      case CustomT(name, params) => {
-        val resultOpt: Option[String] = for {
-          currentId <- typeSystem.currentMapping.get(name)
-          referencedId <- typeSystem.historicalMapping.get(typeSystemState).getOrElse(Map.empty).get(name)
-        } yield {
-          val legacyIndicator = if (currentId == referencedId) "" else s"[OLD:$referencedId]"
-          val includedParams = if (isEmptyMap(params)) "" else s"|${untagged(params)}"
+      case CustomT(name, params, typeSystemState) => {
+        val legacyIndicator = if (typeSystemState == typeSystem.currentVersion) s"[CUR:$typeSystemState]" else s"[OLD:$typeSystemState]"
+        val includedParams = if (isEmptyMap(params)) "" else s"|${untagged(params)}"
 
-          s"${legacyIndicator}${name}$includedParams"
-        }
-
-        resultOpt match {
-          case Some(result) => result
-          case None => {
-            s"[Failed to print type: $name -- $typeSystemState -- ${typeSystem.currentState} -- ${typeSystem.currentMapping.get(name)} -- ${typeSystem.historicalMapping.get(typeSystemState)}]"
-          }
-        }
+        s"${legacyIndicator}${name}$includedParams"
       }
       case TypeT => s"Type"
-      case HistoricalTypeT(uuid) => s"HistoricalType($uuid)"
       case UndefinedT => s"UndefinedType"
-      //case AnyT => s"Any"
       case IdentifierT => "Identifier"
       case BooleanT => "Boolean"
       case ByteT => "Byte"
       case CharacterT  => "Character"
-      //case StringT => "String"
       case LongT => "Long"
       case DoubleT => "Double"
       case UuidT => "UUID"
       case TypeTransformT(_) => "TypeTransform"
       case MapT(TypeTransform(key, value), config) => {
         printMapT(
-          newMapType(key, typeSystem, typeSystemStateOpt),
-          newMapType(value, typeSystem, typeSystemStateOpt),
+          newMapType(key, typeSystem),
+          newMapType(value, typeSystem),
           config
         )
       }
@@ -115,17 +93,7 @@ object PrintNewMapObject {
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
       case SubtypeT(isMember, _, _) => s"Subtype(${untagged(isMember)})"
       case FunctionalSystemT(functionTypes) => s"FunctionalSystem(${untagged(UMap(functionTypes))})"
-      case WithStateT(uuid, nType) => {
-        newMapType(nType, typeSystem, Some(uuid))
-        /*if (typeSystem.currentState == uuid) {
-          newMapType(nType, typeSystem)
-        } else {
-          println(s"*** type system uuid: ${typeSystem.currentState}")
-
-          s"WithState:$uuid:${newMapType(nType, typeSystem)}" 
-        }*/
-      }
-      case WildcardPatternT(name) => untagged(UWildcardPattern(name))
+      case WildcardT(name) => untagged(UWildcard(name))
       case ParamIdT(name) => untagged(ParamId(name))
     }
   }
@@ -196,7 +164,7 @@ object PrintNewMapObject {
     case UFunctionLink(functionName, functionalSystem) => {
       s"${untagged(functionName)}~$functionalSystem}"
     }
-    case UWildcardPattern(name) => "W~" + name
+    case UWildcard(name) => "W~" + name
     case ParamId(name) => s"$name~pi"
     case ApplyFunction(func, input, _) => {
       "(" + untagged(func) + " " + untagged(input) + ")"

@@ -28,8 +28,13 @@ case class UMap(values: Vector[(UntaggedObject, UntaggedObject)]) extends Untagg
 // This is equivalent to UMap where the keys are indecies
 case class UArray(values: Array[UntaggedObject]) extends UntaggedObject
 
+// Make it easer to create values
+object UArray {
+  def apply(values: UntaggedObject*): UArray = new UArray(values.toArray)
+}
+
 // Represents any object (of a given type)
-case class UWildcardPattern(s: String) extends UntaggedObject
+case class UWildcard(s: String) extends UntaggedObject
 
 // This is a pattern that matches a map.
 // It first looks to see if the keyPattern is represented in the map, and if it is, does it match the value pattern

@@ -4,10 +4,16 @@ import org.scalatest._
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Success}
 
+sealed abstract class ScriptExpectation
+
 case class CodeExpectation(
   line: String, // The line of code entered into an environment interpreter
   resultExpectation: ResultExpectation // The expected response from the interpreter  
-)
+) extends ScriptExpectation
+
+case class DirectCommand(
+  line: String, // The line of code entered into an environment interpreter 
+) extends ScriptExpectation
 
 sealed abstract class ResultExpectation
 
@@ -23,6 +29,8 @@ case class SuccessCheck(com: EnvironmentCommand) extends ResultExpectation
 // Expect a success from this line of code, with output given as this string
 case class SuccessCheckStr(s: String) extends ResultExpectation
 
+case class CondSuccessCheck(cond: EnvironmentCommand => Boolean) extends ResultExpectation
+
 
 class TestFullEnvironmentInterpreter extends FlatSpec {
   def Index(i: Long): NewMapObject = NewMapObject(UIndex(i), CountT)
@@ -33,35 +41,44 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    * test a bunch of lines of newmap code
    * on each line, you can check that it succeeds, fails, or 
    */
-  def testCodeScript(expectations: Vector[CodeExpectation]): Unit = {
+  def testCodeScript(expectations: Vector[ScriptExpectation]): Unit = {
     val interpreter = new EnvironmentInterpreter(
       printInitCommandErrors = false,
       suppressStdout = true
     )
 
-    expectations.foreach(expectation => {
-      val interpretation = interpreter(expectation.line)
-      expectation.resultExpectation match {
-        case FailureCheck => assert(interpretation.isFailure)
-        case GeneralSuccessCheck => {
-          interpretation match {
-            case Success(_) => ()
-            case Failure(msg) => fail(msg)
+    expectations.foreach(expectation => expectation match {
+      case CodeExpectation(line, resultExp) => {
+        val interpretation = interpreter.applyEnvCommand(line)
+        resultExp match {
+          case FailureCheck => assert(interpretation.isFailure)
+          case GeneralSuccessCheck => {
+            interpretation match {
+              case Success(_) => ()
+              case Failure(msg) => fail(msg)
+            }
           }
-        }
-        case SuccessCheck(com) => {
-          interpretation match {
-            case Success(msg) => assert(msg == com.displayString(interpreter.env))
-            case Failure(msg) => fail(msg)
+          case SuccessCheck(com) => {
+            interpretation match {
+              case Success(command) => assert(command.displayString(interpreter.env) == com.displayString(interpreter.env))
+              case Failure(msg) => fail(msg)
+            }
           }
-        }
-        case SuccessCheckStr(s) => {
-          interpretation match {
-            case Success(msg) => assert(msg == s)
-            case Failure(msg) => fail(msg)
+          case SuccessCheckStr(s) => {
+            interpretation match {
+              case Success(command) => assert(command.displayString(interpreter.env) == s)
+              case Failure(msg) => fail(msg)
+            }
+          }
+          case CondSuccessCheck(cond) => {
+            interpretation match {
+              case Success(command) => assert(cond(command))
+              case Failure(msg) => fail(msg)
+            }
           }
         }
       }
+      case DirectCommand(line) => interpreter.apply(line)
     })
   }
 
@@ -275,17 +292,30 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   }
 
   "A case " should " be created and instantiated" in {
-    val correctCommand = Environment.eCommand(
-      "x",
-      NewMapObject(UCase(UIdentifier("a"), UIndex(0)), CustomT("MyCase", UArray(Array.empty)))
-    )
+    def correctCommand(command: EnvironmentCommand) = {
+      command match {
+        case FullEnvironmentCommand(
+          "x",
+          NewMapObject(UCase(UIdentifier("a"), UIndex(0)), t),
+          false
+        ) => {
+          t match {
+            case CustomT("MyCase", params, _) => {
+              params.getMapBindings.toOption.exists(_.isEmpty)
+            }
+            case _ => false
+          }
+        }
+        case _ => false
+      }
+    }
 
     testCodeScript(Vector(
       CodeExpectation("data MyCase = CaseType", GeneralSuccessCheck),
       CodeExpectation("update MyCase: (a, 2)", GeneralSuccessCheck),
       CodeExpectation("update MyCase: (b, 3)", GeneralSuccessCheck),
       // TODO - allow this check without knowing mycase id!
-      CodeExpectation("val x: MyCase = a|0", SuccessCheck(correctCommand)),
+      CodeExpectation("val x: MyCase = a|0", CondSuccessCheck(correctCommand)),
       CodeExpectation("val y: MyCase = a|b", FailureCheck),
       CodeExpectation("val x: MyCase = c", FailureCheck),
     ))
@@ -296,7 +326,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       "f",
       NewMapObject(
         UMap(Vector(
-          UWildcardPattern("a") ->
+          UWildcard("a") ->
           ApplyFunction(
             UMap(Vector(
               bind(UIndex(0), UIndex(2)),
@@ -744,7 +774,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
       CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
       CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
-      CodeExpectation("val getOrElse: GenericMap (Option|T: ReqMap(T: T)) = (None|(): (t: t), Some|t: (_: t))", GeneralSuccessCheck),
+      CodeExpectation("val getOrElse: GenericMap (Option|T: GenericMap(T: T)) = (None|(): (t: t), Some|t: (_: t))", GeneralSuccessCheck),
       CodeExpectation("val x: Option|Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option|Count = Some|20", GeneralSuccessCheck),
       CodeExpectation("getOrElse x 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
@@ -935,8 +965,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("len myArray", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
       CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
         NewMapObject(
-          UCase(UIndex(3), UArray(Array(UIndex(1), UIndex(3), UIndex(1)))),
-          CustomT("Array", UCase(UIdentifier("Index"), UIndex(10)))
+          UCase(UIndex(3), UArray(UIndex(1), UIndex(3), UIndex(1))),
+          CustomT("Array", UCase(UIdentifier("Index"), UIndex(10)), 0)
         )
       ))),
     )) 
@@ -1073,14 +1103,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
-      CodeExpectation(":load TestScripts/HelloWorld.nm", GeneralSuccessCheck),
+      DirectCommand(":load TestScripts/HelloWorld.nm"),
       CodeExpectation("stdoutRecorder", SuccessCheckStr("hello world !!\n"))
     ))
   }
 
   "Multiline commands " should " work as expected" in {
     testCodeScript(Vector(
-      CodeExpectation(":load TestScripts/MultilineTest.nm", GeneralSuccessCheck),
+      DirectCommand(":load TestScripts/MultilineTest.nm"),
       CodeExpectation("x", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
     ))
   }
@@ -1163,13 +1193,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "The mean machine " should " work for getting the mean" in {
     testCodeScript(Vector(
-      CodeExpectation(":load TestScripts/MeanMachine.nm", GeneralSuccessCheck),
+      DirectCommand(":load TestScripts/MeanMachine.nm"),
       CodeExpectation("val mm: MeanMachine = (6.0, 3.0)", GeneralSuccessCheck),
       CodeExpectation("mm.mean", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), DoubleT)))),
     ))
   }
-
-
 
   /*
   TODOs with the arrays:

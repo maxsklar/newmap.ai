@@ -14,14 +14,14 @@ object PatternCoverageCalculator {
     nType: NewMapType,
     env: Environment
   ): Outcome[Boolean, String] = {
-    val nTypeOutcome = TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
+    val nTypeOutcome = TypeChecker.getFinalUnderlyingType(nType, env)
 
     // This is the generic pattern, which means that everything will match
     // TODO: This is going to get more complicated with more patterns!!
     // - In the future, we want to know if the keys as a group have all the patterns to cover the type
-    val wildcardPatternExists = keys.exists(k => isCatchallPattern(k, nType, env))
+    val WildcardExists = keys.exists(k => isCatchallPattern(k, nType, env))
 
-    if (wildcardPatternExists) {
+    if (WildcardExists) {
       Success(true)
     }
     else {
@@ -122,7 +122,7 @@ object PatternCoverageCalculator {
   // nType is a pattern that represents a type
   def isCatchallPattern(pattern: UntaggedObject, nType: NewMapType, env: Environment): Boolean = {
     pattern match {
-      case UWildcardPattern(_) => true
+      case UWildcard(_) => true
       case UArray(patterns)  => {
         nType match {
           // TODO: In the future, maybe we can relax "basicMap" by matching other patterns

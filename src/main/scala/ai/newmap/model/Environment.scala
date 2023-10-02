@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConversionCalculator, TypeChecker}
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConverter, TypeChecker}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -26,8 +26,8 @@ case class Environment(
   typeToFieldMapping: UntaggedObject = UMap(Vector.empty),
 
   // Also a stored versioned type, but a special one!
-  typeSystem: NewMapTypeSystem = NewMapTypeSystem.initTypeSystem,
-  channelIdToType: Map[String, NewMapType] = Environment.initialChannelToType,
+  typeSystem: NewMapTypeSystem = NewMapTypeSystem(),
+  channelIdToType: Map[String, NewMapType] = Map.empty,
 
   // Map representing a list of objects to send commands to from a channelId
   channelIdToObjectCommands: Map[String, Set[String]] = Map.empty,
@@ -70,15 +70,13 @@ case class Environment(
   def printTypes: String = {
     val builder: StringBuilder = new StringBuilder()
     for {
-      typeMap <- typeSystem.currentMapping.toVector
-      typeName = typeMap._1
-      typeId = typeMap._2
+      typeName <- typeSystem.typeToParameterType.keys.toVector
 
-      parameterTypeOpt = typeSystem.typeToParameterType.get(typeId)
+      parameterTypeOpt = typeSystem.typeToParameterType.get(typeName)
 
-      parameterTypeString = parameterTypeOpt.map(x => "\t" + x.toString).getOrElse("")
+      parameterTypeString = parameterTypeOpt.map(x => "\t" + x).getOrElse("")
     } {
-      builder.append(s"${typeMap._1}${parameterTypeString}\n")
+      builder.append(s"${typeName}${parameterTypeString}\n")
     }
     builder.toString
   }
@@ -112,9 +110,7 @@ case class Environment(
         val updatedEnv = this.newCommand(
           ApplyIndividualCommand(
             "__FunctionSystem",
-            UMap(
-              Vector(UIndex(0) -> UIdentifier(s), UIndex(1) -> UCase(nType.asUntagged, uObject))
-            )
+            UArray(UIdentifier(s), UCase(nType.asUntagged, uObject))
           )
         )
 
@@ -186,7 +182,7 @@ case class Environment(
 
           isCommandU = if (isCommand) UIndex(1) else UIndex(0)
 
-          newFieldMapping = (UIdentifier(id), UArray(Array(UCase(outputType, value), isCommandU)))
+          newFieldMapping = (UIdentifier(id), UArray(UCase(outputType, value), isCommandU))
 
           newFieldMappings <- currentFields match {
             case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings)
@@ -210,12 +206,10 @@ case class Environment(
         resultO.toOption.get
       }
       case NewTypeCommand(s, nType) => {
-        val uType = nType.asUntagged
+        val parameterType = NewMapTypeSystem.emptyStruct
+        val parameterPattern = UArray()
 
-        val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
-        val parameterPattern = UArray(Array.empty)
-
-        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, nType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -227,9 +221,10 @@ case class Environment(
       }
       case NewParamTypeCommand(s, paramList, nType) => {
         val parameterPattern = if (paramList.length == 1) {
-          UWildcardPattern(paramList.head._1)
+          UWildcard(paramList.head._1)
         } else {
-          UArray(paramList.toArray.map(param => UWildcardPattern(param._1)))
+          val arr: Array[UntaggedObject] = paramList.toArray.map(param => UWildcard(param._1))
+          UArray(arr)
         }
 
         val paramT = if (paramList.length == 1) {
@@ -241,9 +236,7 @@ case class Environment(
           )
         }
 
-        val uType = nType.asUntagged
-
-        val newTypeSystem = typeSystem.createNewCustomType(s, paramT.asUntagged, parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, paramT, parameterPattern, nType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -255,12 +248,10 @@ case class Environment(
       }
       case NewTypeClassCommand(s, typeTransform) => {
         val nType = TypeClassT(typeTransform, UMap(Vector.empty))
-        val uType = nType.asUntagged
 
-        val parameterType = NewMapTypeSystem.emptyStruct.asUntagged
-        val parameterPattern = UArray(Array.empty)
+        val parameterType = NewMapTypeSystem.emptyStruct
 
-        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, parameterPattern, uType) match {
+        val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, UArray(), nType) match {
           case Success(s) => s
           case Failure(f) => throw new Exception(f)
         }
@@ -285,7 +276,7 @@ case class Environment(
                 commandObj = NewMapObject(command, itemType)
                 
                 inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
-                convertedCommand <- TypeConversionCalculator.attemptConvertObjectToType(commandObj, inputT, this)
+                convertedCommand <- TypeConverter.attemptConvertObjectToType(commandObj, inputT, this)
               } yield {
                 convertedCommand.uObject
               }
@@ -336,23 +327,10 @@ case class Environment(
             }
           }
           case Failure(objectLookupFailureMessage) => {
-            val currentState = typeSystem.currentState
-
             for {
-              latestNamespace <- Outcome(typeSystem.historicalMapping.get(currentState), s"Type System missing latest namespace $currentState")
-              typeId <- Outcome(latestNamespace.get(s), s"Couldn't apply command to value $s. Not found in object or type namespace. Object space failure: $objectLookupFailureMessage")
-              currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find underlying type for $s")
-
-              currentParameterPattern = currentUnderlyingType._1
-              currentUnderlyingExp = currentUnderlyingType._2
-
-              underlyingT <- currentUnderlyingExp.asType
-
-              response <- CommandMaps.expandType(underlyingT, command, this)
-
-              newUnderlyingType = response.newType.asUntagged
-
-              newTypeSystem <- typeSystem.upgradeCustomType(s, newUnderlyingType, response.converter)
+              currentUnderlyingType <- typeSystem.currentUnderlyingType(s)
+              response <- CommandMaps.expandType(currentUnderlyingType._2, command, this)
+              newTypeSystem <- typeSystem.upgradeCustomType(s, response.newType, response.converter)
             } yield {
               this.copy(
                 commands = newCommands,
@@ -452,7 +430,7 @@ case class Environment(
         returnedEnv
       }
       case OutputToStdout(nObject) => {
-        val taggedObject = NewMapObject(nObject, CustomT("String", UArray(Array.empty)))
+        val taggedObject = NewMapObject(nObject, CustomT("String", UArray(), typeSystem.currentVersion))
 
         // TODO: obviously this can be way more efficient!
         for {
@@ -561,11 +539,6 @@ object Environment {
     Base.typeAsObject(nType)
   }
 
-  // TODO - eventually make this empty and add it elsewhere!!
-  val initialChannelToType = Map(
-    "stdout" -> CustomT("String", UArray(Array.empty))
-  )
-
   var Base: Environment = Environment()
 
   def buildSimpleMapT(typeTransform: TypeTransform): UntaggedObject = {
@@ -591,7 +564,7 @@ object Environment {
     }
 
     NewMapObject(
-      UMap(Vector(UWildcardPattern("typeTransform") -> transformMapT)),
+      USingularMap(UWildcard("typeTransform"), transformMapT),
       MapT(
         TypeTransform(TypeTransformT(allowGenerics), TypeT),
         MapConfig(RequireCompleteness, PatternMap)
@@ -605,7 +578,7 @@ object Environment {
     eCommand("Char", typeAsObject(CharacterT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", NewMapObject(
-      UMap(Vector(UWildcardPattern("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),
+      UMap(Vector(UWildcard("i") -> UCase(UIdentifier("Inc"), ParamId("i")))),
       MapT(TypeTransform(CountT, CountT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
     eCommand("IsCommand", NewMapObject(
@@ -615,7 +588,7 @@ object Environment {
     eCommand("Boolean", typeAsObject(BooleanT)),
     eCommand("Sequence", NewMapObject(
       USingularMap(
-        UWildcardPattern("key"), 
+        UWildcard("key"), 
         buildSimpleMapT(TypeTransform(IndexT(UIndex(0)),ParamIdT("key")))
       ),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
@@ -627,25 +600,25 @@ object Environment {
     eCommand("CaseType", typeAsObject(CaseT(UMap(Vector.empty), IdentifierT, BasicMap))),
     eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
-      UMap(Vector(UWildcardPattern("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
+      UMap(Vector(UWildcard("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewTypeClassCommand("_default", USingularMap(UWildcardPattern("t"), ParamId("t"))),
+    NewTypeClassCommand("_default", USingularMap(UWildcard("t"), ParamId("t"))),
     NewTypeClassCommand("_typeOf", 
       USingularMap(
-        UWildcardPattern("t"),
-        buildSimpleMapT(TypeTransform(WildcardPatternT("_"), TypeT))
+        UWildcard("t"),
+        buildSimpleMapT(TypeTransform(WildcardT("_"), TypeT))
       )
     ),
     ApplyIndividualCommand(
       "_typeOf",
-      UMap(Vector(UWildcardPattern("t") -> UMap(Vector(UWildcardPattern("_") -> ParamId("t")))))
+      UMap(Vector(UWildcard("t") -> UMap(Vector(UWildcard("_") -> ParamId("t")))))
     ),
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),
       CaseT(
-        UMap(Vector(UWildcardPattern("i") ->
+        UMap(Vector(UWildcard("i") ->
           MapT(
             TypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
             MapConfig(RequireCompleteness, SimpleFunction)
@@ -660,7 +633,7 @@ object Environment {
     NewTypeClassCommand(
       "Addable",
       USingularMap(
-        USingularMap(IndexT(UIndex(2)).asUntagged, UWildcardPattern("t")),
+        USingularMap(IndexT(UIndex(2)).asUntagged, UWildcard("t")),
         ParamId("t")
       )
     ),
@@ -686,4 +659,10 @@ object Environment {
       ), MapConfig(RequireCompleteness, SimpleFunction))
     ))
   ))
+
+  // TODO - eventually make this empty and add it elsewhere!!
+  val initialChannelToType = Map(
+    "stdout" -> CustomT("String", UArray(), 10) // WHY 10?
+  )
+  Base = Base.copy(channelIdToType = initialChannelToType)
 }

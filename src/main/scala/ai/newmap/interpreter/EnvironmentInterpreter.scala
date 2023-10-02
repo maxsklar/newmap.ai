@@ -28,7 +28,9 @@ class EnvironmentInterpreter(
     applyInterpCommand(code) match {
       case CommandPrintSomething(response) => Success(response)
       case CommandExit => Success(":exit")
-      case CommandPassThrough => applyEnvCommand(code)
+      case CommandPassThrough => for {
+        command <- applyEnvCommand(code)
+      } yield command.displayString(env)
     }
   }
 
@@ -118,7 +120,7 @@ class EnvironmentInterpreter(
       tc <- TypeChecker.typeCheck(parseTree, TypeT, env, FullFunction, Map.empty)
       nObject <- Evaluator(tc.nExpression, env)
       nType <- nObject.asType
-      underlyingType <- TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState)
+      underlyingType <- TypeChecker.getFinalUnderlyingType(nType, env)
     } yield {
       underlyingType.displayString(env)
     }
@@ -162,7 +164,6 @@ class EnvironmentInterpreter(
   private def loadFileFromIterator(
     linesIt: Iterator[String],
     env: Environment,
-    tokens: Seq[Lexer.Token] = Seq.empty,
     parser: NewMapCodeParser = NewMapCodeParser()
   ): Outcome[Environment, String] = {
     var tokens: Seq[Lexer.Token] = Vector.empty
@@ -230,7 +231,7 @@ class EnvironmentInterpreter(
     } yield statementParse
   }
 
-  def applyEnvCommand(code: String): Outcome[String, String] = {
+  def applyEnvCommand(code: String): Outcome[EnvironmentCommand, String] = {
     for {
       tokens <- getTokens(code)
 
@@ -240,13 +241,8 @@ class EnvironmentInterpreter(
       interpreted <- StatementInterpreter(statementParse, env, Map.empty)
       command <- StatementEvaluator(interpreted.command, env)
     } yield {
-      applyEnvCommand(command)
+      env = env.newCommand(command)
+      command
     }
-  }
-
-  // Directly apply an environment comment
-  def applyEnvCommand(command: EnvironmentCommand): String = {
-    env = env.newCommand(command)
-    command.displayString(env)
   }
 }

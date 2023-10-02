@@ -8,14 +8,14 @@ import java.util.UUID
 // - to be replaced by internal newmap.ai code
 object IterationUtils {
   def enumerateAllValuesIfPossible(nType: NewMapType, env: Environment): Outcome[Vector[UntaggedObject], String] = {
-    TypeChecker.getFinalUnderlyingType(nType, env, env.typeSystem.currentState) match {
+    TypeChecker.getFinalUnderlyingType(nType, env) match {
       // TODO: What if values is too large? Should we make some restrictions here?
       // - Idea: have a value in the environment that gives us a maximum we are allowed to count up to
       case Success(SubtypeT(UMap(values), _, _)) => {
         // TODO - remove this case!
         enumerateMapKeys(values.map(_._1))
       }
-      case Success(CaseT(cases, CustomT("String", UArray(v)), BasicMap)) if (v.isEmpty) => {
+      case Success(CaseT(cases, CustomT("String", UArray(v), _), BasicMap)) if (v.isEmpty) => {
         for {
           caseMapBindings <- cases.getMapBindings
           paramList <- StatementInterpreter.convertMapValuesToParamList(caseMapBindings, env)
@@ -57,7 +57,7 @@ object IterationUtils {
               }
             }
             case _ => {
-              Success(Vector(UArray(Array.empty)))
+              Success(Vector(UArray()))
             }
           }
         } yield result
@@ -121,27 +121,22 @@ object IterationUtils {
       case NewMapObject(UArray(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         enumerateAllValuesIfPossible(typeTransform.keyType, env)
       }
-      case NewMapObject(UCase(UIndex(_), UArray(values)), CustomT("Array", _)) => {
+      case NewMapObject(UCase(UIndex(_), UArray(values)), CustomT("Array", _, _)) => {
         Success(values.toVector)
       }
-      case NewMapObject(UCase(UIndex(_), UMap(values)), CustomT("Array", _)) => {
+      case NewMapObject(UCase(UIndex(_), UMap(values)), CustomT("Array", _, _)) => {
         // We should be more careful about the ordering here!!
         Success(values.map(_._2))
       }
-      case NewMapObject(untaggedCurrent, CustomT(typeName, params)) => {
-        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
-        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
-
+      case NewMapObject(untaggedCurrent, CustomT(typeName, params, typeSystemId)) => {
         for {
-          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
-
-          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
-
+          underlyingTypeInfo <- env.typeSystem.historicalUnderlyingType(typeName, typeSystemId)
+          
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
           patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+          underlyingType = MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions)
 
           underlyingT <- underlyingType.asType
 
@@ -150,28 +145,11 @@ object IterationUtils {
           result <- iterateObject(currentResolved, env, typeSystemIdOpt)
         } yield result
       }
-      case NewMapObject(untaggedCurrent, WithStateT(typeSystemId, nType)) => {
-        for {
-          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, nType, env)
-          result <- iterateObject(retaggedCurrent, env, Some(typeSystemId))
-        } yield result
-      }
       case NewMapObject(untaggedCurrent, TypeT) => {
         for {
           nType <- untaggedCurrent.asType
           result <- enumerateAllValuesIfPossible(nType, env)
         } yield result
-      }
-      case NewMapObject(uType, HistoricalTypeT(typeSystemId)) => {
-        val newUType = UCase(
-          UIdentifier("WithState"),
-          UCase(
-            Uuuid(typeSystemId),
-            uType
-          )
-        )
-
-        iterateObject(NewMapObject(newUType, TypeT), env)
       }
       case NewMapObject(untaggedCurrent, nType) => {
         Failure(s"Unable to iterate over object: $untaggedCurrent of type ${nType.displayString(env)}")
@@ -181,7 +159,7 @@ object IterationUtils {
   }
 
   // Give a type, what's going to come out of the iteration?
-  def iterationItemType(nType: NewMapType, env: Environment, typeSystemIdOpt: Option[UUID] = None): Outcome[NewMapType, String] = {
+  def iterationItemType(nType: NewMapType, env: Environment): Outcome[NewMapType, String] = {
     nType match {
       case MapT(typeTransform, MapConfig(CommandOutput, BasicMap, _, _, _)) => {
         Success(typeTransform.keyType)
@@ -189,29 +167,23 @@ object IterationUtils {
       case MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _)) => {
         Success(typeTransform.valueType)
       }
-      case CustomT("Array", itemType) => {
+      case CustomT("Array", itemType, _) => {
         itemType.asType
       }
-      case CustomT(typeName, params) => {
-        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
-        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
-
+      case CustomT(typeName, params, typeSystemId) => {
         for {
-          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
-          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+          // TODO - use TypeChecker.getUnderlyingType
+          underlyingTypeInfo <- env.typeSystem.historicalUnderlyingType(typeName, typeSystemId)
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
           patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+          underlyingType = MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions)
 
           underlyingT <- underlyingType.asType
-          result <- iterationItemType(underlyingT, env, typeSystemIdOpt)
+          result <- iterationItemType(underlyingT, env)
         } yield result
-      }
-      case WithStateT(typeSystemId, nType) => {
-        iterationItemType(nType, env, Some(typeSystemId))
       }
       case _ => Failure(s"Unable to get iteration item type: ${nType.displayString(env)}")
     }
@@ -221,7 +193,7 @@ object IterationUtils {
   // This means that the first type is either convertible into the second type, or it's iteration type can be convertible.
   // For example, if my second type is Int, then I can certainly give it an Int. But I can also give it an array of Int because I'm stil getting Ints out of it!
   def isIteratableToType(firstType: NewMapType, secondType: NewMapType, env: Environment): Outcome[Boolean, String] = {
-    if (TypeConversionCalculator.isTypeConvertible(firstType, secondType, env).isSuccess) {
+    if (TypeConverter.isTypeConvertible(firstType, secondType, env).isSuccess) {
       Success(true)
     } else {
       for {
@@ -232,7 +204,7 @@ object IterationUtils {
   }
 
   def isTermPatternFree(uObject: UntaggedObject): Boolean = uObject match {
-    case UWildcardPattern(_) => false
+    case UWildcard(_) => false
     case UCase(constructor, input) => isTermPatternFree(constructor) && isTermPatternFree(input)
     case UArray(patterns) => patterns.forall(isTermPatternFree(_))
     case UMap(items) => items.map(_._2).forall(isTermPatternFree(_))

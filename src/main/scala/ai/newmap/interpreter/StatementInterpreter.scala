@@ -22,13 +22,17 @@ object StatementInterpreter {
   ): Outcome[ReturnValue, String] = {
     sParse match {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
+        //println("FullStatementParse: " + typeExpression)
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
 
           nTypeObj <- Evaluator(tcType.nExpression, env)
 
+          //_ = println("got tc type obj: " + nTypeObj)
+
           nType <- nTypeObj.asType
 
+          //_ = println("Expected type: " + nType.displayString(env))
 
           // If prefix is DefStatement then make sure nType is a potentially recursive function!
           // Also update the environment with the name because it's potentially recursive
@@ -133,7 +137,7 @@ object StatementInterpreter {
               for {
                 tcType <- TypeChecker.typeCheck(iterableExp, TypeT, env, FullFunction, tcParameters)
                 uType <- Evaluator(tcType.nExpression, env)
-                iterableTypeCandidate = NewMapObject(uType, HistoricalTypeT(env.typeSystem.currentState))
+                iterableTypeCandidate = NewMapObject(uType, TypeT)
               } yield iterableTypeCandidate
             }
           }
@@ -147,7 +151,7 @@ object StatementInterpreter {
           command <- channelTypeOpt match {
             case Some(channelType) => {
               for {
-                tObject <- TypeConversionCalculator.attemptConvertObjectToType(iterableObject, channelType, env)
+                tObject <- TypeConverter.attemptConvertObjectToType(iterableObject, channelType, env)
               } yield {
                 IterateIntoChannel(tObject.uObject, UIdentifier(destination.s))
               }
@@ -200,19 +204,10 @@ object StatementInterpreter {
             }
           }
           case (Failure(objectLookupFailureMessage), _) => {
-            val typeSystem = env.typeSystem
-            val currentState = typeSystem.currentState
-
             for {
-              latestNamespace <- Outcome(typeSystem.historicalMapping.get(currentState), s"Type System missing latest namespace $currentState")
-              typeId <- Outcome(latestNamespace.get(id.s), s"Couldn't update variable ${id.s}. Not found in object or type namespace. Object space failure: $objectLookupFailureMessage")
+              currentUnderlyingType <- env.typeSystem.currentUnderlyingType(id.s)
 
-              currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find underlying type for ${id.s}")
-
-              currentParameterPattern = currentUnderlyingType._1
-              underlyingT <- currentUnderlyingType._2.asType
-
-              inputT <- CommandMaps.getTypeExpansionCommandInput(underlyingT, typeSystem)
+              inputT <- CommandMaps.getTypeExpansionCommandInput(currentUnderlyingType._2, env.typeSystem)
 
               newParameterMap <- RetrieveType.getParameterValues(id.s, env)
 
@@ -393,8 +388,6 @@ object StatementInterpreter {
           completeness = if (useCommandMap) CommandOutput else RequireCompleteness
           mapConfig = MapConfig(completeness, featureSet)
 
-          typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
-
           mapType = MapT(typeTransform, mapConfig)
 
           // I still don't know if "FullFunction" is right here
@@ -421,7 +414,7 @@ object StatementInterpreter {
 
           baseT <- baseTypePatternTC.typeCheckResult.asType
           takingTypeT <- takingTypePatternTC.nExpression.asType
-          innerTypeTransform = TypeTransform(baseT, takingTypeT)
+          innerTypeTransform = TypeTransform(takingTypeT, baseT)
 
           fullTypeTransform = TypeTransform(
             baseT,

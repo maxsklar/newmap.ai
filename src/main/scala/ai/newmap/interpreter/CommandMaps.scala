@@ -23,14 +23,9 @@ object CommandMaps {
    */
   def getDefaultValueOfCommandTypeFromEnv(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
     for {
-      defaultTypeId <- Outcome(env.typeSystem.currentMapping.get("_default"), "Couldn't find _default typeClass")
+      defaultUnderlyingType <- env.typeSystem.currentUnderlyingType("_default")
 
-      defaultUnderlyingType <- Outcome(env.typeSystem.typeToUnderlyingType.get(defaultTypeId), "Couldn't find _default underlying typeclass")
-
-      defaultParameterPattern = defaultUnderlyingType._1
-      defaultUnderlyingExp = defaultUnderlyingType._2
-
-      defaultUnderlyingExpT <- defaultUnderlyingExp.asType
+      defaultUnderlyingExpT = defaultUnderlyingType._2
 
       mapValuesU <- defaultUnderlyingExpT match {
         case TypeClassT(_, values) => Success(values)
@@ -77,11 +72,8 @@ object CommandMaps {
         Success(defaultUMap)
       }*/
       case CharacterT => Success(UCharacter('\u0000'))
-      case CustomT("Array", _) => Success(UCase(UIndex(0), UArray(Array.empty)))
-      case CustomT("String", _) => Success(UCase(UIndex(0), UArray(Array.empty))) // Replace this line with a conversion!
-      case WithStateT(_, underlying) => {
-        getDefaultValueOfCommandTypeHardcoded(underlying, env)
-      }
+      case CustomT("Array", _, _) => Success(UCase(UIndex(0), UArray()))
+      case CustomT("String", _, _) => Success(UCase(UIndex(0), UArray())) // Replace this line with a conversion!
       case _ => Failure(s"Type ${nType.displayString(env)} has no default value")
     }
   }
@@ -103,19 +95,13 @@ object CommandMaps {
       case IndexT(_) => Success(NewMapO.emptyStruct) // Where to insert the new value?
       case CaseT(_, parentType, _) => {
         Success(StructT(
-          UMap(Vector(
-            UIndex(0) -> parentType.asUntagged,
-            UIndex(1) -> HistoricalTypeT(typeSystem.currentState).asUntagged
-          )),
+          UArray(parentType.asUntagged, TypeT.asUntagged),
           IndexTN(2)
         ))
       }
       case StructT(_, parentType, _, _) => {
         Success(StructT(
-          UMap(Vector(
-            UIndex(0) -> parentType.asUntagged,
-            UIndex(1) -> SubtypeT(IsCommandFunc, HistoricalTypeT(typeSystem.currentState)).asUntagged
-          )),
+          UArray(parentType.asUntagged, SubtypeT(IsCommandFunc, TypeT).asUntagged),
           IndexTN(2)
         ))
       }
@@ -126,25 +112,18 @@ object CommandMaps {
         Success(StructT(typeTransform, TypeT, CommandOutput, BasicMap))
       }
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
-      case CustomT(name, UArray(_)) => {
-        val currentState = typeSystem.currentState
-
+      case CustomT(name, _, _) => {
         for {
-          currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
-          currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
-          currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
+          currentUnderlyingType <- typeSystem.currentUnderlyingType(name)
 
-          currentParameterPattern = currentUnderlyingType._1
-          underlyingT <- currentUnderlyingType._2.asType
-
-          commandInput <- getTypeExpansionCommandInput(underlyingT, typeSystem)
+          commandInput <- getTypeExpansionCommandInput(currentUnderlyingType._2, typeSystem)
         } yield commandInput
       }
       case _ => Failure(s"Unable to expand key: $nType")
     }
   }
 
-  val untaggedIdentity: UntaggedObject = UMap(Vector(UWildcardPattern("_") -> ParamId("_")))
+  val untaggedIdentity: UntaggedObject = UMap(Vector(UWildcard("_") -> ParamId("_")))
 
   case class ExpandKeyResponse(
     newType: NewMapType,
@@ -184,7 +163,7 @@ object CommandMaps {
         } yield {
           ExpandKeyResponse(
             CaseT(newCaseMap.uObject, parentType, featureSet),
-            Vector(UCase(newCaseName, UWildcardPattern("_"))),
+            Vector(UCase(newCaseName, UWildcard("_"))),
             untaggedIdentity
           )
         }
@@ -195,10 +174,7 @@ object CommandMaps {
           MapConfig(CommandOutput, BasicMap)
         ))
 
-        val adjustedCommand = UMap(Vector(
-          UIndex(0) -> command,
-          UIndex(1) -> UIndex(1)
-        ))
+        val adjustedCommand = UArray(command, UIndex(1))
 
         for {
           newMembersMap <- updateVersionedObject(isMemberMap, adjustedCommand, env)
@@ -232,20 +208,12 @@ object CommandMaps {
           }
         }
       }
-      case CustomT(name, _) => {
+      case CustomT(name, _, _) => {
         // This only occurs if we have a custom type within a custom type - so this won't be called for a while.
         // strategy: get underlying type from the type system, turn it into a NewMapType, and then call this on it!
-        val typeSystem = env.typeSystem
-        val currentState = typeSystem.currentState
         for {
-          currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
-          currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
-          currentUnderlyingTypeInfo <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
-
-          currentParameterPattern = currentUnderlyingTypeInfo._1
-          currentUnderlyingType = currentUnderlyingTypeInfo._2
-          currentUnderlyingT <- currentUnderlyingType.asType
-          response <- expandType(currentUnderlyingT, command, env)
+          currentUnderlyingTypeInfo <- env.typeSystem.currentUnderlyingType(name)
+          response <- expandType(currentUnderlyingTypeInfo._2, command, env)
         } yield response
       }
       case _ => Failure(s"Unable to expand key: $nType -- with command $command")
@@ -254,8 +222,7 @@ object CommandMaps {
 
   def getCommandInputOfCommandType(
     nType: NewMapType,
-    env: Environment,
-    typeSystemIdOpt: Option[UUID] = None
+    env: Environment
   ): Outcome[NewMapType, String] = {
     nType match {
       case CountT => Success(NewMapO.emptyStruct)
@@ -272,10 +239,7 @@ object CommandMaps {
           outputCommandT <- getCommandInputOfCommandType(typeTransform.valueType, env)
         } yield {
           StructT(
-            UMap(Vector(
-              UIndex(0) -> typeTransform.keyType.asUntagged,
-              UIndex(1) -> outputCommandT.asUntagged
-            )),
+            UArray(typeTransform.keyType.asUntagged, outputCommandT.asUntagged),
             IndexTN(2)
           )
         }
@@ -301,10 +265,7 @@ object CommandMaps {
             }
             case _ => {
               StructT(
-                UMap(Vector(
-                  UIndex(0) -> keyExpansionCommandT.asUntagged,
-                  UIndex(1) -> requiredValuesT.asUntagged
-                )),
+                UArray(keyExpansionCommandT.asUntagged, requiredValuesT.asUntagged),
                 IndexTN(2)
               )
             }
@@ -313,10 +274,7 @@ object CommandMaps {
       }
       case FunctionalSystemT(_) => {
         Success(StructT(
-          UMap(Vector(
-            UIndex(0) -> IdentifierT.asUntagged,
-            UIndex(1) -> NewMapO.taggedObjectT.asUntagged
-          )),
+          UArray(IdentifierT.asUntagged, NewMapO.taggedObjectT.asUntagged),
           IndexTN(2)
         ))
       }
@@ -332,10 +290,7 @@ object CommandMaps {
         // A) A field expansion command
         // B) The tagged object that goes in there (so both type and object)
         Success(StructT(
-          UMap(Vector(
-            UIndex(0) -> fieldExpansionCommandT.asUntagged,
-            UIndex(1) -> NewMapO.taggedObjectT.asUntagged
-          )),
+          UArray(fieldExpansionCommandT.asUntagged, NewMapO.taggedObjectT.asUntagged),
           IndexTN(2)
         ))
       }
@@ -345,20 +300,16 @@ object CommandMaps {
         Success(CaseT(parameterList, parentFieldType, featureSet))
       }
       // This should be custom defined
-      case CustomT("Array", nType) => nType.asType
-      case CustomT(typeName, params) => {
-        val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
-        val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
-
+      case CustomT("Array", nType, _) => nType.asType
+      case CustomT(typeName, params, typeSystemId) => {
         for {
-          typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
-          underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+          underlyingTypeInfo <- env.typeSystem.historicalUnderlyingType(typeName, typeSystemId)
 
           (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
           patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-          underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+          underlyingType = MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions)
 
           underlyingT <- underlyingType.asType
           result <- getCommandInputOfCommandType(underlyingT, env)
@@ -366,14 +317,10 @@ object CommandMaps {
           result
         }
       }
-      case WithStateT(typeSystemId, nType) => {
-        getCommandInputOfCommandType(nType, env, Some(typeSystemId))
-      }
       /*case CaseT(cases, _, _) => {
         Success(UndefinedT)
       }*/
       case _ => {
-        println(s"Got undefined for ${nType.displayString(env)}")
         Success(UndefinedT)
       }
     }
@@ -382,8 +329,7 @@ object CommandMaps {
   def updateVersionedObject(
     current: NewMapObject,
     command: UntaggedObject,
-    env: Environment,
-    typeSystemIdOpt: Option[UUID] = None
+    env: Environment
   ): Outcome[NewMapObject, String] = {
     current.nType match {
       case nType@CountT => {
@@ -431,10 +377,7 @@ object CommandMaps {
             env
           )
 
-          mapValues <- current.uObject match {
-            case UMap(values) => Success(values)
-            case _ => Failure(s"Couldn't get map values from ${current.uObject}")
-          }
+          mapValues <- current.uObject.getMapBindings()
 
           newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
         } yield {
@@ -457,16 +400,12 @@ object CommandMaps {
             case _ => {
 
               for {
-                commandPatterns <- command match {
-                  case UMap(patterns) => Success(patterns)
-                  case _ => Failure(s"Unexpected command shape $command")
-                }
-
+                commandPatterns <- command.getMapBindings()
                 keyField <- Evaluator.applyFunction(command, UIndex(0), env)
-
                 valueExpression <- Evaluator.patternMatchInOrder(commandPatterns, UIndex(1), env)
+                valueExpressionEval<- Evaluator(valueExpression, env)
               } yield {
-                (NewMapObject(keyField, keyT), valueExpression)
+                (NewMapObject(keyField, keyT), valueExpressionEval)
               }
             }
           }
@@ -483,10 +422,7 @@ object CommandMaps {
             MapConfig(style, features)
           )
                   
-          mapValues <- current.uObject match {
-            case UMap(values) => Success(values)
-            case _ => Failure(s"Couldn't get map values from $current")
-          }
+          mapValues <- current.uObject.getMapBindings()
 
           _ <- Outcome.failWhen(updateKeyTypeResponse.newValues.length > 1, "A Unimplemented")
 
@@ -500,9 +436,7 @@ object CommandMaps {
           } yield (value._1 -> value._2)
 
           newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
-        } yield {
-          NewMapObject(UMap(newMapValues), newTableType)
-        }
+        } yield NewMapObject(UMap(newMapValues), newTableType)
       }
       case FunctionalSystemT(functionTypes) => {
         for {
@@ -600,7 +534,7 @@ object CommandMaps {
           }
         }
       }
-      case nType@CustomT("Array", _) => {
+      case nType@CustomT("Array", _, _) => {
 
         for {
           untaggedResult <- current.uObject match {
@@ -616,11 +550,12 @@ object CommandMaps {
           result <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
         } yield result
       }
-      case nType@CustomT(typeName, params) => {
+      case nType@CustomT(typeName, params, typeSystemId) => {
         val customResultOutcome = {
           command match {
             case UCase(name, value) => {
               for {
+                // TODO - take into account the typeSystemId
                 // TODO - what if this intercepts a field that's not a command?
                 func <- Evaluator(AccessField(current.uObject, current.nType.asUntagged, name), env)
                 afterCommand <- Evaluator.applyFunction(func, value, env, StandardMatcher)
@@ -632,18 +567,14 @@ object CommandMaps {
         }
 
         customResultOutcome.rescue(f => {
-          val typeSystemId = typeSystemIdOpt.getOrElse(env.typeSystem.currentState)
-          val typeSystemMapping = env.typeSystem.historicalMapping.get(typeSystemId).getOrElse(Map.empty) 
-
           for {
-            typeId <- Outcome(typeSystemMapping.get(typeName), s"Couldn't find type: $typeName")
-            underlyingTypeInfo <- Outcome(env.typeSystem.typeToUnderlyingType.get(typeId), s"Couldn't find type: $typeName -- $typeId")
+            underlyingTypeInfo <- env.typeSystem.historicalUnderlyingType(typeName, typeSystemId)
 
             (underlyingPattern, underlyingExp) = underlyingTypeInfo
 
             patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-            underlyingType = MakeSubstitution(underlyingExp, patternMatchSubstitutions)
+            underlyingType = MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions)
 
             underlyingT <- underlyingType.asType
             currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
@@ -652,13 +583,6 @@ object CommandMaps {
             resultResolved <- TypeChecker.tagAndNormalizeObject(result.uObject, nType, env)
           } yield resultResolved
         })
-      }
-      case WithStateT(typeSystemId, nType) => {
-        for {
-          retaggedCurrent <- TypeChecker.tagAndNormalizeObject(current.uObject, nType, env)
-
-          result <- updateVersionedObject(retaggedCurrent, command, env, Some(typeSystemId))
-        } yield result
       }
       case _ => {
         Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")

@@ -17,7 +17,6 @@ object StatementEvaluator {
       case c@FullEnvironmentCommand(_, nExpression, _) => {
         for {
           evaluatedObject <- Evaluator(nExpression.uObject, env)
-
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
           nObject <- TypeChecker.tagAndNormalizeObject(constantObject, nExpression.nType, env)
         } yield {

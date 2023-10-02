@@ -53,4 +53,13 @@ Build and suggest statistical models based on properties of the dataset.
 Because there is strong verification onboard, imagine having code that is constantly finding upgrades to the way it stores and serves data. These upgrades can be found through the internet, or through an algorithm that searches the solution space.
 
 ### Universal Concept Map
-Once probabilistic programming is a part of newmap.ai, we can generate a collection to model the space of “concepts” known to humans. This is an approach to natural language understanding which 
+Once probabilistic programming is a part of newmap.ai, we can generate a collection to model the space of “concepts” known to humans. This is an approach to natural language understanding which
+
+## Code Design Principles
+
+### Untagged Objects vs Tagged Objects
+
+### NewMapType
+NewMapType is a representation of a type in the type system. Ultimately, the information in NewMapType should specify everything that we need to know about the type of an object.
+
+NewMapType can also be turned into an Untagged Object.

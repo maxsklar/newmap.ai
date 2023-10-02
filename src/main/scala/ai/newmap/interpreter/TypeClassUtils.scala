@@ -12,9 +12,8 @@ object TypeClassUtils {
     env: Environment
   ): Outcome[NewMapType, String] = {
     nType match {
-      case WildcardPatternT(_) => Success(CountT)
+      case WildcardT(_) => Success(CountT)
       case TypeT => Success(nType)
-      case HistoricalTypeT(_) => Success(nType)
       case CountT => Success(nType)
       case BooleanT => {
         for {
@@ -26,20 +25,12 @@ object TypeClassUtils {
           _ <- Outcome.failWhen(i >= j, s"Proposed index $i is too large for type $j")
         } yield nType
       }
-      case CustomT(name, _) => {
-        val typeSystem = env.typeSystem
-        val currentState = typeSystem.currentState
-
+      case CustomT(name, _, typeSystemId) => {
         for {
-          currentMapping <- Outcome(typeSystem.historicalMapping.get(currentState), s"Current type mapping $currentState not found")
-          currentTypeId <- Outcome(currentMapping.get(name), s"$name must be defined")
-          currentUnderlyingType <- Outcome(typeSystem.typeToUnderlyingType.get(currentTypeId), s"Couldn't find underlying type for $name")
+          underlyingType <- env.typeSystem.historicalUnderlyingType(name, typeSystemId)
 
-          currentParameterPattern = currentUnderlyingType._1
-          underlyingT <- currentUnderlyingType._2.asType
-
-          //TODO: The env should. be updated with currentParameterPattern
-          result <- typeIsExpectingAnIndex(underlyingT, i, env)
+          //TODO: The env should be updated with currentParameterPattern
+          result <- typeIsExpectingAnIndex(underlyingType._2, i, env)
         } yield result
         
       }

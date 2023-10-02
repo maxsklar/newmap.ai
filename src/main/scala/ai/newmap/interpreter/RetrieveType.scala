@@ -26,8 +26,7 @@ object RetrieveType {
       isMapValuesClosed(values, knownVariables)
     }
     case USingularMap(key, value) => {
-      isTermClosedLiteral(key, knownVariables) &&
-        isTermClosedLiteral(value, knownVariables)
+      isMapValuesClosed(Vector(key -> value), knownVariables)
     }
     case UArray(values) => values.forall(v => isTermClosedLiteral(v, knownVariables))
     case _ => true
@@ -52,8 +51,8 @@ object RetrieveType {
     env: Environment
   ): Outcome[Map[String, NewMapType], String] = {
     for {
-      parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentState, identifier)
-      parameterPattern <- env.typeSystem.getParameterPattern(env.typeSystem.currentState, identifier)
+      parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentVersion, identifier)
+      parameterPattern <- env.typeSystem.getParameterPattern(env.typeSystem.currentVersion, identifier)
       paramValues <- fetchParamsFromPattern(parameterType, parameterPattern, env)
     } yield paramValues
   }
@@ -63,17 +62,13 @@ object RetrieveType {
     pattern: UntaggedObject,
     env: Environment
   ): Outcome[Map[String, NewMapType], String] = {
-    val expectedTypeOutcome = TypeChecker.getFinalUnderlyingType(
-      nType,
-      env,
-      env.typeSystem.currentState
-    )
+    val expectedTypeOutcome = TypeChecker.getFinalUnderlyingType(nType, env)
 
     for {
       expectedType <- expectedTypeOutcome
 
       answer <- (expectedType, pattern) match {
-        case (_, UWildcardPattern(x)) => Success(Map(x -> nType))
+        case (_, UWildcard(x)) => Success(Map(x -> nType))
         case (CaseT(cases, _, _), UCase(constructor, resultPattern)) => {
           for {
             valueTypeExpression <- Evaluator.applyFunction(cases, constructor, env)

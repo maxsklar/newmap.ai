@@ -28,7 +28,7 @@ object NewMapO {
   def emptyStruct: NewMapType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 
   def taggedObjectT: NewMapType = CaseT(
-    UMap(Vector(UWildcardPattern("t") -> ParamId("t"))),
+    UMap(Vector(UWildcard("t") -> ParamId("t"))),
     fieldParentType = TypeT,
     featureSet = PatternMap,
   )

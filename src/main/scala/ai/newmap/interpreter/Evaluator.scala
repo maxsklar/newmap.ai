@@ -9,23 +9,20 @@ object Evaluator {
   def apply(
     nExpression: UntaggedObject,
     env: Environment,
-
-    // TODO: any way we can get rid of this?
-    paramsToAllow: Vector[String] = Vector.empty
   ): Outcome[UntaggedObject, String] = {
     nExpression match {
       case ApplyFunction(func, input, matchingRules) => {
         for {
-          evalFunc <- this(func, env, paramsToAllow)
-
-          evalInput <- this(input, env, paramsToAllow)
-
+          evalFunc <- this(func, env)
+          evalInput <- this(input, env)
           result <- applyFunction(evalFunc, evalInput, env, matchingRules)
-        } yield result
+        } yield {
+          result
+        }
       }
       case AccessField(value, uTypeClass, field) => {
         for {
-          evalValue <- this(value, env, paramsToAllow)
+          evalValue <- this(value, env)
 
           // The field and type class should already be evaluated, so no need to re-evaluate it here
           fieldsToMap <- applyFunction(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
@@ -40,38 +37,35 @@ object Evaluator {
           }
           
           answer <- applyFunction(resultValue, evalValue, env)
-        } yield {
-          answer
-        }
+        } yield answer
       }
       case ParamId(s) => {
+        // TODO - we should distinguish environment parameters and parameters in a function
+        // - the latter is only substituted during MakeSubstitution when the function is being applied
         env.lookupValue(s) match {
           case Some(nObject) => Success(nObject.uObject)
-          case None => if (paramsToAllow.contains(s)) Success(ParamId(s)) else {
-            Failure(s"Unbound identifier: $s")
-          }
+          case None => Success(ParamId(s))
         }
       }
       case UCase(constructor, input) => {
         for {
-          evalInput <- this(input, env, paramsToAllow)
+          evalInput <- this(input, env)
         } yield {
           UCase(constructor, evalInput)
         }
       }
       case UMap(values) => {
         for {
-          evalValues <- evalMapInstanceVals(values, env, paramsToAllow)
+          evalValues <- evalMapInstanceVals(values, env)
         } yield UMap(evalValues)
       }
       case USingularMap(key, value) => {
         for {
-          evalKey <- this(key, env, paramsToAllow)
+          evalKey <- this(key, env)
 
           newParams = newParametersFromPattern(evalKey)
 
-          // TODO - use "params to allow" in this
-          evalValue = this(value, env, paramsToAllow ++ newParams) match {
+          evalValue = this(value, env) match {
             case Success(vObj) => vObj
             case Failure(f) => value
           }
@@ -79,11 +73,11 @@ object Evaluator {
       }
       case UArray(values) => {
         for {
-          evalValues <- evalStructVals(values, env, paramsToAllow)
+          evalValues <- evalStructVals(values, env)
         } yield UArray(evalValues)
       }
       case ULet(statements, expression) => {
-        evalLet(statements, expression, env, paramsToAllow)
+        evalLet(statements, expression, env)
       }
       case constant => Success(constant)
     }
@@ -114,19 +108,16 @@ object Evaluator {
 
   def evalMapInstanceVals(
     values: Vector[(UntaggedObject, UntaggedObject)],
-    env: Environment,
-    paramsToAllow: Vector[String]
+    env: Environment
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     values match {
       case (k, v) +: restOfValues => {
-        //val newParams = newParametersFromPattern(k)
-        val newParams = Vector.empty
-
         // TODO - rethink about "when to evaluate" what's inside a map
-        val newV = this(v, env, paramsToAllow ++ newParams).toOption.getOrElse(v)
+        //val newV = this(v, env).toOption.getOrElse(v)
+        val newV = v
 
         for {
-          evalRest <- evalMapInstanceVals(restOfValues, env, paramsToAllow)
+          evalRest <- evalMapInstanceVals(restOfValues, env)
         } yield (k -> newV) +: evalRest
       }
       case _ => Success(Vector.empty)
@@ -135,14 +126,13 @@ object Evaluator {
 
   def evalStructVals(
     values: Array[UntaggedObject],
-    env: Environment,
-    paramsToAllow: Vector[String]
+    env: Environment
   ): Outcome[Array[UntaggedObject], String] = {
     values.toVector match {
       case v +: restOfValues => {
         for {
-          evalRest <- evalStructVals(restOfValues.toArray, env, paramsToAllow)
-          evalV <- this(v, env, paramsToAllow)
+          evalRest <- evalStructVals(restOfValues.toArray, env)
+          evalV <- this(v, env)
         } yield {
           (evalV +: evalRest.toVector).toArray
         }
@@ -154,17 +144,16 @@ object Evaluator {
   def evalLet(
     commands: Vector[EnvironmentCommand],
     expression: UntaggedObject,
-    env: Environment,
-    paramsToAllow: Vector[String]
+    env: Environment
   ): Outcome[UntaggedObject, String] = commands match {
     case command +: otherCommands => {
       // If there are still parameters in the command, it cannot be evaluated
       val newEnv = env.newCommand(command)
-      evalLet(otherCommands, expression, newEnv, paramsToAllow)
+      evalLet(otherCommands, expression, newEnv)
     }
     case _ => {
       for {
-        result <- this(expression, env, paramsToAllow)
+        result <- this(expression, env)
       } yield {
         stripVersioningU(result, env)
       }
@@ -186,7 +175,6 @@ object Evaluator {
     }
   }
 
-
   // Assume that both the function and the input have been evaluated
   def applyFunction(
     func: UntaggedObject,
@@ -196,20 +184,26 @@ object Evaluator {
   ): Outcome[UntaggedObject, String] = {
     stripVersioningU(func, env) match {
       case UMap(values) => {
-        val keyMatchResult = patternMatchInOrder(values, input, env, matchingRules) match {
-          case Success(result) => result
-          case Failure(f) => {
-            // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
-            // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
-            UInit
+        if (RetrieveType.isTermClosedLiteral(input)) {
+          val keyMatchResult = patternMatchInOrder(values, input, env, matchingRules) match {
+            case Success(result) => result
+            case Failure(f) => {
+              // Because this is already type checked, we can infer that MapCompleteness == CommandOutput
+              // - If it had equaled "MapCompleteness", then we shouldn't be in a situation with no match
+              UInit
+            }
           }
-        }
 
-        this(keyMatchResult, env)
+          this(keyMatchResult, env)
+        } else Failure(s"input $input not a closed literal")
       }
       case USingularMap(key, value) => {
-        // Treat it like a small map
-        applyFunction(UMap(Vector(key -> value)), input, env, matchingRules)
+        // Singular maps are never command maps, so they may fail
+        for {
+          paramsToSubsitute <- patternMatch(key, input, matchingRules, env)
+          keyMatchResult = MakeSubstitution(value, paramsToSubsitute)
+          finalizeResult <- this(keyMatchResult, env)
+        } yield finalizeResult
       }
       case UArray(array) => {
         for {
@@ -304,7 +298,6 @@ object Evaluator {
     }
   }
 
-
   def patternMatch(
     pattern: UntaggedObject,
     input: UntaggedObject,
@@ -313,7 +306,7 @@ object Evaluator {
   ): Outcome[Map[String, UntaggedObject], String] = {
     pattern match {
       // Always look for wildcard first, no matter what the matching rules are!
-      case UWildcardPattern(name) => Success(Map(name -> input))
+      case UWildcard(name) => Success(Map(name -> input))
       case USingularMap(key, value) => {
         for {
           valueForKey <- applyFunction(input, key, env, matchingRules)
@@ -326,7 +319,7 @@ object Evaluator {
           for {
             patternT <- pattern.asType
             inputT <- input.asType
-            response <- TypeConversionCalculator.isTypeConvertible(inputT, patternT, env)
+            response <- TypeConverter.isTypeConvertible(inputT, patternT, env)
           } yield {
             // Do we make use of the conversion rules at all?
             response.newParameters
@@ -373,7 +366,7 @@ object Evaluator {
         // This is the kind of thing that needs to be in a custom matcher for counts!!
         patternMatch(i, UIndex(j - 1), StandardMatcher, env)
       }
-      case (_, UWildcardPattern(wildcard)) => {
+      case (_, UWildcard(wildcard)) => {
         //throw new Exception(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
         Failure(s"Failed Pattern Match: Split wildcard $wildcard on $pattern")
       }
@@ -411,7 +404,7 @@ object Evaluator {
 
   // TODO - move this elsewhere, maybe to environment!
   def newParametersFromPattern(pattern: UntaggedObject): Vector[String] = pattern match {
-    case UWildcardPattern(name) => Vector(name)
+    case UWildcard(name) => Vector(name)
     case UArray(patterns) => patterns.map(newParametersFromPattern).flatten.toVector
     case UCase(_, input) => newParametersFromPattern(input)
     case UMap(values) => values.map(_._2).map(newParametersFromPattern).flatten.toVector
