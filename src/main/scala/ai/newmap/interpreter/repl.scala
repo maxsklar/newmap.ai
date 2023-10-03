@@ -4,10 +4,14 @@ import org.jline.reader.impl.history.DefaultHistory
 import org.jline.reader.{LineReader, LineReaderBuilder}
 import org.jline.terminal.TerminalBuilder
 import akka.util.Timeout
-import akka.pattern.ask
+import akka.actor.{Actor, ActorRef, ActorSystem, ActorIdentity, ExtendedActorSystem, Identify, Props}
 import java.nio.file.Paths
 import scala.concurrent.duration._
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
+import java.net.Socket
+import java.net.InetSocketAddress
+import scala.concurrent.ExecutionContext.Implicits.global
+import com.typesafe.config.ConfigFactory
 
 /**
  * This is the main class that opens a repl to the appropriate environment daemon.
@@ -28,18 +32,19 @@ object repl extends App {
   history.attach(lineReader)
   history.load()
 
-  // This ensures that the environment daemon is initialized
-  val unit: Unit = ()
-  val envDaemon = new EnvironmentDaemon()
-  val pingResponseF = (envDaemon.daemonActor ? unit)
-  val pingResponse = Await.result(pingResponseF, 5.seconds)
-  println(pingResponse)
+  def getPortArg(args: Array[String]): Option[Int] = {
+    args.sliding(2, 1).collectFirst {
+      case Array("--port", port: String) if port.forall(_.isDigit) => port.toInt
+    }
+  }
+
+  val envDaemon = new EnvironmentDaemon(getPortArg(args))
   
   var continue = true
   while(continue) {
     val code = lineReader.readLine("> ")
 
-    val responseF = envDaemon.daemonActor ? code
+    val responseF = envDaemon.sendCode(code)
 
     val response = Await.result(responseF, 5.seconds)
 
@@ -55,5 +60,5 @@ object repl extends App {
     }
   }
 
-  envDaemon.system.terminate()
+  envDaemon.terminate()
 }
