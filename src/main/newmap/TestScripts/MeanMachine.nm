@@ -2,12 +2,9 @@ data MeanMachine = (sum: Double, count: Double)
 
 new simple map on MeanMachine as mean returning Double = (x: x(sum) / x(count))
 
-//new simple command on MeanMachine as include Double = (self:
-//  (value:
-//  )
-//)
+//new simple command on MeanMachine taking Double where self.include(v) = (self(sum).add(v), self(count) + 1)
 
-//ver mm: MeanMachine = (0, 0)
+//ver mm = new MeanMachine
 //update mm: include(4.0)
 //update mm: include(5.0)
 //update mm: include(6.0)

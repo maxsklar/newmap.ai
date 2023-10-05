@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConverter, TypeChecker}
+import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConverter, TypeChecker, TypeExpander}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -329,7 +329,7 @@ case class Environment(
           case Failure(objectLookupFailureMessage) => {
             for {
               currentUnderlyingType <- typeSystem.currentUnderlyingType(s)
-              response <- CommandMaps.expandType(currentUnderlyingType._2, command, this)
+              response <- TypeExpander.expandType(currentUnderlyingType._2, command, this)
               newTypeSystem <- typeSystem.upgradeCustomType(s, response.newType, response.converter)
             } yield {
               this.copy(

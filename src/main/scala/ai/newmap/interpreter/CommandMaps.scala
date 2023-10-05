@@ -6,7 +6,7 @@ import java.util.UUID
 
 // Evaluates an expression that's already been type checked
 object CommandMaps {
-  def IndexTN(i: Long): NewMapType = IndexT(UIndex(i))
+  val pairT: NewMapType = IndexT(UIndex(2))
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(_ => {
@@ -62,7 +62,7 @@ object CommandMaps {
       case StructT(_, _, CommandOutput, _) => {
         Success(defaultUMap)
       }
-      case StructT(UMap(Vector()), _, _, _) => {
+      case StructT(params, _, _, _) if (params.getMapBindings().toOption.exists(_.isEmpty)) => {
         Success(defaultUMap)
       }
       case FunctionalSystemT(functionTypes) if functionTypes.length == 0 => {
@@ -81,152 +81,18 @@ object CommandMaps {
   def typeTransformHasEmptyKey(typeTransform: TypeTransform): Boolean = {
     typeTransform.keyType match {
       case IndexT(UIndex(0)) | IndexT(UInit) => true
-      case SubtypeT(UMap(m), _, _) => m.isEmpty
+      case SubtypeT(m, _, _) => m.getMapBindings().toOption.exists(_.isEmpty)
       case _ => false // TODO - unimplemented
     }
   }
 
-  // Shouldn't this be called expand type?
-  def getTypeExpansionCommandInput(
-    nType: NewMapType,
-    typeSystem: NewMapTypeSystem
-  ): Outcome[NewMapType, String] = {
-    nType match {
-      case IndexT(_) => Success(NewMapO.emptyStruct) // Where to insert the new value?
-      case CaseT(_, parentType, _) => {
-        Success(StructT(
-          UArray(parentType.asUntagged, TypeT.asUntagged),
-          IndexTN(2)
-        ))
-      }
-      case StructT(_, parentType, _, _) => {
-        Success(StructT(
-          UArray(parentType.asUntagged, SubtypeT(IsCommandFunc, TypeT).asUntagged),
-          IndexTN(2)
-        ))
-      }
-      case SubtypeT(_, parentType, _) => Success(parentType)
-        
-
-      case TypeClassT(typeTransform, _) => {
-        Success(StructT(typeTransform, TypeT, CommandOutput, BasicMap))
-      }
-      //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
-      case CustomT(name, _, _) => {
-        for {
-          currentUnderlyingType <- typeSystem.currentUnderlyingType(name)
-
-          commandInput <- getTypeExpansionCommandInput(currentUnderlyingType._2, typeSystem)
-        } yield commandInput
-      }
-      case _ => Failure(s"Unable to expand key: $nType")
-    }
-  }
-
-  val untaggedIdentity: UntaggedObject = UMap(Vector(UWildcard("_") -> ParamId("_")))
-
-  case class ExpandKeyResponse(
-    newType: NewMapType,
-    newValues: Seq[UntaggedObject],
-    converter: UntaggedObject // This is a function that can convert from the old type to the new type
-  )
-
-  def expandType(
-    nType: NewMapType,
-    command: UntaggedObject,
-    env: Environment
-  ): Outcome[ExpandKeyResponse, String] = {
-    nType match {
-      case IndexT(UIndex(i)) => {
-        val newType = IndexTN(i + 1)
-        Success(ExpandKeyResponse(newType, Vector(UIndex(i)), untaggedIdentity))
-      }
-      case CaseT(cases, parentType, featureSet) => {
-        for {
-          caseBindings <- cases.getMapBindings()
-
-          uConstructors = caseBindings.map(x => x._1 -> UIndex(1))
-          constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
-          mapConfig = MapConfig(RequireCompleteness, BasicMap)
-
-          caseMap = NewMapObject(
-            cases,
-            MapT(
-              TypeTransform(constructorsSubtype, TypeT), 
-              mapConfig
-            )
-          )
-
-          newCaseMap <- updateVersionedObject(caseMap, command, env)
-
-          newCaseName <- Evaluator.applyFunction(command, UIndex(0), env)
-        } yield {
-          ExpandKeyResponse(
-            CaseT(newCaseMap.uObject, parentType, featureSet),
-            Vector(UCase(newCaseName, UWildcard("_"))),
-            untaggedIdentity
-          )
-        }
-      }
-      case SubtypeT(isMember, parentType, featureSet) => {
-        val isMemberMap = NewMapObject(isMember, MapT(
-          TypeTransform(parentType, BooleanT),
-          MapConfig(CommandOutput, BasicMap)
-        ))
-
-        val adjustedCommand = UArray(command, UIndex(1))
-
-        for {
-          newMembersMap <- updateVersionedObject(isMemberMap, adjustedCommand, env)
-        } yield {
-          ExpandKeyResponse(
-            SubtypeT(newMembersMap.uObject, parentType, featureSet),
-            Vector(command),
-            untaggedIdentity
-          )
-        }
-      }
-      case TypeClassT(typeTransform, implementation) => {
-        command match {
-          case UMap(mappings) => {
-            val keys = mappings.map(_._1)
-
-            for {
-              implementationBindings <- implementation.getMapBindings()
-            } yield {
-              val newImplementation = mappings ++ implementationBindings.filter(x => !keys.contains(x._1))
-
-              ExpandKeyResponse(
-                TypeClassT(typeTransform, UMap(newImplementation)),
-                keys,
-                untaggedIdentity
-              )
-            }
-          }
-          case _ => {
-            Failure(s"Wrong input for typeClassT -- ${nType.displayString(env)} -- $command")
-          }
-        }
-      }
-      case CustomT(name, _, _) => {
-        // This only occurs if we have a custom type within a custom type - so this won't be called for a while.
-        // strategy: get underlying type from the type system, turn it into a NewMapType, and then call this on it!
-        for {
-          currentUnderlyingTypeInfo <- env.typeSystem.currentUnderlyingType(name)
-          response <- expandType(currentUnderlyingTypeInfo._2, command, env)
-        } yield response
-      }
-      case _ => Failure(s"Unable to expand key: $nType -- with command $command")
-    }
-  }
-
   def getCommandInputOfCommandType(
-    nType: NewMapType,
+  nType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
     nType match {
       case CountT => Success(NewMapO.emptyStruct)
-      case BooleanT => Success(IndexTN(2))
+      case BooleanT => Success(pairT)
       case MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
         // Now instead of giving the structT, we must give something else!!
         // we have typeTransform
@@ -240,7 +106,7 @@ object CommandMaps {
         } yield {
           StructT(
             UArray(typeTransform.keyType.asUntagged, outputCommandT.asUntagged),
-            IndexTN(2)
+            pairT
           )
         }
       }
@@ -255,7 +121,7 @@ object CommandMaps {
         val requiredValuesT = typeTransform.valueType
 
         for {
-          keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
+          keyExpansionCommandT <- TypeExpander.getTypeExpansionCommandInput(keyT, env.typeSystem)
         } yield {
           keyExpansionCommandT match {
             case StructT(UMap(Vector()), _, _, _) => {
@@ -266,7 +132,7 @@ object CommandMaps {
             case _ => {
               StructT(
                 UArray(keyExpansionCommandT.asUntagged, requiredValuesT.asUntagged),
-                IndexTN(2)
+                pairT
               )
             }
           }
@@ -275,7 +141,7 @@ object CommandMaps {
       case FunctionalSystemT(_) => {
         Success(StructT(
           UArray(IdentifierT.asUntagged, NewMapO.taggedObjectT.asUntagged),
-          IndexTN(2)
+          pairT
         ))
       }
       case StructT(_, parentFieldType, RequireCompleteness, _) => {
@@ -291,7 +157,7 @@ object CommandMaps {
         // B) The tagged object that goes in there (so both type and object)
         Success(StructT(
           UArray(fieldExpansionCommandT.asUntagged, NewMapO.taggedObjectT.asUntagged),
-          IndexTN(2)
+          pairT
         ))
       }
       case StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
@@ -389,7 +255,7 @@ object CommandMaps {
         val requiredValuesT = typeTransform.valueType
 
         for {
-          keyExpansionCommandT <- getTypeExpansionCommandInput(keyT, env.typeSystem)
+          keyExpansionCommandT <- TypeExpander.getTypeExpansionCommandInput(keyT, env.typeSystem)
 
           result <- keyExpansionCommandT match {
             case StructT(UMap(Vector()), _, _, _) => {
@@ -412,10 +278,9 @@ object CommandMaps {
 
           (keyExpansionCommand, valueExpansionExpression) = result
           
-          // Really we're updating the key??
-          updateKeyTypeResponse <- expandType(keyT, keyExpansionCommand.uObject, env)
+          // Really we're updating the key?? [review soon]
+          updateKeyTypeResponse <- TypeExpander.expandType(keyT, keyExpansionCommand.uObject, env)
           // TODO- we need to do something with updateKeyTypeResponse.converter
-
 
           newTableType = MapT(
             TypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
@@ -455,32 +320,14 @@ object CommandMaps {
           }
 
           uNewFunctionType = newFunctionObjectComponents._1
-          newFunctionT <- uNewFunctionType.asType
-
-          newFunctionTPair <- componentsOfMapType(newFunctionT, env)
-          newFunctionTypeTransform = newFunctionTPair._1
-          newFunctionMapConfig = newFunctionTPair._2
-
           uNewFunctionMapping = newFunctionObjectComponents._2
-
-          newChannels <- newFunctionMapConfig.channels.getMapBindings()
         } yield {
-          MapConfig(
-            newFunctionMapConfig.completeness,
-            newFunctionMapConfig.featureSet,
-            newFunctionMapConfig.preservationRules,
-            UMap(newChannels),
-            newFunctionMapConfig.channelParentType
-          )
-
-          // Object to upgrade the functionalSystemT
-          val composedTypeObject = MapT(newFunctionTypeTransform, newFunctionMapConfig).asUntagged
 
           // Also upgrade the function itself
           // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
           NewMapObject(
             UMap((newFunctionNameObj -> UMap(uNewFunctionMapping)) +: currentMapping),
-            FunctionalSystemT((newFunctionNameObj -> composedTypeObject) +: functionTypes)
+            FunctionalSystemT((newFunctionNameObj -> uNewFunctionType) +: functionTypes)
           )
         }
       }
@@ -587,33 +434,6 @@ object CommandMaps {
       case _ => {
         Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")
       }
-    }
-  }
-
-  def componentsOfMapType(
-    nType: NewMapType,
-    env: Environment
-  ): Outcome[(TypeTransform, MapConfig), String] = nType match {
-    case MapT(typeTransform, config) => Success(typeTransform -> config)
-    case _ => Failure(s"Unexpected function type: ${nType.displayString(env)}")
-  }
-
-  def getDefaultValueFromStructParams(
-    params: Vector[(UntaggedObject, UntaggedObject)],
-    env: Environment
-  ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
-    params match {
-      case (fieldName, typeOfFieldExp) +: restOfParams => {
-        for {
-          typeOfField <- Evaluator(typeOfFieldExp, env)
-          typeOfFieldT<- typeOfField.asType
-          paramDefault <- getDefaultValueOfCommandType(typeOfFieldT, env)
-          restOfParamsDefault <- getDefaultValueFromStructParams(restOfParams, env)
-        } yield {
-          (fieldName -> paramDefault) +: restOfParamsDefault
-        }
-      }
-      case _ => Success(Vector.empty)
     }
   }
 }

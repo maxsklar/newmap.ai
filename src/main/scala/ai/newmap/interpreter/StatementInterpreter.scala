@@ -207,7 +207,7 @@ object StatementInterpreter {
             for {
               currentUnderlyingType <- env.typeSystem.currentUnderlyingType(id.s)
 
-              inputT <- CommandMaps.getTypeExpansionCommandInput(currentUnderlyingType._2, env.typeSystem)
+              inputT <- TypeExpander.getTypeExpansionCommandInput(currentUnderlyingType._2, env.typeSystem)
 
               newParameterMap <- RetrieveType.getParameterValues(id.s, env)
 

@@ -208,6 +208,9 @@ object NewFieldVersionedPath {
         case (Identifier("taking"), Some(currentExpression)) if (cons == CommandCons) => {
           Success(NewCommandOnExp(featureSet, currentExpression))
         }
+        case (Identifier("where"), Some(currentExpression)) if (cons == CommandCons) => {
+          Success(NewCommandOnExpWhere(featureSet, currentExpression, EmptyParse))
+        }
         case _ => {
           for {
             newExpressionState <- expressionState.update(token)

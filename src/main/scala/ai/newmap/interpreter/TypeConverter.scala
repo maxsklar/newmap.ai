@@ -267,23 +267,16 @@ object TypeConverter {
     env: Environment
   ): Outcome[StructWithSingleValueResponse, String] = {
     if (mapValues.length >= 1) {
-      // In this case, make sure that all the other values have a default
-      for {
-        defaultStruct <- CommandMaps.getDefaultValueFromStructParams(mapValues.tail, env)
-      } yield {
-        // How do I convert this?
+      val conversionRule = UMap(Vector(
+        UWildcard("item") ->
+          UMap(Vector(mapValues.head._1 -> ParamId("item")))
+      ))
 
-        val conversionRule = UMap(Vector(
-          UWildcard("item") ->
-            UMap(Vector(mapValues.head._1 -> ParamId("item")) ++ defaultStruct)
-        ))
+      // The "standardMatcher" always works here because we only have a Wildcard Pattern
+      // - And all matchers treat the wildcard pattern the same way
+      val matcher = StandardMatcher
 
-        // The "standardMatcher" always works here because we only have a Wildcard Pattern
-        // - And all matchers treat the wildcard pattern the same way
-        val matcher = StandardMatcher
-
-        StructWithSingleValueResponse(mapValues.head._2, Vector(FunctionWithMatchingRules(conversionRule, matcher)))
-      }
+      Success(StructWithSingleValueResponse(mapValues.head._2, Vector(FunctionWithMatchingRules(conversionRule, matcher))))
     } else {
       Failure("Function did not have singular input")
     }

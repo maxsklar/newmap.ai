@@ -34,6 +34,17 @@ class EnvironmentDaemon(portOpt: Option[Int]) {
     }
   }
 
+  def createNewActorRefF(actorSystem: ActorSystem): Future[ActorRef] = {
+    val actorRef = actorSystem.actorOf(Props[DaemonActor], name = "daemonActor")
+    
+    for {
+      pingResponse <- actorRef ? unit
+    } yield {
+      println(pingResponse)
+      actorRef
+    }
+  }
+
   val unit: Unit = ()
 
   // This ensures that the environment daemon is initialized
@@ -41,26 +52,10 @@ class EnvironmentDaemon(portOpt: Option[Int]) {
     val actorSystem: ActorSystem = ActorSystem("DaemonActorSystem")
     for {
       result: ActorRef <- portOpt match {
-        case None => {
-          val actorRef = actorSystem.actorOf(Props[DaemonActor], name = "daemonActor")
-          
-          for {
-            pingResponse <- actorRef ? unit
-          } yield {
-            println(pingResponse)
-            actorRef
-          }
-        }
+        case None => createNewActorRefF(actorSystem)
         case Some(port) if !isPortOpen("localhost", port) => {
           println(s"port $port not open, creating a new EnvironemntDaemon")
-          val actorRef = actorSystem.actorOf(Props[DaemonActor], name = "daemonActor")
-          
-          for {
-            pingResponse <- actorRef ? unit
-          } yield {
-            println(pingResponse)
-            actorRef
-          }
+          createNewActorRefF(actorSystem)
         }
         case Some(port) => {
           val daemonActorPath = s"akka://DaemonActorSystem@127.0.0.1:$port/user/daemonActor"
