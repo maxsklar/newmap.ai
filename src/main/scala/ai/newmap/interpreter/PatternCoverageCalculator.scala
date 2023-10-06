@@ -152,6 +152,7 @@ object PatternCoverageCalculator {
           case _ => false 
         }
       }
+      case UCase(UWildcard(_), UWildcard(_)) => true
       case _ => false
     }
   }

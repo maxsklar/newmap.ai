@@ -617,16 +617,7 @@ object Environment {
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),
-      CaseT(
-        UMap(Vector(UWildcard("i") ->
-          MapT(
-            TypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
-            MapConfig(RequireCompleteness, SimpleFunction)
-          ).asUntagged
-        )),
-        CountT,
-        SimpleFunction
-      )
+      ArrayT(ParamIdT("T"))
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
     NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),

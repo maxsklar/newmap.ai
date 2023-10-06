@@ -67,9 +67,16 @@ object UpdateCommandCalculator {
         Success(defaultUMap)
       }*/
       case CharacterT => Success(UCharacter('\u0000'))
-      case CustomT("Array", _, _) => Success(UCase(UIndex(0), UArray()))
-      case CustomT("String", _, _) => Success(UCase(UIndex(0), UArray())) // Replace this line with a conversion!
-      case _ => Failure(s"Type ${nType.displayString(env)} has no default value")
+      case ArrayT(_) => Success(UCase(UIndex(0), UArray()))
+      case CustomT(name, params, typeSystemId) => {
+        for {
+          underlying <- TypeChecker.getUnderlyingType(name, params, env, typeSystemId)
+          result <- getDefaultValueOfCommandTypeHardcoded(underlying, env)
+        } yield result
+      }
+      case _ => {
+        Failure(s"Type ${nType.displayString(env)} has no default value")
+      }
     }
   }
 
@@ -160,8 +167,7 @@ object UpdateCommandCalculator {
         // Are we allowed to change an old parameter? Let's say sure.
         Success(CaseT(parameterList, parentFieldType, featureSet))
       }
-      // This should be custom defined
-      case CustomT("Array", nType, _) => nType.asType
+      case ArrayT(nType) => Success(nType)
       case CustomT(typeName, params, typeSystemId) => {
         for {
           underlyingTypeInfo <- env.typeSystem.historicalUnderlyingType(typeName, typeSystemId)
@@ -305,7 +311,6 @@ object UpdateCommandCalculator {
           uNewFunctionType = newFunctionObjectComponents._1
           uNewFunctionMapping = newFunctionObjectComponents._2
         } yield {
-
           // Also upgrade the function itself
           // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
           NewMapObject(
@@ -343,7 +348,7 @@ object UpdateCommandCalculator {
         command match {
           case UCase(constructor, input) => {
             for {
-              mapValues <- current.uObject.getMapBindings
+              mapValues <- current.uObject.getMapBindings()
 
               // TODO - this part is currently only written for _default
               // Params need to be updated!!
@@ -358,7 +363,7 @@ object UpdateCommandCalculator {
           }
         }
       }
-      case nType@CustomT("Array", _, _) => {
+      case nType@ArrayT(_) => {
         for {
           untaggedResult <- current.uObject match {
             case UCase(UIndex(length), UArray(values)) => {

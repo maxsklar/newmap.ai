@@ -46,6 +46,16 @@ object TypeConverter {
           IsTypeConvertibleResponse(Vector.empty, refinedEndingType, newParameters)
         }
       }
+      case (ArrayT(param1), ArrayT(param2)) => {
+        // TODO - this is really a copy of the customT situation above
+        for {
+          newParameters <- Evaluator.patternMatch(param2.asUntagged, param1.asUntagged, TypeMatcher, env)
+        } yield {
+          val refinedEndingType = endingType // TODO - recheck this!
+
+          IsTypeConvertibleResponse(Vector.empty, refinedEndingType, newParameters)
+        }
+      }
       case _ if (startingType == endingType) => Success(emptyResponse)
       case (SubtypeT(_, parentType, _), _) => {
         isTypeConvertible(parentType, endingType, env)

@@ -966,7 +966,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
         NewMapObject(
           UCase(UIndex(3), UArray(UIndex(1), UIndex(3), UIndex(1))),
-          CustomT("Array", UCase(UIdentifier("Index"), UIndex(10)), 0)
+          ArrayT(IndexT(UIndex(10)))
         )
       ))),
     )) 

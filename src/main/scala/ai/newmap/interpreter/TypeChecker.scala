@@ -266,15 +266,6 @@ object TypeChecker {
               TypeCheckResponse(UMap(result), expectedType)
             }
           }
-          case Success(MapT(typeTransform, MapConfig(MapPattern, internalFeatureSet, _, _, _))) => {
-            for {
-              _ <- Outcome.failWhen(values.length > 1, "Map Pattern can only have 1 key-value pair: " + values)
-              value <- Outcome(values.headOption, "Empty Map Pattern")
-              mapValue <- typeCheckGenericMap(Vector(value), typeTransform, internalFeatureSet, env, featureSet, tcParameters)
-            } yield {
-              TypeCheckResponse(UMap(mapValue), expectedType)
-            }
-          }
           case Success(MapT(typeTransform, config)) => {
             val isArrayInput = llType == ArrayType
             val correctedValues = if (isArrayInput) {
@@ -409,6 +400,25 @@ object TypeChecker {
               TypeCheckResponse(UCase(firstObj, secondExp.nExpression), expectedType)
             }
           }
+          case Success(ArrayT(itemT)) => {
+            for {
+              firstExp <- typeCheck(first, CountT, env, featureSet, tcParameters)
+
+              // TODO - we must ensure that the evaluator is not evaluating anything too complex here
+              // must be a "simple map" type situation
+              // can this be built into the evaluator?
+              firstObj <- Evaluator(firstExp.nExpression, env)
+
+              secondT = MapT(
+                TypeTransform(IndexT(firstObj), itemT),
+                MapConfig(RequireCompleteness, BasicMap)
+              )
+
+              secondExp <- typeCheck(second, secondT, env, featureSet, tcParameters)
+            } yield {
+              TypeCheckResponse(UCase(firstObj, secondExp.nExpression), expectedType)
+            }
+          }
           case Success(TypeT) | Success(WildcardT(_)) => {
             for {
               result <- typeCheckCaseAsType(first, second, env.typeSystem.currentVersion, featureSet, env, tcParameters)
@@ -490,11 +500,14 @@ object TypeChecker {
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     values match {
       case KeyValueBinding(k, v) +: restOfValues => {
+        //println("Checking KEY: " + k + " -- " + typeTransform.keyType)
         for {
           resultKey <- typeCheckWithPatternMatching(k, typeTransform.keyType, env, externalFeatureSet, internalFeatureSet, tcParameters)
 
           // Keys must be evaluated on the spot
           foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
+
+          //_ = println(s"keyPattern: $foundKeyPattern -- ${resultKey.newParams}")
 
           untaggedTypeTransformKey = typeTransform.keyType.asUntagged
           untaggedTypeTransformValue = typeTransform.valueType.asUntagged
@@ -508,6 +521,8 @@ object TypeChecker {
 
           valueTypePatternUntagged = MakeSubstitution(untaggedTypeTransformValue, paramsToSubsitute)
           valueTypePattern <- valueTypePatternUntagged.asType
+
+          //_ = println(s"About to check value: $v -- $valueTypePattern -- ${resultKey.newParams}")
 
           // Now we want to type check the object, but we have to tell it what kind of map we're in
           //  in order to ensure that the right features are being used
@@ -546,6 +561,21 @@ object TypeChecker {
     } yield underlyingT
   }
 
+  def getCurrentUnderlyingType(name: String, params: UntaggedObject, env: Environment): Outcome[NewMapType, String] = {
+    for {
+      underlyingTypeInfo <- env.typeSystem.currentUnderlyingType(name)
+
+      parameterPattern = underlyingTypeInfo._1
+      genericUnderlyingType = underlyingTypeInfo._2
+
+      substitutions <- Evaluator.patternMatch(parameterPattern, params, StandardMatcher, env)
+
+      underlyingType = MakeSubstitution(genericUnderlyingType.asUntagged, substitutions)
+
+      underlyingT <- underlyingType.asType
+    } yield underlyingT
+  }
+
   def getFinalUnderlyingType(nType: NewMapType, env: Environment): Outcome[NewMapType, String] = {
     nType match {
       case CustomT(name, params, typeSystemId) => {
@@ -553,6 +583,9 @@ object TypeChecker {
           partialResultT <- getUnderlyingType(name, params, env, typeSystemId)
           finalizeResult <- getFinalUnderlyingType(partialResultT, env)
         } yield finalizeResult
+      }
+      case ArrayT(itemT) => {
+        getCurrentUnderlyingType("Array", itemT.asUntagged, env)
       }
       case _ => Success(nType)
     }
@@ -661,6 +694,26 @@ object TypeChecker {
           )
         }
       }
+      case (ConstructCaseParse(constructorP, input), Success(ArrayT(itemT))) if (patternMatchingAllowed) => {
+        for {
+          // TODO - update environment here
+          constructorTC <- typeCheckWithPatternMatching(constructorP, CountT, env, externalFeatureSet, internalFeatureSet, tcParameters)
+          constructor <- Evaluator(constructorTC.typeCheckResult, env)
+
+          inputTExpected = MapT(
+            TypeTransform(IndexT(constructor), itemT),
+            MapConfig(RequireCompleteness, BasicMap)
+          )
+
+          result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet, constructorTC.newParams)
+        } yield {
+          TypeCheckWithPatternMatchingResult(
+            UCase(constructor, result.typeCheckResult),
+            expectedType,
+            result.newParams
+          )
+        }
+      }
       case (ConstructCaseParse(constructorP, input), Success(TypeT)) if (patternMatchingAllowed) => {
         for {
           // For now, the constructor will explicitly point to a generic case type
@@ -682,8 +735,16 @@ object TypeChecker {
             tcParameters
           )
         } yield {
+          // TODO - this is an awkward hack given how we slip in the historical UUID.
+          // - Let's figure out if there's a better way to organize this.
+          val includeUuid = NewMapTypeSystem.isCustomType(name)
+
+          val uParams = if (includeUuid) {
+            UArray(result.typeCheckResult, UIndex(env.typeSystem.currentVersion))
+          } else result.typeCheckResult
+          
           TypeCheckWithPatternMatchingResult(
-            CustomT(name, result.typeCheckResult, env.typeSystem.currentVersion).asUntagged,
+            UCase(UIdentifier(name), uParams),
             expectedType,
             result.newParams
           )

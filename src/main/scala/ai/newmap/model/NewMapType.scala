@@ -101,10 +101,8 @@ object CommandOutput extends MapCompleteness {
   override def getName: String = "CommandOutput"
 }
 
-// This is actually not a full map, but a pattern that may match a map
-// The untagged object of this is going to be USingularMap
-object MapPattern extends MapCompleteness {
-  override def getName: String = "MapPattern"
+object PartialMap extends MapCompleteness {
+  override def getName: String = "PartialMap"
 }
 
 sealed abstract class MapFeatureSet {
@@ -208,6 +206,13 @@ case class FunctionalSystemT(
   functionTypes: Vector[(UntaggedObject, UntaggedObject)]
 ) extends NewMapType
 
+/**
+ * The values are cases, where the first item in the case is the length of the array, and the second is the case itself.
+ * This should probably be implemented as Custom types (CustomT).
+ * However, to start, it's probably easier to have them as explicit in the type system
+ */
+case class ArrayT(nType: NewMapType) extends NewMapType
+
 case class CustomT(
   name: String,
   params: UntaggedObject,
@@ -253,6 +258,7 @@ object NewMapType {
       UIdentifier(featureSet.getName)
     )))
     case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
+    case ArrayT(nType) => UCase(UIdentifier("Array"), nType.asUntagged)
     case CustomT(name, params, typeSystemId) => UCase(UIdentifier(name), UArray(params, UIndex(typeSystemId)))
     case WildcardT(name) => UWildcard(name)
     case ParamIdT(name) => ParamId(name)
@@ -379,6 +385,11 @@ object NewMapType {
         }
         case _ => Success(TypeTransformT(false))
       }
+      case "Array" => {
+        for {
+          nType <- convertToNewMapType(params)
+        } yield ArrayT(nType)
+      }
       case custom => params match {
         case UArray(items) if items.length == 2 => {
           val customParams = items(0)
@@ -400,8 +411,8 @@ object NewMapType {
     case UWildcard(name) => Success(WildcardT(name))
     case ParamId(name) => Success(ParamIdT(name))
     case _ => {
-      //throw new Exception(s"Couldn't convert to NewMapType: $uType")
-      Failure(s"Couldn't convert to NewMapType: $uType")
+      throw new Exception(s"Couldn't convert to NewMapType: $uType")
+      //Failure(s"Couldn't convert to NewMapType: $uType")
     }
   }
 

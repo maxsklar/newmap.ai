@@ -121,12 +121,10 @@ object IterationUtils {
       case NewMapObject(UArray(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
         enumerateAllValuesIfPossible(typeTransform.keyType, env)
       }
-      case NewMapObject(UCase(UIndex(_), UArray(values)), CustomT("Array", _, _)) => {
-        Success(values.toVector)
-      }
-      case NewMapObject(UCase(UIndex(_), UMap(values)), CustomT("Array", _, _)) => {
-        // We should be more careful about the ordering here!!
-        Success(values.map(_._2))
+      case NewMapObject(UCase(UIndex(_), values), ArrayT(_)) => {
+        for {
+          mapBindings <- values.getMapBindings()
+        } yield mapBindings.map(_._2)
       }
       case NewMapObject(untaggedCurrent, CustomT(typeName, params, typeSystemId)) => {
         for {
@@ -167,9 +165,7 @@ object IterationUtils {
       case MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _)) => {
         Success(typeTransform.valueType)
       }
-      case CustomT("Array", itemType, _) => {
-        itemType.asType
-      }
+      case ArrayT(itemT) => Success(itemT)
       case CustomT(typeName, params, typeSystemId) => {
         for {
           // TODO - use TypeChecker.getUnderlyingType

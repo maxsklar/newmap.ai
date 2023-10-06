@@ -28,8 +28,6 @@ object StatementInterpreter {
 
           nTypeObj <- Evaluator(tcType.nExpression, env)
 
-          //_ = println("got tc type obj: " + nTypeObj)
-
           nType <- nTypeObj.asType
 
           //_ = println("Expected type: " + nType.displayString(env))
@@ -58,8 +56,6 @@ object StatementInterpreter {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- nTypeObj.asType
-
-          // Problem is WITH_TYPE!!
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker

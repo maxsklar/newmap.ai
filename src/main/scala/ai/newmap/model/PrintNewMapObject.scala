@@ -93,6 +93,7 @@ object PrintNewMapObject {
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
       case SubtypeT(isMember, _, _) => s"Subtype(${untagged(isMember)})"
       case FunctionalSystemT(functionTypes) => s"FunctionalSystem(${untagged(UMap(functionTypes))})"
+      case ArrayT(t) => "Array|" + newMapType(t, typeSystem)
       case WildcardT(name) => untagged(UWildcard(name))
       case ParamIdT(name) => untagged(ParamId(name))
     }
@@ -114,7 +115,7 @@ object PrintNewMapObject {
         val completenessStr = config.completeness match {
           case RequireCompleteness => "Required"
           case CommandOutput => "Command"
-          case MapPattern => "Pattern"
+          case PartialMap => "Partial"
         }
 
         val featureSetStr = config.featureSet match {

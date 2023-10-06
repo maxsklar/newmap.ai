@@ -28,13 +28,22 @@ case class NewMapTypeSystem(
 
   // Doesn't include all base types
   // defaults to empty struct??
-  typeToParameterType: Map[String, RangeMap[NewMapType]] = {
-    Map("Index" -> RangeMap(0, CountT))
-  },
+  typeToParameterType: Map[String, RangeMap[NewMapType]] = Map.empty,
 
   // First item is the pattern for the parameter, and the second item is the type
   typeToUnderlyingType: Map[String, RangeMap[(UntaggedObject, NewMapType)]] = Map(
-    "Index" -> RangeMap(0, UWildcard("i") -> IndexT(ParamId("i")) ) 
+    "Index" -> RangeMap(0, UWildcard("i") -> IndexT(ParamId("i"))),
+    "Array" -> RangeMap(0, UWildcard("T") -> CaseT(
+        UMap(Vector(UWildcard("i") ->
+         MapT(
+           TypeTransform(IndexT(ParamId("i")), ParamIdT("T")),
+           MapConfig(RequireCompleteness, SimpleFunction)
+         ).asUntagged
+        )),
+        CountT,
+        SimpleFunction
+      )
+    )
   ),
 
   // These are the rules to convert from some type to a future version.
@@ -67,6 +76,8 @@ case class NewMapTypeSystem(
     case "Case" => Failure("Case not implemented")
     case "Subtype" => Failure("Subtype not implemented")
     case "TypeTransform" => Success(emptyStructType)
+    case "Index" => Success(CountT)
+    case "Array" => Success(TypeT)
     case custom => {
       for {
         parameterTypeRangeMap <- Outcome(typeToParameterType.get(custom), s"Couldn't get parameterType for identifier $identifier")
@@ -112,6 +123,7 @@ case class NewMapTypeSystem(
     case "TypeClass" => Failure("TypeClass not implemented")
     case "Case" => Failure("Case not implemented")
     case "Subtype" => Failure("Subtype not implemented")
+    case "Array" => Success(UWildcard("T"))
     case custom => historicalUnderlyingType(custom, typeSystemId).map(_._1)
   }
 
@@ -239,7 +251,8 @@ object NewMapTypeSystem {
     "Struct",
     "TypeClass",
     "Case",
-    "Subtype"
+    "Subtype",
+    "Array"
   )
 
   def isCustomType(s: String): Boolean = !baseTypes.contains(s)
