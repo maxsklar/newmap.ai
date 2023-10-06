@@ -5,16 +5,15 @@ import ai.newmap.util.{Outcome, Success, Failure}
 import java.util.UUID
 
 // Evaluates an expression that's already been type checked
-object CommandMaps {
+object UpdateCommandCalculator {
   val pairT: NewMapType = IndexT(UIndex(2))
+  val defaultUMap: UntaggedObject = UMap(Vector.empty)
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(_ => {
       getDefaultValueOfCommandTypeHardcoded(nType, env)
     })
   }
-
-  val defaultUMap = UMap(Vector.empty)
 
   /*
    * This is getDefaultValueOfCommandType being slowly written into newmap code
@@ -37,11 +36,7 @@ object CommandMaps {
       // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
       // otherwise, we get an infinite loop
       // TODO - try again?
-      result <- Evaluator.patternMatchInOrder(mapValues, nType, env, TypeMatcher) match {
-        case Success(s) => Success(s)
-        case Failure(f) => Failure(f.toString)
-      }
-
+      result <- Evaluator.patternMatchInOrder(mapValues, nType, env, TypeMatcher)
       uObject <- Evaluator(result, env)
     } yield uObject
   }
@@ -212,17 +207,8 @@ object CommandMaps {
       }
       case BooleanT => {
         for {
-          currentValue <- current.uObject match {
-            case UIndex(i) => Success(i)
-            case UInit => Success(0)
-            case _ => Failure(s"Couldn't interpret current value: $current")
-          }
-
-          j <- command match {
-            case UIndex(i) => Success(i)
-            case UInit => Success(0)
-            case _ => Failure(s"Couldn't interpret command $command")
-          }
+          currentValue <- TypeChecker.normalizeCount(current.uObject)
+          j <- TypeChecker.normalizeCount(command)
         } yield {
           val result = if (currentValue == 1 || j == 1) 1 else 0
           NewMapObject(UIndex(result), BooleanT)
@@ -305,10 +291,7 @@ object CommandMaps {
       }
       case FunctionalSystemT(functionTypes) => {
         for {
-          currentMapping <- current.uObject match {
-            case UMap(m) => Success(m)
-            case _ => Failure(s"Function not a mapping: ${current.uObject}")
-          }
+          currentMapping <- current.uObject.getMapBindings()
 
           newFunctionNameObj <- Evaluator.applyFunction(command, UIndex(0), env)
 
@@ -333,10 +316,7 @@ object CommandMaps {
       }
       case StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
         for {
-          mapValues <- current.uObject match {
-            case UMap(values) => Success(values)
-            case _ => Failure(s"Couldn't get map values from $current")
-          }
+          mapValues <- current.uObject.getMapBindings()
 
           nameOfField <- Evaluator.applyFunction(command, UIndex(0), env)
           newValueAsNewMapObject <- Evaluator.applyFunction(command, UIndex(1), env)
@@ -363,10 +343,7 @@ object CommandMaps {
         command match {
           case UCase(constructor, input) => {
             for {
-              mapValues <- current.uObject match {
-                case UMap(values) => Success(values)
-                case _ => Failure(s"Couldn't get map values from $current")
-              }
+              mapValues <- current.uObject.getMapBindings
 
               // TODO - this part is currently only written for _default
               // Params need to be updated!!
@@ -382,7 +359,6 @@ object CommandMaps {
         }
       }
       case nType@CustomT("Array", _, _) => {
-
         for {
           untaggedResult <- current.uObject match {
             case UCase(UIndex(length), UArray(values)) => {

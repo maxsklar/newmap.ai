@@ -63,7 +63,7 @@ object StatementInterpreter {
 
           // TODO: Maybe a special error message if this is not a command type
           // - In fact, we have yet to build an actual command type checker
-          _ <- CommandMaps.getDefaultValueOfCommandType(nType, env)
+          _ <- UpdateCommandCalculator.getDefaultValueOfCommandType(nType, env)
         } yield {
           ReturnValue(
             NewVersionedStatementCommand(id.s, nType),
@@ -183,7 +183,7 @@ object StatementInterpreter {
         (env.lookupVersionedObject(id.s), tcParameters.get(id.s)) match {
           case (_, Some(nType)) => {
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(nType, env)
+              inputT <- UpdateCommandCalculator.getCommandInputOfCommandType(nType, env)
               commandExp <- typeCheck(command, inputT, env, FullFunction, tcParameters)
             } yield {
               ReturnValue(
@@ -194,7 +194,7 @@ object StatementInterpreter {
           }
           case (Success(versionedObjectLink), _) => {
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
+              inputT <- UpdateCommandCalculator.getCommandInputOfCommandType(versionedObjectLink.nType, env)
               commandExp <- typeCheck(command, inputT, env, FullFunction, tcParameters)
             } yield {
               ReturnValue(
@@ -292,7 +292,7 @@ object StatementInterpreter {
         env.lookupVersionedObject(obj.s) match {
           case Success(versionedObjectLink) => {
             for {
-              inputT <- CommandMaps.getCommandInputOfCommandType(versionedObjectLink.nType, env)
+              inputT <- UpdateCommandCalculator.getCommandInputOfCommandType(versionedObjectLink.nType, env)
 
               channelType = env.channelIdToType.get(channelId.s).getOrElse(UndefinedT)
 
@@ -384,7 +384,7 @@ object StatementInterpreter {
           typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
 
           // TODO - what if typeTransform.valueType has a parameter?
-          useCommandMap = CommandMaps.getDefaultValueOfCommandType(typeTransform.valueType, env).isSuccess
+          useCommandMap = UpdateCommandCalculator.getDefaultValueOfCommandType(typeTransform.valueType, env).isSuccess
           completeness = if (useCommandMap) CommandOutput else RequireCompleteness
           mapConfig = MapConfig(completeness, featureSet)
 

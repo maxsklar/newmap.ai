@@ -215,9 +215,10 @@ object Evaluator {
         }
       }
       case IsCommandFunc => {
+        // TODO - this case will be replaced once we have type classes
         val defaultValueOutcome = for {
           inputT <- input.asType
-          defaultValue <- CommandMaps.getDefaultValueOfCommandType(inputT, env)
+          defaultValue <- UpdateCommandCalculator.getDefaultValueOfCommandType(inputT, env)
         } yield defaultValue
 
         val isCommand: Boolean = defaultValueOutcome.isSuccess

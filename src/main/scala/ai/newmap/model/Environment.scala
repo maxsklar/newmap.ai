@@ -1,6 +1,6 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{CommandMaps, Evaluator, IterationUtils, TypeConverter, TypeChecker, TypeExpander}
+import ai.newmap.interpreter.{UpdateCommandCalculator, Evaluator, IterationUtils, TypeConverter, TypeChecker, TypeExpander}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
@@ -147,7 +147,7 @@ case class Environment(
       case NewVersionedStatementCommand(s, nType) => {
         val uuid = java.util.UUID.randomUUID
 
-        val defaultOutcome = CommandMaps.getDefaultValueOfCommandType(
+        val defaultOutcome = UpdateCommandCalculator.getDefaultValueOfCommandType(
           nType,
           this
         )
@@ -275,7 +275,7 @@ case class Environment(
                 itemType <- IterationUtils.iterationItemType(nType, this)
                 commandObj = NewMapObject(command, itemType)
                 
-                inputT <- CommandMaps.getCommandInputOfCommandType(nType, this)
+                inputT <- UpdateCommandCalculator.getCommandInputOfCommandType(nType, this)
                 convertedCommand <- TypeConverter.attemptConvertObjectToType(commandObj, inputT, this)
               } yield {
                 convertedCommand.uObject
@@ -307,7 +307,7 @@ case class Environment(
             for {
               latestVersion <- Evaluator.latestVersion(versionLink.key.uuid, this)
               currentState <- Evaluator.currentState(versionLink.key.uuid, this)
-              newValue <- CommandMaps.updateVersionedObject(currentState, command, this)
+              newValue <- UpdateCommandCalculator.updateVersionedObject(currentState, command, this)
             } yield {
               val newUuid = versionLink.key.uuid
               val newVersion = latestVersion + 1

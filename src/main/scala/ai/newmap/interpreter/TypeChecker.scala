@@ -940,7 +940,7 @@ object TypeChecker {
     uObject match {
       case UInit => {
         for {
-          initValue <- CommandMaps.getDefaultValueOfCommandType(nTypeClass, env)
+          initValue <- UpdateCommandCalculator.getDefaultValueOfCommandType(nTypeClass, env)
         } yield NewMapObject(initValue, nTypeClass)
       }
       case _ => {

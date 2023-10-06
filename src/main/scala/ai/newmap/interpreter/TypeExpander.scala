@@ -80,7 +80,7 @@ object TypeExpander {
             )
           )
 
-          newCaseMap <- CommandMaps.updateVersionedObject(caseMap, command, env)
+          newCaseMap <- UpdateCommandCalculator.updateVersionedObject(caseMap, command, env)
 
           newCaseName <- Evaluator.applyFunction(command, UIndex(0), env)
         } yield {
@@ -100,7 +100,7 @@ object TypeExpander {
         val adjustedCommand = UArray(command, UIndex(1))
 
         for {
-          newMembersMap <- CommandMaps.updateVersionedObject(isMemberMap, adjustedCommand, env)
+          newMembersMap <- UpdateCommandCalculator.updateVersionedObject(isMemberMap, adjustedCommand, env)
         } yield {
           ExpandKeyResponse(
             SubtypeT(newMembersMap.uObject, parentType, featureSet),
