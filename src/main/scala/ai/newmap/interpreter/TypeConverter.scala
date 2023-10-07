@@ -64,13 +64,13 @@ object TypeConverter {
         Failure(s"A) Starting Obj: $startingType\nStartingType: $startingType\nEndingType: $endingType")
       }
       case (
-        MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(_, startingFeatureSet, _, _, _)),
-        MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(_, endingFeatureSet, _, _, _))
+        MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
+        MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
         //  CommandOutput might require adding a default pattern
-        val isMapCompletenessConvertible = true
+        val isMapCompletenessConvertible = (startingCompleteness != PartialMap) && (startingCompleteness != PartialMap)
 
         for {
           // Note: the input type is CONTRAvariant, the output type is COvariant, hence the reversal
@@ -88,7 +88,7 @@ object TypeConverter {
 
           _ <- Outcome.failWhen(
             !isMapCompletenessConvertible,
-            s"Completeness not convertible in maps $startingType -- $endingType"
+            s"Completeness not convertible in maps $startingCompleteness -- $endingCompleteness"
           )
 
         } yield {

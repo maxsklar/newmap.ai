@@ -112,7 +112,7 @@ object UpdateCommandCalculator {
           )
         }
       }
-      case MapT(typeTransform, _) => {
+      case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
         // In this case, there must be a key expansion type
         // TODO: enforce this?
 
@@ -242,7 +242,7 @@ object UpdateCommandCalculator {
           NewMapObject(UMap(newMapValues), mapT)
         }
       }
-      case MapT(typeTransform, MapConfig(style, features, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(RequireCompleteness, features, _, _, _)) => {
         val keyT = typeTransform.keyType
         val requiredValuesT = typeTransform.valueType
 
@@ -276,7 +276,7 @@ object UpdateCommandCalculator {
 
           newTableType = MapT(
             TypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
-            MapConfig(style, features)
+            MapConfig(RequireCompleteness, features)
           )
                   
           mapValues <- current.uObject.getMapBindings()
