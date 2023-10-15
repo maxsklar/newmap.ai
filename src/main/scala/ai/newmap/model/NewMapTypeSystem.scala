@@ -252,7 +252,8 @@ object NewMapTypeSystem {
     "TypeClass",
     "Case",
     "Subtype",
-    "Array"
+    "Array",
+    "Sequence"
   )
 
   def isCustomType(s: String): Boolean = !baseTypes.contains(s)

@@ -54,6 +54,7 @@ object StatementInterpreter {
       case NewVersionedStatementParse(id, typeExpression) => {
         for {
           tcType <- typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
+
           nTypeObj <- Evaluator(tcType.nExpression, env)
           nType <- nTypeObj.asType
 
@@ -262,7 +263,7 @@ object StatementInterpreter {
 
           returnT <- returnType.asType
 
-          returnInputT <- Outcome(returnT.inputTypeOpt, "Input type not found: " + returnT.displayString(env))
+          returnInputT <- Outcome(returnT.inputTypeOpt(None), "Input type not found: " + returnT.displayString(env))
 
           commandParams <- typeCheck(commandParams, returnInputT, env, FullFunction, tcParameters)
         } yield {

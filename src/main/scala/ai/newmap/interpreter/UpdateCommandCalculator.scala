@@ -45,14 +45,11 @@ object UpdateCommandCalculator {
     nType match {
       // TODO - start removing these in favor of newmap code!
       case IndexT(UIndex(i)) if i > 0 => Success(UIndex(0)) //REmove?
-      case MapT(_, MapConfig(CommandOutput, _, _, _, _)) => Success(defaultUMap)
-      case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
-        if (typeTransformHasEmptyKey(typeTransform)) {
-          Success(defaultUMap)
-        } else {
-          throw new Exception(s"Can't start off map with key in typeTransform $typeTransform")
+      case MapT(typeTransform, MapConfig(completeness, _, _, _, _)) => completeness match {
+        case RequireCompleteness if (!typeTransformHasEmptyKey(typeTransform)) => {
           Failure(s"Can't start off map with key in typeTransform $typeTransform")
         }
+        case _ => Success(defaultUMap)
       }
       case StructT(_, _, CommandOutput, _) => {
         Success(defaultUMap)
@@ -74,6 +71,7 @@ object UpdateCommandCalculator {
           result <- getDefaultValueOfCommandTypeHardcoded(underlying, env)
         } yield result
       }
+      case SequenceT(parent, featureSet) => Success(UCase(UIndex(0), defaultUMap))
       case _ => {
         Failure(s"Type ${nType.displayString(env)} has no default value")
       }
@@ -95,24 +93,7 @@ object UpdateCommandCalculator {
     nType match {
       case CountT => Success(NewMapO.emptyStruct)
       case BooleanT => Success(pairT)
-      case MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
-        // Now instead of giving the structT, we must give something else!!
-        // we have typeTransform
-        // we need a pair (a, b) that satisfies the type transform
-        // This is a (pattern/expression) pairing
-        // the type of the expression depends on the value of the pattern??
-        // -- therefore, this is a binding!
-        // -- should we make a binding a first class object, and should typeTransform just be a binding?
-        for {
-          outputCommandT <- getCommandInputOfCommandType(typeTransform.valueType, env)
-        } yield {
-          StructT(
-            UArray(typeTransform.keyType.asUntagged, outputCommandT.asUntagged),
-            pairT
-          )
-        }
-      }
-      case MapT(typeTransform, MapConfig(RequireCompleteness, _, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(PartialMap, _, _, _, _)) => {
         // In this case, there must be a key expansion type
         // TODO: enforce this?
 
@@ -138,6 +119,23 @@ object UpdateCommandCalculator {
               )
             }
           }
+        }
+      }
+      case MapT(typeTransform, _) => {
+        // Now instead of giving the structT, we must give something else!!
+        // we have typeTransform
+        // we need a pair (a, b) that satisfies the type transform
+        // This is a (pattern/expression) pairing
+        // the type of the expression depends on the value of the pattern??
+        // -- therefore, this is a binding!
+        // -- should we make a binding a first class object, and should typeTransform just be a binding?
+        for {
+          outputCommandT <- getCommandInputOfCommandType(typeTransform.valueType, env)
+        } yield {
+          StructT(
+            UArray(typeTransform.keyType.asUntagged, outputCommandT.asUntagged),
+            pairT
+          )
         }
       }
       case FunctionalSystemT(_) => {
@@ -184,6 +182,7 @@ object UpdateCommandCalculator {
           result
         }
       }
+      case SequenceT(parent, featureSet) => Success(parent)
       /*case CaseT(cases, _, _) => {
         Success(UndefinedT)
       }*/
@@ -193,6 +192,7 @@ object UpdateCommandCalculator {
     }
   }
 
+  // Eventually, this will return an UntaggedObject, because we're not going to change the type
   def updateVersionedObject(
     current: NewMapObject,
     command: UntaggedObject,
@@ -220,29 +220,24 @@ object UpdateCommandCalculator {
           NewMapObject(UIndex(result), BooleanT)
         }
       }
-      case mapT@MapT(typeTransform, MapConfig(CommandOutput, _, _, _, _)) => {
-        val outputType = typeTransform.valueType
-
+      case SequenceT(parentT, featureSet) => {
         for {
-          input <- Evaluator.applyFunction(command, UIndex(0), env)
-          commandForInput <- Evaluator.applyFunction(command, UIndex(1), env)
-
-          currentResultForInput <- Evaluator.applyFunction(current.uObject, input, env)
-
-          newResultForInput <- updateVersionedObject(
-            NewMapObject(currentResultForInput, outputType),
-            commandForInput,
-            env
-          )
-
-          mapValues <- current.uObject.getMapBindings()
-
-          newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
+          result <- current.uObject match {
+            case UCase(UIndex(i), uSeq) => {
+              for {
+                oldBindings <- uSeq.getMapBindings
+              } yield {
+                val newBindings = oldBindings :+ (UIndex(i) -> command)
+                UCase(UIndex(i + 1), UMap(newBindings))
+              }
+            }
+            case _ => Failure("Problem with sequence command: " + command)
+          }
         } yield {
-          NewMapObject(UMap(newMapValues), mapT)
+          NewMapObject(result, current.nType)
         }
       }
-      case MapT(typeTransform, MapConfig(RequireCompleteness, features, _, _, _)) => {
+      case MapT(typeTransform, MapConfig(PartialMap, features, _, _, _)) => {
         val keyT = typeTransform.keyType
         val requiredValuesT = typeTransform.valueType
 
@@ -276,7 +271,7 @@ object UpdateCommandCalculator {
 
           newTableType = MapT(
             TypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
-            MapConfig(RequireCompleteness, features)
+            MapConfig(PartialMap, features)
           )
                   
           mapValues <- current.uObject.getMapBindings()
@@ -294,6 +289,28 @@ object UpdateCommandCalculator {
 
           newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
         } yield NewMapObject(UMap(newMapValues), newTableType)
+      }
+      case mapT@MapT(typeTransform, _) => {
+        val outputType = typeTransform.valueType
+
+        for {
+          input <- Evaluator.applyFunction(command, UIndex(0), env)
+          commandForInput <- Evaluator.applyFunction(command, UIndex(1), env)
+
+          currentResultForInput <- Evaluator.applyFunction(current.uObject, input, env)
+
+          newResultForInput <- updateVersionedObject(
+            NewMapObject(currentResultForInput, outputType),
+            commandForInput,
+            env
+          )
+
+          mapValues <- current.uObject.getMapBindings()
+
+          newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
+        } yield {
+          NewMapObject(UMap(newMapValues), mapT)
+        }
       }
       case FunctionalSystemT(functionTypes) => {
         for {

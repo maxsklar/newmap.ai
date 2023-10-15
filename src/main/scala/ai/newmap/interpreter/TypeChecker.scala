@@ -884,7 +884,9 @@ object TypeChecker {
       typeOfFunction = functionTypeChecked.refinedTypeClass
       underlyingTypeOfFunction <- getFinalUnderlyingType(typeOfFunction, env)
 
-      inputTagged <- underlyingTypeOfFunction.inputTypeOpt match {
+      functionUntaggedObject = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+
+      inputTagged <- underlyingTypeOfFunction.inputTypeOpt(Some(functionUntaggedObject)) match {
         case Some(inputT) => {
           for {
             inputTypeChecked <- typeCheck(input, inputT, env, FullFunction, tcParameters)
@@ -905,6 +907,14 @@ object TypeChecker {
         case StructT(UMap(params), _, _, _) => outputTypeFromStructParams(params, inputTC, env)
         case TypeClassT(typeTransform, implementation) => {
           outputTypeFromTypeClassParams(typeTransform, implementation, inputTC, inputType, env)
+        }
+        case SequenceT(parent, _) => {
+          val strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+          
+          strippedExpression match {
+            case UCase(i, _) => Success(IndexT(i))
+            case _ => Failure("Incorrect sequence: " + functionTypeChecked.nExpression)
+          }
         }
         case MapT(typeTransform, _) => {
           for {
@@ -1034,6 +1044,7 @@ object TypeChecker {
       case TypeClassT(_, _) => Success(PatternMap)
       case MapT(_, config) => Success(config.featureSet)
       case TypeT => Success(PatternMap) // This is for type classes
+      case SequenceT(_, featureSet) => Success(featureSet)
       case _ => Failure(s"Cannot retrieve meaningful feature set from object with type $nTypeClass")
     }
   }

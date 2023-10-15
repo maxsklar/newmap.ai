@@ -272,6 +272,11 @@ object Evaluator {
         case UIndex(i) => Success(UDouble(i.toDouble))
         case _ => Failure("Can't convert to decimal: " + input)
       }
+      case UCase(_, result) => {
+        // This is for sequences where the first part of the case is the length.
+        // In the future, the typechecker can maybe alter things so that this hack doesn't appear here.
+        applyFunction(result, input, env)
+      }
       case _ => {
         Failure(s"Not implemented: apply function\nFunction: $func\nInput: $input")
       }

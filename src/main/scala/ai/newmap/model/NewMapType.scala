@@ -9,7 +9,7 @@ sealed abstract class NewMapType {
 
   def asUntagged: UntaggedObject = NewMapType.typeToUntaggedObject(this)
 
-  def inputTypeOpt: Option[NewMapType] = NewMapType.getInputType(this)
+  def inputTypeOpt(uObjectOpt: Option[UntaggedObject]): Option[NewMapType] = NewMapType.getInputType(this, uObjectOpt)
 
   def upgradeCustom(custom: String, newVersion: Long): NewMapType = NewMapType.upgradeCustomType(this, custom, newVersion)
 }
@@ -185,6 +185,21 @@ case class CaseT(
   featureSet: MapFeatureSet = BasicMap,
 ) extends NewMapType
 
+//This is currently a shortcut for the following, which is a case that uses a number (the length) to understand the sequence type
+/* CaseT(
+      USingularMap(UWildcard("i"), MapT(
+        TypeTransform(IndexT(ParamId("i")), valueType),
+        config
+      ).asUntagged),
+      CountT,
+      SimpleFunction,
+    )
+*/
+case class SequenceT(
+  parentType: NewMapType,
+  featureSet: MapFeatureSet = BasicMap,
+) extends NewMapType
+
 // Represents a type that contains a subset of the parent type, represented by a simple function
 // - The output type of the simple function is usually a boolean (2) or at least a command type
 // - Anything that's left at the initial value is NOT in the subtype
@@ -257,6 +272,7 @@ object NewMapType {
       typeToUntaggedObject(parentType),
       UIdentifier(featureSet.getName)
     )))
+    case SequenceT(parentT, featureSet) => UCase(UIdentifier("Sequence"), UArray(parentT.asUntagged, UIdentifier(featureSet.getName)))
     case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
     case ArrayT(nType) => UCase(UIdentifier("Array"), nType.asUntagged)
     case CustomT(name, params, typeSystemId) => UCase(UIdentifier(name), UArray(params, UIndex(typeSystemId)))
@@ -303,6 +319,7 @@ object NewMapType {
             completeness <- config(0) match {
               case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
               case UIdentifier("CommandOutput") => Success(CommandOutput)
+              case UIdentifier("PartialMap") => Success(PartialMap)
               case _ => Failure(s"Can't allow feature set in struct type: ${items(1)}")
             }
 
@@ -326,6 +343,7 @@ object NewMapType {
             completeness <- items(2) match {
               case UIdentifier("RequireCompleteness") => Success(RequireCompleteness)
               case UIdentifier("CommandOutput") => Success(CommandOutput)
+              case UIdentifier("PartialMap") => Success(PartialMap)
               case _ => Failure(s"Can't allow feature set in struct type: ${items(2)}")
             }
 
@@ -334,7 +352,10 @@ object NewMapType {
             StructT(items(0), parentT, completeness, featureSet)
           }
         }
-        case _ => Failure(s"Couldn't convert Struct to NewMapType with params: $params")
+        case _ => {
+          throw new Exception(s"Couldn't convert Struct to NewMapType with params: $params")
+          Failure(s"Couldn't convert Struct to NewMapType with params: $params")
+        }
       }
       case "TypeClass" => params match {
         case UArray(items) if (items.length == 2) => {
@@ -362,6 +383,15 @@ object NewMapType {
           } yield CaseT(items(0), parentT, featureSet)
         }
         case _ => Failure(s"Couldn't convert Case to NewMapType with params: $params")
+      }
+      case "Sequence" => params match {
+        case UArray(items) if items.length == 2 => {
+          for {
+            parentT <- convertToNewMapType(items(0))
+            featureSet <- convertFeatureSet(items(1))
+          } yield SequenceT(parentT, featureSet)
+        }
+        case _ => Failure(s"Couldn't convert Sequence to NewMapType with params: $params")
       }
       case "Subtype" => params match {
         case UArray(items) if items.length == 3 => {
@@ -444,12 +474,31 @@ object NewMapType {
   }
 
   // Return the input type of a function type
-  def getInputType(underlyingT: NewMapType): Option[NewMapType] = {
+  def getInputType(
+    underlyingT: NewMapType,
+    uObjectOpt: Option[UntaggedObject] // In some cases, this provides a shortcut to us but in general rely on underlyingT
+  ): Option[NewMapType] = {
     underlyingT match {
       case StructT(_, parentFieldType, _, _) => Some(parentFieldType)
       // TODO: when we overhaul the type class functionality
       case TypeClassT(_, _) => None
+      case MapT(typeTransform, MapConfig(PartialMap, featureSet, _, _, _)) => {
+        // If uObject is a parameter or something, this becomes impossible.
+        // - we need to deal with this a little better, but we're close!
+        // - ULTIMATELY thing of partial maps as a case type where the label is the keys that are available and the value is the map.
+        //   - but we've shortcutted because the map itself contains all the relevant information
+        uObjectOpt match {
+          case Some(uObject) => Some(SubtypeT(uObject, typeTransform.keyType, featureSet))
+          case None => None
+        }
+      }
       case MapT(typeTransform, _) =>  Some(typeTransform.keyType)
+      case SequenceT(_, _) => {
+        uObjectOpt match {
+          case Some(UCase(i, _)) => Some(IndexT(i))
+          case _ => None
+        }
+      }
       case _ => None
     }
   }

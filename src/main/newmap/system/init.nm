@@ -1,4 +1,4 @@
-ver res = new ReqMap(0: Object)
+ver res = new Table(0: Object)
 
 update _default: (Count:0)
 update _default: (Boolean:0)

@@ -931,6 +931,15 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Partial maps " should " not be callable on the wrong input" in {
+    testCodeScript(Vector(
+      CodeExpectation("val m: PartialMap(4: Identifier) = (0: zero, 2: two)", GeneralSuccessCheck),
+      CodeExpectation("m 0", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIdentifier("zero"), IdentifierT)))),
+      CodeExpectation("m 2", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIdentifier("two"), IdentifierT)))),
+      CodeExpectation("m 1", FailureCheck)
+    ))
+  }
+
   "A typeOf function " should " be creatable as a type class" in {
     testCodeScript(Vector(
       CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),

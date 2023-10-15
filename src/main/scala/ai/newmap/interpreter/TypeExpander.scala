@@ -70,7 +70,7 @@ object TypeExpander {
 
           uConstructors = caseBindings.map(x => x._1 -> UIndex(1))
           constructorsSubtype = SubtypeT(UMap(uConstructors), parentType, featureSet)
-          mapConfig = MapConfig(RequireCompleteness, BasicMap)
+          mapConfig = MapConfig(PartialMap, BasicMap)
 
           caseMap = NewMapObject(
             cases,

@@ -547,6 +547,11 @@ object Environment {
     nType.asUntagged
   }
 
+  def buildSequenceT(valueType: NewMapType): UntaggedObject = {
+    val nType = SequenceT(valueType, SimpleFunction)
+    nType.asUntagged
+  }
+
   def buildSubtypeT(isMember: UntaggedObject, parentType: UntaggedObject): UntaggedObject = {
     UCase(UIdentifier("Subtype"), UArray(Array(
       isMember,
@@ -555,7 +560,9 @@ object Environment {
     )))
   }
 
-  def buildMapCreator(config: MapConfig, allowGenerics: Boolean): NewMapObject = {
+  def buildMapCreator(config: MapConfig): NewMapObject = {
+    val allowGenerics = config.featureSet != BasicMap
+
     val transformMapT = {
       UCase(UIdentifier("Map"), UArray(Array(
         ParamId("typeTransform"),
@@ -589,14 +596,15 @@ object Environment {
     eCommand("Sequence", NewMapObject(
       USingularMap(
         UWildcard("key"), 
-        buildSimpleMapT(TypeTransform(IndexT(UIndex(0)),ParamIdT("key")))
+        buildSequenceT(ParamIdT("key"))
       ),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    eCommand("Map", buildMapCreator(MapConfig(CommandOutput, BasicMap), false)),
-    eCommand("GenericMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
-    eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
-    eCommand("Table", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction), true)),
+    eCommand("Map", buildMapCreator(MapConfig(CommandOutput, BasicMap))),
+    eCommand("GenericMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction))),
+    eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction))),
+    eCommand("Table", buildMapCreator(MapConfig(PartialMap, SimpleFunction))),
+    eCommand("PartialMap", buildMapCreator(MapConfig(PartialMap, SimpleFunction))),
     eCommand("CaseType", typeAsObject(CaseT(UMap(Vector.empty), IdentifierT, BasicMap))),
     eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
