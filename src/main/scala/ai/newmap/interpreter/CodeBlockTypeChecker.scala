@@ -32,7 +32,7 @@ object CodeBlockTypeChecker {
         tcResult <- TypeChecker.typeCheck(expression, expectedType, env, featureSet, newParams)
       } yield {
         val resultingExpression = ULet(envCommands.toVector, tcResult.nExpression)
-        TypeChecker.TypeCheckResponse(resultingExpression, tcResult.refinedTypeClass)
+        TypeChecker.TypeCheckResponse(resultingExpression, tcResult.refinedTypeClass, tcParameters)
       }
     }
   }

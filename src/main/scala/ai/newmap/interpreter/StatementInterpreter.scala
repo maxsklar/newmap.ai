@@ -407,9 +407,9 @@ object StatementInterpreter {
       ) => {
         for {
           baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, PatternMap, true, Map.empty)
-          takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.newParams)
+          takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.tcParameters)
 
-          baseT <- baseTypePatternTC.typeCheckResult.asType
+          baseT <- baseTypePatternTC.nExpression.asType
           takingTypeT <- takingTypePatternTC.nExpression.asType
           innerTypeTransform = TypeTransform(takingTypeT, baseT)
 
