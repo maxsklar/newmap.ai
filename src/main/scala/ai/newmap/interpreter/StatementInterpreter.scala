@@ -89,7 +89,7 @@ object StatementInterpreter {
         val typeTransform = TypeTransform(IdentifierT, TypeT)
 
         for {
-          mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, FullFunction, Map.empty)
+          mapValues <- typeCheckGenericMap(values, typeTransform, false, env, BasicMap, Map.empty)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           ReturnValue(
@@ -406,7 +406,7 @@ object StatementInterpreter {
         outputRule: ParseTree
       ) => {
         for {
-          baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, FullFunction, PatternMap, Map.empty)
+          baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, PatternMap, true, Map.empty)
           takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.newParams)
 
           baseT <- baseTypePatternTC.typeCheckResult.asType

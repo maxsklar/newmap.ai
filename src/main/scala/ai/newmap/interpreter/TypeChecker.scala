@@ -275,7 +275,7 @@ object TypeChecker {
             }
 
             for {
-              mapValues <- typeCheckGenericMap(correctedValues, typeTransform, config.featureSet, env, featureSet, tcParameters)
+              mapValues <- typeCheckGenericMap(correctedValues, typeTransform, config.featureSet != BasicMap, env, config.featureSet, tcParameters)
 
               isCovered <- {
                 if (config.completeness != RequireCompleteness) Success(true)
@@ -303,7 +303,7 @@ object TypeChecker {
             {
               val typeTransform = TypeTransform(IdentifierT, typeT)
               for {
-                mapValues <- typeCheckGenericMap(values, typeTransform, BasicMap, env, featureSet, tcParameters)
+                mapValues <- typeCheckGenericMap(values, typeTransform, false, env, featureSet, tcParameters)
               } yield {
                 TypeCheckResponse(
                   StructT(UMap(mapValues), IdentifierT, RequireCompleteness, BasicMap).asUntagged,
@@ -340,7 +340,8 @@ object TypeChecker {
               mapValue <- typeCheckGenericMap(
                 Vector(value),
                 TypeTransform(TypeT, TypeT),
-                if (allowGenerics) PatternMap else BasicMap,
+                //if (allowGenerics) PatternMap else BasicMap,
+                allowGenerics,
                 env,
                 featureSet,
                 tcParameters
@@ -493,16 +494,16 @@ object TypeChecker {
   def typeCheckGenericMap(
     values: Vector[ParseTree],
     typeTransform: TypeTransform,
-    internalFeatureSet: MapFeatureSet,
+    patternMatchingAllowed: Boolean,
     env: Environment,
-    externalFeatureSet: MapFeatureSet, // This is the external feature set, the map feature set can be found in mapT
+    featureSet: MapFeatureSet, // This is the external feature set, the map feature set can be found in mapT
     tcParameters: Map[String, NewMapType]
   ): Outcome[Vector[(UntaggedObject, UntaggedObject)], String] = {
     values match {
       case KeyValueBinding(k, v) +: restOfValues => {
         //println("Checking KEY: " + k + " -- " + typeTransform.keyType)
         for {
-          resultKey <- typeCheckWithPatternMatching(k, typeTransform.keyType, env, externalFeatureSet, internalFeatureSet, tcParameters)
+          resultKey <- typeCheckWithPatternMatching(k, typeTransform.keyType, env, featureSet, patternMatchingAllowed, tcParameters)
 
           // Keys must be evaluated on the spot
           foundKeyPattern <- Evaluator(resultKey.typeCheckResult, env)
@@ -522,19 +523,17 @@ object TypeChecker {
           valueTypePatternUntagged = MakeSubstitution(untaggedTypeTransformValue, paramsToSubsitute)
           valueTypePattern <- valueTypePatternUntagged.asType
 
-          //_ = println(s"About to check value: $v -- $valueTypePattern -- ${resultKey.newParams}")
-
           // Now we want to type check the object, but we have to tell it what kind of map we're in
           //  in order to ensure that the right features are being used
           objectFoundValue <- typeCheck(
             v,
             valueTypePattern,
             env,
-            featureSet = internalFeatureSet,
+            featureSet = featureSet,
             resultKey.newParams
           )
 
-          restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, internalFeatureSet, env, externalFeatureSet, tcParameters)
+          restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, patternMatchingAllowed, env, featureSet, tcParameters)
         } yield {
           (foundKeyPattern -> objectFoundValue.nExpression) +: restOfMap
         }
@@ -633,13 +632,11 @@ object TypeChecker {
     expression: ParseTree,
     expectedType: NewMapType,
     env: Environment,
-
-    // TODO - I want to get rid of this!
-    externalFeatureSet: MapFeatureSet, // Am I inside a map with restricted features already?
-    internalFeatureSet: MapFeatureSet, // Which feature set is this map allowed to use
+    featureSet: MapFeatureSet, // Am I inside a map with restricted features already?
+    patternMatchingAllowed: Boolean,
     tcParameters: Map[String, NewMapType]
   ): Outcome[TypeCheckWithPatternMatchingResult, String] = {
-    val patternMatchingAllowed = internalFeatureSet.getLevel >= PatternMap.getLevel
+    //val patternMatchingAllowed = internalFeatureSet.getLevel >= PatternMap.getLevel
     
     // Use this??
     // val parentTypeIsIdentifier = TypeClassUtils.typeIsExpectingAnIdentifier(expectedType, s, env)
@@ -653,7 +650,7 @@ object TypeChecker {
           case Some(value) => Success(TypeCheckWithPatternMatchingResult(value.uObject, value.nType, Map.empty))
           case None if (env.typeSystem.typeToParameterType.get(s).nonEmpty) => {
             for {
-              tcResponse <- typeCheckIdentifierFromTypeSystem(s, expectedTypeOutcome, env, externalFeatureSet, tcParameters)
+              tcResponse <- typeCheckIdentifierFromTypeSystem(s, expectedTypeOutcome, env, featureSet, tcParameters)
             } yield {
               TypeCheckWithPatternMatchingResult(tcResponse.nExpression, tcResponse.refinedTypeClass, tcParameters)
             }
@@ -664,14 +661,14 @@ object TypeChecker {
       // TODO: what if instead of BasicMap we have SimpleMap on the struct? It gets a little more complex
       case (LiteralListParse(values, _), Success(StructT(UMap(structValues), _, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
-          tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
+          tcmp <- typeCheckWithMultiplePatterns((values,structValues.map(_._2)).zipped.toVector, featureSet, patternMatchingAllowed, env, tcParameters)
         } yield {
           TypeCheckWithPatternMatchingResult(UArray(tcmp.patterns.toArray), expectedType, tcmp.newParams)
         }
       }
       case (LiteralListParse(values, _), Success(StructT(UArray(structValues), _, _, _))) if (patternMatchingAllowed && (values.length == structValues.length)) => {
         for {
-          tcmp <- typeCheckWithMultiplePatterns((values,structValues).zipped.toVector, externalFeatureSet, internalFeatureSet, env, tcParameters)
+          tcmp <- typeCheckWithMultiplePatterns((values,structValues).zipped.toVector, featureSet, patternMatchingAllowed, env, tcParameters)
         } yield {
           TypeCheckWithPatternMatchingResult(UArray(tcmp.patterns.toArray), expectedType, tcmp.newParams)
         }
@@ -679,13 +676,13 @@ object TypeChecker {
       case (ConstructCaseParse(constructorP, input), Success(CaseT(cases, parentFieldType, _))) if (patternMatchingAllowed) => {
         for {
           // TODO - update environment here
-          constructorTC <- typeCheckWithPatternMatching(constructorP, parentFieldType, env, externalFeatureSet, if (parentFieldType == IdentifierT) BasicMap else internalFeatureSet, tcParameters)
+          constructorTC <- typeCheckWithPatternMatching(constructorP, parentFieldType, env, featureSet, (parentFieldType != IdentifierT) && patternMatchingAllowed, tcParameters)
           constructor <- Evaluator(constructorTC.typeCheckResult, env)
 
           inputTypeExpected <- Evaluator.applyFunction(cases, constructor, env)
           inputTExpected <- inputTypeExpected.asType
 
-          result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet, constructorTC.newParams)
+          result <- typeCheckWithPatternMatching(input, inputTExpected, env, featureSet, patternMatchingAllowed, constructorTC.newParams)
         } yield {
           TypeCheckWithPatternMatchingResult(
             UCase(constructor, result.typeCheckResult),
@@ -697,7 +694,7 @@ object TypeChecker {
       case (ConstructCaseParse(constructorP, input), Success(ArrayT(itemT))) if (patternMatchingAllowed) => {
         for {
           // TODO - update environment here
-          constructorTC <- typeCheckWithPatternMatching(constructorP, CountT, env, externalFeatureSet, internalFeatureSet, tcParameters)
+          constructorTC <- typeCheckWithPatternMatching(constructorP, CountT, env, featureSet, patternMatchingAllowed, tcParameters)
           constructor <- Evaluator(constructorTC.typeCheckResult, env)
 
           inputTExpected = MapT(
@@ -705,7 +702,7 @@ object TypeChecker {
             MapConfig(RequireCompleteness, BasicMap)
           )
 
-          result <- typeCheckWithPatternMatching(input, inputTExpected, env, externalFeatureSet, internalFeatureSet, constructorTC.newParams)
+          result <- typeCheckWithPatternMatching(input, inputTExpected, env, featureSet, patternMatchingAllowed, constructorTC.newParams)
         } yield {
           TypeCheckWithPatternMatchingResult(
             UCase(constructor, result.typeCheckResult),
@@ -730,8 +727,8 @@ object TypeChecker {
             input,
             parameterT,
             env,
-            externalFeatureSet,
-            internalFeatureSet,
+            featureSet,
+            patternMatchingAllowed,
             tcParameters
           )
         } yield {
@@ -752,7 +749,7 @@ object TypeChecker {
       }
       case _ => {
         for {
-          tc <- typeCheck(expression, expectedType, env, externalFeatureSet, tcParameters)
+          tc <- typeCheck(expression, expectedType, env, featureSet, tcParameters)
         } yield {
           TypeCheckWithPatternMatchingResult(tc.nExpression, expectedType, tcParameters)
         }
@@ -767,8 +764,8 @@ object TypeChecker {
 
   def typeCheckWithMultiplePatterns(
     expressions: Vector[(ParseTree, UntaggedObject)],
-    externalFeatureSet: MapFeatureSet,
-    internalFeatureSet: MapFeatureSet,
+    featureSet: MapFeatureSet,
+    patternMatchingAllowed: Boolean,
     env: Environment,
     tcParameters: Map[String, NewMapType]
   ): Outcome[TypeCheckWithMultiplePatternMatchingResult, String] = {
@@ -777,9 +774,9 @@ object TypeChecker {
         for {
           nTypeObj <- Evaluator(nTypeExp, env)
           nType <- nTypeObj.asType
-          response <- typeCheckWithPatternMatching(expression, nType, env, externalFeatureSet, internalFeatureSet, tcParameters)
+          response <- typeCheckWithPatternMatching(expression, nType, env, featureSet, patternMatchingAllowed, tcParameters)
           pattern = response.typeCheckResult
-          finalResponse <- typeCheckWithMultiplePatterns(restOfExpressions, externalFeatureSet, internalFeatureSet, env, response.newParams)
+          finalResponse <- typeCheckWithMultiplePatterns(restOfExpressions, featureSet, patternMatchingAllowed, env, response.newParams)
         } yield {
           TypeCheckWithMultiplePatternMatchingResult(pattern +: finalResponse.patterns, finalResponse.newParams ++ response.newParams)
         }
