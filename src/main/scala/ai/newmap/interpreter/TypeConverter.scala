@@ -238,6 +238,7 @@ object TypeConverter {
 
   def isSingularMap(uObject: UntaggedObject): Boolean = uObject match {
     case UMap(values) if (values.length == 1) => true
+    case UArray(values) if (values.length == 1) => true
     case USingularMap(_, _) => true
     case _ => false
   }

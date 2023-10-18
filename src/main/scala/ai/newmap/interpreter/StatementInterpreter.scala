@@ -406,7 +406,7 @@ object StatementInterpreter {
         outputRule: ParseTree
       ) => {
         for {
-          baseTypePatternTC <- TypeChecker.typeCheckWithPatternMatching(typeParse, TypeT, env, PatternMap, true, Map.empty)
+          baseTypePatternTC <- TypeChecker.typeCheck(typeParse, TypeT, env, PatternMap, Map.empty, true)
           takingTypePatternTC <- TypeChecker.typeCheck(takingTypeParse, TypeT, env, PatternMap, baseTypePatternTC.tcParameters)
 
           baseT <- baseTypePatternTC.nExpression.asType

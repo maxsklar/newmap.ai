@@ -123,37 +123,37 @@ object PatternCoverageCalculator {
   def isCatchallPattern(pattern: UntaggedObject, nType: NewMapType, env: Environment): Boolean = {
     pattern match {
       case UWildcard(_) => true
-      case UArray(patterns)  => {
-        nType match {
-          // TODO: In the future, maybe we can relax "basicMap" by matching other patterns
-          // - That would require isCatchallPattern to match an nType that's a UntaggedObject, not just a NewMapObject
-          case StructT(UMap(params), _, _, _) if (params.length == patterns.length) => {
-            (patterns, params.map(_._2)).zipped.toVector.forall(x => {
-              Evaluator(x._2, env).toOption.map(nObject => {
-                isCatchallPattern(x._1, nObject.asType.toOption.get, env)
-              }).getOrElse(false) // We're not really set up for this yet!
-            })
-          }
-          case StructT(params, _, _, _) => {
-            val x = for {
-              paramBindings <- params.getMapBindings.toOption
-
-              if (paramBindings.length == patterns.length)
-            } yield {
-              (patterns, paramBindings.map(_._2)).zipped.toVector.forall(x => {
-                Evaluator(x._2, env).toOption.map(nObject => {
-                  isCatchallPattern(x._1, nObject.asType.toOption.get, env)
-                }).getOrElse(false) // We're not really set up for this yet!
-              })
-            }
-
-            x.getOrElse(false)
-          }
-          case _ => false 
-        }
-      }
       case UCase(UWildcard(_), UWildcard(_)) => true
-      case _ => false
+      case _ => {
+        val result = for {
+          bindings <- pattern.getMapBindings
+        } yield {
+          isCatchallPatternStruct(bindings.map(_._2), nType, env)
+        }
+
+        result.toOption.getOrElse(false)
+      }
+    }
+  }
+
+  def isCatchallPatternStruct(patterns: Vector[UntaggedObject], nType: NewMapType, env: Environment): Boolean = {
+    nType match {
+      case StructT(params, _, _, _) => {
+        val x = for {
+          paramBindings <- params.getMapBindings.toOption
+
+          if (paramBindings.length == patterns.length)
+        } yield {
+          (patterns, paramBindings.map(_._2)).zipped.toVector.forall(x => {
+            Evaluator(x._2, env).toOption.map(nObject => {
+              isCatchallPattern(x._1, nObject.asType.toOption.get, env)
+            }).getOrElse(false) // We're not really set up for this yet!
+          })
+        }
+
+        x.getOrElse(false)
+      }
+      case _ => false 
     }
   }
 }

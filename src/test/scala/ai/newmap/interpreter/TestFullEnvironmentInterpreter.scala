@@ -378,19 +378,18 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  /*
   // This "might" be possible with generics
-  it should " be creatable without a type given" in {
+  it should " be creatable without a type given" ignore {
     val line = "val f = (t: t)"
     testCodeLine(CodeExpectation(line, GeneralSuccessCheck))
   }
 
-  it should " be able to infer the function type" in {
+  it should " be able to infer the function type" ignore {
     testCodeScript(Vector(
       CodeExpectation("val x: 12 = 6", GeneralSuccessCheck),
       CodeExpectation("(6: 10, 1: 3, 2: 1) x", GeneralSuccessCheck)
     ))
-  }*/
+  }
 
   it should " be usable in a function" in {
     testCodeScript(Vector(
