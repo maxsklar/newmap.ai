@@ -874,19 +874,11 @@ object TypeChecker {
   def tagAndNormalizeObject(uObject: UntaggedObject, nTypeClass: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
     uObject match {
       case UInit => {
-        for {
-          initValue <- UpdateCommandCalculator.getDefaultValueOfCommandType(nTypeClass, env)
-        } yield NewMapObject(initValue, nTypeClass)
+        UpdateCommandCalculator.getDefaultValueOfCommandType(nTypeClass, env).map(initValue => NewMapObject(initValue, nTypeClass))
       }
-      case _ => {
-        if (nTypeClass == CountT) {
-          normalizeCount(uObject) match {
-            case Success(i) => Success(NewMapObject(UIndex(i), nTypeClass))
-            case _ => Success(NewMapObject(uObject, nTypeClass))
-          }
-        } else {
-          Success(NewMapObject(uObject, nTypeClass))
-        }
+      case _ => (nTypeClass, normalizeCount(uObject)) match {
+        case (CountT, Success(i)) => Success(NewMapObject(UIndex(i), nTypeClass))
+        case _ => Success(NewMapObject(uObject, nTypeClass))
       }
     }
   }
