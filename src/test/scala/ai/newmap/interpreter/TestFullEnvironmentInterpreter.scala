@@ -734,12 +734,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data ListOfCounts = CaseType", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts: (Empty, ())", GeneralSuccessCheck),
       CodeExpectation("update ListOfCounts: (Node, (head: Count, tail: ListOfCounts))", GeneralSuccessCheck),
-      CodeExpectation("val length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
-      CodeExpectation("def length: ReqMaq(ListOfCounts, Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", FailureCheck),
-      CodeExpectation("def length: (ListOfCounts => Count) = (Empty|_: 0, Node|(head, tail): Increment (length(tail)))", GeneralSuccessCheck),
-      CodeExpectation("length Empty", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(0, CountT)))),
-      CodeExpectation("length (Node|(6, Node|(2, Empty)))", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, CountT)))),
-      // Include examples to test the length function
+      CodeExpectation("new recursive map on ListOfCounts as length returning Count = (Empty|_: 0, Node|(head, tail): Increment (tail.length))", GeneralSuccessCheck),
+      CodeExpectation("val x: ListOfCounts = Empty", GeneralSuccessCheck),
+      CodeExpectation("x.length", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(0, CountT)))),
+      CodeExpectation("val y: ListOfCounts = (Node|(6, Node|(2, Empty)))", GeneralSuccessCheck),
+      CodeExpectation("y.length", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(2, CountT)))),
     ))
   }
 
@@ -773,11 +772,11 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("data Option (T: Type)", GeneralSuccessCheck),
       CodeExpectation("update Option: (None, ())", GeneralSuccessCheck),
       CodeExpectation("update Option: (Some, T)", GeneralSuccessCheck),
-      CodeExpectation("val getOrElse: GenericMap (Option|T: GenericMap(T: T)) = (None|(): (t: t), Some|t: (_: t))", GeneralSuccessCheck),
+      CodeExpectation("new pattern map on Option|T as getOrElse returning GenericMap(T: T) = (None|(): (t: t), Some|t: (_: t))", GeneralSuccessCheck),
       CodeExpectation("val x: Option|Count = None", GeneralSuccessCheck),
       CodeExpectation("val y: Option|Count = Some|20", GeneralSuccessCheck),
-      CodeExpectation("getOrElse x 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
-      CodeExpectation("getOrElse y 5", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(20, CountT))))
+      CodeExpectation("x.getOrElse(5)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(5, CountT)))),
+      CodeExpectation("y.getOrElse(5)", SuccessCheck(ExpOnlyEnvironmentCommand(IndexValue(20, CountT))))
     ))
   }
 
@@ -963,14 +962,23 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " come with a length function as a field " in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Array|Identifier = 5|(0: ~zero, 1: ~one, 2: ~two, 3: ~three, 4: ~four)", GeneralSuccessCheck),
+      CodeExpectation("new basic map on Array|T as length returning Count = (i|_: i)", FailureCheck),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("x.length", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
+    ))
+  }
+
   it should " be updatable with new values" in {
     testCodeScript(Vector(
       CodeExpectation("ver myArray = new Array|10", GeneralSuccessCheck),
       CodeExpectation("update myArray: 1", GeneralSuccessCheck),
       CodeExpectation("update myArray: 3", GeneralSuccessCheck),
       CodeExpectation("update myArray: 1", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len myArray", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("myArray.length", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
       CodeExpectation("myArray", SuccessCheck(ExpOnlyEnvironmentCommand(
         NewMapObject(
           UCase(UIndex(3), UArray(UIndex(1), UIndex(3), UIndex(1))),
@@ -1001,8 +1009,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   it should " come with a length function that also works with brackets" in {
     testCodeScript(Vector(
       CodeExpectation("val y: Array|Count = 5|[2, 3, 5, 7, 11]", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len y", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("y.length", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
     ))
   }
 
@@ -1031,8 +1039,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver appendedArray = new Array|Identifier", GeneralSuccessCheck),
       CodeExpectation("iterate myArray1 into appendedArray", GeneralSuccessCheck),
       CodeExpectation("iterate myArray2 into appendedArray", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("appendedArray.length", SuccessCheck(ExpOnlyEnvironmentCommand(Index(5)))),
     ))
   }
 
@@ -1041,8 +1049,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
       CodeExpectation("val t: Type = 10", GeneralSuccessCheck),
       CodeExpectation("iterate t into appendedArray", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(10), CountT)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("appendedArray.length", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(10), CountT)))),
     ))
   }
 
@@ -1050,8 +1058,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("ver appendedArray = new Array|10", GeneralSuccessCheck),
       CodeExpectation("iterate 10 into appendedArray", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len appendedArray", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(10), CountT)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("appendedArray.length", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UIndex(10), CountT)))),
     ))
   }
 
@@ -1064,8 +1072,8 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("update x: 2", GeneralSuccessCheck),
       CodeExpectation("ver a = new Array|Count", GeneralSuccessCheck),
       CodeExpectation("iterate x into a", GeneralSuccessCheck),
-      CodeExpectation("val len: GenericMap(Array|T: Count) = (i|_: i)", GeneralSuccessCheck),
-      CodeExpectation("len a", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
+      CodeExpectation("new pattern map on Array|T as length returning Count = (i|_: i)", GeneralSuccessCheck),
+      CodeExpectation("a.length", SuccessCheck(ExpOnlyEnvironmentCommand(Index(3)))),
     ))
   }
 

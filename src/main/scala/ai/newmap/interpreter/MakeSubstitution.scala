@@ -42,6 +42,13 @@ object MakeSubstitution {
         USingularMap(newKey, newValue)
       }
       case UArray(values) => UArray(values.map(v => this(v, parameters)))
+      case AccessField(value: UntaggedObject, uTypeClass: UntaggedObject, field: UntaggedObject) => {
+        AccessField(
+          this(value, parameters),
+          uTypeClass, // TODO: do we do a substitution here?
+          field // TODO: do we do a substitution here?
+        )
+      }
       case _ => expression
     }
   }

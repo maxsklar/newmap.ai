@@ -251,8 +251,8 @@ object NewFieldVersionedPath {
       case Identifier("basic") => Some(BasicMap)
       case Identifier("pattern") => Some(PatternMap)
       case Identifier("simple") => Some(SimpleFunction)
-      case Identifier("grounded") => Some(WellFoundedFunction)
-      case Identifier("full") => Some(FullFunction)
+      case Identifier("recursive") => Some(WellFoundedFunction)
+      case Identifier("turing") => Some(FullFunction)
       case _ => None
     }
   }

@@ -32,10 +32,8 @@ object StatementEvaluator {
         }
       }
       case ExpOnlyEnvironmentCommand(exp) => {
-        //println(s"Evaluating $exp")
         for {
           evaluatedObject <- Evaluator(exp.uObject, env)
-          //_ = println(s"evaluatedObject $evaluatedObject")
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
           nObject <- TypeChecker.tagAndNormalizeObject(constantObject, exp.nType, env)
         } yield {

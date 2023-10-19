@@ -378,7 +378,9 @@ object StatementInterpreter {
           // - Think about this more, and try to make it more obvious what to use in the future.
           typeTransformTC <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT(true), env, SimpleFunction, Map.empty)
 
-          typeTransform <- NewMapType.convertToTypeTransform(typeTransformTC.nExpression)
+          typeTransformEval <- Evaluator(typeTransformTC.nExpression, env)
+
+          typeTransform <- NewMapType.convertToTypeTransform(typeTransformEval)
 
           // TODO - what if typeTransform.valueType has a parameter?
           useCommandMap = UpdateCommandCalculator.getDefaultValueOfCommandType(typeTransform.valueType, env).isSuccess
@@ -387,8 +389,17 @@ object StatementInterpreter {
 
           mapType = MapT(typeTransform, mapConfig)
 
+          newEnv = if (featureSet.getLevel >= WellFoundedFunction.getLevel) {
+            // If its recursive, add it to the environment
+            env.newCommand(
+              NewVersionedFieldCommand(id, mapType, ParamId(id), false)
+            )
+          } else {
+            env
+          }
+
           // I still don't know if "FullFunction" is right here
-          valueTC <- TypeChecker.typeCheck(parseTree, mapType, env, FullFunction, Map.empty)
+          valueTC <- TypeChecker.typeCheck(parseTree, mapType, newEnv, FullFunction, Map.empty)
         } yield {
           ReturnValue(
             NewVersionedFieldCommand(id, valueTC.refinedTypeClass, valueTC.nExpression, false),

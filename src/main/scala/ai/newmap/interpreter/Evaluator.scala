@@ -195,7 +195,9 @@ object Evaluator {
           }
 
           this(keyMatchResult, env)
-        } else Failure(s"input $input not a closed literal")
+        } else {
+          Failure(s"input $input not a closed literal")
+        }
       }
       case USingularMap(key, value) => {
         // Singular maps are never command maps, so they may fail
