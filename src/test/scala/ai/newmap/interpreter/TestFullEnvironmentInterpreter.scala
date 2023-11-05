@@ -261,21 +261,6 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be creatable as a versioned object" in {
-    testCodeScript(Vector(
-      CodeExpectation("ver x = new ()", GeneralSuccessCheck),
-      CodeExpectation("update x: (myField, Count|3)", GeneralSuccessCheck),
-    ))
-  }
-
-  it should " be updatable with a pre-defined tagged object" in {
-    testCodeScript(Vector(
-      CodeExpectation("ver x = new ()", GeneralSuccessCheck),
-      CodeExpectation("val o: Object = Count|3", GeneralSuccessCheck),
-      CodeExpectation("update x: (myField, o)", GeneralSuccessCheck),
-    ))
-  }
-
   it should " be recognized as complete when in a pattern " in {
     testCodeScript(Vector(
       CodeExpectation("val myStructSimple: Type = (first: 1, second: 1)", GeneralSuccessCheck),
@@ -284,6 +269,21 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       CodeExpectation("val myStruct: Type = (first: 2, second: 3)", GeneralSuccessCheck),
       CodeExpectation("val myMap: ReqMap(myStruct: Identifier) = ((0, 0): a, (0, 1): b, (0, 2): c, (1, 0): d, (1, 1): e, (1, 2): f)", GeneralSuccessCheck),
       CodeExpectation("val myMap: ReqMap(myStruct: Identifier) = ((0, 0): a, (0, 1): b, (1, 0): d, (1, 1): e, (1, 2): f)", FailureCheck),
+    ))
+  }
+
+  "A partial map of Objects" should " be possible" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver x = new Table(Identifier: Object)", GeneralSuccessCheck),
+      CodeExpectation("update x: (myField, Count|3)", GeneralSuccessCheck),
+    ))
+  }
+
+  it should " be updatable with a pre-defined tagged object" in {
+    testCodeScript(Vector(
+      CodeExpectation("ver x = new Table(Identifier: Object)", GeneralSuccessCheck),
+      CodeExpectation("val o: Object = Count|3", GeneralSuccessCheck),
+      CodeExpectation("update x: (myField, o)", GeneralSuccessCheck),
     ))
   }
 

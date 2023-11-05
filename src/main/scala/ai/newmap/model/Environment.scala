@@ -725,10 +725,6 @@ object Environment {
     UpdateTypeclassWithFieldCommand("AnyType", "_", TypeT, "typeOf", Vector(
       WildcardT("t") -> ParamId("t")
     ), false),
-    /*ApplyIndividualCommand(
-      "_typeOf",
-      UMap(Vector(UWildcard("t") -> UMap(Vector(UWildcard("_") -> ParamId("t")))))
-    ),*/
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),

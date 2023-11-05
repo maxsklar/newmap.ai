@@ -132,25 +132,10 @@ object UpdateCommandCalculator {
           pairT
         ))
       }
-      case StructT(_, parentFieldType, RequireCompleteness, _) => {
-        // We may have the option to wanting to expand this struct!
-        // TODO: This is one of the cases where the type CHANGES when you update the object
-        // - should this be allowed? This may be a problem.
-
-        // Expand the number of fields in this struct like so!
-        val fieldExpansionCommandT = parentFieldType
-        // We are freely adding to an object and changing the type of it's fields
-        // This means that we need to give
-        // A) A field expansion command
-        // B) The tagged object that goes in there (so both type and object)
-        Success(StructT(
-          UArray(fieldExpansionCommandT.asUntagged, NewMapO.taggedObjectT.asUntagged),
-          pairT
-        ))
-      }
-      case StructT(parameterList, parentFieldType, CommandOutput, featureSet) => {
+      case StructT(parameterList, parentFieldType, _, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
-        // Are we allowed to change an old parameter? Let's say sure.
+        // TODO: rethink this, maybe the input should actually be a struct of the same type to overlay the old struct
+        // - or not the same type, but the command type of each field!
         Success(CaseT(parameterList, parentFieldType, featureSet))
       }
       case ArrayT(nType) => Success(nType)
@@ -319,24 +304,10 @@ object UpdateCommandCalculator {
           mapValues <- current.uObject.getMapBindings()
 
           nameOfField <- Evaluator.applyFunction(command, UIndex(0), env)
-          newValueAsNewMapObject <- Evaluator.applyFunction(command, UIndex(1), env)
-
-          uCaseValue <- newValueAsNewMapObject match {
-            case u@UCase(_, _) => Success(u)
-            case _ => Failure(s"Wrong update for complete struct: $newValueAsNewMapObject")
-          }
-
-          parameterListValues <- parameterList.getMapBindings()
-
+          valueOfField <- Evaluator.applyFunction(command, UIndex(1), env)
         } yield {
-          val typeOfField = uCaseValue.constructor
-          val valueOfField = uCaseValue.input
-
           val newMapValues = (nameOfField -> valueOfField) +: mapValues.filter(x => x._1 != nameOfField)
-
-          val newParams = (nameOfField -> typeOfField) +: parameterListValues.filter(x => x._1 != nameOfField)
-
-          NewMapObject(UMap(newMapValues), StructT(UMap(newParams), parentFieldType, RequireCompleteness, featureSet))
+          NewMapObject(UMap(newMapValues), current.nType)
         }
       }
       case StructT(params, parentFieldType, CommandOutput, _) => {
@@ -344,13 +315,9 @@ object UpdateCommandCalculator {
           case UCase(constructor, input) => {
             for {
               mapValues <- current.uObject.getMapBindings()
-
-              // TODO - this part is currently only written for Initializable
-              // Params need to be updated!!
-              newParams = params
             } yield {
               val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
-              NewMapObject(UMap(newMapValues), StructT(newParams, parentFieldType))
+              NewMapObject(UMap(newMapValues), current.nType)
             }
           }
           case _ => {
