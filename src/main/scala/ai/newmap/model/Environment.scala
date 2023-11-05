@@ -1,11 +1,17 @@
 package ai.newmap.model
 
-import ai.newmap.interpreter.{UpdateCommandCalculator, Evaluator, IterationUtils, TypeConverter, TypeChecker, TypeExpander}
+import ai.newmap.interpreter.{UpdateCommandCalculator, Evaluator, IterationUtils, MakeSubstitution, TypeConverter, TypeChecker, TypeExpander}
 
 import scala.collection.mutable.StringBuilder
 import scala.collection.immutable.ListMap
 import ai.newmap.util.{Failure, Outcome, Success}
 import java.util.UUID
+
+case class TypeClassFieldInfo(
+  wildcardParam: String,
+  nType: NewMapType,
+  isCommand: Boolean
+)
 
 // Additional things to keep track of: latest versions of all versioned objects??
 case class Environment(
@@ -22,8 +28,14 @@ case class Environment(
   //  functions returned from those fields (and including whether it is a command)
   // TODO - this must be versioned!
   // TODO - how to include commands as well
+  // TODO - belongs in the type system
   // This is a map from NewMapType => (String => NewMapObject)
   typeToFieldMapping: UntaggedObject = UMap(Vector.empty),
+
+  // TODO: this also needs to be refactored and versioned
+  // TODO - belongs in the type system
+  // This is a map from String => (String => NewMapType)
+  typeclassToFieldMapping: Map[String, Map[String, TypeClassFieldInfo]] = Map.empty,
 
   // Also a stored versioned type, but a special one!
   typeSystem: NewMapTypeSystem = NewMapTypeSystem(),
@@ -246,13 +258,14 @@ case class Environment(
           typeSystem = newTypeSystem
         )
       }
-      case NewTypeClassCommand(s, typeTransform) => {
-        val nType = TypeClassT(typeTransform, UMap(Vector.empty))
+      case NewTypeClassCommand(s, typeSet) => {
+        val nType = TypeClassT(typeSet)
 
         val parameterType = NewMapTypeSystem.emptyStruct
 
         val newTypeSystem = typeSystem.createNewCustomType(s, parameterType, UArray(), nType) match {
           case Success(s) => s
+          // TODO - handle this better!
           case Failure(f) => throw new Exception(f)
         }
 
@@ -260,6 +273,101 @@ case class Environment(
           commands = newCommands,
           typeSystem = newTypeSystem
         )
+      }
+      case UpdateTypeclassWithTypeCommand(id, nType, implementations) => {
+        var newEnv = this
+
+        for {
+          typeClass <- typeSystem.currentUnderlyingType(id)
+          expandedTypeClass <- TypeExpander.expandType(typeClass._2, nType.asUntagged, this)
+
+          newTypeSystem <- typeSystem.upgradeCustomType(id, expandedTypeClass.newType, expandedTypeClass.converter)
+
+          typeClassFields <- Outcome(typeclassToFieldMapping.get(id), s"Typeclass $id not found")
+        } yield {
+          
+          for {
+            implementation <- implementations
+          } {
+            val implField = implementation._1
+            val implValue = implementation._2
+            
+            for {
+              fieldInfo: TypeClassFieldInfo <- typeClassFields.get(implField)
+              fieldT = fieldInfo.nType
+
+              substFieldType = MakeSubstitution(fieldT.asUntagged, Map(fieldInfo.wildcardParam -> nType.asUntagged))
+
+              substFieldT <- substFieldType.asType.toOption
+            } {
+              val fieldTypeIsCommand = if (fieldInfo.isCommand) UIndex(1) else UIndex(0)
+
+              newEnv = newEnv.newCommand(NewVersionedFieldCommand(
+                implField,
+                MapT(TypeTransform(nType, substFieldT), MapConfig(RequireCompleteness, SimpleFunction)),
+                implValue,
+                isCommand = (fieldTypeIsCommand != UIndex(0)) // This isn't a great equality check here
+              ))
+            }
+          }
+
+          newEnv.copy(
+            commands = newCommands,
+            typeSystem = newTypeSystem
+          )
+        }
+
+        newEnv
+      }
+      case UpdateTypeclassWithFieldCommand(id, typeParameter, fieldType, fieldName, implementations, isCommand) => {
+        var newEnv = this
+
+        val fieldTypeArray = StructT(UArray(TypeT.asUntagged, BooleanT.asUntagged), IndexT(UIndex(2)))
+
+        val typclassToFieldMappingType = MapT(
+          ai.newmap.model.TypeTransform(IdentifierT, MapT(
+            ai.newmap.model.TypeTransform(IdentifierT, fieldTypeArray),
+            MapConfig(PartialMap, PatternMap)
+          )),
+          MapConfig(CommandOutput, PatternMap)
+        )
+
+        // 1) update typeclassToFieldMapping to get the new field
+        val currentFieldsForTypeclass = typeclassToFieldMapping.get(id).getOrElse(Map.empty)
+        val newFieldInfo = TypeClassFieldInfo(typeParameter, fieldType, false)
+        val newFieldsForTypeclass: Map[String, TypeClassFieldInfo] = currentFieldsForTypeclass + (fieldName -> newFieldInfo)
+        val newTypeclassToFieldMapping = typeclassToFieldMapping + (id -> newFieldsForTypeclass)
+
+        newEnv = newEnv.copy(typeclassToFieldMapping = newTypeclassToFieldMapping)
+
+        // 2) update typeToFieldMapping with the implementations
+        for {
+          implementation <- implementations
+        } {
+          val implT = implementation._1
+          val impl = implementation._2
+
+          val specificFieldType = MakeSubstitution(
+            fieldType.asUntagged,
+            Map(typeParameter -> implT.asUntagged)
+          )
+
+          for {
+            specificFieldT <- specificFieldType.asType
+          } {
+            newEnv = newEnv.newCommand(NewVersionedFieldCommand(
+              fieldName,
+              MapT(
+                ai.newmap.model.TypeTransform(implT, specificFieldT),
+                MapConfig(RequireCompleteness, SimpleFunction)
+              ),
+              USingularMap(UWildcard(typeParameter), impl),
+              isCommand
+            ))
+          }
+        }
+
+        newEnv
       }
       case IterateIntoCommand(iterableObject, destinationObject) => {
         IterationUtils.iterateObject(iterableObject, this) match {
@@ -491,7 +599,7 @@ case class Environment(
     NewMapObject(uType, TypeT)
   }
 
-  def TypeTransform(
+  def UTypeTransform(
     inputT: NewMapType,
     outputT: NewMapType
   ): UntaggedObject = {
@@ -611,17 +719,17 @@ object Environment {
       UMap(Vector(UWildcard("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewTypeClassCommand("_default", USingularMap(UWildcard("t"), ParamId("t"))),
-    NewTypeClassCommand("_typeOf", 
-      USingularMap(
-        UWildcard("t"),
-        buildSimpleMapT(TypeTransform(WildcardT("_"), TypeT))
-      )
-    ),
-    ApplyIndividualCommand(
+    //NewTypeClassCommand("Initializable", USingularMap(UWildcard("t"), ParamId("t"))),
+    NewTypeClassCommand("Initializable", UMap(Vector.empty)),
+    UpdateTypeclassWithFieldCommand("Initializable", "T", ParamIdT("T"), "init", Vector.empty, false),
+    NewTypeClassCommand("AnyType", UMap(Vector(UWildcard("_") -> UIndex(1)))),
+    UpdateTypeclassWithFieldCommand("AnyType", "_", TypeT, "typeOf", Vector(
+      WildcardT("t") -> ParamId("t")
+    ), false),
+    /*ApplyIndividualCommand(
       "_typeOf",
       UMap(Vector(UWildcard("t") -> UMap(Vector(UWildcard("_") -> ParamId("t")))))
-    ),
+    ),*/
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),
@@ -629,13 +737,14 @@ object Environment {
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
     NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),
-    NewTypeClassCommand(
+    /*NewTypeClassCommand(
       "Addable",
       USingularMap(
         USingularMap(IndexT(UIndex(2)).asUntagged, UWildcard("t")),
         ParamId("t")
       )
-    ),
+    ),*/
+    NewTypeClassCommand("Addable", UMap(Vector.empty)),
     eCommand("+", NewMapObject(
       UPlus,
       MapT(TypeTransform(

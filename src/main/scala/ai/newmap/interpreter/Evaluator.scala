@@ -35,7 +35,7 @@ object Evaluator {
             case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
-          
+
           answer <- applyFunction(resultValue, evalValue, env)
         } yield answer
       }
@@ -211,7 +211,7 @@ object Evaluator {
         for {
           count <- TypeChecker.normalizeCount(input)
 
-          _ <- Outcome.failWhen(count >= array.length, s"Array out of bounds for count $count: $array")
+          _ <- Outcome.failWhen(count >= array.length, s"Array out of bounds for count $count: $array -- func = $func")
         } yield {
           array(count.toInt)
         }

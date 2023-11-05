@@ -98,20 +98,90 @@ object StatementInterpreter {
           )
         }
       }
-      case NewTypeClassStatementParse(id, typeTransformParse) => {
+      case NewTypeClassStatementParse(id, types) => {
         for {
-          typeTransformResult <- TypeChecker.typeCheck(typeTransformParse, TypeTransformT(true), env, FullFunction, tcParameters)
-
-          typeTransform <- typeTransformResult.nExpression match {
-            case UMap(values) if (values.length == 1) => {
-              Success(USingularMap(values.head._1, values.head._2))
-            }
-            case result@USingularMap(_, _) => Success(result)
-            case _ => Failure(s"Invalid type transform: ${typeTransformResult.nExpression}")
-          }
+          typeSetResult <- TypeChecker.typeCheck(
+            types,
+            MapT(TypeTransform(TypeT, IndexT(UIndex(2))), MapConfig(CommandOutput, PatternMap)),
+            env,
+            SimpleFunction,
+            tcParameters
+          )
         } yield {
           ReturnValue(
-            NewTypeClassCommand(id.s, typeTransform),
+            NewTypeClassCommand(id.s, typeSetResult.nExpression),
+            tcParameters
+          )
+        }
+      }
+      case UpdateTypeclassWithTypeCommandParse(id, nTypeParse, implementations) => {
+        for {
+          nTypeResult <- TypeChecker.typeCheck(nTypeParse, TypeT, env, FullFunction, tcParameters, patternMatchingAllowed = true)
+          nTypeObj <- Evaluator(nTypeResult.nExpression, env)
+          nType <- nTypeObj.asType
+
+          implementationsResult <- TypeChecker.typeCheck(
+            implementations,
+            // THE PROBLEM IS HERE!!
+            MapT(TypeTransform(IdentifierT, nType), MapConfig(PartialMap, BasicMap)),
+            env,
+            FullFunction,
+            tcParameters
+          )
+
+          mapBindings <- implementationsResult.nExpression.getMapBindings()
+        } yield {
+          val implementationsTransformed = mapBindings.flatMap(binding => {
+            for {
+              identifier <- binding._1 match {
+                case UIdentifier(id) => Some(id)
+                case _ => None
+              }
+            } yield identifier -> binding._2
+          })
+
+          ReturnValue(
+            UpdateTypeclassWithTypeCommand(id.s, nType, implementationsTransformed),
+            tcParameters
+          )
+        }
+      }
+      case UpdateTypeclassWithFieldCommandParse(id, typeParameter, fieldType, fieldName, implementations, isCommand) => {
+        //println("In here: " + sParse)
+        for {
+          fieldTypeResult <- TypeChecker.typeCheck(fieldType, TypeT, env, FullFunction, tcParameters + (typeParameter -> TypeT))
+          //_ = println(s"fieldTypeResult: $fieldTypeResult")
+          fieldTypeObject <- Evaluator(fieldTypeResult.nExpression, env)
+          //_ = println(s"fieldTypeObject: $fieldTypeObject")
+          fieldT <- fieldTypeObject.asType
+
+          //_ = println(s"fieldT: $fieldT")
+
+          implementationsResult <- TypeChecker.typeCheck(
+            implementations,
+            MapT(TypeTransform(TypeT, fieldT), MapConfig(PartialMap, BasicMap)),
+            env,
+            FullFunction,
+            tcParameters
+          )
+
+          //_ = println(s"implementationsResult: $implementationsResult")
+
+          mapBindings <- implementationsResult.nExpression.getMapBindings()
+
+          //_ = println(s"mapBindings: $mapBindings")
+        } yield {
+          val implementationsTransformed: Vector[(NewMapType, UntaggedObject)] = mapBindings.flatMap(binding => {
+            for {
+              implementationTypeResult <- TypeChecker.typeCheck(fieldType, TypeT, env, FullFunction, tcParameters).toOption
+              implT <- implementationTypeResult.nExpression.asType.toOption
+            } yield implT -> binding._2
+          })
+
+          //println(s"implementationsTransformed: $implementationsTransformed")
+
+          ReturnValue(
+            UpdateTypeclassWithFieldCommand(id, typeParameter, fieldT, fieldName, implementationsTransformed, isCommand),
             tcParameters
           )
         }

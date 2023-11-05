@@ -20,25 +20,17 @@ object UpdateCommandCalculator {
    * It is a map that takes certain types (called command types) and outputs their default, or initial value
    * The initial value of Count is 0, for example
    */
-  def getDefaultValueOfCommandTypeFromEnv(nType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
+  def getDefaultValueOfCommandTypeFromEnv(uType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
     for {
-      defaultUnderlyingType <- env.typeSystem.currentUnderlyingType("_default")
+      fieldsToMap <- Evaluator.applyFunction(env.typeToFieldMapping, uType, env, TypeMatcher)
+      result <- Evaluator.applyFunction(fieldsToMap, UIdentifier("init"), env)
+      func <- Evaluator.applyFunction(result, UIndex(0), env)
 
-      defaultUnderlyingExpT = defaultUnderlyingType._2
-
-      mapValuesU <- defaultUnderlyingExpT match {
-        case TypeClassT(_, values) => Success(values)
-        case _ => Failure(s"Not a type class: ${defaultUnderlyingExpT.displayString(env)}")
+      value <- func match {
+        case UCase(typeOfFunc, valueOfFunc) => Success(valueOfFunc)
+        case _ => Failure("unexpected object: " + func)
       }
-
-      mapValues <- mapValuesU.getMapBindings()
-
-      // I wanted to call "applyFunctionAttempt" here, but we can't call getDefaultValueOfCommandType
-      // otherwise, we get an infinite loop
-      // TODO - try again?
-      result <- Evaluator.patternMatchInOrder(mapValues, nType, env, TypeMatcher)
-      uObject <- Evaluator(result, env)
-    } yield uObject
+    } yield value
   }
 
   def getDefaultValueOfCommandTypeHardcoded(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
@@ -87,7 +79,7 @@ object UpdateCommandCalculator {
   }
 
   def getCommandInputOfCommandType(
-  nType: NewMapType,
+    nType: NewMapType,
     env: Environment
   ): Outcome[NewMapType, String] = {
     nType match {
@@ -103,21 +95,17 @@ object UpdateCommandCalculator {
         val keyT = typeTransform.keyType
         val requiredValuesT = typeTransform.valueType
 
-        for {
-          keyExpansionCommandT <- TypeExpander.getTypeExpansionCommandInput(keyT, env.typeSystem)
-        } yield {
-          keyExpansionCommandT match {
-            case StructT(UMap(Vector()), _, _, _) => {
-              // TODO - this is an ugly exception.. we need a better way to add fields to a struct
-              // (particularly an empty struct like in this case)
-              requiredValuesT
-            }
-            case _ => {
-              StructT(
-                UArray(keyExpansionCommandT.asUntagged, requiredValuesT.asUntagged),
-                pairT
-              )
-            }
+        keyT match {
+          case StructT(UMap(Vector()), _, _, _) => {
+            // TODO - this is an ugly exception.. we need a better way to add fields to a struct
+            // (particularly an empty struct like in this case)
+            Success(requiredValuesT)
+          }
+          case _ => {
+            Success(StructT(
+              UArray(keyT.asUntagged, requiredValuesT.asUntagged),
+              pairT
+            ))
           }
         }
       }
@@ -242,13 +230,11 @@ object UpdateCommandCalculator {
         val requiredValuesT = typeTransform.valueType
 
         for {
-          keyExpansionCommandT <- TypeExpander.getTypeExpansionCommandInput(keyT, env.typeSystem)
-
-          result <- keyExpansionCommandT match {
+          result <- keyT match {
             case StructT(UMap(Vector()), _, _, _) => {
               // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
-              Success((NewMapObject(UMap(Vector.empty), keyExpansionCommandT), command))
+              Success((NewMapObject(UMap(Vector.empty), keyT), command))
             }
             case _ => {
 
@@ -266,19 +252,11 @@ object UpdateCommandCalculator {
           (keyExpansionCommand, valueExpansionExpression) = result
           
           // Really we're updating the key?? [review soon]
-          updateKeyTypeResponse <- TypeExpander.expandType(keyT, keyExpansionCommand.uObject, env)
-          // TODO- we need to do something with updateKeyTypeResponse.converter
+          //updateKeyTypeResponse <- TypeExpander.expandType(keyT, keyExpansionCommand.uObject, env)
 
-          newTableType = MapT(
-            TypeTransform(updateKeyTypeResponse.newType, requiredValuesT),
-            MapConfig(PartialMap, features)
-          )
+          // TODO- we need to do something with updateKeyTypeResponse.converter
                   
           mapValues <- current.uObject.getMapBindings()
-
-          _ <- Outcome.failWhen(updateKeyTypeResponse.newValues.length > 1, "A Unimplemented")
-
-          newPattern <- Outcome(updateKeyTypeResponse.newValues.headOption, s"Cannot expand type: $keyT and get a new pattern to match")
 
           prepNewValues = for {
             value <- mapValues
@@ -287,8 +265,8 @@ object UpdateCommandCalculator {
             if (value._1 != keyExpansionCommand.uObject)
           } yield (value._1 -> value._2)
 
-          newMapValues = (newPattern -> valueExpansionExpression) +: prepNewValues
-        } yield NewMapObject(UMap(newMapValues), newTableType)
+          newMapValues = (keyExpansionCommand.uObject -> valueExpansionExpression) +: prepNewValues
+        } yield NewMapObject(UMap(newMapValues), current.nType)
       }
       case mapT@MapT(typeTransform, _) => {
         val outputType = typeTransform.valueType
@@ -367,7 +345,7 @@ object UpdateCommandCalculator {
             for {
               mapValues <- current.uObject.getMapBindings()
 
-              // TODO - this part is currently only written for _default
+              // TODO - this part is currently only written for Initializable
               // Params need to be updated!!
               newParams = params
             } yield {
@@ -430,7 +408,7 @@ object UpdateCommandCalculator {
         })
       }
       case _ => {
-        Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker")
+        Failure(s"C) ${current.displayString(env)} is not a command type, error in type checker -- ${current.nType}")
       }
     }
   }

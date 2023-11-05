@@ -31,9 +31,7 @@ object TypeExpander {
         ))
       }
       case SubtypeT(_, parentType, _) => Success(parentType)
-      case TypeClassT(typeTransform, _) => {
-        Success(StructT(typeTransform, TypeT, CommandOutput, BasicMap))
-      }
+      case TypeClassT(typeSet) => Success(TypeT)
       //case MapT(keyType, valueType, config) => getTypeExpansionCommandInput(valueType, typeSystem)
       case CustomT(name, _, _) => {
         for {
@@ -109,8 +107,28 @@ object TypeExpander {
           )
         }
       }
-      case TypeClassT(typeTransform, implementation) => {
-        command match {
+      case TypeClassT(typeSet) => {
+        val adjustedCommand = UArray(command, UIndex(1))
+
+        val typeSetObject = NewMapObject(
+          typeSet,
+          MapT(
+            TypeTransform(TypeT, BooleanT),
+            MapConfig(CommandOutput, SimpleFunction)
+          )
+        )
+
+        for {
+          newTypeSet <- UpdateCommandCalculator.updateVersionedObject(typeSetObject, adjustedCommand, env)
+        } yield {
+          ExpandKeyResponse(
+            TypeClassT(newTypeSet.uObject),
+            Vector(command),
+            untaggedIdentity
+          )
+        }
+
+        /*command match {
           case UMap(mappings) => {
             val keys = mappings.map(_._1)
 
@@ -129,7 +147,7 @@ object TypeExpander {
           case _ => {
             Failure(s"Wrong input for typeClassT -- ${nType.displayString(env)} -- $command")
           }
-        }
+        }*/
       }
       case CustomT(name, _, _) => {
         // This only occurs if we have a custom type within a custom type - so this won't be called for a while.

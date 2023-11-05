@@ -34,7 +34,11 @@ object TypeChecker {
     // TODO - write a bunch of tests for that!
     expression match {
       case EmptyParse => {
-        responseFromConversion(NewMapObject(UArray(), NewMapO.emptyStruct), expectedType, env, tcParameters)
+        for {
+          defaultValue <- UpdateCommandCalculator.getDefaultValueOfCommandType(expectedType, env)
+        } yield TypeCheckResponse(defaultValue, expectedType, tcParameters)
+
+        //responseFromConversion(NewMapObject(UArray(), NewMapO.emptyStruct), expectedType, env, tcParameters)
       }
       case NaturalNumberParse(i: Long) => {
         for {
@@ -773,9 +777,9 @@ object TypeChecker {
 
       resultingType <- underlyingTypeOfFunction match {
         case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
-        case TypeClassT(typeTransform, implementation) => {
+        /*case TypeClassT(typeTransform, implementation) => {
           outputTypeFromTypeClassParams(typeTransform, inputType, env)
-        }
+        }*/
         case SequenceT(parent, _) => {
           val strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
           
@@ -802,7 +806,7 @@ object TypeChecker {
             _ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
           } yield nType
         }
-        case TypeT => {
+        /*case TypeT => {
           for {
             typeCheckedT <- functionTypeChecked.nExpression.asType
 
@@ -815,12 +819,12 @@ object TypeChecker {
               case _ => Failure(s"Cannot get resulting type from function of Type ${functionTypeChecked.nExpression} -- $function -- $input")
             }
           } yield result
-        }
+        }*/
         case _ => Failure(s"Cannot get resulting type from function type ${typeOfFunction.displayString(env)} -- $function -- $input")
       }
 
       resultingFunctionExpression <- typeOfFunction match {
-        case TypeT => {
+        /*case TypeT => {
           for {
             typeCheckedT <- functionTypeChecked.nExpression.asType
             underlingT <- getFinalUnderlyingType(typeCheckedT, env)
@@ -836,7 +840,7 @@ object TypeChecker {
           } yield {
             patternMatchAttempted
           }
-        }
+        }*/
         case _ => Success(functionTypeChecked.nExpression)
       }
     } yield {
@@ -897,7 +901,7 @@ object TypeChecker {
   def retrieveFeatureSetFromFunctionTypePattern(nTypeClass: NewMapType): Outcome[MapFeatureSet, String] = {
     nTypeClass match {
       case StructT(_, _, _, featureSet) => Success(featureSet)
-      case TypeClassT(_, _) => Success(PatternMap)
+      //case TypeClassT(_, _) => Success(PatternMap)
       case MapT(_, config) => Success(config.featureSet)
       case TypeT => Success(PatternMap) // This is for type classes
       case SequenceT(_, featureSet) => Success(featureSet)

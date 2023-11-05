@@ -2,7 +2,7 @@ package ai.newmap.parser.config
 
 import ai.newmap.parser.ParseState
 import ai.newmap.parser.Lexer
-import ai.newmap.parser.Lexer.Symbol
+import ai.newmap.parser.Lexer.{Identifier, Symbol}
 import ai.newmap.model.{ApplyCommandStatementParse, ApplyCustomCommandParse, EnvStatementParse, IdentifierParse, ParseTree}
 import ai.newmap.util.{Failure, Success, Outcome}
 
@@ -69,7 +69,11 @@ object ApplyCommandPath {
 
   case class InitState() extends ParseState[EnvStatementParse] {
     override def update(token: Lexer.Token): Outcome[ParseState[EnvStatementParse], String] = {
-      ParseState.expectingIdentifier(token, id => UpdateId(id))
+      if (token == Identifier("class")) {
+        Success(UpdateClassPath.InitState())
+      } else {
+        ParseState.expectingIdentifier(token, id => UpdateId(id))
+      }
     }
   }
 }

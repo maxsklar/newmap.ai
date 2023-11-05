@@ -143,6 +143,21 @@ case class NewTypeClassStatementParse(
   typeTransform: ParseTree
 ) extends EnvStatementParse
 
+case class UpdateTypeclassWithTypeCommandParse(
+  id: IdentifierParse,
+  nType: ParseTree,
+  implementations: ParseTree
+) extends EnvStatementParse
+
+case class UpdateTypeclassWithFieldCommandParse(
+  id: String,
+  typeParameter: String,
+  fieldType: ParseTree,
+  fieldName: String,
+  implementations: ParseTree,
+  isCommand: Boolean
+) extends EnvStatementParse
+
 case class IterateIntoStatementParse(
   iterableObject: ParseTree,
   destinationObject: Identifier

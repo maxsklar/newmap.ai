@@ -1,16 +1,17 @@
-ver res = new Table(0: Object)
+ver res = new Sequence(Object)
 
-update _default: (Count:0)
-update _default: (Boolean:0)
-update _default: (Type: UndefinedType)
+update class Initializable with type Count: (init : 0)
+update class Initializable with type Boolean: (init : 0)
+update class Initializable with type Type: (init : UndefinedType)
 
 data String = Array|Char
 
-typeclass _display (t: (t => String))
-update _display: (String: (s: s))
+typeclass Displayable (t: (t => String))
+update class Displayable t with field (t => String) as display
+//update class Displayable with type String: (display : (s: s))
 
 //data Option (T: Type)
 //update Option: (None, ())
 //update Option: (Some, T)
 
-//typeclass addable (t: (t => t => t))
+typeclass addable (t: (t => t => t))

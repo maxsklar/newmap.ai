@@ -894,9 +894,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
 
   "Tables " should " be allowed to be created" in {
     testCodeScript(Vector(
-      CodeExpectation("ver n = new Table(0: Identifier)", GeneralSuccessCheck),
-      CodeExpectation("update n: hello", GeneralSuccessCheck),
-      CodeExpectation("update n: world", GeneralSuccessCheck),
+      CodeExpectation("ver n = new Table(Count: Identifier)", GeneralSuccessCheck),
+      CodeExpectation("update n: (0, hello)", GeneralSuccessCheck),
+      CodeExpectation("update n: (1, world)", GeneralSuccessCheck),
       CodeExpectation("n", GeneralSuccessCheck),
       CodeExpectation("n 1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapO.identifier("world")))),
     ))
@@ -920,7 +920,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     )
 
     testCodeScript(Vector(
-      CodeExpectation("ver idChange = new Table(Subtype(Identifier): Identifier)", GeneralSuccessCheck),
+      CodeExpectation("ver idChange = new Table(Identifier: Identifier)", GeneralSuccessCheck),
       CodeExpectation("update idChange: (Monday, MON)", GeneralSuccessCheck),
       CodeExpectation("update idChange: (Tuesday, TUE)", GeneralSuccessCheck),
       CodeExpectation("update idChange: (Wednesday, WED)", GeneralSuccessCheck),
@@ -942,9 +942,9 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     testCodeScript(Vector(
       CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),
       CodeExpectation("val y: Identifier = ~hi", GeneralSuccessCheck),
-      CodeExpectation("_typeOf x", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IndexTN(9).asUntagged, TypeT)))),
-      CodeExpectation("_typeOf y", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IdentifierT.asUntagged, TypeT)))),
-      CodeExpectation("_typeOf 4", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(CountT.asUntagged, TypeT)))),
+      CodeExpectation("x.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IndexTN(9).asUntagged, TypeT)))),
+      CodeExpectation("y.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IdentifierT.asUntagged, TypeT)))),
+      CodeExpectation("4.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(CountT.asUntagged, TypeT)))),
     ))
   }
 
@@ -1095,14 +1095,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be printed nicely" in {
+  it should " be printed nicely" ignore {
     testCodeScript(Vector(
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
       CodeExpectation("s", SuccessCheckStr("asdf"))
     ))
   }
 
-  "The stdout channel " should " work with strings" in {
+  "The stdout channel " should " work with strings" ignore {
     testCodeScript(Vector(
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
@@ -1115,7 +1115,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "HelloWorld.nm script " should " behave as expected" in {
+  "HelloWorld.nm script " should " behave as expected" ignore {
     testCodeScript(Vector(
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),

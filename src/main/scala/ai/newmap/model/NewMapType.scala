@@ -170,11 +170,10 @@ case class TypeClassT(
   // The typeTransform encodes the abstract values that this type class is required to have.
   // Eg (t: t => String) means that every type in this class can calculate a String value for all it's objects.
   // Note that this value isn't named, but its'
-  typeTransformPattern: USingularMap,
+  //typeTransformPattern: USingularMap,
 
-  // List of the actual types in the class
-  // Along with their implementation
-  typesInTypeClass: UntaggedObject,
+  // set of the actual types in the class
+  typeSet: UntaggedObject,
 ) extends NewMapType
 
 // cases: input type is the case constructors, output type is the field types per constructor
@@ -258,10 +257,7 @@ object NewMapType {
       UIdentifier(completenesss.getName),
       UIdentifier(featureSet.getName)
     )))
-    case TypeClassT(typeTransform, typesInTypeClass) => UCase(UIdentifier("TypeClass"), UArray(Array(
-      typeTransform,
-      typesInTypeClass
-    )))
+    case TypeClassT(typeSet) => UCase(UIdentifier("TypeClass"), typeSet)
     case CaseT(cases, fieldParentType, featureSet) => UCase(UIdentifier("Case"), UArray(Array(
       cases,
       typeToUntaggedObject(fieldParentType),
@@ -357,23 +353,7 @@ object NewMapType {
           Failure(s"Couldn't convert Struct to NewMapType with params: $params")
         }
       }
-      case "TypeClass" => params match {
-        case UArray(items) if (items.length == 2) => {
-          for {
-            typeTransform <- items(0) match {
-              case ump@USingularMap(_, _) => Success(ump)
-              case UMap(uMap) if (uMap.length <= 1) => uMap.headOption match {
-                case Some(singleton) => Success(USingularMap(singleton._1, singleton._2))
-                case None => Failure("Empty Type Class Pattern")
-              }
-              case _ => Failure(s"Invalid typeTransform in TypeClass: ${items(0)}")
-            }
-          } yield {
-            TypeClassT(typeTransform, items(1))
-          }
-        }
-        case _ => Failure(s"Couldn't convert TypeClass to NewMapType with params: $params")
-      }
+      case "TypeClass" => Success(TypeClassT(params))
       case "Case" => params match {
         case UArray(items) if items.length == 3 => {
           for {
@@ -480,8 +460,6 @@ object NewMapType {
   ): Option[NewMapType] = {
     underlyingT match {
       case StructT(_, parentFieldType, _, _) => Some(parentFieldType)
-      // TODO: when we overhaul the type class functionality
-      case TypeClassT(_, _) => None
       case MapT(typeTransform, MapConfig(PartialMap, featureSet, _, _, _)) => {
         // If uObject is a parameter or something, this becomes impossible.
         // - we need to deal with this a little better, but we're close!
@@ -525,7 +503,7 @@ object NewMapType {
 
         StructT(UMap(newParams), fieldParentType.upgradeCustom(custom, newVersion), completenesss, featureSet)
       }
-      case TypeClassT(_, _) => {
+      case TypeClassT(_) => {
         // TODO - we're going to have to redo these when we redo type classes
         nType
       }

@@ -57,10 +57,33 @@ case class NewParamTypeCommand(
 
 case class NewTypeClassCommand(
   id: String,
-  typeTransform: USingularMap
+  isMember: UntaggedObject
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    s"typeclass $id ${typeTransform}"
+    s"typeclass $id ${isMember}"
+  }
+}
+
+case class UpdateTypeclassWithTypeCommand(
+  id: String,
+  nType: NewMapType,
+  implementations: Vector[(String, UntaggedObject)]
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = {
+    s"update typeclass $id with type $nType $implementations"
+  }
+}
+
+case class UpdateTypeclassWithFieldCommand(
+  id: String,
+  typeParameter: String,
+  fieldType: NewMapType,
+  fieldName: String,
+  implementations: Vector[(NewMapType, UntaggedObject)],
+  isCommand: Boolean
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = {
+    s"update typeclass $id $typeParameter with field $fieldType as $fieldName $implementations"
   }
 }
 

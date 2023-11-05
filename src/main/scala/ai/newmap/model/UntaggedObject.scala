@@ -13,6 +13,7 @@ sealed abstract class UntaggedObject {
     case UMap(values) => Success(values)
     case USingularMap(key, value) => Success(Vector(key -> value))
     case UArray(values) => Success(values.zipWithIndex.map(x => UIndex(x._2) -> x._1).toVector)
+    case UInit => Success(Vector.empty)
     case _ => Failure("Could not get bindings: " + this)
   }
 

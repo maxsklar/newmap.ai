@@ -29,8 +29,9 @@ object PrintNewMapObject {
       displayUnderlyingType <- env.typeSystem.currentUnderlyingType("_display")
       dislayUnderlyingExpT = displayUnderlyingType._2
 
+      // TODO - given the new TypeClassT, the rest of this is nonsense
       mapValues <- dislayUnderlyingExpT match {
-        case TypeClassT(_, values) => Success(values)
+        case TypeClassT(typeSet) => Success(typeSet)
         case _ => Failure(s"Not a type class: ${dislayUnderlyingExpT.displayString(env)}")
       }
 
@@ -83,8 +84,8 @@ object PrintNewMapObject {
       }
       //case StructT(params, parentType, completeness, featureSet) => s"Struct(${mapToString(params)})~$parentType~$completeness~$featureSet"
       case StructT(params, _, _, _) => s"Struct(${untagged(params)})"
-      case TypeClassT(typeTransform, implementation) => {
-        s"TypeClassT(${untagged(typeTransform)}, ${untagged(implementation)})"
+      case TypeClassT(typeSet) => {
+        s"TypeClassT(${untagged(typeSet)})"
       }
       case CaseT(cases, _, _) => {
         s"Case${untagged(cases)}"
