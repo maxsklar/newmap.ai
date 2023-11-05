@@ -310,8 +310,7 @@ case class Environment(
               ))
             }
           }
-
-          newEnv.copy(
+          newEnv = newEnv.copy(
             commands = newCommands,
             typeSystem = newTypeSystem
           )

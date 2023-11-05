@@ -1095,14 +1095,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " be printed nicely" ignore {
+  it should " be printed nicely" in {
     testCodeScript(Vector(
       CodeExpectation("val s: String = \"asdf\"", GeneralSuccessCheck),
       CodeExpectation("s", SuccessCheckStr("asdf"))
     ))
   }
 
-  "The stdout channel " should " work with strings" ignore {
+  "The stdout channel " should " work with strings" in {
     testCodeScript(Vector(
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),
@@ -1115,7 +1115,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "HelloWorld.nm script " should " behave as expected" ignore {
+  "HelloWorld.nm script " should " behave as expected" in {
     testCodeScript(Vector(
       CodeExpectation("ver stdoutRecorder = new String", GeneralSuccessCheck),
       CodeExpectation("connectChannel stdout stdoutRecorder", GeneralSuccessCheck),

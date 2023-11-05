@@ -6,12 +6,13 @@ update class Initializable with type Type: (init : UndefinedType)
 
 data String = Array|Char
 
-typeclass Displayable (t: (t => String))
+typeclass Displayable
 update class Displayable t with field (t => String) as display
-//update class Displayable with type String: (display : (s: s))
+update class Displayable with type String: (display : (s: s))
 
 //data Option (T: Type)
 //update Option: (None, ())
 //update Option: (Some, T)
 
-typeclass addable (t: (t => t => t))
+//typeclass Addable
+//typeclass addable (t: (t => t => t))

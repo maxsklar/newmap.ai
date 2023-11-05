@@ -26,7 +26,8 @@ object PrintNewMapObject {
     env: Environment
   ): Outcome[String, String] = {
     for {
-      displayUnderlyingType <- env.typeSystem.currentUnderlyingType("_display")
+      displayUnderlyingType <- env.typeSystem.currentUnderlyingType("Displayable")
+
       dislayUnderlyingExpT = displayUnderlyingType._2
 
       // TODO - given the new TypeClassT, the rest of this is nonsense
@@ -35,12 +36,10 @@ object PrintNewMapObject {
         case _ => Failure(s"Not a type class: ${dislayUnderlyingExpT.displayString(env)}")
       }
 
-      result <- Evaluator.applyFunction(mapValues, nType, env, TypeMatcher) match {
-        case Success(s) => Success(s)
-        case Failure(f) => Failure(f.toString)
-      }
+      membershipCheck <- Evaluator.applyFunction(mapValues, nType, env, TypeMatcher)
+      _ <- Outcome.failWhen(membershipCheck == UInit, s"Not member of Displayable typeclass: $nType")
 
-      evalResult <- Evaluator(ApplyFunction(result, uObject, StandardMatcher), env)
+      evalResult <- Evaluator(AccessField(uObject, nType, UIdentifier("display")), env)
 
       finalString <-  evalResult match {
         case UCase(_, UArray(chars)) => {

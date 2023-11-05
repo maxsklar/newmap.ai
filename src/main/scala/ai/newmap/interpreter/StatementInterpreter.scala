@@ -1,6 +1,6 @@
 package ai.newmap.interpreter
 
-import ai.newmap.interpreter.TypeChecker.{typeCheck, typeCheckGenericMap}
+import ai.newmap.interpreter.TypeChecker.{typeCheck, typeCheckMap}
 import ai.newmap.model._
 import ai.newmap.util.{Failure, Outcome, Success}
 
@@ -89,7 +89,7 @@ object StatementInterpreter {
         val typeTransform = TypeTransform(IdentifierT, TypeT)
 
         for {
-          mapValues <- typeCheckGenericMap(values, typeTransform, false, env, BasicMap, Map.empty)
+          mapValues <- typeCheckMap(values, typeTransform, false, env, BasicMap, Map.empty)
           paramList <- convertMapValuesToParamList(mapValues, env)
         } yield {
           ReturnValue(
@@ -120,10 +120,31 @@ object StatementInterpreter {
           nTypeObj <- Evaluator(nTypeResult.nExpression, env)
           nType <- nTypeObj.asType
 
+          // What is the type for the implementations?
+          // 1) get the implementations required
+          typeClassFields: Map[String, TypeClassFieldInfo] = {
+            env.typeclassToFieldMapping.get(id.s).getOrElse(Map.empty)
+          }
+
+          fieldTypes: Vector[(UntaggedObject, UntaggedObject)] = {
+            for {
+              (fieldName, fieldInfo) <- typeClassFields.toVector
+            } yield {
+              val fieldType = MakeSubstitution(
+                fieldInfo.nType.asUntagged,
+                Map(fieldInfo.wildcardParam -> nTypeObj)
+              )
+
+              (UIdentifier(fieldName) -> fieldType)
+            }
+          }
+
+          // 2) put that into a struct
+          implementationRequirements: NewMapType = StructT(UMap(fieldTypes), IdentifierT)
+
           implementationsResult <- TypeChecker.typeCheck(
             implementations,
-            // THE PROBLEM IS HERE!!
-            MapT(TypeTransform(IdentifierT, nType), MapConfig(PartialMap, BasicMap)),
+            implementationRequirements,
             env,
             FullFunction,
             tcParameters

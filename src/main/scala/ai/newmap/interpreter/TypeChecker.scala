@@ -293,7 +293,7 @@ object TypeChecker {
             }
 
             for {
-              mapValues <- typeCheckGenericMap(correctedValues, typeTransform, config.featureSet != BasicMap, env, config.featureSet, tcParameters)
+              mapValues <- typeCheckMap(correctedValues, typeTransform, config.featureSet != BasicMap, env, config.featureSet, tcParameters)
 
               isCovered <- {
                 if (config.completeness != RequireCompleteness) Success(true)
@@ -321,7 +321,7 @@ object TypeChecker {
             {
               val typeTransform = TypeTransform(IdentifierT, typeT)
               for {
-                mapValues <- typeCheckGenericMap(values, typeTransform, false, env, featureSet, tcParameters)
+                mapValues <- typeCheckMap(values, typeTransform, false, env, featureSet, tcParameters)
               } yield {
                 TypeCheckResponse(
                   StructT(UMap(mapValues), IdentifierT, RequireCompleteness, BasicMap).asUntagged,
@@ -357,10 +357,9 @@ object TypeChecker {
             for {
               _ <- Outcome.failWhen(values.length > 1, "Type transform cannot have multiple values")
               value <- Outcome(values.headOption, "Type transform must contain a key and a value")
-              mapValue <- typeCheckGenericMap(
+              mapValue <- typeCheckMap(
                 Vector(value),
                 TypeTransform(TypeT, TypeT),
-                //if (allowGenerics) PatternMap else BasicMap,
                 allowGenerics,
                 env,
                 featureSet,
@@ -389,19 +388,17 @@ object TypeChecker {
 
           inputT <- evalInputType.asType
           outputT <- outputType.nExpression.asType
-        } yield {
-          val typeTransform = TypeTransform(inputT, outputT)
+
+          typeTransform = TypeTransform(inputT, outputT)
 
           // TODO - how do we make the mapConfig customizable in the LambdaParse Symbol?
           // - Is there anything we can do with more equals signs, or -> or maybe ~> (I don't know)
-          val mapConfig = MapConfig(RequireCompleteness, FullFunction)
+          mapConfig = MapConfig(RequireCompleteness, FullFunction)
 
-          TypeCheckResponse(
-            MapT(typeTransform, mapConfig).asUntagged,
-            TypeT,
-            tcParameters
-          )
-        }
+          nObject = NewMapObject(MapT(typeTransform, mapConfig).asUntagged, TypeT)
+
+          response <- responseFromConversion(nObject, expectedType, env, tcParameters)
+        } yield response
       }
       case ConstructCaseParse(first, second) => {
         expectedTypeOutcome match {
@@ -511,7 +508,7 @@ object TypeChecker {
     }
   }
 
-  def typeCheckGenericMap(
+  def typeCheckMap(
     values: Vector[ParseTree],
     typeTransform: TypeTransform,
     patternMatchingAllowed: Boolean,
@@ -552,7 +549,7 @@ object TypeChecker {
             resultKey.tcParameters
           )
 
-          restOfMap <- typeCheckGenericMap(restOfValues, typeTransform, patternMatchingAllowed, env, featureSet, tcParameters)
+          restOfMap <- typeCheckMap(restOfValues, typeTransform, patternMatchingAllowed, env, featureSet, tcParameters)
         } yield {
           (foundKeyPattern -> objectFoundValue.nExpression) +: restOfMap
         }
