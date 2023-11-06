@@ -83,7 +83,7 @@ object TypeExpander {
           newCaseName <- Evaluator.applyFunction(command, UIndex(0), env)
         } yield {
           ExpandKeyResponse(
-            CaseT(newCaseMap.uObject, parentType, featureSet),
+            CaseT(newCaseMap, parentType, featureSet),
             Vector(UCase(newCaseName, UWildcard("_"))),
             untaggedIdentity
           )
@@ -101,7 +101,7 @@ object TypeExpander {
           newMembersMap <- UpdateCommandCalculator.updateVersionedObject(isMemberMap, adjustedCommand, env)
         } yield {
           ExpandKeyResponse(
-            SubtypeT(newMembersMap.uObject, parentType, featureSet),
+            SubtypeT(newMembersMap, parentType, featureSet),
             Vector(command),
             untaggedIdentity
           )
@@ -122,32 +122,11 @@ object TypeExpander {
           newTypeSet <- UpdateCommandCalculator.updateVersionedObject(typeSetObject, adjustedCommand, env)
         } yield {
           ExpandKeyResponse(
-            TypeClassT(newTypeSet.uObject),
+            TypeClassT(newTypeSet),
             Vector(command),
             untaggedIdentity
           )
         }
-
-        /*command match {
-          case UMap(mappings) => {
-            val keys = mappings.map(_._1)
-
-            for {
-              implementationBindings <- implementation.getMapBindings()
-            } yield {
-              val newImplementation = mappings ++ implementationBindings.filter(x => !keys.contains(x._1))
-
-              ExpandKeyResponse(
-                TypeClassT(typeTransform, UMap(newImplementation)),
-                keys,
-                untaggedIdentity
-              )
-            }
-          }
-          case _ => {
-            Failure(s"Wrong input for typeClassT -- ${nType.displayString(env)} -- $command")
-          }
-        }*/
       }
       case CustomT(name, _, _) => {
         // This only occurs if we have a custom type within a custom type - so this won't be called for a while.

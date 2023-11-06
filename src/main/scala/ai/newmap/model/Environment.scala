@@ -22,7 +22,8 @@ case class Environment(
   idToObject: ListMap[String, NewMapObject] = ListMap.empty,
 
   latestVersionNumber: Map[UUID, Long] = ListMap.empty,
-  storedVersionedTypes: Map[VersionedObjectKey, NewMapObject] = ListMap.empty,
+  storedVersionTypes: Map[UUID, NewMapType] = Map.empty,
+  storedVersionedObjects: Map[VersionedObjectKey, UntaggedObject] = Map.empty,
 
   // This is a (pattern) mapping from TypeT to a map from the fields on that type to the
   //  functions returned from those fields (and including whether it is a command)
@@ -34,7 +35,6 @@ case class Environment(
 
   // TODO: this also needs to be refactored and versioned
   // TODO - belongs in the type system
-  // This is a map from String => (String => NewMapType)
   typeclassToFieldMapping: Map[String, Map[String, TypeClassFieldInfo]] = Map.empty,
 
   // Also a stored versioned type, but a special one!
@@ -154,7 +154,8 @@ case class Environment(
           commands = newCommands,
           idToObject = idToObject + (s -> versionedObject),
           latestVersionNumber = latestVersionNumber + (uuid -> 0L),
-          storedVersionedTypes = storedVersionedTypes + (key -> NewMapObject(initValue, nType))
+          storedVersionTypes = storedVersionTypes + (uuid -> nType),
+          storedVersionedObjects = storedVersionedObjects + (key -> initValue)
         )
       }
       case NewVersionedFieldCommand(id, mapT, value, isCommand) => {
@@ -398,15 +399,15 @@ case class Environment(
               val newKey = VersionedObjectKey(newVersion, newUuid)
 
               // TODO - during this, versions that are no longer in use can be destroyed
-              val newStoredVTypes = storedVersionedTypes + (newKey -> newValue)
+              val newStoredVTypes = storedVersionedObjects + (newKey -> newValue)
 
-              val newObject = NewMapObject(ULink(newKey), newValue.nType)
+              val newObject = NewMapObject(ULink(newKey), currentState.nType)
 
               this.copy(
                 commands = newCommands,
                 idToObject = idToObject + (s -> newObject),
                 latestVersionNumber = latestVersionNumber + (newUuid -> newVersion),
-                storedVersionedTypes = newStoredVTypes
+                storedVersionedObjects = newStoredVTypes
               )
             }
           }
@@ -441,7 +442,8 @@ case class Environment(
           commands = newCommands,
           idToObject = idToObject + (s -> versionedObject),
           latestVersionNumber = latestVersionNumber + (uuid -> version),
-          storedVersionedTypes = storedVersionedTypes + (newKey -> current)
+          storedVersionTypes = storedVersionTypes + (newKey.uuid -> current.nType),
+          storedVersionedObjects = storedVersionedObjects + (newKey -> current.uObject)
         )
       }
       case ExpOnlyEnvironmentCommand(nObject) => {

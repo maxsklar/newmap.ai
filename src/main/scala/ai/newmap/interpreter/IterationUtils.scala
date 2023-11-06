@@ -138,9 +138,10 @@ object IterationUtils {
 
           underlyingT <- underlyingType.asType
 
-          currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
+          //currentResolved <- TypeChecker.tagAndNormalizeObject(untaggedCurrent, underlyingT, env)
 
-          result <- iterateObject(currentResolved, env, typeSystemIdOpt)
+          //result <- iterateObject(currentResolved, env, typeSystemIdOpt)
+          result <- iterateObject(NewMapObject(untaggedCurrent, underlyingT), env, typeSystemIdOpt)
         } yield result
       }
       case NewMapObject(untaggedCurrent, TypeT) => {

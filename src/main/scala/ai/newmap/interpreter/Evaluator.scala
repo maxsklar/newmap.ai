@@ -84,19 +84,24 @@ object Evaluator {
   }
 
   def latestVersion(uuid: UUID, env: Environment): Outcome[Long, String] = {
-    env.latestVersionNumber.get(uuid) match {
-      case Some(v) => Success(v)
-      case None => Failure(s"Couldn't find version number for $uuid")
-    }
+    Outcome(
+      env.latestVersionNumber.get(uuid),
+      s"Couldn't find version number for $uuid"
+    )
   }
 
   def indicatedState(key: VersionedObjectKey, env: Environment): Outcome[NewMapObject, String] = {
     for {
-      currentState <- env.storedVersionedTypes.get(key) match {
-        case Some(obj) => Success(obj)
-        case None => Failure(s"Couldn't find current state of version ${key.versionNumber} number for ${key.uuid}")
-      }
-    } yield currentState
+      uObject <- Outcome(
+        env.storedVersionedObjects.get(key),
+        s"Couldn't find current state of version ${key.versionNumber} number for ${key.uuid}"
+      )
+
+      nType <- Outcome(
+        env.storedVersionTypes.get(key.uuid),
+        s"Couldn't find current type of versioned object ${key.uuid}"
+      )
+    } yield NewMapObject(uObject, nType)
   }
 
   def currentState(uuid: UUID, env: Environment): Outcome[NewMapObject, String] = {

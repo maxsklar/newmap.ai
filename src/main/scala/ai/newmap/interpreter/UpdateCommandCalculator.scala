@@ -144,21 +144,29 @@ object UpdateCommandCalculator {
         }
       }
       case SequenceT(parent, featureSet) => Success(parent)
-      /*case CaseT(cases, _, _) => {
-        Success(UndefinedT)
-      }*/
       case _ => {
         Success(UndefinedT)
       }
     }
   }
 
-  // Eventually, this will return an UntaggedObject, because we're not going to change the type
   def updateVersionedObject(
     current: NewMapObject,
     command: UntaggedObject,
     env: Environment
-  ): Outcome[NewMapObject, String] = {
+  ): Outcome[UntaggedObject, String] = {
+    for {
+      uObject <- updateVersionedObjectUnnormalized(current, command, env)
+      nObject <- TypeChecker.tagAndNormalizeObject(uObject, current.nType, env)
+    } yield nObject.uObject
+  }
+
+  // Eventually, this will return an UntaggedObject, because we're not going to change the type
+  private def updateVersionedObjectUnnormalized(
+    current: NewMapObject,
+    command: UntaggedObject,
+    env: Environment
+  ): Outcome[UntaggedObject, String] = {
     current.nType match {
       case nType@CountT => {
         for {
@@ -167,10 +175,7 @@ object UpdateCommandCalculator {
             case UInit => Success(0L)
             case _ => Failure(s"Couldn't interpret count value: ${current.uObject}")
           }
-
-          newState = UCase(UIdentifier("Inc"), UIndex(c))
-          result <- TypeChecker.tagAndNormalizeObject(newState, nType, env)
-        } yield result
+        } yield UCase(UIdentifier("Inc"), UIndex(c))
       }
       case BooleanT => {
         for {
@@ -178,7 +183,7 @@ object UpdateCommandCalculator {
           j <- TypeChecker.normalizeCount(command)
         } yield {
           val result = if (currentValue == 1 || j == 1) 1 else 0
-          NewMapObject(UIndex(result), BooleanT)
+          UIndex(result)
         }
       }
       case SequenceT(parentT, featureSet) => {
@@ -195,7 +200,7 @@ object UpdateCommandCalculator {
             case _ => Failure("Problem with sequence command: " + command)
           }
         } yield {
-          NewMapObject(result, current.nType)
+          result
         }
       }
       case MapT(typeTransform, MapConfig(PartialMap, features, _, _, _)) => {
@@ -239,7 +244,7 @@ object UpdateCommandCalculator {
           } yield (value._1 -> value._2)
 
           newMapValues = (keyExpansionCommand.uObject -> valueExpansionExpression) +: prepNewValues
-        } yield NewMapObject(UMap(newMapValues), current.nType)
+        } yield UMap(newMapValues)
       }
       case mapT@MapT(typeTransform, _) => {
         val outputType = typeTransform.valueType
@@ -258,9 +263,9 @@ object UpdateCommandCalculator {
 
           mapValues <- current.uObject.getMapBindings()
 
-          newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
+          newMapValues = (input -> newResultForInput) +: mapValues.filter(x => x._1 != input)
         } yield {
-          NewMapObject(UMap(newMapValues), mapT)
+          UMap(newMapValues)
         }
       }
       case StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {
@@ -271,7 +276,7 @@ object UpdateCommandCalculator {
           valueOfField <- Evaluator.applyFunction(command, UIndex(1), env)
         } yield {
           val newMapValues = (nameOfField -> valueOfField) +: mapValues.filter(x => x._1 != nameOfField)
-          NewMapObject(UMap(newMapValues), current.nType)
+          UMap(newMapValues)
         }
       }
       case StructT(params, parentFieldType, CommandOutput, _) => {
@@ -281,7 +286,7 @@ object UpdateCommandCalculator {
               mapValues <- current.uObject.getMapBindings()
             } yield {
               val newMapValues = (constructor -> input) +: mapValues.filter(x => x._1 != constructor)
-              NewMapObject(UMap(newMapValues), current.nType)
+              UMap(newMapValues)
             }
           }
           case _ => {
@@ -300,9 +305,7 @@ object UpdateCommandCalculator {
             }
             case _ => Failure(s"Unknown array data: $current")
           }
-
-          result <- TypeChecker.tagAndNormalizeObject(untaggedResult, nType, env)
-        } yield result
+        } yield untaggedResult
       }
       case nType@CustomT(typeName, params, typeSystemId) => {
         val customResultOutcome = {
@@ -313,8 +316,7 @@ object UpdateCommandCalculator {
                 // TODO - what if this intercepts a field that's not a command?
                 func <- Evaluator(AccessField(current.uObject, current.nType.asUntagged, name), env)
                 afterCommand <- Evaluator.applyFunction(func, value, env, StandardMatcher)
-                resultResolved <- TypeChecker.tagAndNormalizeObject(afterCommand, nType, env)
-              } yield resultResolved
+              } yield afterCommand
             }
             case _ => Failure("command $command in the wrong format for custom result")
           }
@@ -334,8 +336,7 @@ object UpdateCommandCalculator {
             currentResolved <- TypeChecker.tagAndNormalizeObject(current.uObject, underlyingT, env)
 
             result <- updateVersionedObject(currentResolved, command, env)
-            resultResolved <- TypeChecker.tagAndNormalizeObject(result.uObject, nType, env)
-          } yield resultResolved
+          } yield result
         })
       }
       case _ => {

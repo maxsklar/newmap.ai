@@ -898,7 +898,6 @@ object TypeChecker {
   def retrieveFeatureSetFromFunctionTypePattern(nTypeClass: NewMapType): Outcome[MapFeatureSet, String] = {
     nTypeClass match {
       case StructT(_, _, _, featureSet) => Success(featureSet)
-      //case TypeClassT(_, _) => Success(PatternMap)
       case MapT(_, config) => Success(config.featureSet)
       case TypeT => Success(PatternMap) // This is for type classes
       case SequenceT(_, featureSet) => Success(featureSet)
