@@ -22,32 +22,17 @@ object StatementInterpreter {
   ): Outcome[ReturnValue, String] = {
     sParse match {
       case FullStatementParse(prefix, id, typeExpression, objExpression) => {
-        //println("FullStatementParse: " + typeExpression)
         for {
           tcType <- TypeChecker.typeCheck(typeExpression, TypeT, env, FullFunction, tcParameters)
-
           nTypeObj <- Evaluator(tcType.nExpression, env)
-
           nType <- nTypeObj.asType
-
-          //_ = println("Expected type: " + nType.displayString(env))
-
-          // If prefix is DefStatement then make sure nType is a potentially recursive function!
-          // Also update the environment with the name because it's potentially recursive
-          // TODO - shouldn't this check happen in the type checker?
-          newParams <- nType match {
-            case _ if (prefix != DefStatement) => Success(tcParameters)
-            case MapT(_, MapConfig(_, featureSet, _, _, _)) if (featureSet.getLevel >= WellFoundedFunction.getLevel) => Success(tcParameters + (id.s -> nType))
-            case _ => Failure("A def statment should define a function that is Full or Well Founded. For other values or functions, use a val or ver statement instead")
-          }
-
-          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction, newParams)
           
+          tc <- TypeChecker.typeCheck(objExpression, nType, env, FullFunction, tcParameters)
           nObject = NewMapObject(tc.nExpression, nType)
         } yield {
           ReturnValue(
-            FullEnvironmentCommand(id.s, nObject, prefix == DefStatement),
-            newParams
+            FullEnvironmentCommand(id.s, nObject),
+            tcParameters
           )
         }
       }
@@ -443,7 +428,7 @@ object StatementInterpreter {
         } yield {
           val nObject = NewMapObject(tc.nExpression, tc.refinedTypeClass)
           ReturnValue(
-            FullEnvironmentCommand(id.s, nObject, false),
+            FullEnvironmentCommand(id.s, nObject),
             tcParameters
           )
         }

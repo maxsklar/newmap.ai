@@ -115,30 +115,7 @@ case class Environment(
     val newCommands = commands :+ command
 
     command match {
-      case FullEnvironmentCommand(s, nObjectFunc, true) => {
-        val uObject = nObjectFunc.uObject
-        val nType = nObjectFunc.nType
-
-        val updatedEnv = this.newCommand(
-          ApplyIndividualCommand(
-            "__FunctionSystem",
-            UArray(UIdentifier(s), UCase(nType.asUntagged, uObject))
-          )
-        )
-
-        val fSystemId = updatedEnv.lookupValue("__FunctionSystem") match {
-          case Some(NewMapObject(ULink(VersionedObjectKey(_, uuid)), _)) => uuid
-          case f => throw new Exception(s"Can't handle Function System $f")
-        }
-
-        val fLink = UFunctionLink(UIdentifier(s), fSystemId)
-
-        updatedEnv.copy(
-          commands = newCommands,
-          idToObject = idToObject + (s -> NewMapObject(fLink, nType))
-        )
-      }
-      case FullEnvironmentCommand(s, nObject, false) => {
+      case FullEnvironmentCommand(s, nObject) => {
         val nObjectO = for {
           evaluatedObject <- Evaluator(nObject.uObject, this)
 
@@ -718,7 +695,6 @@ object Environment {
       UMap(Vector(UWildcard("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    //NewTypeClassCommand("Initializable", USingularMap(UWildcard("t"), ParamId("t"))),
     NewTypeClassCommand("Initializable", UMap(Vector.empty)),
     UpdateTypeclassWithFieldCommand("Initializable", "T", ParamIdT("T"), "init", Vector.empty, false),
     NewTypeClassCommand("AnyType", UMap(Vector(UWildcard("_") -> UIndex(1)))),
@@ -731,7 +707,6 @@ object Environment {
       ArrayT(ParamIdT("T"))
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
-    NewVersionedStatementCommand("__FunctionSystem", FunctionalSystemT(Vector.empty)),
     /*NewTypeClassCommand(
       "Addable",
       USingularMap(

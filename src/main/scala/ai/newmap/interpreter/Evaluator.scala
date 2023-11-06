@@ -227,14 +227,6 @@ object Evaluator {
 
         Success(if (isCommand) UIndex(1) else UInit)
       }
-      case UFunctionLink(name, _) => {
-        for {
-          // TODO - don't ignore the uuid if we're using an old functional system
-          fSystemV <- env.lookupVersionedObject("__FunctionSystem")
-          uFunction <- applyFunction(ULink(fSystemV.key), name, env)
-          result <- applyFunction(uFunction, input, env)
-        } yield result
-      }
       case UPlus => {
         for {
           first <- applyFunction(input, UIndex(0), env)

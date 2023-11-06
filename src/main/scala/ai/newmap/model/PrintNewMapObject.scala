@@ -2,8 +2,6 @@ package ai.newmap.model
 
 // CAREFUL! This should not be imported here, need to move some things around
 import ai.newmap.interpreter.Evaluator
-
-import java.util.UUID
 import ai.newmap.util.{Outcome, Success, Failure}
 
 object PrintNewMapObject {
@@ -95,7 +93,6 @@ object PrintNewMapObject {
       //TODO(2022): we might not want to print out the full parent here, because it could be large
       // - instead, we link to the function or map somehow... when we give things uniqueids we can figure this out
       case SubtypeT(isMember, _, _) => s"Subtype(${untagged(isMember)})"
-      case FunctionalSystemT(functionTypes) => s"FunctionalSystem(${untagged(UMap(functionTypes))})"
       case ArrayT(t) => "Array|" + newMapType(t, typeSystem)
       case WildcardT(name) => untagged(UWildcard(name))
       case ParamIdT(name) => untagged(ParamId(name))
@@ -165,9 +162,6 @@ object PrintNewMapObject {
     case ULong(value: Long) => s"$value"
     case UDouble(value: Double) => s"$value"
     case Uuuid(value) => s"$value"
-    case UFunctionLink(functionName, functionalSystem) => {
-      s"${untagged(functionName)}~$functionalSystem}"
-    }
     case UWildcard(name) => "W~" + name
     case ParamId(name) => s"$name~pi"
     case ApplyFunction(func, input, _) => {

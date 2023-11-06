@@ -1,6 +1,5 @@
 package ai.newmap.model
 
-import java.util.UUID
 import ai.newmap.util.{Outcome, Success, Failure}
 
 sealed abstract class NewMapType {
@@ -210,16 +209,6 @@ case class SubtypeT(
   featureSet: MapFeatureSet = BasicMap
 ) extends NewMapType
 
-/** 
- * This represents a "system" of functions that are potentially mutually recursive on one another.
- * The keys (the way we name these functions) are assumed to identifier, so no need to give it one.
- * The values are MapT type signatures
- */
-case class FunctionalSystemT(
-  // Contains the type of each function
-  functionTypes: Vector[(UntaggedObject, UntaggedObject)]
-) extends NewMapType
-
 /**
  * The values are cases, where the first item in the case is the length of the array, and the second is the case itself.
  * This should probably be implemented as Custom types (CustomT).
@@ -269,7 +258,6 @@ object NewMapType {
       UIdentifier(featureSet.getName)
     )))
     case SequenceT(parentT, featureSet) => UCase(UIdentifier("Sequence"), UArray(parentT.asUntagged, UIdentifier(featureSet.getName)))
-    case FunctionalSystemT(functionTypes) => UCase(UIdentifier("FunctionalSystem"), UMap(functionTypes))
     case ArrayT(nType) => UCase(UIdentifier("Array"), nType.asUntagged)
     case CustomT(name, params, typeSystemId) => UCase(UIdentifier(name), UArray(params, UIndex(typeSystemId)))
     case WildcardT(name) => UWildcard(name)

@@ -8,8 +8,7 @@ sealed abstract class EnvironmentCommand {
 
 case class FullEnvironmentCommand(
   id: String,
-  nObject: NewMapObject,
-  functionalSystem: Boolean = false // If true, this is a function that we want to add to the functional system
+  nObject: NewMapObject
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
     s"val $id: ${nObject.nType.displayString(env)} = ${PrintNewMapObject.untagged(nObject.uObject)}"

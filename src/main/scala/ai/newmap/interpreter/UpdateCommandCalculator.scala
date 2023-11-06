@@ -49,12 +49,6 @@ object UpdateCommandCalculator {
       case StructT(params, _, _, _) if (params.getMapBindings().toOption.exists(_.isEmpty)) => {
         Success(defaultUMap)
       }
-      case FunctionalSystemT(functionTypes) if functionTypes.length == 0 => {
-        Success(defaultUMap)
-      }
-      /*case TypeClassT(typeTransform, implementation) if (implementation.isEmpty) => {
-        Success(defaultUMap)
-      }*/
       case CharacterT => Success(UCharacter('\u0000'))
       case ArrayT(_) => Success(UCase(UIndex(0), UArray()))
       case CustomT(name, params, typeSystemId) => {
@@ -125,12 +119,6 @@ object UpdateCommandCalculator {
             pairT
           )
         }
-      }
-      case FunctionalSystemT(_) => {
-        Success(StructT(
-          UArray(IdentifierT.asUntagged, NewMapO.taggedObjectT.asUntagged),
-          pairT
-        ))
       }
       case StructT(parameterList, parentFieldType, _, featureSet) => {
         // Change to CaseT because we are adding a single parameter!
@@ -273,30 +261,6 @@ object UpdateCommandCalculator {
           newMapValues = (input -> newResultForInput.uObject) +: mapValues.filter(x => x._1 != input)
         } yield {
           NewMapObject(UMap(newMapValues), mapT)
-        }
-      }
-      case FunctionalSystemT(functionTypes) => {
-        for {
-          currentMapping <- current.uObject.getMapBindings()
-
-          newFunctionNameObj <- Evaluator.applyFunction(command, UIndex(0), env)
-
-          newFunctionObject <- Evaluator.applyFunction(command, UIndex(1), env)
-
-          newFunctionObjectComponents <- newFunctionObject match {
-            case UCase(t, UMap(pairs)) => Success(t -> pairs)
-            case _ => Failure(s"Recieved Unexpected Object: $newFunctionObject") 
-          }
-
-          uNewFunctionType = newFunctionObjectComponents._1
-          uNewFunctionMapping = newFunctionObjectComponents._2
-        } yield {
-          // Also upgrade the function itself
-          // TODO: I think the composition between uNewFunctionMaping and currentMapping needs to be handled better
-          NewMapObject(
-            UMap((newFunctionNameObj -> UMap(uNewFunctionMapping)) +: currentMapping),
-            FunctionalSystemT((newFunctionNameObj -> uNewFunctionType) +: functionTypes)
-          )
         }
       }
       case StructT(parameterList, parentFieldType, RequireCompleteness, featureSet) => {

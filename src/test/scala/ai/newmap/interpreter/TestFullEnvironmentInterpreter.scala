@@ -296,8 +296,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
       command match {
         case FullEnvironmentCommand(
           "x",
-          NewMapObject(UCase(UIdentifier("a"), UIndex(0)), t),
-          false
+          NewMapObject(UCase(UIdentifier("a"), UIndex(0)), t)
         ) => {
           t match {
             case CustomT("MyCase", params, _) => {

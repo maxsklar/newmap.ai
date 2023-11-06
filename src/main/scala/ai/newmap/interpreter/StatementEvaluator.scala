@@ -14,7 +14,7 @@ object StatementEvaluator {
     env: Environment
   ): Outcome[EnvironmentCommand, String] = {
     command match {
-      case c@FullEnvironmentCommand(_, nExpression, _) => {
+      case c@FullEnvironmentCommand(_, nExpression) => {
         for {
           evaluatedObject <- Evaluator(nExpression.uObject, env)
           constantObject = Evaluator.stripVersioningU(evaluatedObject, env)
