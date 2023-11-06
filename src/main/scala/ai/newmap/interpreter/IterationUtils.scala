@@ -109,17 +109,9 @@ object IterationUtils {
     typeSystemIdOpt: Option[UUID] = None
   ): Outcome[Vector[UntaggedObject], String] = {
     nObject match {
-      case NewMapObject(UMap(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
-        Success(values.map(_._1))
-      }
-      case NewMapObject(UMap(values), MapT(_, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
-        Success(values.map(_._2))
-      }
-      case NewMapObject(UArray(values), MapT(_, MapConfig(CommandOutput, BasicMap, _, _, _))) => {
-        Success(values.toVector)
-      }
-      case NewMapObject(UArray(_), MapT(typeTransform, MapConfig(RequireCompleteness, BasicMap, _, _, _))) => {
-        enumerateAllValuesIfPossible(typeTransform.keyType, env)
+      case NewMapObject(values, MapT(_, MapConfig(completeness, BasicMap, _, _, _))) => completeness match {
+        case CommandOutput => values.getMapBindings().map(_.map(_._1))
+        case _ => values.getMapBindings().map(_.map(_._2))
       }
       case NewMapObject(UCase(UIndex(_), values), ArrayT(_)) => {
         for {
@@ -134,9 +126,7 @@ object IterationUtils {
 
           patternMatchSubstitutions <- Evaluator.patternMatch(underlyingPattern, params, StandardMatcher, env)
 
-          underlyingType = MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions)
-
-          underlyingT <- underlyingType.asType
+          underlyingT <- MakeSubstitution(underlyingExp.asUntagged, patternMatchSubstitutions).asType
           result <- iterateObject(NewMapObject(untaggedCurrent, underlyingT), env, typeSystemIdOpt)
         } yield result
       }
