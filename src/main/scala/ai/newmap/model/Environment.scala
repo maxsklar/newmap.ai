@@ -668,6 +668,7 @@ object Environment {
   Base = Base.newCommands(Vector(
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
+    eCommand("Double", typeAsObject(DoubleT)),
     eCommand("Char", typeAsObject(CharacterT)),
     eCommand("Identifier", typeAsObject(IdentifierT)),
     eCommand("Increment", NewMapObject(
@@ -700,23 +701,79 @@ object Environment {
     NewTypeClassCommand("Initializable", UMap(Vector.empty)),
     UpdateTypeclassWithFieldCommand("Initializable", "T", ParamIdT("T"), "init", Vector.empty, false),
     NewTypeClassCommand("AnyType", UMap(Vector(UWildcard("_") -> UIndex(1)))),
-    UpdateTypeclassWithFieldCommand("AnyType", "_", TypeT, "typeOf", Vector(
-      WildcardT("t") -> ParamId("t")
-    ), false),
+    UpdateTypeclassWithFieldCommand(
+      "AnyType",
+      "T",
+      MapT(
+        TypeTransform(ParamIdT("T"), TypeT),
+        MapConfig(RequireCompleteness, SimpleFunction)
+      ),
+      "type",
+      Vector(WildcardT("t") -> ParamId("t")),
+      false
+    ),
     NewParamTypeCommand(
       "Array",
       Vector("T" -> TypeT),
       ArrayT(ParamIdT("T"))
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
-    /*NewTypeClassCommand(
+    NewTypeClassCommand("Addable", UMap(Vector.empty)),
+    UpdateTypeclassWithFieldCommand(
       "Addable",
-      USingularMap(
-        USingularMap(IndexT(UIndex(2)).asUntagged, UWildcard("t")),
-        ParamId("t")
+      "T",
+      MapT(
+        TypeTransform(ParamIdT("T"), MapT(TypeTransform(ParamIdT("T"), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction))),
+        MapConfig(RequireCompleteness, SimpleFunction)
+      ),
+      "plus",
+      Vector.empty,
+      false
+    ),
+    UpdateTypeclassWithTypeCommand(
+      "Addable",
+      CountT,
+      Vector(
+        "plus" -> UMap(Vector(UWildcard("a") -> 
+          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
+        ))
+      )
+    ),
+    UpdateTypeclassWithTypeCommand(
+      "Addable",
+      DoubleT,
+      Vector(
+        "plus" -> UMap(Vector(UWildcard("a") -> 
+          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
+        ))
+      )
+    )
+  ))
+
+  /**
+   *
+   * 
+    /*UpdateTypeclassWithTypeCommand(
+      "Addable",
+      CountT,
+      Vector(
+        "plus" -> UMap(Vector(UWildcard("a") -> 
+          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
+        ))
       )
     ),*/
-    NewTypeClassCommand("Addable", UMap(Vector.empty)),
+    /*UpdateTypeclassWithTypeCommand(
+      "Addable",
+      DoubleT,
+      Vector(
+        "plus" -> UMap(Vector(UWildcard("a") -> 
+          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
+        ))
+      )
+    ),*/ 
+   */
+  
+  Base = Base.newCommands(Vector(
     eCommand("+", NewMapObject(
       UPlus,
       MapT(TypeTransform(
@@ -742,7 +799,7 @@ object Environment {
 
   // TODO - eventually make this empty and add it elsewhere!!
   val initialChannelToType = Map(
-    "stdout" -> CustomT("String", UArray(), 10) // WHY 10?
+    "stdout" -> CustomT("String", UArray(), 11) // WHY 11?
   )
   Base = Base.copy(channelIdToType = initialChannelToType)
 }

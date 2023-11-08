@@ -10,9 +10,5 @@ typeclass Displayable
 update class Displayable t with field (t => String) as display
 update class Displayable with type String: (display : (s: s))
 
-//data Option (T: Type)
-//update Option: (None, ())
-//update Option: (Some, T)
-
-//typeclass Addable
-//typeclass addable (t: (t => t => t))
+//update class Addable with type Count: (plus: (a: (b: a + b)))
+//update class Addable with type Double: (plus: (a: (b: a + b)))

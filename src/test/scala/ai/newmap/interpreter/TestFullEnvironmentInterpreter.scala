@@ -937,13 +937,13 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  "A typeOf function " should " be creatable as a type class" in {
+  "A type function " should " be creatable as a type class" in {
     testCodeScript(Vector(
       CodeExpectation("val x: 9 = 4", GeneralSuccessCheck),
       CodeExpectation("val y: Identifier = ~hi", GeneralSuccessCheck),
-      CodeExpectation("x.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IndexTN(9).asUntagged, TypeT)))),
-      CodeExpectation("y.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IdentifierT.asUntagged, TypeT)))),
-      CodeExpectation("4.typeOf", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(CountT.asUntagged, TypeT)))),
+      CodeExpectation("x.type", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IndexTN(9).asUntagged, TypeT)))),
+      CodeExpectation("y.type", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(IdentifierT.asUntagged, TypeT)))),
+      CodeExpectation("4.type", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(CountT.asUntagged, TypeT)))),
     ))
   }
 

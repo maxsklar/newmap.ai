@@ -15,6 +15,7 @@ object TypeClassUtils {
       case WildcardT(_) => Success(CountT)
       case TypeT => Success(nType)
       case CountT => Success(nType)
+      case DoubleT => Success(nType)
       case BooleanT => {
         for {
           _ <- Outcome.failWhen(i > 1, s"Input to Boolean must be 0 or 1.. was $i")

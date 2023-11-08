@@ -181,14 +181,14 @@ object TypeConverter {
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
       }
-      case (CountT, DoubleT) => {
+      /*case (CountT, DoubleT) => {
         Success(
           IsTypeConvertibleResponse(
             Vector(FunctionWithMatchingRules(UCountToDecimal, StandardMatcher)),
             DoubleT
           ),
         )
-      }
+      }*/
       case _ => {
         val str = s"No rule to convert ${startingType} to ${endingType} -- ${startingType == endingType}"
         Failure(str)

@@ -1,0 +1,3 @@
+data Option (T: Type)
+update Option: (None, ())
+update Option: (Some, T)
