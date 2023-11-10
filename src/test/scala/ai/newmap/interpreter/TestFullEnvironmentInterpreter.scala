@@ -1139,10 +1139,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
-  it should " work for doubles" ignore {
+  it should " work for doubles" in {
     testCodeScript(Vector(
-      CodeExpectation("1.0 + 1.", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), CountT)))),
-      CodeExpectation("0.0 + 4.5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(4.5), CountT)))),
+      CodeExpectation("1.0 + 1.0", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.0), CountT)))),
+      CodeExpectation(".0 + 4.5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(4.5), CountT)))),
+   ))
+  }
+
+  it should " work for a mix of doubles and counts" in {
+    testCodeScript(Vector(
+      CodeExpectation("1 + 1.1", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(2.1), CountT)))),
+      CodeExpectation("2.5 + 5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(7.5), CountT)))),
    ))
   }
 

@@ -723,7 +723,7 @@ object Environment {
       "Addable",
       "T",
       MapT(
-        TypeTransform(ParamIdT("T"), MapT(TypeTransform(ParamIdT("T"), ParamIdT("T")), MapConfig(RequireCompleteness, SimpleFunction))),
+        TypeTransform(ParamIdT("T"), ParamIdT("T")),
         MapConfig(RequireCompleteness, SimpleFunction)
       ),
       "plus",
@@ -749,29 +749,6 @@ object Environment {
       )
     )
   ))
-
-  /**
-   *
-   * 
-    /*UpdateTypeclassWithTypeCommand(
-      "Addable",
-      CountT,
-      Vector(
-        "plus" -> UMap(Vector(UWildcard("a") -> 
-          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
-        ))
-      )
-    ),*/
-    /*UpdateTypeclassWithTypeCommand(
-      "Addable",
-      DoubleT,
-      Vector(
-        "plus" -> UMap(Vector(UWildcard("a") -> 
-          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
-        ))
-      )
-    ),*/ 
-   */
   
   Base = Base.newCommands(Vector(
     eCommand("+", NewMapObject(

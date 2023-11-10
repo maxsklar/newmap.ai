@@ -173,6 +173,13 @@ object TypeChecker {
           }
         }
       }
+      case ApplyParse(AccessFieldParse(value, field), input) => {
+        for {
+          tcValue <- typeCheckUnknownType(value, env, tcParameters)
+          nObject = NewMapObject(tcValue.nExpression, tcValue.refinedTypeClass)
+          result <- accessFieldTypeParseWithInput(Vector(nObject), field, input, expectedType, env, featureSet, tcParameters)
+        } yield result
+      }
       case ApplyParse(function, input) => {
         for {
           result <- typeCheckUnknownFunction(function, input, env, tcParameters)
@@ -210,51 +217,12 @@ object TypeChecker {
           TypeCheckResponse(applyParseResult, result.resultingType, tcParameters)
         }
       }
-      case AccessFieldAsMapParse(value, field) => {
+      case AccessFieldParse(value, field) => {
         for {
           tcValue <- typeCheckUnknownType(value, env, tcParameters)
-
-          uTypeClass = tcValue.refinedTypeClass.asUntagged
-
-          fieldsToTypeMap <- Evaluator.applyFunction(
-            env.typeToFieldMapping,
-            uTypeClass,
-            env,
-            TypeMatcher
-          )
-
-          typeOfPotentialFields = SubtypeT(fieldsToTypeMap, IdentifierT)
-
-          theFieldTC <- typeCheck(field, typeOfPotentialFields, env, SimpleFunction, tcParameters)
-
-          // Do not pass tcParameters to the evaluator, because the field must be evaluated
-          //  in its entirety in order to be used in the expression
-          evaluatedField <- Evaluator(theFieldTC.nExpression, env)
-
-          returnValuePair <- Evaluator.applyFunction(
-            fieldsToTypeMap,
-            evaluatedField,
-            env
-          )
-
-          returnValue <- Evaluator.applyFunction(
-            returnValuePair,
-            UIndex(0),
-            env
-          )
-
-          returnType <- returnValue match {
-            case UCase(t, _) => Success(t)
-            case _ => Failure("Unknown return value: " + returnValue)
-          }
-
-          returnT <- returnType.asType
-
-          response <- TypeConverter.isTypeConvertible(returnT, expectedType, env)
-        } yield {
-          val accessFieldResult = AccessField(tcValue.nExpression, uTypeClass, evaluatedField)
-          TypeCheckResponse(accessFieldResult, returnT, tcParameters)
-        }
+          nObject = NewMapObject(tcValue.nExpression, tcValue.refinedTypeClass)
+          result <- accessFieldTypeParseSingleType(nObject, field, expectedType, env, tcParameters)
+        } yield result
       }
       case LiteralListParse(values: Vector[ParseTree], llType: LiteralListType) => {
         expectedTypeOutcome match {
@@ -734,7 +702,7 @@ object TypeChecker {
     typeCheck(expression, WildcardT("_"), env, FullFunction, tcParameters)
   }
 
-  case class TypeCheckUnknownFunctionResult(
+  case class TypeCheckFunctionResult(
     functionExpression: UntaggedObject,
     typeOfFunction: NewMapType,
     inputExpression: UntaggedObject,
@@ -746,115 +714,219 @@ object TypeChecker {
     input: ParseTree,
     env: Environment,
     tcParameters: Map[String, NewMapType]
-  ): Outcome[TypeCheckUnknownFunctionResult, String] = {
+  ): Outcome[TypeCheckFunctionResult, String] = {
     for {
       functionTypeChecked <- typeCheckUnknownType(function, env, tcParameters)
+      functionObj = NewMapObject(functionTypeChecked.nExpression, functionTypeChecked.refinedTypeClass)
+      result <- typeCheckKnownFunction(functionObj, input, env, functionTypeChecked.tcParameters)
+    } yield result
+  }
 
-      typeOfFunction = functionTypeChecked.refinedTypeClass
-      underlyingTypeOfFunction <- getFinalUnderlyingType(typeOfFunction, env)
+  def typeCheckKnownFunction(
+    function: NewMapObject,
+    input: ParseTree,
+    env: Environment,
+    tcParameters: Map[String, NewMapType]
+  ): Outcome[TypeCheckFunctionResult, String] = {
+    for {
+      underlyingTypeOfFunction <- getFinalUnderlyingType(function.nType, env)
 
-      functionUntaggedObject = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
+      functionUntaggedObject = Evaluator.stripVersioningU(function.uObject, env)
 
-      inputTagged <- underlyingTypeOfFunction.inputTypeOpt(Some(functionUntaggedObject)) match {
+      inputObj <- underlyingTypeOfFunction.inputTypeOpt(Some(functionUntaggedObject)) match {
         case Some(inputT) => {
           for {
             inputTypeChecked <- typeCheck(input, inputT, env, FullFunction, tcParameters)
-          } yield (inputTypeChecked.nExpression -> inputTypeChecked.refinedTypeClass)
+          } yield NewMapObject(inputTypeChecked.nExpression, inputTypeChecked.refinedTypeClass)
         }
         case None => {
           for {
             typeCheckUnknownTypeResult <- typeCheckUnknownType(input, env, tcParameters)
-          } yield (typeCheckUnknownTypeResult.nExpression -> typeCheckUnknownTypeResult.refinedTypeClass)
+          } yield NewMapObject(typeCheckUnknownTypeResult.nExpression, typeCheckUnknownTypeResult.refinedTypeClass)
         }
       }
 
-      (inputTC, inputType) = inputTagged
+      functionObj = NewMapObject(functionUntaggedObject, underlyingTypeOfFunction)
 
-      untaggedInputType = inputType.asUntagged
-
-      resultingType <- underlyingTypeOfFunction match {
-        case StructT(params, _, _, _) => outputTypeFromStructParams(params, inputTC, env)
-        /*case TypeClassT(typeTransform, implementation) => {
-          outputTypeFromTypeClassParams(typeTransform, inputType, env)
-        }*/
-        case SequenceT(parent, _) => {
-          val strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
-          
-          strippedExpression match {
-            case UCase(i, _) => Success(IndexT(i))
-            case _ => Failure("Incorrect sequence: " + functionTypeChecked.nExpression)
-          }
-        }
-        case MapT(typeTransform, _) => {
-          for {
-            newParams <- Evaluator.patternMatch(
-              typeTransform.keyType.asUntagged,
-              untaggedInputType,
-              TypeMatcher,
-              env
-            )
-
-            typeAsObj = MakeSubstitution(
-              typeTransform.valueType.asUntagged,
-              newParams
-            )
-
-            nType <- typeAsObj.asType
-            _ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type $inputType to type transform $typeTransform")
-          } yield nType
-        }
-        /*case TypeT => {
-          for {
-            typeCheckedT <- functionTypeChecked.nExpression.asType
-
-            underlingT <- getFinalUnderlyingType(typeCheckedT, env)
-
-            result <- underlingT match {
-              case TypeClassT(typeTransform, implementation) => {
-                outputTypeFromTypeClassParams(typeTransform, inputType, env)
-              }
-              case _ => Failure(s"Cannot get resulting type from function of Type ${functionTypeChecked.nExpression} -- $function -- $input")
-            }
-          } yield result
-        }*/
-        case _ => Failure(s"Cannot get resulting type from function type ${typeOfFunction.displayString(env)} -- $function -- $input")
-      }
-
-      resultingFunctionExpression <- typeOfFunction match {
-        /*case TypeT => {
-          for {
-            typeCheckedT <- functionTypeChecked.nExpression.asType
-            underlingT <- getFinalUnderlyingType(typeCheckedT, env)
-
-            impl <- underlingT match {
-              case TypeClassT(_, implementation) => Success(implementation)
-              case _ => Failure(s"Cannot get resulting type from function of Type ${underlingT}")
-            }
-
-            strippedExpression = Evaluator.stripVersioningU(functionTypeChecked.nExpression, env)
-
-            patternMatchAttempted <- Evaluator.applyFunction(impl, untaggedInputType, env, TypeMatcher)
-          } yield {
-            patternMatchAttempted
-          }
-        }*/
-        case _ => Success(functionTypeChecked.nExpression)
-      }
+      resultingType <- resultingTypeFromFunction(functionObj, inputObj, env)
     } yield {
-      TypeCheckUnknownFunctionResult(resultingFunctionExpression, typeOfFunction, inputTC, resultingType)
+      TypeCheckFunctionResult(function.uObject, function.nType, inputObj.uObject, resultingType)
     }    
   }
 
-  def outputTypeFromTypeClassParams(
-    params: UntaggedObject,
-    inputType: NewMapType,
+  def verifyFunctionResult(
+    result: TypeCheckFunctionResult,
+    expectedType: NewMapType,
+    env: Environment,
+    featureSet: MapFeatureSet,
+    tcParameters: Map[String, NewMapType]
+  ): Outcome[TypeCheckResponse, String] = {
+    for {
+      // Is member of Subtype check here?
+      underlyingTypeOfFunction <- getFinalUnderlyingType(result.typeOfFunction, env)
+
+      functionFeatureSet <- retrieveFeatureSetFromFunctionTypePattern(underlyingTypeOfFunction)
+
+      // If the function is a simplemap, and if it has no internal parameters, it can be executed now, and considered a basic
+      functionFeatureSetFixed = if (functionFeatureSet.getLevel <= SimpleFunction.getLevel) {
+        Evaluator.applyFunction(result.functionExpression, result.inputExpression, env) match {
+          case Success(_) => BasicMap // TODO - save the actual result we got!
+          case Failure(_) => functionFeatureSet
+        }
+      } else functionFeatureSet
+
+      // Validate that this is allowed from the feature set
+      _ <- Outcome.failWhen(
+        !TypeConverter.isFeatureSetConvertible(functionFeatureSetFixed, featureSet),
+        s"Cannot allow function with feature set $functionFeatureSetFixed in expression that should be featureSet $featureSet"
+      )
+
+      // If the function is a parameter, then there's no guarantee that it's not self-referential
+      // If functionFeatureSet is basicMap, then this can't cause a self-referential issue
+      // TODO - flesh out these rules a little bit more
+      _ <- Outcome.failWhen(
+        !RetrieveType.isTermClosedLiteral(result.functionExpression) && (functionFeatureSet != BasicMap) && (featureSet != FullFunction),
+        s"Function ${result.functionExpression} is based on a parameter, which could create a self-referential definition, disallowed in featureSet $featureSet -- $functionFeatureSetFixed"
+      )
+      response <- TypeConverter.isTypeConvertible(result.resultingType, expectedType, env)
+      // TODO - execute response.convertInstructions
+    } yield {
+      val applyParseResult = ApplyFunction(result.functionExpression, result.inputExpression, StandardMatcher)
+      TypeCheckResponse(applyParseResult, result.resultingType, tcParameters)
+    }
+  }
+
+  def resultingTypeFromFunction(
+    function: NewMapObject,
+    input: NewMapObject,
     env: Environment
   ): Outcome[NewMapType, String] = {
+    function.nType match {
+      case StructT(params, _, _, _) => outputTypeFromStructParams(params, input.uObject, env)
+      case SequenceT(parentT, _) => {
+        val strippedExpression = Evaluator.stripVersioningU(function.uObject, env)
+        
+        strippedExpression match {
+          case UCase(i, _) => Success(IndexT(i))
+          case _ => Failure("Incorrect sequence: " + function.uObject)
+        }
+      }
+      case MapT(typeTransform, _) => {
+        for {
+          newParams <- Evaluator.patternMatch(
+            typeTransform.keyType.asUntagged,
+            input.nType.asUntagged,
+            TypeMatcher,
+            env
+          )
+
+          typeAsObj = MakeSubstitution(
+            typeTransform.valueType.asUntagged,
+            newParams
+          )
+
+          nType <- typeAsObj.asType
+          _ <- Outcome.failWhen(nType == UndefinedT, s"Couldn't apply type ${input.nType} to type transform $typeTransform")
+        } yield nType
+      }
+      case _ => Failure(s"Cannot get resulting type from function type ${function.nType.displayString(env)} -- $input")
+    }
+  }
+
+  // TODO: There's kind of an implicit breadth-first-search going on here
+  // - This should be simpler somehow, ensure that not cycle can come about
+  def accessFieldTypeParseWithInput(
+    nObjects: Vector[NewMapObject],
+    field: ParseTree,
+    input: ParseTree,
+    expectedType: NewMapType,
+    env: Environment,
+    featureSet: MapFeatureSet,
+    tcParameters: Map[String, NewMapType]
+  ): Outcome[TypeCheckResponse, String] = nObjects match {
+    case nObject +: others => {
+      val firstAttempt: Outcome[TypeCheckResponse, String] = for {
+        result <- accessFieldTypeParseSingleType(nObject, field, WildcardT("_"), env, tcParameters)
+        functionResult <- typeCheckKnownFunction(NewMapObject(result.nExpression, result.refinedTypeClass), input, env, result.tcParameters)
+        tcResponse <- verifyFunctionResult(functionResult, expectedType, env, featureSet, tcParameters)
+      } yield tcResponse
+
+      firstAttempt.rescue(f => {
+        val newNObjects = for {
+          (nType, conversionResponse) <- env.typeSystem.convertibilityGraph.findPotentialConversions(nObject.nType)
+        } yield {
+          val conv = conversionResponse.convertInstructions
+
+          // TODO: Handle this better!
+          // It needs to use all the conversion information
+          val newUObject = ApplyFunction(conv(0).func, nObject.uObject, conv(0).matchingRules)
+
+          NewMapObject(newUObject, nType)
+        }
+
+        val newUnderlyingObjects = nObject.nType match {
+          case CustomT(name, params, typeSystemId) => {
+            for {
+              underlying <- getUnderlyingType(name, params, env, typeSystemId).toOption.toVector
+            } yield NewMapObject(nObject.uObject, underlying)
+          }
+          case _ => Vector.empty
+        }
+
+        accessFieldTypeParseWithInput(
+          newUnderlyingObjects ++ newNObjects.toVector ++ others, field, input, expectedType, env, featureSet, tcParameters
+        )
+      })
+    }
+    case _ => Failure("Couldn't find a working type")
+  }
+
+  def accessFieldTypeParseSingleType(
+    nObject: NewMapObject,
+    field: ParseTree,
+    expectedType: NewMapType,
+    env: Environment,
+    tcParameters: Map[String, NewMapType]
+  ): Outcome[TypeCheckResponse, String] = {
+    val uTypeClass = nObject.nType.asUntagged
+
     for {
-      resultingFunctionType <- Evaluator.applyFunction(params, inputType.asUntagged, env)
-      resultingFunctionT <- resultingFunctionType.asType
+      fieldsToTypeMap <- Evaluator.applyFunction(
+        env.typeToFieldMapping,
+        uTypeClass,
+        env,
+        TypeMatcher
+      )
+
+      typeOfPotentialFields = SubtypeT(fieldsToTypeMap, IdentifierT)
+
+      theFieldTC <- typeCheck(field, typeOfPotentialFields, env, SimpleFunction, tcParameters)
+
+      // Do not pass tcParameters to the evaluator, because the field must be evaluated
+      //  in its entirety in order to be used in the expression
+      evaluatedField <- Evaluator(theFieldTC.nExpression, env)
+
+      returnValuePair <- Evaluator.applyFunction(
+        fieldsToTypeMap,
+        evaluatedField,
+        env
+      )
+
+      returnValue <- Evaluator.applyFunction(
+        returnValuePair,
+        UIndex(0),
+        env
+      )
+
+      returnT <- returnValue match {
+        case UCase(t, _) => t.asType
+        case _ => Failure("Unknown return value: " + returnValue)
+      }
+
+      response <- TypeConverter.isTypeConvertible(returnT, expectedType, env)
     } yield {
-      resultingFunctionT
+      val accessFieldResult = AccessField(nObject.uObject, uTypeClass, evaluatedField)
+      TypeCheckResponse(accessFieldResult, returnT, tcParameters)
     }
   }
 

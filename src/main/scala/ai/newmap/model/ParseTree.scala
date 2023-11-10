@@ -38,7 +38,7 @@ case class ApplyParse(
   input: ParseTree
 ) extends ParseTree
 
-case class AccessFieldAsMapParse(
+case class AccessFieldParse(
   value: ParseTree,
   field: ParseTree
 ) extends ParseTree

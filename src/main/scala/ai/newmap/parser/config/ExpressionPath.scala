@@ -76,7 +76,7 @@ object ExpressionPath {
 
         result <- symbol match {
           case "|" => Some(ConstructCaseParse(firstExp, secondExp))
-          case "." => Some(AccessFieldAsMapParse(firstExp, secondExp))
+          case "." => Some(AccessFieldParse(firstExp, secondExp))
           case ":" => Some(KeyValueBinding(firstExp, secondExp))
           case "," => {
             firstExp match {
@@ -87,10 +87,12 @@ object ExpressionPath {
             }
           }
           case "=>" => Some(LambdaParse(firstExp, secondExp))
-          case "+" => Some(ApplyParse(
-            IdentifierParse("+"),
-            LiteralListParse(Vector(firstExp, secondExp), ArrayType)
-          ))
+          case "+" => Some(
+            ApplyParse(
+              AccessFieldParse(firstExp, IdentifierParse("plus")),
+              secondExp
+            )
+          )
           case "*" => Some(ApplyParse(
             IdentifierParse("*"),
             LiteralListParse(Vector(firstExp, secondExp), ArrayType)

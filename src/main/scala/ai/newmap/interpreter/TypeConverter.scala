@@ -3,29 +3,28 @@
 import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
+case class TypeConvertionResponse(
+  convertInstructions: Vector[FunctionWithMatchingRules],
+  refinedEndingType: NewMapType,
+  newParameters: Map[String, UntaggedObject] = Map.empty
+)
+
 /**
  * Handles checking if two subtypes are comparable to one another
  */
 object TypeConverter {
-
-  case class IsTypeConvertibleResponse(
-    convertInstructions: Vector[FunctionWithMatchingRules],
-    refinedEndingType: NewMapType,
-    newParameters: Map[String, UntaggedObject] = Map.empty
-  )
-
   // Return - Instructions in the form of functions for converting from one type to another
   def isTypeConvertible(
     startingType: NewMapType,
     endingType: NewMapType,
     env: Environment
-  ): Outcome[IsTypeConvertibleResponse, String] = {
+  ): Outcome[TypeConvertionResponse, String] = {
     //println(s"Calling isTypeConvertible: $startingType -- $endingType")
-    val emptyResponse = IsTypeConvertibleResponse(Vector.empty, endingType)
+    val emptyResponse = TypeConvertionResponse(Vector.empty, endingType)
 
     (startingType, endingType) match {
       case (startingType, WildcardT(name)) => {
-        Success(IsTypeConvertibleResponse(
+        Success(TypeConvertionResponse(
           Vector.empty,
           startingType,
           Map(name -> startingType.asUntagged)
@@ -43,7 +42,7 @@ object TypeConverter {
         } yield {
           val refinedEndingType = endingType // TODO - recheck this!
 
-          IsTypeConvertibleResponse(Vector.empty, refinedEndingType, newParameters)
+          TypeConvertionResponse(Vector.empty, refinedEndingType, newParameters)
         }
       }
       case (ArrayT(param1), ArrayT(param2)) => {
@@ -53,7 +52,7 @@ object TypeConverter {
         } yield {
           val refinedEndingType = endingType // TODO - recheck this!
 
-          IsTypeConvertibleResponse(Vector.empty, refinedEndingType, newParameters)
+          TypeConvertionResponse(Vector.empty, refinedEndingType, newParameters)
         }
       }
       case _ if (startingType == endingType) => Success(emptyResponse)
@@ -155,7 +154,7 @@ object TypeConverter {
 
           convertInstructions <- env.typeSystem.searchForForwardConvertibility(name1, typeSystemId1, typeSystemId2)
         } yield {
-          IsTypeConvertibleResponse(convertInstructions, endingType)
+          TypeConvertionResponse(convertInstructions, endingType)
         }
       }
       case (CustomT(name, params, typeSystemId), _) => {
@@ -181,14 +180,6 @@ object TypeConverter {
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
       }
-      /*case (CountT, DoubleT) => {
-        Success(
-          IsTypeConvertibleResponse(
-            Vector(FunctionWithMatchingRules(UCountToDecimal, StandardMatcher)),
-            DoubleT
-          ),
-        )
-      }*/
       case _ => {
         val str = s"No rule to convert ${startingType} to ${endingType} -- ${startingType == endingType}"
         Failure(str)

@@ -1,6 +1,7 @@
 package ai.newmap.model
 
 import ai.newmap.util.{Outcome, RangeMap, Success, Failure}
+import ai.newmap.interpreter.TypeConvertibilityGraph
 
 // Each Type System:
 // - has a UUID
@@ -48,7 +49,11 @@ case class NewMapTypeSystem(
 
   // These are the rules to convert from some type to a future version.
   // More flexible conversion rules (for completely different types) still need to be implemented
-  forwardCompatibilityRules: Map[String, RangeMap[FunctionWithMatchingRules]] = Map.empty
+  forwardCompatibilityRules: Map[String, RangeMap[FunctionWithMatchingRules]] = Map.empty,
+
+  // This is the general convertibility search
+  // It is a Map from Type => (Type => convertInstructions)
+  convertibilityGraph: TypeConvertibilityGraph = TypeConvertibilityGraph.init
 ) {
   def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
   def emptyStructPattern = UArray()
@@ -109,7 +114,6 @@ case class NewMapTypeSystem(
     case "Boolean" => Success(emptyStructPattern)
     case "Byte" => Success(emptyStructPattern)
     case "Character" => Success(emptyStructPattern)
-    //case "String" => Success(emptyStructPattern)
     case "Long" => Success(emptyStructPattern)
     case "Double" => Success(emptyStructPattern)
     case "Uuid" => Success(emptyStructPattern)
