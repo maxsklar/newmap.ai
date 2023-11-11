@@ -440,10 +440,7 @@ object StatementInterpreter {
         } yield {
           val nObject = NewMapObject(tc.nExpression, tc.refinedTypeClass)
 
-          ReturnValue(
-            ExpOnlyEnvironmentCommand(nObject),
-            tcParameters
-          )
+          ReturnValue(ExpOnlyEnvironmentCommand(nObject), tcParameters)
         }
       }
       case NewVersionedFieldParse(featureSet, typeParse, id, returnTypeParse, parseTree) => {

@@ -30,9 +30,9 @@ object TypeClassUtils {
         for {
           underlyingType <- env.typeSystem.historicalUnderlyingType(name, typeSystemId)
 
-          //TODO: The env should be updated with currentParameterPattern
+          //TODO: Use the type parameter
           result <- typeIsExpectingAnIndex(underlyingType._2, i, env)
-        } yield result
+        } yield nType
         
       }
       case SubtypeT(isMember, parentType, _) => {

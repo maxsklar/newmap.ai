@@ -124,7 +124,9 @@ object TypeConverter {
           singularObj <- Evaluator(singularOutputResponse.inputType, env)
           singularObjT <- singularObj.asType
           response <- isTypeConvertible(startingType, singularObjT, env)
-        } yield response.copy(convertInstructions = singularOutputResponse.conversionRules ++ response.convertInstructions)
+        } yield {
+          response.copy(convertInstructions = singularOutputResponse.conversionRules ++ response.convertInstructions)
+        }
       }
       case (CaseT(_, _, _), CaseT(_, _, _)) => {
         // Note the contravariance (ending cases first)
@@ -161,14 +163,6 @@ object TypeConverter {
         for {
           underlyingT <- TypeChecker.getUnderlyingType(name, params, env, typeSystemId)
           response <- isTypeConvertible(underlyingT, endingType, env)
-        } yield response
-      }
-      case (_, CustomT(name, params, typeSystemId)) => {
-        // TODO: We should be converting in this direction automatically
-        // - perhaps some logic in the type checker can replace this!
-        for {
-          underlyingT <- TypeChecker.getUnderlyingType(name, params, env, typeSystemId)
-          response <- isTypeConvertible(startingType, underlyingT, env)
         } yield response
       }
       case (_, CaseT(values, endingFieldType, _)) if (isSingularMap(values)) => {

@@ -42,11 +42,10 @@ object TypeChecker {
       }
       case NaturalNumberParse(i: Long) => {
         for {
-          t <- expectedTypeOutcome
-          refinedType <- TypeClassUtils.typeIsExpectingAnIndex(t, i, env)
+          refinedType <- TypeClassUtils.typeIsExpectingAnIndex(expectedType, i, env)
         } yield {
           val expectingType = TypeConverter.isTypeConvertible(refinedType, TypeT, env).isSuccess
-
+          
           if (expectingType) {
             val untaggedValue = IndexT(UIndex(i)).asUntagged
             TypeCheckResponse(untaggedValue, refinedType, tcParameters)
@@ -221,6 +220,7 @@ object TypeChecker {
         for {
           tcValue <- typeCheckUnknownType(value, env, tcParameters)
           nObject = NewMapObject(tcValue.nExpression, tcValue.refinedTypeClass)
+
           result <- accessFieldTypeParseSingleType(nObject, field, expectedType, env, tcParameters)
         } yield result
       }

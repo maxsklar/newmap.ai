@@ -20,14 +20,21 @@ object Evaluator {
           result
         }
       }
-      case AccessField(value, uTypeClass, field) => {
+      case AccessField(value, uType, field) => {
+        //println(s"AccessField: $value -- $uType -- $field")
         for {
           evalValue <- this(value, env)
 
+          //_ = println(s"evalValue: $evalValue")
+
           // The field and type class should already be evaluated, so no need to re-evaluate it here
-          fieldsToMap <- applyFunction(env.typeToFieldMapping, uTypeClass, env, TypeMatcher)
+          fieldsToMap <- applyFunction(env.typeToFieldMapping, uType, env, TypeMatcher)
+
+          //_ = println(s"fieldsToMap: $fieldsToMap")
 
           result <- applyFunction(fieldsToMap, field, env)
+
+          //_ = println(s"result: $result")
 
           func <- applyFunction(result, UIndex(0), env)
 
@@ -35,6 +42,8 @@ object Evaluator {
             case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
+
+          //_ = println(s"resultValue: $resultValue")
 
           answer <- applyFunction(resultValue, evalValue, env)
         } yield answer

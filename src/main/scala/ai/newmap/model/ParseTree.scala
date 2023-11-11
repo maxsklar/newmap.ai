@@ -11,7 +11,9 @@ case class FloatParse(d: Double) extends ParseTree
 case class IdentifierParse(
   s: String,
   force: Boolean = false // If this is true, the identifier is forced to be a raw identifier, and not a keyword or substitute
-) extends ParseTree
+) extends ParseTree {
+  override def toString: String = if (force) ("~" + s) else s
+}
 
 case class KeyValueBinding(
   key: ParseTree,

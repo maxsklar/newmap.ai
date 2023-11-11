@@ -1224,7 +1224,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   //    
   //}
 
-  "The mean machine " should " work for getting the mean" ignore {
+  "The mean machine " should " work for getting the mean" in {
     testCodeScript(Vector(
       DirectCommand(":load TestScripts/MeanMachine.nm"),
       CodeExpectation("val mm: MeanMachine = (6.0, 3.0)", GeneralSuccessCheck),

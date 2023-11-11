@@ -188,9 +188,7 @@ case class Environment(
             case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
           }
         } yield {
-          this.copy(
-            typeToFieldMapping = newTypeToFieldMapping
-          )
+          this.copy(typeToFieldMapping = newTypeToFieldMapping)
         }
 
         resultO.toOption.get
