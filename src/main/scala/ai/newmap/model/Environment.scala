@@ -665,6 +665,23 @@ object Environment {
     )
   }
 
+  def applyToPair(function: UntaggedObject, first: String, second: String): UntaggedObject = {
+    ApplyFunction(function, UArray(ParamId(first), ParamId(second)), StandardMatcher)
+  }
+
+  def functionFromPairF(function: UntaggedObject): UntaggedObject = {
+    UMap(Vector(UWildcard("a") -> 
+      UMap(Vector(UWildcard("b") -> applyToPair(function, "a", "b")))
+    ))
+  }
+
+  def simpleAutomap(nType: NewMapType): NewMapType = {
+    MapT(
+      TypeTransform(nType, nType),
+      MapConfig(RequireCompleteness, SimpleFunction)
+    )
+  }
+
   Base = Base.newCommands(Vector(
     eCommand("Type", typeAsObject(TypeT)),
     eCommand("Count", typeAsObject(CountT)),
@@ -719,64 +736,47 @@ object Environment {
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
     NewTypeClassCommand("Addable", UMap(Vector.empty)),
-    UpdateTypeclassWithFieldCommand(
-      "Addable",
-      "T",
-      MapT(
-        TypeTransform(ParamIdT("T"), ParamIdT("T")),
-        MapConfig(RequireCompleteness, SimpleFunction)
-      ),
-      "plus",
-      Vector.empty,
-      false
-    ),
+    UpdateTypeclassWithFieldCommand("Addable", "T", simpleAutomap(ParamIdT("T")), "+", Vector.empty, false),
     UpdateTypeclassWithTypeCommand(
       "Addable",
       CountT,
-      Vector(
-        "plus" -> UMap(Vector(UWildcard("a") -> 
-          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
-        ))
-      )
+      Vector("+" -> functionFromPairF(UPlus))
     ),
     UpdateTypeclassWithTypeCommand(
       "Addable",
       DoubleT,
-      Vector(
-        "plus" -> UMap(Vector(UWildcard("a") -> 
-          UMap(Vector(UWildcard("b") -> ApplyFunction(UPlus, UArray(ParamId("a"), ParamId("b")), StandardMatcher)))
-        ))
-      )
+      Vector("+" -> functionFromPairF(UPlus))
+    ),
+    NewTypeClassCommand("Multipliable", UMap(Vector.empty)),
+    UpdateTypeclassWithFieldCommand("Multipliable", "T", simpleAutomap(ParamIdT("T")), "*", Vector.empty, false),
+    UpdateTypeclassWithTypeCommand(
+      "Multipliable",
+      CountT,
+      Vector("*" -> functionFromPairF(UTimes))
+    ),
+    UpdateTypeclassWithTypeCommand(
+      "Multipliable",
+      DoubleT,
+      Vector("*" -> functionFromPairF(UTimes))
+    ),
+    NewTypeClassCommand("Divideable", UMap(Vector.empty)),
+    UpdateTypeclassWithFieldCommand("Divideable", "T", simpleAutomap(ParamIdT("T")), "/", Vector.empty, false),
+    UpdateTypeclassWithTypeCommand(
+      "Divideable",
+      DoubleT,
+      Vector("/" -> functionFromPairF(UDivide))
+    ),
+    UpdateTypeclassWithFieldCommand("Subtractable", "T", simpleAutomap(ParamIdT("T")), "-", Vector.empty, false),
+    UpdateTypeclassWithTypeCommand(
+      "Subtractable",
+      DoubleT,
+      Vector("-" -> functionFromPairF(UMinus))
     )
-  ))
-  
-  Base = Base.newCommands(Vector(
-    eCommand("+", NewMapObject(
-      UPlus,
-      MapT(TypeTransform(
-        MapT(TypeTransform(IndexT(UIndex(2)), CountT), MapConfig(RequireCompleteness, BasicMap)),
-        CountT
-      ), MapConfig(RequireCompleteness, SimpleFunction))
-    )),
-    eCommand("*", NewMapObject(
-      UTimes,
-      MapT(TypeTransform(
-        MapT(TypeTransform(IndexT(UIndex(2)), DoubleT), MapConfig(RequireCompleteness, BasicMap)),
-        DoubleT
-      ), MapConfig(RequireCompleteness, SimpleFunction))
-    )),
-    eCommand("/", NewMapObject(
-      UDivide,
-      MapT(TypeTransform(
-        MapT(TypeTransform(IndexT(UIndex(2)), DoubleT), MapConfig(RequireCompleteness, BasicMap)),
-        DoubleT
-      ), MapConfig(RequireCompleteness, SimpleFunction))
-    ))
   ))
 
   // TODO - eventually make this empty and add it elsewhere!!
   val initialChannelToType = Map(
-    "stdout" -> CustomT("String", UArray(), 11) // WHY 11?
+    "stdout" -> CustomT("String", UArray(), 16) // WHY?? Remove the need for this.
   )
   Base = Base.copy(channelIdToType = initialChannelToType)
 }

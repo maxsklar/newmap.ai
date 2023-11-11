@@ -174,7 +174,7 @@ object PrintNewMapObject {
     case UPlus => "+"
     case UTimes => "*"
     case UDivide => "/"
-    //case UMinus => "-"
+    case UMinus => "-"
     case UCountToDecimal => "CountToDecimal"
   }
 

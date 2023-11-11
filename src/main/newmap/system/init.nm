@@ -9,6 +9,3 @@ data String = Array|Char
 typeclass Displayable
 update class Displayable t with field (t => String) as display
 update class Displayable with type String: (display : (s: s))
-
-//update class Addable with type Count: (plus: (a: (b: a + b)))
-//update class Addable with type Double: (plus: (a: (b: a + b)))

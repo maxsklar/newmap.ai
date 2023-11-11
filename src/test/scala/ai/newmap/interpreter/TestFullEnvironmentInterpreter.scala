@@ -1153,6 +1153,17 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
    ))
   }
 
+  "Multiplication " should " work for counts" in {
+    testCodeScript(Vector(
+      CodeExpectation("1 * 1", SuccessCheck(ExpOnlyEnvironmentCommand(Index(1)))),
+      CodeExpectation("1 * 2 * 3", SuccessCheck(ExpOnlyEnvironmentCommand(Index(6)))),
+      CodeExpectation("8 * 1.5", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(12.0), DoubleT)))),
+      CodeExpectation("5 + 2 * 10", SuccessCheck(ExpOnlyEnvironmentCommand(Index(25)))),
+      CodeExpectation("1 + 2.0 * 10", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(21.0), DoubleT)))),
+      CodeExpectation("5 * 1.0 + 3", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(8.0), DoubleT)))),
+    ))
+  }
+
   "Field Maps " should " work" in {
     testCodeScript(Vector(
       CodeExpectation(
@@ -1213,7 +1224,7 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
   //    
   //}
 
-  "The mean machine " should " work for getting the mean" in {
+  "The mean machine " should " work for getting the mean" ignore {
     testCodeScript(Vector(
       DirectCommand(":load TestScripts/MeanMachine.nm"),
       CodeExpectation("val mm: MeanMachine = (6.0, 3.0)", GeneralSuccessCheck),

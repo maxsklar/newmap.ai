@@ -246,6 +246,20 @@ object Evaluator {
           }
         } yield result
       }
+      case UMinus => {
+        for {
+          first <- applyFunction(input, UIndex(0), env)
+          second <- applyFunction(input, UIndex(1), env)
+
+          result <- (stripVersioningU(first, env), stripVersioningU(second, env)) match {
+            case (UIndex(n1), UIndex(n2)) => Success(UDouble(n1 - n2))
+            case (UDouble(n1), UIndex(n2)) => Success(UDouble(n1 - n2))
+            case (UIndex(n1), UDouble(n2)) => Success(UDouble(n1 - n2))
+            case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 - d2))
+            case _ => Failure("Can't add: " + first + " -- " + second)
+          }
+        } yield result
+      }
       case UTimes => {
         for {
           first <- applyFunction(input, UIndex(0), env)
@@ -266,8 +280,8 @@ object Evaluator {
           second <- applyFunction(input, UIndex(1), env)
 
           result <- (stripVersioningU(first, env), stripVersioningU(second, env)) match {
-            case (UIndex(n1), UIndex(n2)) => Success(UDouble(n1 / n2))
-            case (UDouble(n1), UIndex(n2)) => Success(UDouble(n1 / n2))
+            case (UIndex(n1), UIndex(n2)) => Success(UDouble((n1) / n2.toDouble))
+            case (UDouble(n1), UIndex(n2)) => Success(UDouble(n1 / n2.toDouble))
             case (UIndex(n1), UDouble(n2)) => Success(UDouble(n1 / n2))
             case (UDouble(d1), UDouble(d2)) => Success(UDouble(d1 / d2))
             case _ => Failure("Can't divide: " + first + " -- " + second)

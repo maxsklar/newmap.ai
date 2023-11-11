@@ -26,7 +26,6 @@ case class IndexT(i: UntaggedObject) extends NewMapType
 case object BooleanT extends NewMapType
 case object ByteT extends NewMapType
 case object CharacterT extends NewMapType
-//case object StringT extends NewMapType
 case object LongT extends NewMapType
 case object DoubleT extends NewMapType
 case object UuidT extends NewMapType

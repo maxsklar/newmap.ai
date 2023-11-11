@@ -845,11 +845,15 @@ object TypeChecker {
     tcParameters: Map[String, NewMapType]
   ): Outcome[TypeCheckResponse, String] = nObjects match {
     case nObject +: others => {
+      //println("accessFieldTypeParseWithInput: " + nObject + " -- " + field + " -- " + input)
+
       val firstAttempt: Outcome[TypeCheckResponse, String] = for {
         result <- accessFieldTypeParseSingleType(nObject, field, WildcardT("_"), env, tcParameters)
         functionResult <- typeCheckKnownFunction(NewMapObject(result.nExpression, result.refinedTypeClass), input, env, result.tcParameters)
-        tcResponse <- verifyFunctionResult(functionResult, expectedType, env, featureSet, tcParameters)
+        tcResponse <- verifyFunctionResult(functionResult, WildcardT("_"), env, featureSet, tcParameters)
       } yield tcResponse
+
+      //println("firstAttempt: " + firstAttempt)
 
       firstAttempt.rescue(f => {
         val newNObjects = for {
@@ -918,15 +922,15 @@ object TypeChecker {
         env
       )
 
-      returnT <- returnValue match {
-        case UCase(t, _) => t.asType
+      returnObj <- returnValue match {
+        case UCase(t, o) => t.asType.map(nT => NewMapObject(o, nT))
         case _ => Failure("Unknown return value: " + returnValue)
       }
 
-      response <- TypeConverter.isTypeConvertible(returnT, expectedType, env)
+      response <- TypeConverter.isTypeConvertible(returnObj.nType, expectedType, env)
     } yield {
       val accessFieldResult = AccessField(nObject.uObject, uTypeClass, evaluatedField)
-      TypeCheckResponse(accessFieldResult, returnT, tcParameters)
+      TypeCheckResponse(accessFieldResult, returnObj.nType, tcParameters)
     }
   }
 
