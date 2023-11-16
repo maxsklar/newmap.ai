@@ -22,8 +22,7 @@ object UpdateCommandCalculator {
    */
   def getDefaultValueOfCommandTypeFromEnv(uType: UntaggedObject, env: Environment): Outcome[UntaggedObject, String] = {
     for {
-      fieldsToMap <- Evaluator.applyFunction(env.typeToFieldMapping, uType, env, TypeMatcher)
-      result <- Evaluator.applyFunction(fieldsToMap, UIdentifier("init"), env)
+      result <- Evaluator.findFieldValue(uType, UIdentifier("init"), env)
       func <- Evaluator.applyFunction(result, UIndex(0), env)
 
       value <- func match {

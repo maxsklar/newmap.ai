@@ -40,10 +40,3 @@ case class TypeConvertibilityGraph(
     TypeConvertibilityGraph(newGraph)
   }
 }
-
-object TypeConvertibilityGraph {
-  val init: TypeConvertibilityGraph = {
-    TypeConvertibilityGraph()
-      .addConversion(CountT, DoubleT, FunctionWithMatchingRules(UCountToDecimal, StandardMatcher))
-  }
-}

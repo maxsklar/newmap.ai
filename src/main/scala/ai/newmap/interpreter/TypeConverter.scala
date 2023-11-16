@@ -34,10 +34,7 @@ object TypeConverter {
       case (CustomT(name1, param1, typeSystemId1), CustomT(name2, param2, typeSystemId2)) if (name1 == name2 && typeSystemId1 == typeSystemId2) => {
         for {
           parameterType <- env.typeSystem.getParameterType(env.typeSystem.currentVersion, name1)
-
-          // TODO: eventually, there should be a general way to convert a type to a matcher
-          matcher = if (isTypeConvertible(parameterType, TypeT, env).isSuccess) TypeMatcher else StandardMatcher
-
+          matcher = matcherForType(parameterType, env) 
           newParameters <- Evaluator.patternMatch(param2, param1, matcher, env)
         } yield {
           val refinedEndingType = endingType // TODO - recheck this!
@@ -174,11 +171,29 @@ object TypeConverter {
           response <- isTypeConvertible(startingType, singularObjT, env)
         } yield response
       }
-      case _ => {
+      case (startingType, endingType) => {
+        for {
+          (nType, conversionResponse) <- env.typeSystem.convertibilityGraph.findPotentialConversions(startingType)
+        } {
+          for {
+            response <- isTypeConvertible(nType, endingType, env)
+          } {
+            // TODO - figure out the real way to compose conversion responses
+            val newConvertInstructions = conversionResponse.convertInstructions ++ response.convertInstructions
+            return Success(response.copy(convertInstructions = newConvertInstructions))
+          }
+        }
+        // See if we can convert any of these further to the ending type
+
         val str = s"No rule to convert ${startingType} to ${endingType} -- ${startingType == endingType}"
         Failure(str)
       }
     }
+  }
+
+  def matcherForType(nType: NewMapType, env: Environment): MatchingRules = {
+    // TODO: eventually, there should be a general way to convert a type to a matcher
+    if (isTypeConvertible(nType, TypeT, env).isSuccess) TypeMatcher else StandardMatcher
   }
 
   // TODO: this is for automatic conversion. There should be another conversion, which is a superset of this, which is less automatic

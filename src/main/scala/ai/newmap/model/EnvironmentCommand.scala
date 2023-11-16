@@ -164,6 +164,14 @@ case class IterateIntoChannel(
   override def displayString(env: Environment): String = s"iterate $nObject into $channel"
 }
 
+case class AddTypeConversion(
+  nTypeFrom: NewMapType,
+  nTypeTo: NewMapType,
+  func: UntaggedObject
+) extends EnvironmentCommand {
+  override def displayString(env: Environment): String = s"convert ${nTypeFrom.displayString(env)} to ${nTypeTo.displayString(env)} with $func"
+}
+
 case object EmptyEnvironmentCommand extends EnvironmentCommand {
   override def displayString(env: Environment): String = ""
 }

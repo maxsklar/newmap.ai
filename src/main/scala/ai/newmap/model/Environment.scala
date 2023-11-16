@@ -168,21 +168,22 @@ case class Environment(
           inputType = typeTransform.keyType.asUntagged
           outputType = typeTransform.valueType.asUntagged
 
-          currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, TypeMatcher)
-
+          // StandardMatcher because we don't want the current fields to match some subtype
+          currentFields <- Evaluator.applyFunction(typeToFieldMapping, inputType, this, StandardMatcher)
+          
           isCommandU = if (isCommand) UIndex(1) else UIndex(0)
 
           newFieldMapping = (UIdentifier(id), UArray(UCase(outputType, value), isCommandU))
 
           newFieldMappings <- currentFields match {
-            case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings)
+            case UMap(fieldMappings) => Success(newFieldMapping +: fieldMappings.filter(x => x._1 != UIdentifier(id)))
             case UInit => Success(Vector(newFieldMapping))
             case _ => Failure("unexpected currentFields: " + currentFields)
           }
 
           newTypeToFieldMapping <- typeToFieldMapping match {
             case UMap(mappings) => {
-              val newMappings: Vector[(UntaggedObject, UntaggedObject)] = (inputType -> UMap(newFieldMappings)) +: mappings  
+              val newMappings: Vector[(UntaggedObject, UntaggedObject)] = (inputType -> UMap(newFieldMappings)) +: mappings.filter(x => x._1 != inputType)  
               Success(UMap(newMappings))
             }
             case _ => Failure("unexpected typeToFieldMapping: " + typeToFieldMapping)
@@ -330,7 +331,7 @@ case class Environment(
           for {
             specificFieldT <- specificFieldType.asType
           } {
-            newEnv = newEnv.newCommand(NewVersionedFieldCommand(
+            val newVersionedFieldCommand = NewVersionedFieldCommand(
               fieldName,
               MapT(
                 ai.newmap.model.TypeTransform(implT, specificFieldT),
@@ -338,7 +339,9 @@ case class Environment(
               ),
               USingularMap(UWildcard(typeParameter), impl),
               isCommand
-            ))
+            )
+            
+            newEnv = newEnv.newCommand(newVersionedFieldCommand)
           }
         }
 
@@ -558,6 +561,13 @@ case class Environment(
           }
         }
       }
+      case AddTypeConversion(nTypeFrom, nTypeTo, func) => {
+        val matcher = TypeConverter.matcherForType(nTypeFrom, this)
+        val functionWithMatcher = FunctionWithMatchingRules(func, matcher)
+        val newConvertibilityGraph = typeSystem.convertibilityGraph.addConversion(nTypeFrom, nTypeTo, functionWithMatcher)
+        val newTypeSystem = typeSystem.copy(convertibilityGraph = newConvertibilityGraph)
+        this.copy(typeSystem = newTypeSystem)
+      }
       case EmptyEnvironmentCommand => this
     }
   }
@@ -769,7 +779,8 @@ object Environment {
       "Subtractable",
       DoubleT,
       Vector("-" -> functionFromPairF(UMinus))
-    )
+    ),
+    AddTypeConversion(CountT, DoubleT, UCountToDecimal)
   ))
 
   // TODO - eventually make this empty and add it elsewhere!!

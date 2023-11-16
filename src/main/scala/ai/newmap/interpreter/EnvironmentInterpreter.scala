@@ -30,7 +30,9 @@ class EnvironmentInterpreter(
       case CommandExit => Success(":exit")
       case CommandPassThrough => for {
         command <- applyEnvCommand(code)
-      } yield command.displayString(env)
+      } yield {
+        command.displayString(env)
+      }
     }
   }
 

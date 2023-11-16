@@ -53,7 +53,7 @@ case class NewMapTypeSystem(
 
   // This is the general convertibility search
   // It is a Map from Type => (Type => convertInstructions)
-  convertibilityGraph: TypeConvertibilityGraph = TypeConvertibilityGraph.init
+  convertibilityGraph: TypeConvertibilityGraph = TypeConvertibilityGraph()
 ) {
   def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
   def emptyStructPattern = UArray()

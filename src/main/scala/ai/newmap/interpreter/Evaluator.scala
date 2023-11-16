@@ -28,13 +28,11 @@ object Evaluator {
           //_ = println(s"evalValue: $evalValue")
 
           // The field and type class should already be evaluated, so no need to re-evaluate it here
-          fieldsToMap <- applyFunction(env.typeToFieldMapping, uType, env, TypeMatcher)
+          // TODO - HERE IS THE PROBLEM!
+          // solution: pattern match all, and figure out which one(s) to return
+          //_ = throw new Exception("hi")
 
-          //_ = println(s"fieldsToMap: $fieldsToMap")
-
-          result <- applyFunction(fieldsToMap, field, env)
-
-          //_ = println(s"result: $result")
+          result <- Evaluator.findFieldValue(uType, field, env)
 
           func <- applyFunction(result, UIndex(0), env)
 
@@ -90,6 +88,22 @@ object Evaluator {
       }
       case constant => Success(constant)
     }
+  }
+
+  def findFieldValue(
+    uType: UntaggedObject,
+    field: UntaggedObject,
+    env: Environment
+  ): Outcome[UntaggedObject, String] = {
+    for {
+      typeToFieldBindings <- env.typeToFieldMapping.getMapBindings()
+
+      potentialFieldsToMap = Evaluator.patternMatchAll(typeToFieldBindings, uType, env, TypeMatcher)
+      potentialResults = potentialFieldsToMap.flatMap(fieldsToMap => Evaluator.applyFunction(fieldsToMap, field, env).toOption)
+      
+      // TODO - how to we ensure that we pick the right result? Must be the most specific option
+      result <- Outcome(potentialResults.filterNot(_ == UInit).headOption, s"No field init for $uType")
+    } yield result
   }
 
   def latestVersion(uuid: UUID, env: Environment): Outcome[Long, String] = {
@@ -331,6 +345,22 @@ object Evaluator {
         s"Unable to pattern match $input, The type checker should have caught this so there may be an error in there",
       )
     }
+  }
+
+  def patternMatchAll(
+    patternsToMatch: Vector[(UntaggedObject, UntaggedObject)],
+    input: UntaggedObject,
+    env: Environment,
+    matchingRules: MatchingRules = StandardMatcher
+  ): Vector[UntaggedObject] = {
+    for {
+      patternToMatch <- patternsToMatch
+
+      pattern = patternToMatch._1
+      answer = patternToMatch._2
+
+      paramsToSubsitute <- patternMatch(pattern, input, matchingRules, env).toOption.toVector
+    } yield MakeSubstitution(answer, paramsToSubsitute)
   }
 
   def patternMatch(

@@ -1164,6 +1164,14 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  "Type Conversion " should " work for simple Count to Double" in {
+    testCodeScript(Vector(
+      CodeExpectation("val x: Count = 12", GeneralSuccessCheck),
+      CodeExpectation("val y: Double = x",GeneralSuccessCheck),
+      CodeExpectation("y", SuccessCheck(ExpOnlyEnvironmentCommand(NewMapObject(UDouble(12.0), DoubleT)))),
+    ))
+  }
+
   "Field Maps " should " work" in {
     testCodeScript(Vector(
       CodeExpectation(
