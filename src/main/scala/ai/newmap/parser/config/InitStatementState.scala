@@ -30,6 +30,7 @@ case object InitStatementState extends ParseState[EnvStatementParse] {
     "new" -> NewFieldVersionedPath.InitState(),
     "val" -> ValPath.InitState(ValStatement),
     "def" -> ValPath.InitState(DefStatement),
+    "convert" -> AddTypeConversionPath.InitState()
   )
 
   override def generateOutput: Option[EnvStatementParse] = Some(EmptyStatement)

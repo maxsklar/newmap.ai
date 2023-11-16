@@ -529,6 +529,30 @@ object StatementInterpreter {
           )
         }
       }
+      case AddTypeConversionParse(fromTypeParse, toTypeParse, conversionFunctionParse) => {
+        for {
+          fromTC <- TypeChecker.typeCheck(fromTypeParse, TypeT, env, PatternMap, Map.empty, true)
+          toTC <- TypeChecker.typeCheck(toTypeParse, TypeT, env, PatternMap, fromTC.tcParameters)
+
+          fromT <- fromTC.nExpression.asType
+          toT <- toTC.nExpression.asType
+
+          converterType = MapT(TypeTransform(fromT, toT), MapConfig(RequireCompleteness, SimpleFunction))
+
+          converterTC <- TypeChecker.typeCheck(
+            conversionFunctionParse,
+            converterType,
+            env,
+            FullFunction,
+            Map.empty
+          )
+        } yield {
+          ReturnValue(
+            AddTypeConversion(fromT, toT, converterTC.nExpression),
+            tcParameters
+          )
+        }    
+      }
       case EmptyStatement => Success(ReturnValue(EmptyEnvironmentCommand, tcParameters))
     }
   }

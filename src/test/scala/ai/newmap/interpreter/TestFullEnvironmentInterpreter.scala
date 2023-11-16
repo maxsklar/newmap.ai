@@ -1172,6 +1172,20 @@ class TestFullEnvironmentInterpreter extends FlatSpec {
     ))
   }
 
+  it should " be specifyable in code to flip a boolean" in {
+    testCodeScript(Vector(
+      CodeExpectation("data UrbitBool = 2", GeneralSuccessCheck),
+      CodeExpectation("val a: Boolean = 0",GeneralSuccessCheck),
+      CodeExpectation("val b: Boolean = 1",GeneralSuccessCheck),
+      CodeExpectation("convert Boolean to UrbitBool with (0: 1)", FailureCheck),
+      CodeExpectation("convert Boolean to UrbitBool with (1: 0, 0: 1)", GeneralSuccessCheck),
+      CodeExpectation("val x: UrbitBool = a", GeneralSuccessCheck),
+      CodeExpectation("val y: UrbitBool = b", GeneralSuccessCheck),
+      CodeExpectation("x", SuccessCheckStr("1")),
+      CodeExpectation("y", SuccessCheckStr("0"))
+    ))
+  }
+
   "Field Maps " should " work" in {
     testCodeScript(Vector(
       CodeExpectation(

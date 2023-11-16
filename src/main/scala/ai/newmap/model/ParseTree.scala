@@ -184,6 +184,12 @@ case class NewCommandParse(
   outputRule: ParseTree
 ) extends EnvStatementParse
 
+case class AddTypeConversionParse(
+  fromType: ParseTree,
+  toType: ParseTree,
+  conversionFunction: ParseTree
+) extends EnvStatementParse
+
 case object EmptyStatement extends EnvStatementParse
 
 sealed abstract class StatementPrefix
