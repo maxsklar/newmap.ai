@@ -159,6 +159,8 @@ case class Environment(
         )
       }
       case NewVersionedFieldCommand(id, mapT, value, isCommand) => {
+        println(s"newVersionedFieldCommand: $id -- $mapT -- $value")
+
         val resultO = for {
           typeTransform <- mapT match {
             case MapT(typeTransform, _) => Success(typeTransform)
@@ -323,6 +325,14 @@ case class Environment(
           val implT = implementation._1
           val impl = implementation._2
 
+          println("implT: " + implT)
+          println("impl: " + impl)
+
+          // I THINK SOMETHING IS HERE
+          println(s"upcoming substitution for $id . $fieldName: " + fieldType + " -- " + Map(typeParameter -> implT.asUntagged))
+
+          // TODO(max) - This is a key spot!!
+          // ANOTHER GUESS: fieldT is ALWAYS a map - and the key needs to be substituted differently than the value
           val specificFieldType = MakeSubstitution(
             fieldType.asUntagged,
             Map(typeParameter -> implT.asUntagged)
@@ -333,13 +343,13 @@ case class Environment(
           } {
             val newVersionedFieldCommand = NewVersionedFieldCommand(
               fieldName,
-              MapT(
-                ai.newmap.model.TypeTransform(implT, specificFieldT),
-                MapConfig(RequireCompleteness, SimpleFunction)
-              ),
-              USingularMap(UWildcard(typeParameter), impl),
+              specificFieldT,
+              impl,
+              //USingularMap(UWildcard(typeParameter), impl),
               isCommand
             )
+
+            println("calling newVersionedFieldCommand: " + newVersionedFieldCommand)
             
             newEnv = newEnv.newCommand(newVersionedFieldCommand)
           }

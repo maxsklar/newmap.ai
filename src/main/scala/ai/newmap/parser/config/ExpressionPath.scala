@@ -111,6 +111,18 @@ object ExpressionPath {
               secondExp
             )
           )
+          case "^" => Some(
+            ApplyParse(
+              AccessFieldParse(firstExp, IdentifierParse("^")),
+              secondExp
+            )
+          )
+          case "?" => Some(
+            ApplyParse(
+              AccessFieldParse(firstExp, IdentifierParse("?")),
+              secondExp
+            )
+          )
           case "" => Some(ApplyParse(firstExp, secondExp))
           case _ => {
             None
@@ -325,7 +337,7 @@ object ExpressionPath {
     case "|" => 11
     case "." => 10
     case "" => 9
-    case "^" => 8
+    case "^" | "?" => 8
     case "*" | "/" => 7
     case "+" | "-" => 6
     case ":" => 5

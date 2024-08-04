@@ -1,6 +1,6 @@
 package ai.newmap.parser
 
-import ai.newmap.parser.Lexer.{Identifier, Token}
+import ai.newmap.parser.Lexer.{Identifier, Symbol, Token}
 import ai.newmap.parser.config.{ExpressionPath, InitStatementState}
 import ai.newmap.model.{EnvStatementParse, ParseTree}
 import ai.newmap.util.{Failure, Outcome, Success}
@@ -63,6 +63,7 @@ object ParseState {
   def expectingIdentifier[OutT](token: Token, f: String => ParseState[OutT]): Outcome[ParseState[OutT], String] = {
     token match {
       case Identifier(id) => Success(f(id))
+      case Symbol(s) => Success(f(s))
       case _ => Failure("Expected identifier, got " + token.toString)
     }
   }

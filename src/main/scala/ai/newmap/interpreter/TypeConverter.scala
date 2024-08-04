@@ -63,6 +63,8 @@ object TypeConverter {
         MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
         MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
+        println("We are here: " + startingType + " -- " + endingType)
+
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from
         //  CommandOutput might require adding a default pattern
@@ -73,6 +75,8 @@ object TypeConverter {
           // Eventually, we'll have to implement covariance in generic types
 
           // PROBLEM IS THAT isTypeConvertible doesn't then check if the types line up WRT subsets
+          //TODO - change TypeTransform, so that we know what type of pattern the key is!
+          // Create a UExternalWildcard - it's rare, and can only exist in these type transforms
           inputTypesConversionInstruction <- isTypeConvertible(endingInputType, startingInputType, env)
 
           outputTypesConversionInstructions <- isTypeConvertible(startingOutputType, endingOutputType, env)

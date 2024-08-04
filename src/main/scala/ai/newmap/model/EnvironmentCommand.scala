@@ -82,7 +82,7 @@ case class UpdateTypeclassWithFieldCommand(
   isCommand: Boolean
 ) extends EnvironmentCommand {
   override def displayString(env: Environment): String = {
-    s"update typeclass $id $typeParameter with field $fieldType as $fieldName $implementations"
+    s"update typeclass $id $typeParameter with field $fieldType as $fieldName ${UMap(implementations.map(x => x._1.asUntagged -> x._2))}"
   }
 }
 
