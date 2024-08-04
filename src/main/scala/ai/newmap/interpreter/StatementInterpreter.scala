@@ -124,7 +124,7 @@ object StatementInterpreter {
             }
           }
 
-          _ = println("fieldTypes: " + fieldTypes)
+          //_ = println("fieldTypes: " + fieldTypes)
 
           // 2) put that into a struct
           implementationRequirements: NewMapType = StructT(UMap(fieldTypes), IdentifierT)
@@ -174,7 +174,7 @@ case class UpdateTypeclassWithFieldCommandParse(
           fieldT <- fieldTypeObject.asType
 
           //_ = println(s"fieldT: $fieldT")
-          _ = println(s"implementations: $implementations -- ${fieldTypeResult.tcParameters}")
+          //_ = println(s"implementations: $implementations -- ${fieldTypeResult.tcParameters}")
 
           implementationsResult <- TypeChecker.typeCheck(
             implementations,
@@ -184,11 +184,9 @@ case class UpdateTypeclassWithFieldCommandParse(
             fieldTypeResult.tcParameters
           )
 
-          _ = println(s"implementationsResult: $implementationsResult")
+          //_ = println(s"implementationsResult: $implementationsResult")
 
           mapBindings <- implementationsResult.nExpression.getMapBindings()
-
-          _ = println(s"mapBindings: $mapBindings")
         } yield {
           val implementationsTransformed: Vector[(NewMapType, UntaggedObject)] = mapBindings.flatMap(binding => {
             for {
@@ -196,7 +194,7 @@ case class UpdateTypeclassWithFieldCommandParse(
             } yield implT -> binding._2
           })
 
-          println(s"implementationsTransformed: $implementationsTransformed")
+          //println(s"implementationsTransformed: $implementationsTransformed")
 
           ReturnValue(
             UpdateTypeclassWithFieldCommand(id, typeParameter, fieldT, fieldName, implementationsTransformed, isCommand),

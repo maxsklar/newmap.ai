@@ -63,7 +63,7 @@ object TypeConverter {
         MapT(TypeTransform(startingInputType, startingOutputType), MapConfig(startingCompleteness, startingFeatureSet, _, _, _)),
         MapT(TypeTransform(endingInputType, endingOutputType), MapConfig(endingCompleteness, endingFeatureSet, _, _, _))
       ) => {
-        println("We are here: " + startingType + " -- " + endingType)
+        //println("We are here: " + startingType + " -- " + endingType)
 
         // TODO: This is not entirely true
         // I think we can convert these (so long as the feature set is compatible) - but conversion from

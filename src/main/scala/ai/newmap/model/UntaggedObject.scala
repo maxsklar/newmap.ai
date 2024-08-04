@@ -26,6 +26,12 @@ case class UIdentifier(s: String) extends UntaggedObject
 // TODO: change from Vector to ListMap
 case class UMap(values: Vector[(UntaggedObject, UntaggedObject)]) extends UntaggedObject
 
+object UMap {
+  def apply(values: (UntaggedObject, UntaggedObject)*): UMap = {
+    UMap(values.toVector)
+  }
+}
+
 // This is equivalent to UMap where the keys are indecies
 case class UArray(values: Array[UntaggedObject]) extends UntaggedObject
 

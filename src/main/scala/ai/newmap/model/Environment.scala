@@ -159,7 +159,7 @@ case class Environment(
         )
       }
       case NewVersionedFieldCommand(id, mapT, value, isCommand) => {
-        println(s"newVersionedFieldCommand: $id -- $mapT -- $value")
+        //println(s"newVersionedFieldCommand: $id -- $mapT -- $value")
 
         val resultO = for {
           typeTransform <- mapT match {
@@ -325,11 +325,11 @@ case class Environment(
           val implT = implementation._1
           val impl = implementation._2
 
-          println("implT: " + implT)
-          println("impl: " + impl)
+          //println("implT: " + implT)
+          //println("impl: " + impl)
 
           // I THINK SOMETHING IS HERE
-          println(s"upcoming substitution for $id . $fieldName: " + fieldType + " -- " + Map(typeParameter -> implT.asUntagged))
+          //println(s"upcoming substitution for $id . $fieldName: " + fieldType + " -- " + Map(typeParameter -> implT.asUntagged))
 
           // TODO(max) - This is a key spot!!
           // ANOTHER GUESS: fieldT is ALWAYS a map - and the key needs to be substituted differently than the value
@@ -349,7 +349,7 @@ case class Environment(
               isCommand
             )
 
-            println("calling newVersionedFieldCommand: " + newVersionedFieldCommand)
+            //println("calling newVersionedFieldCommand: " + newVersionedFieldCommand)
             
             newEnv = newEnv.newCommand(newVersionedFieldCommand)
           }
@@ -744,7 +744,9 @@ object Environment {
         MapConfig(RequireCompleteness, SimpleFunction)
       ),
       "type",
-      Vector(WildcardT("t") -> ParamId("t")),
+      Vector(WildcardT("t") -> UMap(
+        UWildcard("_") -> ParamId("t")
+      )),
       false
     ),
     NewParamTypeCommand(

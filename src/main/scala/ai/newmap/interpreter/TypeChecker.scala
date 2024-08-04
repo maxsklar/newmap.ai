@@ -1,7 +1,7 @@
 package ai.newmap.interpreter
 
 import ai.newmap.model._
-import ai.newmap.util.{Outcome, Success, Failure}
+import ai.newmap.util.{Outcome, Success, Failure, DebugUtils}
 import java.util.UUID
 
 object TypeChecker {
@@ -110,10 +110,6 @@ object TypeChecker {
         } else {
           env.lookupValue(s) match {
             case Some(nObject) => {
-              if (s == "asdf") {
-                println("nObject: " + nObject + " -- " + nObject.nType + " -- " + expectedType)
-              }
-
               responseFromConversion(nObject, expectedType, env, tcParameters)
             }
             case None if (env.typeSystem.typeToParameterType.get(s).nonEmpty) => {
@@ -735,26 +731,26 @@ object TypeChecker {
     for {
       underlyingTypeOfFunction <- getFinalUnderlyingType(function.nType, env)
 
-      _ = println("underlyingTypeOfFunction: " + underlyingTypeOfFunction)
+      //_ = println("underlyingTypeOfFunction: " + underlyingTypeOfFunction)
 
       functionUntaggedObject = Evaluator.stripVersioningU(function.uObject, env)
 
       inputObj <- underlyingTypeOfFunction.inputTypeOpt(Some(functionUntaggedObject)) match {
         case Some(inputT) => {
-          println("in here: " + inputT + " -- " + typeCheck(input, inputT, env, FullFunction, tcParameters))
+          //println("in here: " + inputT + " -- " + typeCheck(input, inputT, env, FullFunction, tcParameters))
           for {
             inputTypeChecked <- typeCheck(input, inputT, env, FullFunction, tcParameters)
           } yield NewMapObject(inputTypeChecked.nExpression, inputTypeChecked.refinedTypeClass)
         }
         case None => {
-          println("in here!!!")
+          //println("in here!!!")
           for {
             typeCheckUnknownTypeResult <- typeCheckUnknownType(input, env, tcParameters)
           } yield NewMapObject(typeCheckUnknownTypeResult.nExpression, typeCheckUnknownTypeResult.refinedTypeClass)
         }
       }
 
-      _ = println("inputObj: " + inputObj + " -- " + inputObj.nType)
+      //_ = println("inputObj: " + inputObj + " -- " + inputObj.nType)
 
       functionObj = NewMapObject(functionUntaggedObject, underlyingTypeOfFunction)
 
@@ -855,18 +851,18 @@ object TypeChecker {
     tcParameters: Map[String, NewMapType]
   ): Outcome[TypeCheckResponse, String] = nObjects match {
     case nObject +: others => {
-      println("accessFieldTypeParseWithInput: " + nObject + " -- " + field + " -- " + input)
+      //println("accessFieldTypeParseWithInput: " + nObject + " -- " + field + " -- " + input)
       
       val firstAttempt: Outcome[TypeCheckResponse, String] = for {
         result <- accessFieldTypeParseSingleType(nObject, field, WildcardT("_"), env, tcParameters)
-        _ = println("result: " + result.nExpression + " -- " + result.refinedTypeClass + " -- " + input)
+        //_ = println("result: " + result.nExpression + " -- " + result.refinedTypeClass + " -- " + input)
         functionResult <- typeCheckKnownFunction(NewMapObject(result.nExpression, result.refinedTypeClass), input, env, result.tcParameters)
 
-        _ = println("function result: " + functionResult)
+        //_ = println("function result: " + functionResult)
         tcResponse <- verifyFunctionResult(functionResult, WildcardT("_"), env, featureSet, tcParameters)
       } yield tcResponse
 
-      println("firstAttempt: " + firstAttempt)
+      //println("firstAttempt: " + firstAttempt)
 
       firstAttempt.rescue(f => {
         val newNObjects = for {
@@ -935,14 +931,14 @@ object TypeChecker {
         env
       )
 
-      _ = println("returnValue: " + returnValue + " -- " + theFieldTC.tcParameters)
+      //_ = println("returnValue: " + returnValue + " -- " + theFieldTC.tcParameters)
 
       returnObj <- returnValue match {
         case UCase(t, o) => t.asType.map(nT => NewMapObject(o, nT))
         case _ => Failure("Unknown return value: " + returnValue)
       }
 
-      _ = println("returnObj: " + returnObj + " -- " + returnObj.nType)
+      //_ = println("returnObj: " + returnObj + " -- " + returnObj.nType)
 
       response <- TypeConverter.isTypeConvertible(returnObj.nType, expectedType, env)
     } yield {
@@ -966,13 +962,16 @@ object TypeChecker {
   }
 
   def tagAndNormalizeObject(uObject: UntaggedObject, nTypeClass: NewMapType, env: Environment): Outcome[NewMapObject, String] = {
-    uObject match {
-      case UInit => {
-        UpdateCommandCalculator.getDefaultValueOfCommandType(nTypeClass, env).map(initValue => NewMapObject(initValue, nTypeClass))
-      }
-      case _ => (nTypeClass, normalizeCount(uObject)) match {
-        case (CountT, Success(i)) => Success(NewMapObject(UIndex(i), nTypeClass))
-        case _ => Success(NewMapObject(uObject, nTypeClass))
+    if (uObject == UInit) {
+      UpdateCommandCalculator.getDefaultValueOfCommandType(nTypeClass, env).map(initValue => NewMapObject(initValue, nTypeClass))
+    } else {
+      if (nTypeClass == CountT) {
+        normalizeCount(uObject) match {
+          case Success(i) => Success(NewMapObject(UIndex(i), nTypeClass))
+          case _ => Success(NewMapObject(uObject, nTypeClass))
+        }
+      } else {
+        Success(NewMapObject(uObject, nTypeClass))
       }
     }
   }
@@ -984,7 +983,10 @@ object TypeChecker {
         normalizeCount(internal).map(i => i + 1)
       }
       case UIndex(i) => Success(i)
-      case _ => Failure(s"Couldn't normalize count: $uObject")
+      case _ => {
+        //DebugUtils.printStackTrace()
+        Failure(s"Couldn't normalize count: $uObject")
+      }
     }
   }
 

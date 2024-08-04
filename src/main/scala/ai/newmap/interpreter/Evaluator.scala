@@ -21,11 +21,8 @@ object Evaluator {
         }
       }
       case AccessField(value, uType, field) => {
-        //println(s"AccessField: $value -- $uType -- $field")
         for {
           evalValue <- this(value, env)
-
-          //_ = println(s"evalValue: $evalValue")
 
           // The field and type class should already be evaluated, so no need to re-evaluate it here
           // TODO - HERE IS THE PROBLEM!
@@ -40,8 +37,6 @@ object Evaluator {
             case UCase(_, v) => Success(v)
             case _ => Failure("Can't access value: " + result)
           }
-
-          //_ = println(s"resultValue: $resultValue")
 
           answer <- applyFunction(resultValue, evalValue, env)
         } yield answer
