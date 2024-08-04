@@ -138,7 +138,7 @@ object TypeChecker {
                     if (caseT == IndexT(UIndex(1))) {
                       TypeCheckResponse(UCase(UIdentifier(s), UIndex(0)), expectedType, tcParameters)
                     } else {
-                      TypeCheckResponse(UCase(UIdentifier(s), UMap(Vector.empty)), expectedType, tcParameters)
+                      TypeCheckResponse(UCase(UIdentifier(s), UMap()), expectedType, tcParameters)
                     }
                   }
                 }
@@ -154,7 +154,7 @@ object TypeChecker {
 
                     _ <- Outcome.failWhen(!parameterTypeIsEmptyStruct, s"No parameter specified for type $s")
                   } yield {
-                    TypeCheckResponse(UCase(UIdentifier(s), UMap(Vector.empty)), expectedType, tcParameters)
+                    TypeCheckResponse(UCase(UIdentifier(s), UMap()), expectedType, tcParameters)
                   }
                 }
                 case Success(WildcardT(w)) => {

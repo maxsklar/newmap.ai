@@ -25,7 +25,7 @@ object NewMapO {
 
   def identifier(s: String): NewMapObject = NewMapObject(UIdentifier(s), IdentifierT)
 
-  def emptyStruct: NewMapType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  def emptyStruct: NewMapType = StructT(UMap(), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 
   def taggedObjectT: NewMapType = CaseT(
     UMap(Vector(UWildcard("t") -> ParamId("t"))),

@@ -77,7 +77,7 @@ case class MapConfig(
   completeness: MapCompleteness,
   featureSet: MapFeatureSet,
   preservationRules: Vector[PreservationRule] = Vector.empty,
-  channels: UntaggedObject = UMap(Vector.empty),
+  channels: UntaggedObject = UMap(),
   channelParentType: NewMapType = IdentifierT
 )
 

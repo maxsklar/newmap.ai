@@ -55,7 +55,7 @@ case class NewMapTypeSystem(
   // It is a Map from Type => (Type => convertInstructions)
   convertibilityGraph: TypeConvertibilityGraph = TypeConvertibilityGraph()
 ) {
-  def emptyStructType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  def emptyStructType = StructT(UMap(), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
   def emptyStructPattern = UArray()
 
   def getParameterType(
@@ -240,7 +240,7 @@ object NewMapTypeSystem {
     typeSystemVersion: Long
   )
 
-  val emptyStruct: NewMapType = StructT(UMap(Vector.empty), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
+  val emptyStruct: NewMapType = StructT(UMap(), IndexT(UIndex(0)), RequireCompleteness, BasicMap)
 
   val baseTypes = Set(
     "Count",

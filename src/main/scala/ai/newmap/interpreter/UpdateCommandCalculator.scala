@@ -7,7 +7,7 @@ import java.util.UUID
 // Evaluates an expression that's already been type checked
 object UpdateCommandCalculator {
   val pairT: NewMapType = IndexT(UIndex(2))
-  val defaultUMap: UntaggedObject = UMap(Vector.empty)
+  val defaultUMap: UntaggedObject = UMap()
 
   def getDefaultValueOfCommandType(nType: NewMapType, env: Environment): Outcome[UntaggedObject, String] = {
     getDefaultValueOfCommandTypeFromEnv(nType.asUntagged, env).rescue(_ => {
@@ -211,7 +211,7 @@ object UpdateCommandCalculator {
             case StructT(UMap(Vector()), _, _, _) => {
               // TODO - this is an ugly exception.. we need a better way to add fields to a struct
               // (particularly an empty struct like in this case)
-              Success((NewMapObject(UMap(Vector.empty), keyT), command))
+              Success((NewMapObject(UMap(), keyT), command))
             }
             case _ => {
 

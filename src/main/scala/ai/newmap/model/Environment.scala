@@ -31,7 +31,7 @@ case class Environment(
   // TODO - how to include commands as well
   // TODO - belongs in the type system
   // This is a map from NewMapType => (String => NewMapObject)
-  typeToFieldMapping: UntaggedObject = UMap(Vector.empty),
+  typeToFieldMapping: UntaggedObject = UMap(),
 
   // TODO: this also needs to be refactored and versioned
   // TODO - belongs in the type system
@@ -727,13 +727,13 @@ object Environment {
     eCommand("ReqMap", buildMapCreator(MapConfig(RequireCompleteness, SimpleFunction))),
     eCommand("Table", buildMapCreator(MapConfig(PartialMap, SimpleFunction))),
     eCommand("PartialMap", buildMapCreator(MapConfig(PartialMap, SimpleFunction))),
-    eCommand("CaseType", typeAsObject(CaseT(UMap(Vector.empty), IdentifierT, BasicMap))),
-    eCommand("StructSeq", typeAsObject(StructT(UMap(Vector.empty), IndexT(UIndex(0))))),
+    eCommand("CaseType", typeAsObject(CaseT(UMap(), IdentifierT, BasicMap))),
+    eCommand("StructSeq", typeAsObject(StructT(UMap(), IndexT(UIndex(0))))),
     eCommand("Subtype", NewMapObject(
-      UMap(Vector(UWildcard("t") -> buildSubtypeT(UMap(Vector.empty), ParamId("t")))),
+      UMap(Vector(UWildcard("t") -> buildSubtypeT(UMap(), ParamId("t")))),
       MapT(TypeTransform(TypeT, TypeT), MapConfig(RequireCompleteness, SimpleFunction))
     )),
-    NewTypeClassCommand("Initializable", UMap(Vector.empty)),
+    NewTypeClassCommand("Initializable", UMap()),
     UpdateTypeclassWithFieldCommand("Initializable", "T", ParamIdT("T"), "init", Vector.empty, false),
     NewTypeClassCommand("AnyType", UMap(Vector(UWildcard("_") -> UIndex(1)))),
     UpdateTypeclassWithFieldCommand(
@@ -755,7 +755,7 @@ object Environment {
       ArrayT(ParamIdT("T"))
     ),
     NewTypeCommand("Object", NewMapO.taggedObjectT),
-    NewTypeClassCommand("Addable", UMap(Vector.empty)),
+    NewTypeClassCommand("Addable", UMap()),
     UpdateTypeclassWithFieldCommand("Addable", "T", simpleAutomap(ParamIdT("T")), "+", Vector.empty, false),
     UpdateTypeclassWithTypeCommand(
       "Addable",
@@ -767,7 +767,7 @@ object Environment {
       DoubleT,
       Vector("+" -> functionFromPairF(UPlus))
     ),
-    NewTypeClassCommand("Multipliable", UMap(Vector.empty)),
+    NewTypeClassCommand("Multipliable", UMap()),
     UpdateTypeclassWithFieldCommand("Multipliable", "T", simpleAutomap(ParamIdT("T")), "*", Vector.empty, false),
     UpdateTypeclassWithTypeCommand(
       "Multipliable",
@@ -779,7 +779,7 @@ object Environment {
       DoubleT,
       Vector("*" -> functionFromPairF(UTimes))
     ),
-    NewTypeClassCommand("Divideable", UMap(Vector.empty)),
+    NewTypeClassCommand("Divideable", UMap()),
     UpdateTypeclassWithFieldCommand("Divideable", "T", simpleAutomap(ParamIdT("T")), "/", Vector.empty, false),
     UpdateTypeclassWithTypeCommand(
       "Divideable",
