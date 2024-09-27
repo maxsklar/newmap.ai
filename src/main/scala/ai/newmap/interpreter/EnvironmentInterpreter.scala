@@ -5,6 +5,7 @@ import ai.newmap.model._
 import ai.newmap.util.{Outcome, Success, Failure}
 
 import java.io.File
+
 import scala.io.Source
 
 class EnvironmentInterpreter(
@@ -147,13 +148,28 @@ class EnvironmentInterpreter(
     }
   }
 
-  def loadFile(filename: String): String = {
-    val baseDir = "src/main/newmap/"
+  def checkFilePath(fileInput: String): String = {
+    val filePath1 = "src/main/newmap/TestScripts"
+    val filePath2 = "src/test/newTests/"
 
-    val fileName = baseDir + filename
+    val file1 = new File(filePath1, fileInput)
+    if (file1.exists) {
+      return file1.getAbsolutePath
+    }
+
+    val file2 = new File(filePath2, fileInput)
+    if (file2.exists) {
+      return file2.getAbsolutePath
+    }
+
+    return fileInput
+  }
+
+  def loadFile(filename: String): String = {
+
+    val fileName = checkFilePath(filename)
 
     val linesIt = Source.fromFile(fileName).getLines
-
     loadFileFromIterator(linesIt, env) match {
       case Success(newEnv) => {
         env = newEnv
